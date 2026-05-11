@@ -7,10 +7,10 @@ CREATE RULE no_update_ledger AS
     ON UPDATE TO wallet_schema.ledger_entries DO INSTEAD NOTHING;
 
 CREATE RULE no_delete_ledger AS
-    ON DELETE FROM wallet_schema.ledger_entries DO INSTEAD NOTHING;
+    ON DELETE TO wallet_schema.ledger_entries DO INSTEAD NOTHING;
 
 CREATE RULE no_update_transactions AS
     ON UPDATE TO wallet_schema.transactions DO INSTEAD NOTHING;
 
 CREATE RULE no_delete_transactions AS
-    ON DELETE FROM wallet_schema.transactions DO INSTEAD NOTHING;
+    ON DELETE TO wallet_schema.transactions DO INSTEAD NOTHING;
