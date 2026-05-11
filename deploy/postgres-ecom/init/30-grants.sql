@@ -77,6 +77,20 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA sizefinder_schema
 ALTER DEFAULT PRIVILEGES IN SCHEMA sizefinder_schema
   GRANT USAGE, SELECT ON SEQUENCES TO sizefinder_user;
 
+-- antifraud (v7 — core-svc)
+GRANT USAGE ON SCHEMA antifraud_schema TO antifraud_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA antifraud_schema
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO antifraud_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA antifraud_schema
+  GRANT USAGE, SELECT ON SEQUENCES TO antifraud_user;
+
+-- einvoice (v7 — jobs-svc)
+GRANT USAGE ON SCHEMA einvoice_schema TO einvoice_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA einvoice_schema
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO einvoice_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA einvoice_schema
+  GRANT USAGE, SELECT ON SEQUENCES TO einvoice_user;
+
 -- ref_schema: read-only SELECT for every module role
 GRANT USAGE ON SCHEMA ref_schema TO PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA ref_schema

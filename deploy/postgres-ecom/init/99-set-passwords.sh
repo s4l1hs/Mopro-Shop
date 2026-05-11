@@ -36,5 +36,7 @@ alter_password notification_user NOTIFICATION_DB_PASSWORD
 alter_password support_user      SUPPORT_DB_PASSWORD
 alter_password media_user        MEDIA_DB_PASSWORD
 alter_password sizefinder_user   SIZEFINDER_DB_PASSWORD
+alter_password antifraud_user    ANTIFRAUD_DB_PASSWORD
+alter_password einvoice_user     EINVOICE_DB_PASSWORD
 
 echo "[99-set-passwords] done"
