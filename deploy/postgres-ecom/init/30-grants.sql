@@ -91,6 +91,37 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA einvoice_schema
 ALTER DEFAULT PRIVILEGES IN SCHEMA einvoice_schema
   GRANT USAGE, SELECT ON SEQUENCES TO einvoice_user;
 
+-- Cross-module: modules that publish events via order_schema.outbox.
+-- cart, payment, seller, identity, catalog all write their domain events to
+-- order_schema.outbox (owned by order_user). They need USAGE on the schema
+-- plus INSERT + SELECT on the outbox table only.
+-- ALTER DEFAULT PRIVILEGES covers tables created in the future (belt-and-suspenders).
+GRANT USAGE ON SCHEMA order_schema TO cart_user, payment_user, seller_user, identity_user, catalog_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA order_schema
+  GRANT INSERT, SELECT ON TABLES TO cart_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA order_schema
+  GRANT INSERT, SELECT ON TABLES TO payment_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA order_schema
+  GRANT INSERT, SELECT ON TABLES TO seller_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA order_schema
+  GRANT INSERT, SELECT ON TABLES TO identity_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA order_schema
+  GRANT INSERT, SELECT ON TABLES TO catalog_user;
+
+-- Retroactive belt-and-suspenders: explicit grant on already-created tables.
+DO $$
+DECLARE
+  tbl RECORD;
+BEGIN
+  FOR tbl IN SELECT tablename FROM pg_tables WHERE schemaname = 'order_schema' LOOP
+    EXECUTE format(
+      'GRANT INSERT, SELECT ON order_schema.%I TO cart_user, payment_user, seller_user, identity_user, catalog_user',
+      tbl.tablename
+    );
+  END LOOP;
+END;
+$$;
+
 -- ref_schema: read-only SELECT for every module role
 GRANT USAGE ON SCHEMA ref_schema TO PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA ref_schema
