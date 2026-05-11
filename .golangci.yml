@@ -1,0 +1,93 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - depguard
+    - gocyclo
+    - errcheck
+    - revive
+    - gosec
+    - gocritic
+
+  settings:
+    # depguard rules from DEVELOPMENT.md § 9 verbatim
+    depguard:
+      rules:
+        core-modules-no-fin:
+          list-mode: lax
+          files:
+            - "internal/identity/**"
+            - "internal/catalog/**"
+            - "internal/cart/**"
+            - "internal/order/**"
+            - "internal/payment/**"
+            - "internal/seller/**"
+            - "internal/search/**"
+          deny:
+            - pkg: github.com/mopro/platform/internal/wallet
+              desc: "core-svc modules MUST NOT import fin-svc internals; use eventbus"
+            - pkg: github.com/mopro/platform/internal/commission
+              desc: "core-svc modules MUST NOT import fin-svc internals; use eventbus"
+            - pkg: github.com/mopro/platform/internal/treasury
+              desc: "core-svc modules MUST NOT import fin-svc internals; use eventbus"
+            - pkg: github.com/mopro/platform/internal/cashback
+              desc: "core-svc modules MUST NOT import fin-svc internals; use eventbus"
+            - pkg: github.com/mopro/platform/internal/sellerpayout
+              desc: "core-svc modules MUST NOT import fin-svc internals; use eventbus"
+        fin-no-ecom:
+          files:
+            - "internal/wallet/**"
+            - "internal/commission/**"
+            - "internal/treasury/**"
+            - "internal/cashback/**"
+            - "internal/sellerpayout/**"
+          deny:
+            - pkg: github.com/mopro/platform/internal/order
+              desc: "fin-svc MUST NOT import core-svc internals"
+            - pkg: github.com/mopro/platform/internal/payment
+              desc: "fin-svc MUST NOT import core-svc internals"
+        cashback-uses-wallet-via-public-api:
+          files:
+            - "internal/cashback/**"
+            - "internal/sellerpayout/**"
+          deny:
+            - pkg: github.com/mopro/platform/internal/wallet/repository
+              desc: "Use wallet public Service interface, not internal repository"
+        modules-only-via-api:
+          files:
+            - "internal/order/**"
+          deny:
+            - pkg: github.com/mopro/platform/internal/catalog/repository
+              desc: "Use internal/catalog public interface"
+            - pkg: github.com/mopro/platform/internal/catalog/service
+              desc: "Use internal/catalog public interface"
+
+    gocyclo:
+      min-complexity: 15
+
+    errcheck:
+      check-type-assertions: true
+      exclude-functions:
+        - fmt.Printf
+        - fmt.Println
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Fprint
+        - (io.Closer).Close
+
+    revive:
+      min-confidence: 0
+      rules:
+        - name: exported
+          disabled: true
+        - name: unused-parameter
+          disabled: true
+
+    gosec:
+      excludes:
+        - G104  # unhandled errors: handled explicitly in skeleton stubs
+        - G706  # log injection: MARKET/SVC_NAME are operator env vars, not user input

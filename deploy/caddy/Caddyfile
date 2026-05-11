@@ -1,0 +1,34 @@
+{
+    email {$CADDY_EMAIL}
+    # CloudFlare-only: reject requests that don't come via CloudFlare
+    # TODO(mopro:placeholder): add trusted_proxies cloudflare once CF IP range is confirmed
+}
+
+api.moproshop.com {
+    # Wallet, cashback, and payout reads are served by fin-svc
+    @fin path /api/v1/wallet* /api/v1/cashback* /api/v1/payout* /api/v1/admin*
+    reverse_proxy @fin fin-svc:8080
+
+    # All other API traffic goes to core-svc
+    reverse_proxy core-svc:8080
+
+    # Rate limiting
+    rate_limit {
+        zone dynamic {
+            key {remote_host}
+            events 200
+            window 1m
+        }
+    }
+}
+
+seller.moproshop.com {
+    reverse_proxy core-svc:8080
+}
+
+# Local dev: plaintext HTTP on localhost
+localhost, :80 {
+    @fin path /api/v1/wallet* /api/v1/cashback* /api/v1/payout* /api/v1/admin*
+    reverse_proxy @fin fin-svc:8080
+    reverse_proxy core-svc:8080
+}

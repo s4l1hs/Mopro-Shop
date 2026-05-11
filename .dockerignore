@@ -1,0 +1,13 @@
+.git/
+.github/
+*.md
+docs/
+deploy/
+test/
+testdata/
+**/*.test
+coverage.out
+node_modules/
+.local/
+.env*
+!.env.example
