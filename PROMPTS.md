@@ -1,41 +1,42 @@
-# PROMPTS.md — Master Prompt Library
+# PROMPTS.md — Master Prompt Library v7
 
-This file is the **official anthology of commands** an operator gives to Claude Code (or any autonomous coding agent) to build Mopro Shop from an empty repository to a launched production system. Every prompt is copy-paste-ready, restrictive, and faithful to PRD v3.2.
+This file is the official anthology of commands an operator gives to Claude Code (or any autonomous coding agent) to build Mopro Shop from an empty repository to a launched production system. Every prompt is copy-paste-ready, restrictive, and faithful to PRD v6.0.
 
 ## How to Use
 
-1. Pick the phase you are in (0 through 6).
+1. Pick the phase you are in (0 through 7).
 2. Find the matching prompt by goal.
 3. Copy the **Copy-Paste Prompt** block verbatim and feed it to the agent.
 4. After the agent completes, run the **Verification / Done Criteria** checklist. Do not advance to the next prompt until every item passes.
 
 ## Conventions
 
-- Every prompt opens with `READ FIRST: CLAUDE.md, ARCHITECTURE.md, DATA_DICTIONARY.md, LEDGER_GUIDE.md, INFRASTRUCTURE.md.` This forces the agent to load context.
+- Every prompt opens with `READ FIRST: CLAUDE.md, ARCHITECTURE.md, DATA_DICTIONARY.md, LEDGER_GUIDE.md, INFRASTRUCTURE.md.`
 - `ghcr.io/mopro/<binary>` is the canonical image namespace.
-- Module path is `github.com/mopro/platform`.
-- All shell snippets are POSIX `bash`; the host is Ubuntu 22.04 / Debian 12.
-- All Go code is `go 1.22+`; all Postgres SQL targets PostgreSQL 16; all Redis is 7.x.
-- The single VDS is 6 vCPU / 24 GB RAM / 120 GB disk.
+- Module path: `github.com/mopro/platform`.
+- Backend: Go 1.22+. Mobile: Flutter 3.x. DB: PostgreSQL 16. Cache: Redis 7.
+- Single VDS: 6 vCPU / 24 GB RAM / 120 GB disk.
+- Launch market: `MARKET=TR`, `DEFAULT_CURRENCY=TRY`, `DEFAULT_LOCALE=tr-TR`.
+- **Cashback v6 LOCKED model (PERPETUAL):** monthly = (price × commission_pct_bps × ref_rate_bps / 10000 / 10000) / 12, perpetual; ref_rate_bps frozen at 5000 (%50) per plan.
+- **Seller payout v5 LOCKED model:** unlock = delivered_at + 3 business days (read TR business calendar).
+- Both plan and seller payout are FROZEN at creation; only `status` mutable.
 
 ---
 
 # PHASE 0 — Infrastructure & Skeleton
 
-The goal of Phase 0 is to produce an empty but **buildable, runnable, tested** monorepo with the three binaries, the two Postgres clusters with all rules and triggers in place, the Redis Streams event bus, and the Docker Compose stack.
-
 ## Prompt 0.1 — Initialize Monorepo Skeleton
 
-**Phase & Goal:** Phase 0. Create the repository directory layout, Go modules, linter rules, Makefile, and base configuration so that `make verify` runs on an empty project.
+**Phase & Goal:** Phase 0. Create repo layout, Go modules, linter rules, Makefile, base config so `make verify` runs on an empty project.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
 READ FIRST: CLAUDE.md, ARCHITECTURE.md, DATA_DICTIONARY.md, INFRASTRUCTURE.md, DEVELOPMENT.md.
 
 Create the initial monorepo skeleton for Mopro Shop. Do not write business logic; only create the structure, config, and stubs that compile.
 
-CREATE THESE PATHS (exact list — do not add or remove):
+CREATE THESE PATHS (exact list):
 
 /cmd/core-svc/main.go
 /cmd/fin-svc/main.go
@@ -53,6 +54,8 @@ CREATE THESE PATHS (exact list — do not add or remove):
 /internal/wallet/
 /internal/commission/
 /internal/treasury/
+/internal/cashback/         ← cashback-engine module (fin-svc)
+/internal/sellerpayout/     ← NEW v5: seller-payout-engine module (fin-svc)
 /internal/notification/
 /internal/support/
 /internal/media/
@@ -64,15 +67,18 @@ CREATE THESE PATHS (exact list — do not add or remove):
 /pkg/logger/
 /pkg/tracing/
 /pkg/crypto/
+/pkg/currency/              ← ISO codes, Code type, ref reader
+/pkg/i18n/                  ← translation key resolver
 /pkg/httpx/
 /pkg/dbx/
-/pkg/timex/
+/pkg/timex/                 ← MUST include AddBusinessDays(date, n, calendar) helper
 
 /migrations/ecom/
+/migrations/ecom/seed/
 /migrations/ledger/
 
 /build/Dockerfile
-/build/Dockerfile.dockerignore
+/.dockerignore
 
 /deploy/docker-compose.yml
 /deploy/caddy/Caddyfile
@@ -91,61 +97,59 @@ CREATE THESE PATHS (exact list — do not add or remove):
 /scripts/ledger-reconcile.sh
 /scripts/restore-drill.sh
 /scripts/backup.sh
+/scripts/cashback-monthly-cron.sh
+/scripts/seller-payout-daily-cron.sh    ← NEW v5
 
 /.golangci.yml
 /.gitignore
-/.dockerignore
 /.editorconfig
 /Makefile
 /go.mod
-/go.sum
 /.env.example
 /README.md
 
-For each /internal/<name>/ directory, create five empty Go files: api.go (package <name>), service.go, repository.go, domain.go, errors.go. The api.go must declare:
+For each /internal/<name>/ directory, create five empty Go files:
+  api.go (package <name>; declares 'type Service interface{}' and 'type Repository interface{}')
+  service.go
+  repository.go
+  domain.go
+  errors.go
 
-  package <name>
-  type Service interface{}
-  type Repository interface{}
+For each /cmd/<binary>/main.go: minimal `func main(){}` that loads env via os.Getenv("SVC_NAME"), prints "starting <binary> market=$MARKET", exits 0.
 
-For each /cmd/<binary>/main.go, create a minimal `func main(){}` that loads env via os.Getenv("SVC_NAME"), prints "starting <binary>", and exits 0.
+Module path: github.com/mopro/platform
 
-Use module path: github.com/mopro/platform
-
-go.mod must require:
+go.mod requirements:
   - go 1.22
   - github.com/jackc/pgx/v5 (latest)
   - github.com/redis/go-redis/v9 (latest)
   - github.com/golang-migrate/migrate/v4 (latest)
-  - github.com/leanovate/gopter (latest, for property tests)
+  - github.com/leanovate/gopter (latest)
   - go.opentelemetry.io/otel (latest)
   - go.opentelemetry.io/otel/sdk (latest)
 
-.golangci.yml MUST configure depguard with the rules from DEVELOPMENT.md § 9 verbatim:
-  - core-modules-no-fin: identity/catalog/cart/order/payment/seller/search cannot import internal/wallet, internal/commission, internal/treasury.
-  - fin-no-ecom: wallet/commission/treasury cannot import internal/order, internal/payment.
-  - modules-only-via-api: internal/order/** cannot import internal/catalog/repository or internal/catalog/service.
+.golangci.yml: depguard rules from DEVELOPMENT.md § 9 verbatim (includes new cashback + sellerpayout rules).
 
-Makefile MUST define targets: verify, fmt, vet, test, lint, boundaries, build, build-core, build-fin, build-jobs, build-migrate, build-mopro, run-local, down-local. The verify target chains fmt vet test lint boundaries.
+Makefile targets: verify, fmt, vet, test, lint, boundaries, property-cashback, property-payout, property-ledger, build-core, build-fin, build-jobs, build-migrate, build-mopro, run-local, down-local. The verify target chains all check sub-targets.
 
-scripts/check-module-boundaries.sh MUST contain the script body from DEVELOPMENT.md § 10 verbatim.
+scripts/check-module-boundaries.sh: body from DEVELOPMENT.md § 10 verbatim (includes cashback plan UPDATE block, seller_payouts core fields immutability check, and PaybackMonths=24 enforcement).
 
-scripts/install-hooks.sh installs a pre-push hook that runs `make verify` and aborts the push on failure.
+scripts/install-hooks.sh: installs pre-push hook running `make verify`.
 
-.gitignore MUST include: .env*, !.env.example, /data/, /tmp/, /vendor/, *.test, coverage.out, .DS_Store, .idea/, .vscode/.
+.gitignore: .env*, !.env.example, /data/, /tmp/, /vendor/, *.test, coverage.out, .DS_Store, .idea/, .vscode/.
 
-.dockerignore MUST exclude: .git/, .github/, *.md, docs/, deploy/, test/, testdata/, **/*.test, coverage.out, node_modules/, .local/.
+.dockerignore: .git/, .github/, *.md, docs/, deploy/, test/, testdata/, **/*.test, coverage.out, node_modules/, .local/.
 
-.env.example MUST contain every variable from DEVELOPMENT.md § 3, with placeholder values like "REPLACE_ME". Never commit real secrets.
+.env.example: every variable from DEVELOPMENT.md § 3 with placeholder values like "REPLACE_ME". Never commit real secrets.
 
 After creating the skeleton:
   1. Run `go mod tidy`.
-  2. Run `make verify`. It MUST pass on the empty skeleton (no failing test, no lint error).
-  3. Run `go build ./...`. It MUST succeed.
+  2. Run `make verify`. MUST pass on empty skeleton.
+  3. Run `go build ./...`. MUST succeed.
 
-DO NOT add business logic. DO NOT introduce new dependencies beyond the list above. DO NOT add HTTP frameworks (chi/gin) yet — Phase 1 will choose. DO NOT add any code that connects to a real database.
+DO NOT add business logic. DO NOT introduce new dependencies. DO NOT add HTTP frameworks yet (Phase 1 chooses).
 
-Report at the end: list of files created, output of `make verify`, output of `go build ./...`.
+Report at end: list of files created, output of `make verify`, output of `go build ./...`.
 ```
 
 **Verification / Done Criteria:**
@@ -153,22 +157,22 @@ Report at the end: list of files created, output of `make verify`, output of `go
 - [ ] `go mod tidy` produces no errors.
 - [ ] `go build ./...` succeeds.
 - [ ] `make verify` exits 0 with all sub-targets green.
-- [ ] `golangci-lint run` exits 0 (no warnings on empty modules).
-- [ ] `git status` shows only intended files (no `.env`, `data/`, IDE folders).
+- [ ] `golangci-lint run` exits 0.
+- [ ] `git status` shows only intended files.
 - [ ] `scripts/check-module-boundaries.sh` exits 0.
 
 ---
 
-## Prompt 0.2 — Create postgres-ecom Init Scripts (All Module Schemas)
+## Prompt 0.2 — Create postgres-ecom Init Scripts (with v5 ref_schema seeds)
 
-**Phase & Goal:** Phase 0. Provision postgres-ecom with one schema per module, one role per module, and locked-down permissions. No tables yet — those are added in their phases.
+**Phase & Goal:** Phase 0. Provision postgres-ecom with module schemas + ref_schema (currencies, countries, locales, categories, **commission_rules** with 42 categories, **business_calendars** with TR holidays).
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: DATA_DICTIONARY.md (especially § 2.1 and § 2.3), CLAUDE.md § 5.
+READ FIRST: DATA_DICTIONARY.md (especially § 2 and § 5), CLAUDE.md § 5.
 
-Create Postgres init scripts for postgres-ecom. The scripts run automatically when the container starts on an empty volume (Docker Postgres convention: /docker-entrypoint-initdb.d/*.sql executed in lexical order).
+Create Postgres init scripts for postgres-ecom. Run automatically when container starts on empty volume.
 
 PATHS TO CREATE:
 
@@ -176,2504 +180,2104 @@ PATHS TO CREATE:
 /deploy/postgres-ecom/init/10-roles.sql
 /deploy/postgres-ecom/init/20-schemas.sql
 /deploy/postgres-ecom/init/30-grants.sql
+/deploy/postgres-ecom/init/40-ref-schema.sql        ← currencies, countries, locales, categories, commission_rules, business_calendars
+/deploy/postgres-ecom/init/50-ref-seed.sql          ← seed all 42 commission rules + TR business calendar 2026-2030
+/deploy/postgres-ecom/init/99-set-passwords.sh
 
-CONTENT REQUIREMENTS:
+CONTENT:
 
 00-extensions.sql:
-  - Enable pgcrypto, pg_stat_statements.
+  CREATE EXTENSION IF NOT EXISTS pgcrypto;
+  CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 
 10-roles.sql:
-  - Create one LOGIN ROLE per module:
-    identity_user, catalog_user, cart_user, order_user, payment_user,
-    seller_user, search_user, notification_user, support_user, media_user, sizefinder_user.
-  - Each role's password is read from env via Postgres init: use placeholder bcrypt-style "REPLACE_BY_INIT" — passwords are set after container start by an outer wrapper; do not embed real passwords.
-  - All roles: NOSUPERUSER, NOCREATEDB, NOCREATEROLE, INHERIT, LOGIN.
+  CREATE LOGIN ROLE per module: identity_user, catalog_user, cart_user, order_user,
+    payment_user, seller_user, search_user, notification_user, support_user, media_user, sizefinder_user.
+  All NOSUPERUSER, NOCREATEDB, NOCREATEROLE, INHERIT, LOGIN.
+  Placeholder password 'REPLACE_BY_INIT'; real passwords set by 99-set-passwords.sh from env.
 
 20-schemas.sql:
-  - REVOKE ALL ON SCHEMA public FROM PUBLIC.
-  - For each module, CREATE SCHEMA <module>_schema AUTHORIZATION <module>_user.
-  - Eleven schemas total: identity_schema, catalog_schema, cart_schema, order_schema, payment_schema, seller_schema, search_schema, notification_schema, support_schema, media_schema, sizefinder_schema.
+  REVOKE ALL ON SCHEMA public FROM PUBLIC;
+  CREATE SCHEMA <module>_schema AUTHORIZATION <module>_user; (× 11)
 
 30-grants.sql:
-  - For each <module>_user: GRANT USAGE ON SCHEMA <module>_schema, GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA <module>_schema, GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA <module>_schema, ALTER DEFAULT PRIVILEGES IN SCHEMA <module>_schema GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO <module>_user.
-  - NEVER grant cross-schema permissions. order_user must NOT have permission on catalog_schema.
+  Per module: GRANT USAGE ON SCHEMA <module>_schema; GRANT SELECT/INSERT/UPDATE/DELETE on tables.
+  Plus GRANT SELECT on ALL TABLES IN SCHEMA ref_schema to PUBLIC.
 
-Add a wrapper script /deploy/postgres-ecom/init/99-set-passwords.sh that reads passwords from env vars (IDENTITY_DB_PASSWORD, CATALOG_DB_PASSWORD, …) and runs ALTER USER for each role. Use this format so env-driven secrets never appear in SQL files.
+40-ref-schema.sql:
+  Create ref_schema with tables:
+    - currencies(code TEXT PRIMARY KEY, kind TEXT, minor_unit_scale INT, symbol TEXT, name_en TEXT, active BOOL)
+    - countries(code TEXT PRIMARY KEY, name_en TEXT, default_currency TEXT, default_locale TEXT, default_timezone TEXT)
+    - locales(tag TEXT PRIMARY KEY, name_en TEXT, active BOOL)
+    - categories(id BIGINT PRIMARY KEY, slug TEXT UNIQUE, name_tr TEXT, name_en TEXT, parent_id BIGINT, active BOOL)
+    - commission_rules(id BIGSERIAL PRIMARY KEY, market TEXT, category_id BIGINT REFERENCES categories(id),
+        commission_pct_bps INT NOT NULL CHECK (commission_pct_bps BETWEEN 0 AND 10000),
+        kdv_pct_bps INT NOT NULL,
+        effective_from TIMESTAMPTZ DEFAULT now(), effective_to TIMESTAMPTZ, active BOOL DEFAULT TRUE,
+        UNIQUE(market, category_id, effective_from))
+    - business_calendars(market TEXT, date DATE, reason TEXT, PRIMARY KEY(market, date))
 
-Update /deploy/docker-compose.yml later (Prompt 0.5) to mount these init scripts into postgres-ecom under /docker-entrypoint-initdb.d/.
+50-ref-seed.sql:
+  Seed exact rows from DATA_DICTIONARY.md § 2.5 verbatim:
+    - 8 currency rows (TRY/TRY_COIN active; others inactive)
+    - 4 country rows (TR active; others ready)
+    - 4 locale rows (tr-TR active; others ready)
+    - 42 category rows with their slugs + Turkish + English names
+    - 42 commission_rules rows for market='TR' with the exact bps values from PRD v5 Section 2.2.2
+      (Atkı/Bere=2000, Saat=2000, ..., Akıllı Telefon=700, ..., Çiçek=2000)
+    - business_calendars: all official Turkish public holidays for 2026-2030 (Yılbaşı, Ulusal Egemenlik,
+      Emek Günü, Atatürk'ü Anma, Demokrasi Günü, Zafer Bayramı, Cumhuriyet Bayramı, plus floating
+      Ramazan/Kurban dates per Diyanet).
 
-Add a /deploy/postgres-ecom/postgresql.conf with parameters from INFRASTRUCTURE.md § 16.2 (shared_buffers=2GB, effective_cache_size=6GB, work_mem=16MB, maintenance_work_mem=256MB, max_connections=100, wal_level=replica, max_wal_size=2GB, checkpoint_completion_target=0.9, log_min_duration_statement=200, autovacuum=on, autovacuum_max_workers=3, wal_keep_size=1GB, random_page_cost=1.1, effective_io_concurrency=200).
+99-set-passwords.sh:
+  Reads ECOM_DB_PASSWORD, IDENTITY_DB_PASSWORD, etc. from env and runs ALTER USER per role.
 
-DO NOT add any tables. Tables are owned by their module migrations (Phase 1+).
+After applying:
+  Verify with:
+    SELECT count(*) FROM ref_schema.commission_rules WHERE market='TR' AND active=TRUE;  -- expect 42
+    SELECT count(*) FROM ref_schema.business_calendars WHERE market='TR';  -- expect ~50
 
-Provide a one-time bootstrap doc at /deploy/postgres-ecom/README.md explaining the init order and how to rotate passwords.
-
-Verify by:
-  1. `docker compose up -d postgres-ecom` (after Prompt 0.5 wires it).
-  2. `docker exec postgres-ecom psql -U ecom_admin -d mopro_ecom -c "\dn"` — expect all eleven schemas.
-  3. `docker exec postgres-ecom psql -U ecom_admin -d mopro_ecom -c "\du"` — expect all module roles.
+Report: SQL snippets, init log output, verification query results.
 ```
 
 **Verification / Done Criteria:**
-- [ ] All four init files exist with the prescribed content.
-- [ ] Eleven schemas appear in `\dn` output.
-- [ ] Eleven module roles appear in `\du`.
-- [ ] No role has BYPASSRLS, CREATEDB, CREATEROLE, or SUPERUSER.
-- [ ] Public schema permissions revoked from PUBLIC.
-- [ ] postgresql.conf parameters match INFRASTRUCTURE.md exactly.
-- [ ] Init scripts produce zero ERROR or WARNING in container logs on first run.
+- [ ] `docker exec postgres-ecom psql -U ecom_admin -d mopro_ecom -c "\dn"` lists all 11 module schemas + ref_schema.
+- [ ] `SELECT count(*) FROM ref_schema.commission_rules WHERE market='TR'` returns 42.
+- [ ] `SELECT commission_pct_bps FROM ref_schema.commission_rules WHERE category_id=30` (Akıllı Telefon) returns 700.
+- [ ] `SELECT count(*) FROM ref_schema.business_calendars WHERE market='TR'` returns 50+.
+- [ ] No errors in init logs.
+- [ ] `make verify` still passes.
 
 ---
 
-## Prompt 0.3 — Create postgres-ledger with D=C Trigger
+## Prompt 0.3 — Create postgres-ledger with Multi-Currency D=C Trigger + Cashback + Seller Payout Schemas
 
-**Phase & Goal:** Phase 0. Provision postgres-ledger with the wallet, commission, and treasury schemas, the append-only RULES, the DEFERRABLE INITIALLY DEFERRED double-entry trigger, and the outbox table. This is the financial heart of the system; getting it wrong here is catastrophic.
+**Phase & Goal:** Phase 0. Provision postgres-ledger with wallet/commission/treasury/cashback schemas. Install the multi-currency-aware D=C trigger. Add the cashback plan immutability trigger AND the seller payout immutability trigger.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: LEDGER_GUIDE.md (entire file), CLAUDE.md § 4 and § 5, DATA_DICTIONARY.md § 2.2 and § 5.5.
+READ FIRST: DATA_DICTIONARY.md § 8, § 9, LEDGER_GUIDE.md § 3, § 4, § 7, § 8.
 
-Create Postgres init scripts for postgres-ledger. This is a SEPARATE CLUSTER from postgres-ecom; it lives on the mopro-fin-net Docker network and is reachable ONLY by fin-svc.
+Create Postgres init scripts for postgres-ledger.
 
 PATHS TO CREATE:
 
 /deploy/postgres-ledger/init/00-extensions.sql
 /deploy/postgres-ledger/init/10-roles.sql
 /deploy/postgres-ledger/init/20-schemas.sql
-/deploy/postgres-ledger/init/30-wallet-schema.sql
-/deploy/postgres-ledger/init/31-wallet-trigger.sql
-/deploy/postgres-ledger/init/32-wallet-rules.sql
-/deploy/postgres-ledger/init/33-wallet-outbox.sql
-/deploy/postgres-ledger/init/34-wallet-alerts.sql
-/deploy/postgres-ledger/init/40-commission-schema.sql
-/deploy/postgres-ledger/init/50-treasury-schema.sql
-/deploy/postgres-ledger/init/60-grants.sql
+/deploy/postgres-ledger/init/30-grants.sql
+/deploy/postgres-ledger/init/40-wallet-schema.sql
+/deploy/postgres-ledger/init/41-trigger-d-equals-c.sql       ← multi-currency aware
+/deploy/postgres-ledger/init/42-rules-no-update-delete.sql
+/deploy/postgres-ledger/init/50-cashback-schema.sql          ← v5: total_months CHECK = 24
+/deploy/postgres-ledger/init/51-cashback-immutable-trigger.sql
+/deploy/postgres-ledger/init/60-seller-payout-schema.sql     ← NEW v5
+/deploy/postgres-ledger/init/61-seller-payout-immutable-trigger.sql  ← NEW v5
+/deploy/postgres-ledger/init/70-chart-of-accounts-seed.sql   ← v5: includes retained_commission, seller_payable, retained_commission
 /deploy/postgres-ledger/init/99-set-passwords.sh
 
-CONTENT REQUIREMENTS:
+00-extensions.sql, 10-roles.sql (wallet_user, commission_user, treasury_user, cashback_user, sellerpayout_user),
+20-schemas.sql, 30-grants.sql: same pattern as postgres-ecom.
 
-00-extensions.sql:
-  - CREATE EXTENSION IF NOT EXISTS pgcrypto;
-  - CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+40-wallet-schema.sql:
+  CREATE TABLE wallet_schema.accounts (id, type, owner_type, owner_id, currency NOT NULL, status, created_at)
+  CREATE TABLE wallet_schema.transactions (id, type, reference, fx_pair_id, idempotency_key UNIQUE, status, created_at)
+  CREATE TABLE wallet_schema.ledger_entries (id, transaction_id FK, account_id FK, direction CHAR(1) CHECK IN ('D','C'), amount_minor BIGINT > 0, created_at)
+  CREATE TABLE wallet_schema.outbox (id, aggregate, event_type, payload JSONB, idempotency_key UNIQUE, trace_id, span_id, market, currency, published_at, created_at)
+  CREATE MATERIALIZED VIEW wallet_schema.balances ...
 
-10-roles.sql:
-  - LOGIN ROLE: wallet_user, commission_user, treasury_user.
-  - All NOSUPERUSER, NOCREATEDB, NOCREATEROLE, LOGIN.
-
-20-schemas.sql:
-  - REVOKE ALL ON SCHEMA public FROM PUBLIC.
-  - CREATE SCHEMA wallet_schema AUTHORIZATION wallet_user.
-  - CREATE SCHEMA commission_schema AUTHORIZATION commission_user.
-  - CREATE SCHEMA treasury_schema AUTHORIZATION treasury_user.
-
-30-wallet-schema.sql (verbatim from LEDGER_GUIDE.md § 3):
-  CREATE TABLE wallet_schema.accounts (
-      id          BIGSERIAL PRIMARY KEY,
-      type        TEXT NOT NULL,
-      owner_type  TEXT,
-      owner_id    BIGINT,
-      currency    TEXT NOT NULL DEFAULT 'TRY_COIN',
-      status      TEXT NOT NULL DEFAULT 'active',
-      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-  );
-
-  CREATE TABLE wallet_schema.transactions (
-      id              BIGSERIAL PRIMARY KEY,
-      type            TEXT NOT NULL,
-      reference       TEXT,
-      idempotency_key TEXT NOT NULL UNIQUE,
-      status          TEXT NOT NULL DEFAULT 'posted',
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-  );
-
-  CREATE TABLE wallet_schema.ledger_entries (
-      id              BIGSERIAL PRIMARY KEY,
-      transaction_id  BIGINT NOT NULL REFERENCES wallet_schema.transactions(id),
-      account_id      BIGINT NOT NULL REFERENCES wallet_schema.accounts(id),
-      direction       CHAR(1) NOT NULL CHECK (direction IN ('D','C')),
-      amount_minor    BIGINT NOT NULL CHECK (amount_minor > 0),
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-  );
-
-  CREATE INDEX ledger_entries_account_idx ON wallet_schema.ledger_entries(account_id);
-  CREATE INDEX ledger_entries_txn_idx     ON wallet_schema.ledger_entries(transaction_id);
-
-31-wallet-trigger.sql (verbatim from LEDGER_GUIDE.md § 4):
-  CREATE OR REPLACE FUNCTION wallet_schema.enforce_double_entry()
-  RETURNS TRIGGER AS $$
-  DECLARE
-      debit_total  BIGINT;
-      credit_total BIGINT;
-  BEGIN
-      SELECT
-          COALESCE(SUM(amount_minor) FILTER (WHERE direction='D'), 0),
-          COALESCE(SUM(amount_minor) FILTER (WHERE direction='C'), 0)
-      INTO debit_total, credit_total
-      FROM wallet_schema.ledger_entries
-      WHERE transaction_id = NEW.transaction_id;
-
-      IF debit_total != credit_total THEN
-          RAISE EXCEPTION
-              'Double-entry violation: txn=% debit=% credit=%',
-              NEW.transaction_id, debit_total, credit_total
-              USING ERRCODE = 'check_violation';
-      END IF;
-
-      RETURN NEW;
-  END;
-  $$ LANGUAGE plpgsql;
-
+41-trigger-d-equals-c.sql:
+  Function wallet_schema.enforce_double_entry() per LEDGER_GUIDE.md § 4 verbatim:
+    - First check: array_agg(DISTINCT a.currency) for the txn → must be size 1.
+    - Second check: SUM(D) == SUM(C) within the txn.
   CREATE CONSTRAINT TRIGGER ledger_balance_check
-  AFTER INSERT ON wallet_schema.ledger_entries
-  DEFERRABLE INITIALLY DEFERRED
-  FOR EACH ROW
-  EXECUTE FUNCTION wallet_schema.enforce_double_entry();
+    AFTER INSERT ON wallet_schema.ledger_entries
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE FUNCTION wallet_schema.enforce_double_entry();
 
-32-wallet-rules.sql:
-  CREATE RULE no_update_ledger AS
-      ON UPDATE TO wallet_schema.ledger_entries DO INSTEAD NOTHING;
-  CREATE RULE no_delete_ledger AS
-      ON DELETE FROM wallet_schema.ledger_entries DO INSTEAD NOTHING;
-  CREATE RULE no_update_transactions AS
-      ON UPDATE TO wallet_schema.transactions DO INSTEAD NOTHING;
-  CREATE RULE no_delete_transactions AS
-      ON DELETE FROM wallet_schema.transactions DO INSTEAD NOTHING;
+42-rules-no-update-delete.sql:
+  CREATE RULE no_update_ledger ... DO INSTEAD NOTHING (× 4: ledger_entries × {UPDATE,DELETE}, transactions × {UPDATE,DELETE}).
 
-33-wallet-outbox.sql:
-  CREATE TABLE wallet_schema.outbox (
-      id              BIGSERIAL PRIMARY KEY,
-      aggregate       TEXT NOT NULL,
-      event_type      TEXT NOT NULL,
-      payload         JSONB NOT NULL,
-      idempotency_key TEXT NOT NULL UNIQUE,
-      trace_id        TEXT,
-      span_id         TEXT,
-      published_at    TIMESTAMPTZ,
-      created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-  );
-  CREATE INDEX outbox_unpublished_idx
-      ON wallet_schema.outbox(created_at) WHERE published_at IS NULL;
+50-cashback-schema.sql (v6 PERPETUAL — no rules table, no total fields):
+  CREATE TABLE cashback_schema.plans:
+    - id BIGSERIAL PRIMARY KEY
+    - order_id BIGINT NOT NULL
+    - user_id BIGINT NOT NULL
+    - monthly_amount_minor BIGINT NOT NULL CHECK > 0                        ← v6: aylık coin (sabit, dondurulmuş)
+    - currency TEXT NOT NULL DEFAULT 'TRY_COIN'
+    - reference_interest_rate_bps INTEGER NOT NULL DEFAULT 5000             ← v6: %50 = 5000 bps (snapshot)
+    - start_date DATE NOT NULL                                              ← = delivered + 3 BD
+    - status TEXT NOT NULL DEFAULT 'active' CHECK IN ('active','cancelled','suspended')
+    - delivered_at TIMESTAMPTZ NOT NULL
+    - market TEXT NOT NULL DEFAULT 'TR'
+    - commission_snapshot JSONB NOT NULL                                    ← per-item commission breakdown (audit)
+    - idempotency_key TEXT NOT NULL UNIQUE
+    - created_at, updated_at TIMESTAMPTZ
+    -- v6 NOTES: NO total_amount_minor, NO total_months, NO end_date — plan is PERPETUAL.
 
-34-wallet-alerts.sql:
-  CREATE TABLE wallet_schema.ledger_alerts (
-      id            BIGSERIAL PRIMARY KEY,
-      severity      TEXT NOT NULL,                 -- 'INFO','WARN','CRITICAL'
-      message       TEXT NOT NULL,
-      detected_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-      acknowledged  BOOLEAN NOT NULL DEFAULT FALSE
-  );
+  CREATE TABLE cashback_schema.plans_history (
+    id BIGSERIAL PK, plan_id FK, field_changed TEXT, old_value TEXT, new_value TEXT,
+    reason TEXT, changed_by TEXT, created_at TIMESTAMPTZ
+  )  -- audit trail for partial-refund monthly_amount changes (only allowed mutation path)
 
-40-commission-schema.sql:
-  -- Phase 2 will add accruals, rules, settlements tables.
-  -- For now, schema exists, owner is commission_user. No tables.
+  CREATE TABLE cashback_schema.payments (id, plan_id FK, period_yyyymm INTEGER CHECK BETWEEN 202600 AND 209912,
+    scheduled_date, paid_date, amount_minor > 0, status, ledger_transaction_id,
+    idempotency_key UNIQUE, attempt_count, last_attempt_at, last_error, created_at)
+    -- v6: no pre-seed; cron INSERTs one row per active plan per month.
+  CREATE UNIQUE INDEX cashback_payments_plan_period_uq ON cashback_schema.payments(plan_id, period_yyyymm);
+  CREATE INDEX cashback_plans_active_due_idx ON cashback_schema.plans(start_date) WHERE status='active';
 
-50-treasury-schema.sql:
-  -- Phase 2 will add float_positions, bank_movements tables.
-  -- For now, schema exists, owner is treasury_user. No tables.
+51-cashback-immutable-trigger.sql:
+  Function cashback_schema.enforce_plan_immutable() per DATA_DICTIONARY.md § 8 verbatim.
+  TRIGGER BEFORE UPDATE ON cashback_schema.plans.
+  Allows monthly_amount_minor change ONLY when accompanied by a plans_history row created in the
+  same transaction (within the last 2 seconds).
 
-60-grants.sql:
-  - Each module role gets only USAGE on its own schema and SELECT/INSERT on its tables.
-  - wallet_user gets SELECT, INSERT on wallet_schema.* (UPDATE/DELETE blocked by RULES even if attempted).
-  - commission_user and treasury_user follow the same pattern in their schemas.
+60-seller-payout-schema.sql (NEW v5):
+  CREATE TABLE commission_schema.seller_payouts:
+    - id BIGSERIAL PRIMARY KEY
+    - order_id BIGINT NOT NULL
+    - seller_id BIGINT NOT NULL
+    - amount_minor BIGINT NOT NULL CHECK > 0
+    - currency TEXT NOT NULL DEFAULT 'TRY'
+    - delivered_at TIMESTAMPTZ NOT NULL
+    - unlock_at DATE NOT NULL                                  ← = delivered + 3 BD
+    - paid_at TIMESTAMPTZ
+    - psp_transfer_id TEXT
+    - status TEXT NOT NULL DEFAULT 'scheduled' CHECK IN ('scheduled','processing','paid','failed','cancelled','reversed')
+    - market TEXT NOT NULL DEFAULT 'TR'
+    - ledger_transaction_id BIGINT
+    - idempotency_key TEXT NOT NULL UNIQUE
+    - attempt_count INTEGER NOT NULL DEFAULT 0
+    - last_attempt_at TIMESTAMPTZ
+    - last_error TEXT
+    - created_at, updated_at TIMESTAMPTZ
+  CREATE INDEX seller_payouts_due_idx ON commission_schema.seller_payouts(unlock_at, status) WHERE status='scheduled';
+  CREATE INDEX seller_payouts_seller_idx ON commission_schema.seller_payouts(seller_id, created_at DESC);
 
-99-set-passwords.sh: same pattern as postgres-ecom; reads WALLET_DB_PASSWORD, COMMISSION_DB_PASSWORD, TREASURY_DB_PASSWORD from env and ALTER USER on each.
+61-seller-payout-immutable-trigger.sql:
+  Function commission_schema.enforce_payout_immutable() per DATA_DICTIONARY.md § 9 verbatim.
+  TRIGGER BEFORE UPDATE ON commission_schema.seller_payouts.
 
-Add /deploy/postgres-ledger/postgresql.conf with parameters from INFRASTRUCTURE.md § 16.3 (shared_buffers=1GB, effective_cache_size=3GB, max_connections=50, fsync=on, synchronous_commit=on, log_statement='mod' for audit, log_min_duration_statement=100, log_connections=on, log_disconnections=on).
+70-chart-of-accounts-seed.sql (v6 PERPETUAL):
+  Insert one account per pattern from LEDGER_GUIDE.md § 2:
+    asset:bank:escrow:TRY
+    asset:bank:outbound_pending:TRY
+    liability:bank_outbound:TRY
+    liability:seller_payable:TRY
+    equity:cashback_distribution:TRY_COIN          ← v6: monthly coin distribution counter-equity
+    equity:retained_commission:TRY                 ← v6: Mopro's permanent capital (commission accumulates here)
+    equity:retained_float_income:TRY               ← 3BD float yield
+    equity:fx_gain_loss:TRY
+    liability:kdv_payable:TRY
+  All status='active'. owner_type='platform'. NO user wallet accounts here (created lazily by wallet.OpenOrFindUserWallet).
 
-After containers are running, verify with:
+99-set-passwords.sh: same pattern.
 
-  -- 1. Append-only enforcement test (must fail or no-op):
-  -- (open psql as wallet_user)
-  INSERT INTO wallet_schema.accounts (type) VALUES ('test_asset');
-  INSERT INTO wallet_schema.transactions (type, idempotency_key) VALUES ('test', 'idem-1');
-  INSERT INTO wallet_schema.ledger_entries (transaction_id, account_id, direction, amount_minor) VALUES (1,1,'D',100);
-  INSERT INTO wallet_schema.ledger_entries (transaction_id, account_id, direction, amount_minor) VALUES (1,1,'C',100);
-  -- Both inserts should succeed at COMMIT.
+Run init. Verify by inserting a synthetic transaction with mixed currencies → MUST fail. Insert a balanced single-currency transaction → MUST succeed.
 
-  -- 2. Imbalance test (must fail at commit):
-  BEGIN;
-  INSERT INTO wallet_schema.transactions (type, idempotency_key) VALUES ('test2', 'idem-2');
-  INSERT INTO wallet_schema.ledger_entries (transaction_id, account_id, direction, amount_minor) VALUES (2,1,'D',100);
-  INSERT INTO wallet_schema.ledger_entries (transaction_id, account_id, direction, amount_minor) VALUES (2,1,'C',50);
-  COMMIT;
-  -- Expected: ERROR: Double-entry violation
-
-  -- 3. Append-only enforcement (UPDATE must be a no-op):
-  UPDATE wallet_schema.ledger_entries SET amount_minor = 999 WHERE id = 1;
-  -- Expected: 0 rows updated (RULE rewrites it).
-
-DO NOT seed any production accounts here. Production chart-of-accounts seeding is Phase 2 work and goes through migrations.
-
-DO NOT use float types anywhere. amount_minor is BIGINT.
+Report SQL output, trigger validation results.
 ```
 
 **Verification / Done Criteria:**
-- [ ] All eleven init files exist exactly as specified.
-- [ ] `\dn` shows wallet_schema, commission_schema, treasury_schema.
-- [ ] `\dt wallet_schema.*` shows accounts, transactions, ledger_entries, outbox, ledger_alerts.
-- [ ] D=C imbalance test produces `ERROR: check_violation` at COMMIT.
-- [ ] UPDATE on ledger_entries reports 0 rows affected (silently rewritten by RULE).
-- [ ] DELETE on transactions reports 0 rows affected.
-- [ ] postgres-ledger is on mopro-fin-net only (verified by `docker network inspect mopro-fin-net`).
-- [ ] core-svc and jobs-svc cannot reach postgres-ledger:5432 (verified by `docker exec core-svc nc -zv postgres-ledger 5432` returning network-unreachable).
+- [ ] All schemas + tables exist.
+- [ ] `INSERT` of mixed-currency transaction is REJECTED with the specific exception.
+- [ ] `INSERT` of D-only or C-only is REJECTED at COMMIT.
+- [ ] `UPDATE cashback_schema.plans SET total_amount_minor=...` raises plan immutability exception.
+- [ ] `UPDATE commission_schema.seller_payouts SET amount_minor=...` raises payout immutability exception.
+- [ ] `INSERT INTO cashback_schema.plans (... total_months=12 ...)` violates CHECK constraint (must be 24).
+- [ ] Chart of accounts has all v5 accounts seeded.
 
 ---
 
-## Prompt 0.4 — Implement EventBus over Redis Streams + Outbox Publisher
+## Prompt 0.4 — Implement EventBus + Outbox Publisher (market+currency aware)
 
-**Phase & Goal:** Phase 0. Build the shared `internal/eventbus` package with a Publisher / Subscriber interface and a Redis Streams implementation, plus the `internal/outbox` publisher worker that drains outbox tables into the bus. Both are used by Phase 2+ business code.
+**Phase & Goal:** Phase 0. Implement Redis Streams event bus interface + outbox publisher worker. Both must propagate `market` and `currency` labels through every event.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: ARCHITECTURE.md § 8, LEDGER_GUIDE.md § 5 and § 6, CLAUDE.md § 3 and § 4.4.
+READ FIRST: ARCHITECTURE.md § 5, LEDGER_GUIDE.md § 5, CLAUDE.md § 3.
 
-Implement the EventBus and Outbox publisher as shared packages used by core-svc, fin-svc, and jobs-svc.
+Implement /internal/eventbus/ + /internal/outbox/.
 
-PATHS TO CREATE:
+/internal/eventbus/api.go:
+  type Event struct {
+    EventID, EventType, Aggregate, IdempotencyKey string
+    Market, Currency  string                  // mandatory labels
+    TraceID, SpanID   string
+    OccurredAt        time.Time
+    Payload           json.RawMessage
+  }
+  type Publisher interface { Publish(ctx, Event) error }
+  type Consumer  interface { Subscribe(ctx, group, topic string, handler func(Event) error) error }
 
-/internal/eventbus/topics.go
-/internal/eventbus/event.go
-/internal/eventbus/publisher.go
-/internal/eventbus/subscriber.go
-/internal/eventbus/redis_bus.go
-/internal/eventbus/dlq.go
-/internal/eventbus/eventbus_test.go
+/internal/eventbus/redis_bus.go:
+  Implement Publisher with redis.XAdd; serialize fields explicitly so Market and Currency live in the stream entry.
+  Implement Consumer with XREADGROUP + XACK; per-event handler runs in its own goroutine bounded by a worker pool of 8.
 
-/internal/outbox/row.go
-/internal/outbox/store.go
-/internal/outbox/publisher.go
-/internal/outbox/publisher_test.go
+/internal/outbox/api.go:
+  type Row struct { ID, Aggregate, EventType, IdempotencyKey, Market, Currency, TraceID, SpanID; Payload json.RawMessage }
+  type Repository interface { Insert(ctx, tx, Row) error; FetchUnpublished(ctx, limit) ([]Row, error); MarkPublished(ctx, id) error }
 
-REQUIREMENTS:
+/internal/outbox/publisher.go:
+  Worker that loops:
+    SELECT * FROM outbox WHERE published_at IS NULL FOR UPDATE SKIP LOCKED LIMIT 100
+    For each row: bus.Publish(...) with Market and Currency from the row.
+    UPDATE outbox SET published_at = now() WHERE id = ?
+  Implements graceful shutdown; uses context cancellation; emits metric mopro_<svc>_outbox_publish_total{market,currency,event_type,result}.
 
-1. /internal/eventbus/topics.go
-   Define topic constants. Naming convention <domain>.<entity>.<action>.v<n>.
+/internal/outbox/repository.go:
+  Implement against pgx using the pattern from LEDGER_GUIDE.md § 5.
 
-   const (
-       TopicOrderCompletedV1            = "ecom.order.completed.v1"
-       TopicPaymentCapturedV1           = "ecom.payment.captured.v1"
-       TopicCommissionAccruedV1         = "fin.commission.accrued.v1"
-       TopicCommissionRefundRequestedV1 = "fin.commission.refund_requested.v1"
-       TopicCommissionRefundPostedV1    = "fin.commission.refund_posted.v1"
-       TopicWithdrawRequestedV1         = "fin.withdraw.requested.v1"
-       TopicWithdrawCompletedV1         = "fin.withdraw.completed.v1"
-       TopicNotificationRequestedV1     = "jobs.notification.requested.v1"
-   )
+Tests:
+  - Property test: ANY successful Insert is eventually Published in the order it was inserted (per aggregate).
+  - Idempotency: re-publishing a row with same idempotency_key results in zero duplicate downstream side-effects (test consumer counts).
 
-2. /internal/eventbus/event.go
-   type Event struct {
-       Topic          string    `json:"topic"`
-       EventID        string    `json:"event_id"`        // UUID v4
-       OccurredAt     time.Time `json:"occurred_at"`     // RFC3339Nano
-       IdempotencyKey string    `json:"idempotency_key"`
-       TraceID        string    `json:"trace_id"`
-       SpanID         string    `json:"span_id"`
-       Payload        json.RawMessage `json:"payload"`
-   }
-   func NewEvent(topic, idemKey string, payload any) (Event, error)
-   // NewEvent fills EventID with uuid.New(), OccurredAt with time.Now().UTC().
-
-3. /internal/eventbus/publisher.go
-   type Publisher interface {
-       Publish(ctx context.Context, ev Event) error
-   }
-
-4. /internal/eventbus/subscriber.go
-   type Handler func(ctx context.Context, ev Event) error
-
-   type Subscriber interface {
-       // Subscribe registers a Handler for a topic under a consumer group.
-       // Group ensures multiple instances share work; pendingTimeout reclaims hung messages.
-       Subscribe(topic, group, consumer string, h Handler) error
-       Run(ctx context.Context) error
-       Stop(ctx context.Context) error
-   }
-
-5. /internal/eventbus/redis_bus.go
-   - RedisBus struct holds *redis.Client and config (maxLen for trim, blockTimeout, pendingTimeout, dlqTopic).
-   - NewRedisBus(cfg Config) *RedisBus.
-   - Publish: enforces ev.TraceID != "" (return ErrTraceRequired); calls XAdd with MAXLEN ~ 10000 (approx) and Values map: event_id, idempotency_key, trace_id, span_id, payload, occurred_at, topic.
-   - Subscribe: stores handler registrations. Run loops over registered subscriptions, calling XREADGROUP per group with COUNT=10, BLOCK=2s. Acks via XACK on success. On handler error, increments retry counter using XCLAIM; after 5 retries, calls dlq.Push(ev) and XACKs to clear pending.
-   - All XREADGROUP/XADD calls accept ctx and respect cancellation.
-   - Use go-redis/v9.
-
-6. /internal/eventbus/dlq.go
-   type DLQ interface {
-       Push(ctx context.Context, ev Event, err error) error
-   }
-   type RedisDLQ struct { client *redis.Client; stream string }
-   // Pushes to a separate stream (e.g., "<topic>.dlq") with the original event + error message and a "first_failed_at"/"last_failed_at"/"failure_count" trio.
-   // The mopro CLI later reads from this stream for replay tooling.
-
-7. /internal/outbox/row.go
-   type Row struct {
-       ID             int64
-       Aggregate      string
-       EventType      string
-       Payload        json.RawMessage
-       IdempotencyKey string
-       TraceID        string
-       SpanID         string
-       CreatedAt      time.Time
-   }
-
-8. /internal/outbox/store.go
-   type Store interface {
-       Insert(ctx context.Context, tx pgx.Tx, r Row) error
-       FetchUnpublished(ctx context.Context, limit int) ([]Row, error)
-       MarkPublished(ctx context.Context, id int64) error
-   }
-   // Two implementations: one for postgres-ecom (uses order_schema.outbox or similar per-module), and one for postgres-ledger (wallet_schema.outbox). Choose by which DB pool you pass in.
-
-9. /internal/outbox/publisher.go
-   type Publisher struct {
-       store Store
-       bus   eventbus.Publisher
-       interval time.Duration
-       batch    int
-   }
-   // Run loops every Publisher.interval (default 250ms): FetchUnpublished(batch=100), for each row build eventbus.Event, call bus.Publish, on success MarkPublished. Errors are logged but do not crash; the next tick retries.
-   // Crucially: idempotency_key on bus.Publish is the row's idempotency_key, NOT a fresh one — so re-publish is safe.
-
-10. /internal/eventbus/eventbus_test.go and /internal/outbox/publisher_test.go
-   - Use miniredis or testcontainers for Redis.
-   - Property test: publish 10000 events; consumer must see exactly each idempotency_key at least once.
-   - DLQ test: handler that always errors → after 5 retries, event lands on <topic>.dlq.
-   - Outbox publisher test: insert 100 rows; after one Run iteration, they are all published and marked.
-
-DO NOT add HTTP. EventBus is a library, not a server.
-DO NOT use channels for cross-process delivery; Redis Streams only.
-DO NOT bypass the bus when publishing financial events — the LEDGER_GUIDE.md outbox rule still applies.
-
-When done, run `go test ./internal/eventbus/... ./internal/outbox/...` and report.
+Report: file list, test output, sample log lines showing trace_id propagation.
 ```
 
 **Verification / Done Criteria:**
-- [ ] `go build ./internal/eventbus/... ./internal/outbox/...` succeeds.
-- [ ] `go test ./internal/eventbus/... ./internal/outbox/...` passes.
-- [ ] Property test publishes ≥ 10,000 events without loss.
-- [ ] DLQ test routes a permanently-failing event after 5 retries.
-- [ ] `golangci-lint run ./internal/eventbus/... ./internal/outbox/...` is clean.
-- [ ] No file in `/internal/eventbus/` or `/internal/outbox/` imports any module package (`/internal/wallet`, etc.).
-- [ ] `RedisBus.Publish` rejects events without TraceID (`ErrTraceRequired`).
+- [ ] `Insert` writes to outbox; `FetchUnpublished` returns it.
+- [ ] Publisher drains outbox to Redis Streams; consumer receives event with all fields including Market and Currency.
+- [ ] Property test passes 1000 iterations.
+- [ ] Idempotency dedup verified.
 
 ---
 
 ## Prompt 0.5 — Bootstrap Docker Compose Stack
 
-**Phase & Goal:** Phase 0. Wire all containers (Caddy, two Postgres, two PgBouncer, Redis, Meilisearch, three Go binaries, Grafana Agent) into a single `docker compose up` that runs locally and on the production VDS.
+**Phase & Goal:** Phase 0. Bring up the entire 9-container stack with resource limits enforced.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: ARCHITECTURE.md, INFRASTRUCTURE.md (especially § 5 hardening and § 2 RAM table), CLAUDE.md § 7.
+READ FIRST: INFRASTRUCTURE.md § 2-7, ARCHITECTURE.md § 2.
 
-Produce /deploy/docker-compose.yml that boots the full stack with all hardening flags, mem_limits, and network isolation per PRD v3.2.
+Create /deploy/docker-compose.yml that runs:
+  caddy, postgres-ecom, postgres-ledger, pgbouncer-ecom, pgbouncer-ledger, redis, meilisearch, grafana-agent
+  + core-svc, fin-svc, jobs-svc
 
-REQUIREMENTS:
+Apply x-go-defaults anchor from INFRASTRUCTURE.md § 5 to all 3 Go binaries.
+Apply Postgres exception from § 5.2 to both Postgres containers.
 
-1. Two networks:
-     mopro-net      bridge, subnet 172.30.0.0/24
-     mopro-fin-net  bridge, subnet 172.31.0.0/24
+Networks:
+  mopro-net 172.30.0.0/24 (all except postgres-ledger and pgbouncer-ledger)
+  mopro-fin-net 172.31.0.0/24 (postgres-ledger, pgbouncer-ledger, fin-svc)
 
-2. YAML anchor x-go-defaults with the entire hardening block from INFRASTRUCTURE.md § 5 (mem_limit 384m, mem_reservation 192m, cpus 0.5, pids_limit 256, security_opt no-new-privileges:true, cap_drop ALL, read_only true, tmpfs /tmp 64M, ulimits, json-file logging max 20m × 5).
+Mounts:
+  /opt/mopro/data/postgres-ecom → postgres-ecom:/var/lib/postgresql/data
+  /opt/mopro/data/postgres-ledger → postgres-ledger:/var/lib/postgresql/data
+  /opt/mopro/data/redis → redis:/data
+  /opt/mopro/data/meili → meilisearch:/meili_data
+  Init scripts mounted into /docker-entrypoint-initdb.d/ for both Postgres containers.
 
-3. Services:
+Environment files: ${ROOT}/.env (chmod 600 root-only).
 
-   caddy:
-     image caddy:2-alpine
-     ports 80, 443
-     mem_limit 256m, cpus 0.5
-     security_opt no-new-privileges:true
-     volumes:
-       ./caddy/Caddyfile -> /etc/caddy/Caddyfile (ro)
-       caddy_data, caddy_config (named volumes)
-     networks: [mopro-net]
+Healthchecks per service.
+Restart policy: unless-stopped on all.
 
-   postgres-ecom:
-     image postgres:16-alpine
-     mem_limit 5g, mem_reservation 3g, cpus 2.0, shm_size 256m
-     read_only false
-     security_opt no-new-privileges:true
-     cap_drop ALL
-     cap_add CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID
-     environment: POSTGRES_DB=mopro_ecom, POSTGRES_USER=ecom_admin, POSTGRES_PASSWORD=${ECOM_DB_PASSWORD}
-     volumes:
-       ./data/postgres-ecom -> /var/lib/postgresql/data
-       ./postgres-ecom/init -> /docker-entrypoint-initdb.d (ro)
-       ./postgres-ecom/postgresql.conf -> /etc/postgresql/postgresql.conf (ro)
-     command: ["postgres","-c","config_file=/etc/postgresql/postgresql.conf"]
-     healthcheck: pg_isready
-     networks: [mopro-net]
+After compose up:
+  docker compose ps  → all healthy
+  docker exec core-svc nc -zv postgres-ledger 5432   → MUST FAIL
+  docker exec fin-svc  nc -zv postgres-ledger 5432   → MUST SUCCEED
+  docker exec fin-svc  nc -zv redis 6379             → MUST SUCCEED
+  docker stats --no-stream  → no container exceeds its mem_limit
+  curl -sf http://localhost/healthz  → 200
 
-   postgres-ledger:
-     image postgres:16-alpine
-     mem_limit 3g, mem_reservation 2g, cpus 1.5, shm_size 128m
-     read_only false
-     security flags same as postgres-ecom
-     environment: POSTGRES_DB=mopro_ledger, POSTGRES_USER=ledger_admin, POSTGRES_PASSWORD=${LEDGER_DB_PASSWORD}
-     volumes:
-       ./data/postgres-ledger -> /var/lib/postgresql/data
-       ./postgres-ledger/init -> /docker-entrypoint-initdb.d (ro)
-       ./postgres-ledger/postgresql.conf -> /etc/postgresql/postgresql.conf (ro)
-     networks: [mopro-fin-net]    # ONLY this network — critical isolation
-
-   pgbouncer-ecom:
-     image edoburu/pgbouncer:latest
-     mem_limit 100m, cpus 0.2
-     security_opt no-new-privileges:true
-     environment:
-       DATABASE_URL=postgres://ecom_admin:${ECOM_DB_PASSWORD}@postgres-ecom:5432/mopro_ecom
-       POOL_MODE=transaction
-       MAX_CLIENT_CONN=500
-       DEFAULT_POOL_SIZE=30
-     networks: [mopro-net]
-     depends_on: [postgres-ecom]
-
-   pgbouncer-ledger:
-     image edoburu/pgbouncer:latest
-     mem_limit 100m, cpus 0.2
-     environment:
-       DATABASE_URL=postgres://ledger_admin:${LEDGER_DB_PASSWORD}@postgres-ledger:5432/mopro_ledger
-       POOL_MODE=transaction
-       MAX_CLIENT_CONN=200
-       DEFAULT_POOL_SIZE=20
-     networks: [mopro-fin-net]
-     depends_on: [postgres-ledger]
-
-   redis:
-     image redis:7-alpine
-     mem_limit 1.2g, cpus 1.0
-     security_opt no-new-privileges:true
-     command: ["redis-server","/usr/local/etc/redis/redis.conf"]
-     volumes:
-       ./redis/redis.conf -> /usr/local/etc/redis/redis.conf (ro)
-       ./data/redis -> /data
-     networks: [mopro-net]
-
-   meilisearch:
-     image getmeili/meilisearch:v1.6
-     mem_limit 1.5g, cpus 1.0
-     security_opt no-new-privileges:true
-     environment:
-       MEILI_ENV=production
-       MEILI_MASTER_KEY=${MEILI_MASTER_KEY}
-       MEILI_NO_ANALYTICS=true
-     volumes:
-       ./data/meilisearch -> /meili_data
-     networks: [mopro-net]
-
-   core-svc:
-     <<: *go-defaults
-     image: ghcr.io/mopro/core-svc:${CORE_TAG:-dev}
-     environment: SVC_NAME=core-svc, ENV=production, DB_HOST=pgbouncer-ecom, DB_PORT=5432, DB_NAME=mopro_ecom, REDIS_URL=redis://redis:6379/0, JWT_SIGNING_KEY=${JWT_SIGNING_KEY}, PII_KEK_BASE64=${PII_KEK_BASE64}
-     # Inherits networks: [mopro-net] from go-defaults
-
-   fin-svc:
-     <<: *go-defaults
-     image: ghcr.io/mopro/fin-svc:${FIN_TAG:-dev}
-     environment: SVC_NAME=fin-svc, ENV=production, DB_HOST=pgbouncer-ledger, DB_PORT=5432, DB_NAME=mopro_ledger, DB_USER=wallet_user, DB_PASSWORD=${WALLET_DB_PASSWORD}, REDIS_URL=redis://redis:6379/0, PII_KEK_BASE64=${PII_KEK_BASE64}
-     networks: [mopro-net, mopro-fin-net]   # two networks: redis on ecom side, ledger on fin side
-
-   jobs-svc:
-     <<: *go-defaults
-     image: ghcr.io/mopro/jobs-svc:${JOBS_TAG:-dev}
-     environment: SVC_NAME=jobs-svc, ENV=production, DB_HOST=pgbouncer-ecom, DB_PORT=5432, DB_NAME=mopro_ecom, REDIS_URL=redis://redis:6379/0, FCM_SERVER_KEY=${FCM_SERVER_KEY}
-
-   grafana-agent:
-     image: grafana/agent:latest
-     mem_limit 300m, cpus 0.3
-     security_opt no-new-privileges:true
-     volumes:
-       ./grafana-agent/agent.yaml -> /etc/agent.yaml (ro)
-       /var/run/docker.sock -> /var/run/docker.sock (ro)
-       /var/log -> /var/log (ro)
-     command: ["-config.file=/etc/agent.yaml"]
-     networks: [mopro-net]
-
-4. Volumes (named): caddy_data, caddy_config.
-
-5. Compose-level YAML anchor for healthcheck retries and start_period for Postgres (start_period 30s, retries 5).
-
-6. Ensure restart: unless-stopped on all services.
-
-7. Add a separate /deploy/docker-compose.dev.yml override that:
-     - Removes read_only and security_opt for easier local dev.
-     - Adds bind mounts for live source code (only in dev override, never in prod).
-     - Maps Postgres ports 5432 and 5433 to host (only in dev).
-
-VERIFY:
-  docker compose --env-file .env.local up -d
-  docker compose --env-file .env.local ps     # all healthy
-  docker network inspect mopro-fin-net        # only fin-svc, pgbouncer-ledger, postgres-ledger
-  docker network inspect mopro-net            # rest
-  docker exec core-svc nc -zv postgres-ledger 5432    # MUST FAIL (network-unreachable)
-  docker exec fin-svc nc -zv postgres-ledger 5432     # MUST SUCCEED
-  docker exec fin-svc nc -zv redis 6379               # MUST SUCCEED
-
-DO NOT mount /var/run/docker.sock into any application container (only grafana-agent, read-only).
-DO NOT publish Postgres or Redis ports on the host in production. Only in dev override.
-DO NOT use the same password for ECOM_DB_PASSWORD and LEDGER_DB_PASSWORD.
+Report: compose file, healthcheck output, stats snapshot.
 ```
 
 **Verification / Done Criteria:**
-- [ ] `docker compose --env-file .env.local up -d` brings every service to healthy.
-- [ ] `docker network inspect mopro-fin-net` lists only fin-svc, pgbouncer-ledger, postgres-ledger.
-- [ ] core-svc cannot reach postgres-ledger (TCP refused / unreachable).
-- [ ] fin-svc reaches both Redis and postgres-ledger.
-- [ ] No application container (other than grafana-agent) has docker.sock mounted.
-- [ ] No service runs as root (`docker exec <svc> id` shows nonroot UID 65532).
-- [ ] All x-go-defaults flags applied to core-svc, fin-svc, jobs-svc.
+- [ ] All 9 containers healthy.
+- [ ] Network isolation verified (3 nc commands).
+- [ ] Memory totals match the 12.6 GB target (+/- 5%).
 
 ---
 
-## Prompt 0.6 — Configure Caddy Reverse Proxy with TLS and Base Routes
+## Prompt 0.6 — Caddy Reverse Proxy with Base Routes
 
-**Phase & Goal:** Phase 0. Stand up Caddy with automatic Let's Encrypt, JSON access logs, baseline rate-limit, and `/healthz` route. Module-specific routes are added in Phase 1.
+**Phase & Goal:** Phase 0. Configure Caddy with TLS, rate limiting, and the four route groups.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: ARCHITECTURE.md § 1, PROMPTS.md Prompt 0.5.
+READ FIRST: ARCHITECTURE.md § 1.
 
-Create /deploy/caddy/Caddyfile and ensure it auto-reloads cleanly.
+Create /deploy/caddy/Caddyfile:
+  api.moproshop.com:
+    reverse_proxy core-svc:8080
+    handle_path /v1/wallet/*  { reverse_proxy fin-svc:8080 }
+    handle_path /v1/cashback/* { reverse_proxy fin-svc:8080 }
+    handle_path /v1/payouts/*  { reverse_proxy fin-svc:8080 }
+    handle_path /v1/jobs/*     { reverse_proxy jobs-svc:8080 }
+    rate_limit { zone api_per_ip { key {client_ip} window 1m max 600 } }
+    @cf_only header CF-Connecting-IP * { request_header X-Forwarded-For {http.request.header.CF-Connecting-IP} }
+    not @cf_only respond 403
 
-REQUIREMENTS:
+  seller.moproshop.com:
+    reverse_proxy core-svc:8080  (only /api/v1/seller/* + static seller panel)
 
-Global block:
-  {
-      email ${CADDY_EMAIL}
-      admin off
-      servers {
-          protocols h1 h2 h3
-      }
-      log default {
-          output stderr
-          format json
-          level INFO
-      }
-  }
+  img.moproshop.com:
+    reverse_proxy https://<b2-bucket-public-url>
 
-api.moproshop.com host block:
-  encode zstd gzip
+  TLS: managed automatically (Let's Encrypt) for HTTPS; in dev use internal CA.
 
-  # Default per-IP rate limit
-  rate_limit {
-      zone per_ip {
-          key {remote_host}
-          events 600
-          window 1m
-      }
-  }
+After deploying: curl -sk https://api.moproshop.com/healthz returns 200 from core-svc.
 
-  # Health and metrics for upstream probes (reachable from internal only via header check)
-  @internal {
-      header X-Internal-Probe "true"
-      path /healthz /metrics
-  }
-  handle @internal {
-      reverse_proxy core-svc:9090
-  }
-
-  # Public health check (no auth, very small payload)
-  handle /healthz {
-      respond "ok" 200
-  }
-
-  # Phase 1+ adds /v1/* matchers. Until then, default 404:
-  handle {
-      respond 404
-  }
-
-  log {
-      output file /var/log/caddy/api.log {
-          roll_size 100mb
-          roll_keep 7
-      }
-      format json
-  }
-
-seller.moproshop.com host block:
-  # Will route to seller-panel-web in a future phase. For now respond 503 maintenance.
-  handle { respond 503 }
-
-img.moproshop.com host block:
-  reverse_proxy https://f000.backblazeb2.com/file/mopro-media {
-      header_up Host {upstream_hostport}
-  }
-  header Cache-Control "public, max-age=2592000"
-
-For local dev (the dev override): the host can be `localhost` and TLS internal/self-signed. Do not use real ACME against a domain you do not own.
-
-Add a /deploy/caddy/README.md with:
-  - How to reload: docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
-  - How to validate: docker run --rm -v $(pwd)/Caddyfile:/etc/caddy/Caddyfile caddy:2 caddy validate --config /etc/caddy/Caddyfile
-
-VERIFY:
-  curl -sf http://localhost/healthz   # → ok
-  curl -sf http://localhost/v1/test    # → 404 (no matcher yet)
-  docker compose logs caddy | head -50
-
-DO NOT expose Caddy admin API.
-DO NOT add routes for modules that are not implemented yet.
-DO NOT add basic_auth on the public API (auth is the identity module's job in Phase 1).
+Report Caddyfile + curl outputs.
 ```
 
 **Verification / Done Criteria:**
-- [ ] `caddy validate` returns success.
-- [ ] `/healthz` returns 200 with body "ok".
-- [ ] `/v1/anything` returns 404.
-- [ ] Access logs are JSON in /var/log/caddy/api.log.
-- [ ] No host header other than the configured ones gets a successful response.
-- [ ] Caddy reload does not drop active connections (test with a long-running curl during reload).
+- [ ] HTTPS works (or dev CA mode).
+- [ ] Routes reach the correct binary.
+- [ ] Rate limit kicks in at 601 requests/min from same IP.
 
 ---
 
 # PHASE 1 — E-Commerce Core
 
-The goal of Phase 1 is to bring the catalog, cart, order, payment, seller, and search modules online inside core-svc, and to expose them via Caddy.
+## Prompt 1.1 — Create catalog Module (Multi-Currency, Multi-Language, Category-Aware)
 
-## Prompt 1.1 — Create catalog Module in core-svc
+**Phase & Goal:** Phase 1. Catalog module with products + variants + translations + category-driven commission preview.
 
-**Phase & Goal:** Phase 1. Build the catalog module with its public interface, repository, domain types, schema migration, and tests. The pattern set here is the template for cart, order, seller, and search modules.
-
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: CLAUDE.md § 2.3 and § 3.1, DATA_DICTIONARY.md (especially § 2.1 and § 3 cross-schema ban), DEVELOPMENT.md § 9 (depguard).
+READ FIRST: DATA_DICTIONARY.md § 6, CLAUDE.md § 2-3.
 
-Create the catalog module inside core-svc.
+Implement /internal/catalog/ inside core-svc.
 
-PATHS:
+Domain types in /internal/catalog/domain.go:
+  Product { ID, SellerID, CategoryID, Brand, DefaultCurrency, DefaultLocale, Status, ... }
+  Variant { ID, ProductID, SKU, Color, Size, PriceMinor, PriceCurrency, Stock, ImageKeys }
+  ProductTranslation { ProductID, Locale, Title, Description }
+  CategoryCommission { CategoryID, CommissionPctBps, KdvPctBps }   ← read from ref_schema
 
-/internal/catalog/api.go
-/internal/catalog/service.go
-/internal/catalog/repository.go
-/internal/catalog/domain.go
-/internal/catalog/errors.go
-/internal/catalog/api_test.go
-/internal/catalog/service_test.go
-/internal/catalog/repository_integration_test.go
-/migrations/ecom/0010_create_catalog_schema.sql
-/migrations/ecom/0011_create_catalog_products.sql
-/migrations/ecom/0012_create_catalog_variants.sql
-/migrations/ecom/0013_create_catalog_categories.sql
-/migrations/ecom/0014_create_catalog_indexes.sql
+Service interface in /internal/catalog/api.go:
+  CreateProduct(ctx, req) (Product, error)
+  AddVariant(ctx, productID, req) (Variant, error)
+  UpdateTranslation(ctx, productID, locale, title, description) error
+  GetByID(ctx, id) (Product, []Variant, []ProductTranslation, error)
+  Search(ctx, query, locale, market) ([]Product, error)
+  GetCommissionForCategory(ctx, market, categoryID) (CategoryCommission, error)   ← reads ref_schema.commission_rules
 
-REQUIREMENTS:
+Repository implements all SQL queries. Use pgx.
+Migration /migrations/ecom/0010_catalog.sql per DATA_DICTIONARY.md § 6.
+Validate: variant.PriceCurrency MUST exist in ref_schema.currencies (active=TRUE).
 
-1. domain.go:
+HTTP handlers in core-svc:
+  POST /v1/products
+  POST /v1/products/:id/variants
+  PUT  /v1/products/:id/translations/:locale
+  GET  /v1/products/:id
+  GET  /v1/categories/:id/commission?market=TR    ← used by seller panel cashback preview
 
-   type Category struct { ID int64; ParentID *int64; Name string; AttributesSchema json.RawMessage; CreatedAt time.Time }
-   type Product struct { ID int64; SellerID int64; Title string; Description string; Brand string; CategoryID int64; Status string; CreatedAt time.Time; UpdatedAt time.Time }
-   type Variant struct { ID int64; ProductID int64; SKU string; Color string; Size string; PriceMinor int64; Stock int32; ImageKeys []string }
+For each handler: Idempotency-Key required, Locale resolved from Accept-Language.
 
-   Status enum: 'draft','active','archived'.
-   PriceMinor is BIGINT minor units (kuruş). Do not use float.
+Add 80%+ unit tests. Add integration test that creates a product with TRY pricing + Turkish translation + queries it back.
 
-2. errors.go (sentinel errors):
-
-   var (
-       ErrProductNotFound  = errors.New("catalog: product not found")
-       ErrVariantNotFound  = errors.New("catalog: variant not found")
-       ErrCategoryNotFound = errors.New("catalog: category not found")
-       ErrInvalidStatus    = errors.New("catalog: invalid status")
-       ErrSKUConflict      = errors.New("catalog: sku already exists for product")
-   )
-
-3. api.go (the ONLY file other modules import):
-
-   package catalog
-   import "context"
-
-   type Service interface {
-       CreateProduct(ctx context.Context, in CreateProductInput) (Product, error)
-       GetProduct(ctx context.Context, id int64) (Product, error)
-       ListProducts(ctx context.Context, q ListQuery) ([]Product, string, error)   // returns slice + next cursor
-       AddVariant(ctx context.Context, productID int64, in CreateVariantInput) (Variant, error)
-       GetVariant(ctx context.Context, id int64) (Variant, error)
-       AdjustStock(ctx context.Context, variantID int64, delta int32, reason string, idemKey string) error
-   }
-
-   type Repository interface {
-       InsertProduct(ctx context.Context, p Product) (int64, error)
-       FindProductByID(ctx context.Context, id int64) (Product, error)
-       FindProductsByCursor(ctx context.Context, q ListQuery) ([]Product, string, error)
-       InsertVariant(ctx context.Context, v Variant) (int64, error)
-       FindVariantByID(ctx context.Context, id int64) (Variant, error)
-       AdjustVariantStock(ctx context.Context, variantID int64, delta int32, idemKey string) error
-   }
-
-   The Repository interface must NEVER expose raw *sql.Rows or pgx-specific types.
-
-4. service.go:
-   - Implements Service.
-   - AdjustStock uses an idempotency_key UNIQUE table (catalog_schema.stock_adjustments(idempotency_key UNIQUE)) to deduplicate retries.
-   - All methods accept context.Context and propagate it.
-   - Validation happens in service, not repository.
-
-5. repository.go:
-   - Uses pgx.Pool injected via constructor.
-   - All queries scoped to catalog_schema. NEVER read another module's schema.
-   - Cursor encoding: base64({"id": <int>, "created_at": "<rfc3339>"}).
-
-6. Migrations:
-
-   0010_create_catalog_schema.sql — already created in Prompt 0.2 init script; this file is no-op or a sanity assertion.
-
-   0011_create_catalog_products.sql:
-     CREATE TABLE catalog_schema.products (
-       id BIGSERIAL PRIMARY KEY,
-       seller_id BIGINT NOT NULL,
-       title TEXT NOT NULL,
-       description TEXT NOT NULL DEFAULT '',
-       brand TEXT NOT NULL DEFAULT '',
-       category_id BIGINT NOT NULL,
-       status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','archived')),
-       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-     );
-
-   0012_create_catalog_variants.sql:
-     CREATE TABLE catalog_schema.variants (
-       id BIGSERIAL PRIMARY KEY,
-       product_id BIGINT NOT NULL REFERENCES catalog_schema.products(id),
-       sku TEXT NOT NULL,
-       color TEXT NOT NULL DEFAULT '',
-       size TEXT NOT NULL DEFAULT '',
-       price_minor BIGINT NOT NULL CHECK (price_minor >= 0),
-       stock INTEGER NOT NULL DEFAULT 0,
-       image_keys TEXT[] NOT NULL DEFAULT '{}'::text[],
-       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-     );
-     CREATE UNIQUE INDEX variants_product_sku_uq ON catalog_schema.variants(product_id, sku);
-
-   0013_create_catalog_categories.sql:
-     CREATE TABLE catalog_schema.categories (
-       id BIGSERIAL PRIMARY KEY,
-       parent_id BIGINT REFERENCES catalog_schema.categories(id),
-       name TEXT NOT NULL,
-       attributes_schema JSONB NOT NULL DEFAULT '{}'::jsonb,
-       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-     );
-
-     CREATE TABLE catalog_schema.stock_adjustments (
-       id BIGSERIAL PRIMARY KEY,
-       variant_id BIGINT NOT NULL REFERENCES catalog_schema.variants(id),
-       delta INTEGER NOT NULL,
-       reason TEXT NOT NULL,
-       idempotency_key TEXT NOT NULL UNIQUE,
-       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-     );
-
-   0014_create_catalog_indexes.sql:
-     CREATE INDEX CONCURRENTLY products_status_idx ON catalog_schema.products(status);
-     CREATE INDEX CONCURRENTLY products_category_idx ON catalog_schema.products(category_id);
-     CREATE INDEX CONCURRENTLY products_seller_idx ON catalog_schema.products(seller_id);
-     CREATE INDEX CONCURRENTLY products_created_at_idx ON catalog_schema.products(created_at DESC);
-
-   NEVER use FK to other schemas. seller_id is a BIGINT but does NOT carry a REFERENCES clause to seller_schema.sellers.
-
-7. Tests:
-   - api_test.go uses a fake Repository. Asserts service contracts.
-   - service_test.go: validation cases (empty title, negative price, invalid status, idempotency replay).
-   - repository_integration_test.go uses testcontainers to spin a real Postgres and applies migrations 0010–0014. Build tag: integration.
-
-8. Wire up in /cmd/core-svc/main.go:
-   - Build a pgx pool to pgbouncer-ecom:5432.
-   - Construct catalog.Repository (concrete) → catalog.Service (concrete).
-   - Register HTTP handlers under /v1/catalog/* (define in /internal/catalog/http_handler.go).
-
-9. Forbidden:
-   - import "github.com/mopro/platform/internal/wallet" → fails depguard.
-   - SQL like SELECT ... FROM order_schema.orders inside catalog → fails check-module-boundaries.sh.
-   - float64 for any price/amount field.
-   - DROP, ALTER COLUMN TYPE, RENAME in any migration.
-
-When done, run:
-  go test ./internal/catalog/...
-  go test -tags=integration ./internal/catalog/...
-  golangci-lint run ./internal/catalog/...
-  ./scripts/check-module-boundaries.sh
+Report: file list, test output, sample API curls.
 ```
 
 **Verification / Done Criteria:**
-- [ ] All eleven listed paths exist.
-- [ ] `go test ./internal/catalog/...` passes.
-- [ ] `go test -tags=integration ./internal/catalog/...` passes.
-- [ ] `golangci-lint run ./internal/catalog/...` is clean.
-- [ ] `./scripts/check-module-boundaries.sh` is clean.
-- [ ] `migrate-tool ecom up` runs all four catalog migrations without error.
-- [ ] `\dt catalog_schema.*` shows products, variants, categories, stock_adjustments.
-- [ ] AdjustStock with the same idempotency_key applied twice changes stock only once (test case present).
-- [ ] No FK declared from catalog tables to any other schema.
+- [ ] All endpoints work.
+- [ ] `GET /v1/categories/30/commission?market=TR` returns `{commission_pct_bps: 700, kdv_pct_bps: 2000}`.
+- [ ] Coverage ≥ 80%.
 
 ---
 
-## Prompt 1.2 — Create cart Module + Redis-Backed Sessions
+## Prompt 1.2 — Create cart Module + Redis Lua Stock Reservation
 
-**Phase & Goal:** Phase 1. Cart module persists per-user cart state in Redis with a Postgres fallback for durability. The pattern includes idempotency on add/remove and atomic stock reservation via a Lua script.
+**Phase & Goal:** Phase 1. Cart with Redis-backed stock reservation (atomic) using a single Lua script.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: CLAUDE.md, DATA_DICTIONARY.md, ARCHITECTURE.md § 4.1.
+READ FIRST: ARCHITECTURE.md § 5 (the in-memory module communication rule), CLAUDE.md § 3.
 
-Create the cart module inside core-svc.
+Implement /internal/cart/ inside core-svc.
 
-PATHS:
+Service:
+  AddItem(ctx, userID, variantID, qty) error
+  RemoveItem(ctx, userID, variantID) error
+  GetCart(ctx, userID) (Cart, error)
+  Reserve(ctx, userID) (reservationID string, error)   ← used at checkout
+  Release(ctx, reservationID) error                    ← saga compensation
 
-/internal/cart/api.go
-/internal/cart/service.go
-/internal/cart/repository.go
-/internal/cart/redis_store.go
-/internal/cart/lua/reserve_stock.lua
-/internal/cart/domain.go
-/internal/cart/errors.go
-/internal/cart/http_handler.go
-/internal/cart/{api,service,redis_store}_test.go
-/migrations/ecom/0020_create_cart_schema.sql
-/migrations/ecom/0021_create_cart_durable.sql
+State: Redis hash per cart (mopro:cart:user_<id>).
+Stock reservation: Redis Lua script that, atomically:
+  1. Reads current variant stock.
+  2. If stock >= qty: DECRBY stock; PUT reservation with TTL 15 min.
+  3. Else: returns OUT_OF_STOCK.
 
-REQUIREMENTS:
+Cross-module call: cart calls catalog.GetVariant via in-memory function call (NOT HTTP, NOT direct repo).
+The cart module has NO direct access to catalog repository.
 
-1. domain.go:
-   type Cart struct { ID string; UserID int64; Items []CartItem; UpdatedAt time.Time }
-   type CartItem struct { VariantID int64; Qty int32; UnitPriceMinor int64; SellerID int64 }
+Add property test: 100 concurrent reserve attempts on a stock=10 variant succeed at most 10 times.
 
-2. api.go (Service interface):
-   AddItem(ctx, userID, variantID, qty, idemKey) (Cart, error)
-   RemoveItem(ctx, userID, variantID, idemKey) (Cart, error)
-   Get(ctx, userID) (Cart, error)
-   ReserveForCheckout(ctx, userID, idemKey) (reservationID string, err error)  // calls catalog.AdjustStock via service injection
-   ReleaseReservation(ctx, reservationID) error
-
-3. redis_store.go:
-   - Hash key: cart:{user_id}
-   - JSON-encoded Cart per user.
-   - TTL: 14 days; refreshed on every write.
-   - Idempotency cache key: cart_idem:{user_id}:{idem_key} → "<sha256 of result body>", TTL 24h.
-
-4. lua/reserve_stock.lua:
-   - Atomic decrement of `stock:{variant_id}` Redis counter; reverts on failure.
-   - Returns 1 on success, 0 on insufficient stock.
-   - Loaded once at startup via SCRIPT LOAD; called via EVALSHA for performance.
-
-5. repository.go (Postgres fallback for durability and analytics):
-   - cart_schema.cart_snapshots(user_id BIGINT, payload JSONB, updated_at TIMESTAMPTZ).
-   - Snapshot every cart write asynchronously (fire-and-forget; not blocking the response).
-
-6. service.go:
-   - Coordinates Redis (live cart) + Postgres (durable snapshot) + catalog.Service (price/stock lookup).
-   - ReserveForCheckout calls into catalog.Service via the Service interface (NOT into catalog.Repository).
-   - Holds a reservation lock in Redis: lock:reservation:{user_id} via SETNX with 5-minute TTL.
-
-7. http_handler.go:
-   - POST /v1/cart/items, DELETE /v1/cart/items/{variant_id}, GET /v1/cart, POST /v1/cart/checkout/reserve.
-   - All POST/DELETE require Idempotency-Key header (return 400 if missing).
-
-8. Migrations:
-   0020 — schema (no-op; already created in Prompt 0.2).
-   0021_create_cart_durable.sql:
-     CREATE TABLE cart_schema.cart_snapshots (
-       user_id BIGINT PRIMARY KEY,
-       payload JSONB NOT NULL,
-       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-     );
-
-9. Tests:
-   - service_test.go: ConcurrentAdd → final qty correct.
-   - redis_store_test.go: Idempotency replay returns identical cart.
-   - reserve_stock test: 100 goroutines reserving 1 each from a stock of 50 → exactly 50 succeed.
-
-10. Wire to /cmd/core-svc/main.go.
-
-DO NOT cross-import internal/catalog/repository.
-DO NOT use pessimistic Postgres locks for cart; Redis is the source of truth.
-DO NOT log full cart payloads (PII risk).
+Report: file list, test output, Lua script.
 ```
 
 **Verification / Done Criteria:**
-- [ ] go test passes including the high-concurrency reservation test.
-- [ ] Idempotency-Key header missing → 400.
-- [ ] Adding the same item twice with same Idempotency-Key returns identical cart.
-- [ ] catalog imports remain through the public Service interface only.
+- [ ] Property test passes; never overshoots stock.
+- [ ] depguard rejects an import of internal/catalog/repository from cart.
 
 ---
 
-## Prompt 1.3 — Create order Module with Saga Orchestration
+## Prompt 1.3 — Create order Module + ecom.order.delivered.v1 Event Emission
 
-**Phase & Goal:** Phase 1. The order module orchestrates checkout: validate cart → reserve stock → create payment → write order + outbox row → return order_id. This is the producer side of the order.completed saga.
+**Phase & Goal:** Phase 1. Order saga (pending_payment → paid → shipped → delivered → cancelled/refunded). On delivered, emit `ecom.order.delivered.v1` carrying the snapshotted commission/KDV per item — this triggers BOTH cashback engine and seller-payout engine in fin-svc.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: CLAUDE.md § 4 (financial invariants apply because outbox writes here too), ARCHITECTURE.md § 5, PROMPTS.md Prompt 1.1 and 1.2.
+READ FIRST: DATA_DICTIONARY.md § 7, LEDGER_GUIDE.md § 7.1, ARCHITECTURE.md § 5.
 
-Create the order module inside core-svc.
+Implement /internal/order/ inside core-svc.
 
-PATHS:
+Domain:
+  Order { ID, UserID, Status, SubtotalMinor, ShippingMinor, ShippingPayer, TotalMinor, Currency,
+          Market, DeliveredAt, CashbackEligible, CashbackCurrency, IdempotencyKey, ... }
+  OrderItem { ID, OrderID, VariantID, SellerID, CategoryID, Qty,
+              UnitPriceMinor, UnitPriceCurrency,
+              CommissionPctBps,             ← snapshot from ref_schema.commission_rules at order time
+              KdvPctBps,                    ← snapshot
+              CommissionAmountMinor,        ← computed = unit*qty*pct/10000
+              KdvAmountMinor,               ← computed
+              SellerNetMinor                ← computed = unit*qty - commission - kdv
+            }
 
-/internal/order/api.go
-/internal/order/service.go
-/internal/order/repository.go
-/internal/order/saga.go
-/internal/order/domain.go
-/internal/order/errors.go
-/internal/order/http_handler.go
-/internal/order/{api,service,saga}_test.go
-/migrations/ecom/0030_create_order_schema.sql
-/migrations/ecom/0031_create_order_tables.sql
-/migrations/ecom/0032_create_order_outbox.sql
+Service:
+  Checkout(ctx, userID, cartID, addressID, paymentRef, idempotencyKey) (Order, error)
+    1. Acquire stock reservation from cart.
+    2. For each item: read commission_pct_bps + kdv_pct_bps from ref_schema (single source of truth at sale time).
+    3. Compute snapshot fields.
+    4. Insert order + order_items rows + outbox event ecom.order.created.v1 in single tx.
+  MarkPaid(ctx, orderID, pspRef) error
+    Insert outbox event ecom.payment.captured.v1.
+  MarkShipped(ctx, orderID, carrier, tracking) error
+  MarkDelivered(ctx, orderID, deliveredAt time.Time) error
+    Update orders.status='delivered', orders.delivered_at=deliveredAt.
+    Insert outbox event ecom.order.delivered.v1 with payload:
+      { order_id, user_id, market, delivered_at, items: [{seller_id, category_id, qty,
+        unit_price_minor, commission_pct_bps, commission_amount_minor, kdv_amount_minor, seller_net_minor}, ...] }
+  Cancel(ctx, orderID) error
+  RefundFull(ctx, orderID) error  → emits ecom.order.refunded.v1
+  RefundPartial(ctx, orderID, items) error
 
-REQUIREMENTS:
+The delivered event MUST contain everything fin-svc needs to compute cashback total + per-seller payout net.
+DO NOT compute cashback in core-svc; only emit the event with snapshots.
 
-1. domain.go:
-   type Order struct {
-       ID int64; UserID int64; Status string; TotalMinor int64; Currency string;
-       Items []OrderItem; CreatedAt, UpdatedAt time.Time;
-   }
-   type OrderItem struct {
-       ID int64; OrderID int64; VariantID int64; SellerID int64;
-       Qty int32; UnitPriceMinor int64; CommissionRuleID *int64;
-   }
+Add property test: For any cart with N items at random commission rates, sum(items[i].seller_net_minor) + sum(commission) + sum(kdv) == sum(unit*qty).
 
-   Status enum: 'pending_payment','paid','shipped','delivered','cancelled','refunded'.
-   Currency: always 'TRY'.
-
-2. api.go (Service):
-   Checkout(ctx, in CheckoutInput) (Order, paymentURL string, err error)
-   GetByID(ctx, id int64, userID int64) (Order, error)
-   ListByUser(ctx, userID int64, cursor string) ([]Order, string, error)
-   Cancel(ctx, id int64, userID int64, idemKey string) error
-
-3. saga.go orchestrates checkout:
-
-   func (s *service) Checkout(ctx context.Context, in CheckoutInput) (Order, string, error) {
-       if in.IdempotencyKey == "" { return Order{}, "", ErrIdempotencyKeyRequired }
-       // 1. Cart freeze + reservation
-       reservationID, err := s.cart.ReserveForCheckout(ctx, in.UserID, in.IdempotencyKey)
-       if err != nil { return Order{}, "", err }
-       defer func() {
-           if err != nil { _ = s.cart.ReleaseReservation(ctx, reservationID) }
-       }()
-
-       // 2. Compute totals (NOT in DB tx; pure calculation)
-       cart, _ := s.cart.Get(ctx, in.UserID)
-       total := computeTotal(cart)
-
-       // 3. Open Postgres tx (SERIALIZABLE)
-       var orderID int64; var paymentURL string
-       err = s.repo.WithTx(ctx, sql.LevelSerializable, func(tx pgx.Tx) error {
-           // 3a. Insert order + items
-           orderID, err = s.repo.InsertOrder(ctx, tx, Order{...})
-           if err != nil { return err }
-
-           // 3b. Initiate payment via payment.Service (in-memory call inside core-svc)
-           paymentURL, err = s.payment.CreateAttempt(ctx, tx, orderID, total, in.IdempotencyKey)
-           if err != nil { return err }
-
-           // 3c. Write outbox row in SAME tx
-           return s.outbox.Insert(ctx, tx, outbox.Row{
-               Aggregate:      "order",
-               EventType:      eventbus.TopicOrderCompletedV1,   // emitted only on payment.captured later
-               Payload:        marshalCheckoutPayload(orderID, in),
-               IdempotencyKey: in.IdempotencyKey,
-               TraceID:        traceIDFromCtx(ctx),
-           })
-       })
-       if err != nil { return Order{}, "", err }
-       order, _ := s.repo.GetByID(ctx, orderID)
-       return order, paymentURL, nil
-   }
-
-   NOTE: The actual order.completed event is published only after payment.captured (Phase 3 wires this). Phase 1 just persists the outbox row in 'pending_payment' state and the publisher worker holds it; the saga prompt in Phase 3 makes the publisher conditional on payment status.
-
-4. repository.go: pgx, scoped strictly to order_schema.
-
-5. Migrations:
-
-   0031_create_order_tables.sql:
-     CREATE TABLE order_schema.orders (
-       id BIGSERIAL PRIMARY KEY,
-       user_id BIGINT NOT NULL,
-       status TEXT NOT NULL CHECK (status IN ('pending_payment','paid','shipped','delivered','cancelled','refunded')),
-       total_minor BIGINT NOT NULL CHECK (total_minor >= 0),
-       currency TEXT NOT NULL DEFAULT 'TRY',
-       idempotency_key TEXT NOT NULL UNIQUE,
-       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-     );
-
-     CREATE TABLE order_schema.order_items (
-       id BIGSERIAL PRIMARY KEY,
-       order_id BIGINT NOT NULL REFERENCES order_schema.orders(id),
-       variant_id BIGINT NOT NULL,
-       seller_id BIGINT NOT NULL,
-       qty INTEGER NOT NULL CHECK (qty > 0),
-       unit_price_minor BIGINT NOT NULL CHECK (unit_price_minor >= 0),
-       commission_rule_id BIGINT
-     );
-
-     CREATE INDEX CONCURRENTLY orders_user_idx ON order_schema.orders(user_id, created_at DESC);
-
-   0032_create_order_outbox.sql:
-     CREATE TABLE order_schema.outbox (
-       id              BIGSERIAL PRIMARY KEY,
-       aggregate       TEXT NOT NULL,
-       event_type      TEXT NOT NULL,
-       payload         JSONB NOT NULL,
-       idempotency_key TEXT NOT NULL UNIQUE,
-       trace_id        TEXT,
-       span_id         TEXT,
-       published_at    TIMESTAMPTZ,
-       created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-     );
-     CREATE INDEX outbox_unpublished_idx ON order_schema.outbox(created_at) WHERE published_at IS NULL;
-
-6. http_handler.go:
-   POST /v1/orders/checkout — body {cart_id, address_id, payment_method_id}; header Idempotency-Key required.
-   GET /v1/orders/{id} — auth user_id matches.
-   POST /v1/orders/{id}/cancel — Idempotency-Key required.
-
-7. Tests:
-   - Concurrent checkout with same Idempotency-Key from one user → exactly one order in DB.
-   - Insufficient stock → checkout fails, reservation released.
-   - Saga rollback test: payment.CreateAttempt fails → no order row, no outbox row.
-
-DO NOT cross-import any fin-svc package.
-DO NOT publish events directly; only write outbox rows.
-DO NOT FK across schemas.
+Report: file list, sample event payload JSON, test output.
 ```
 
 **Verification / Done Criteria:**
-- [ ] Concurrent checkout test produces exactly one order.
-- [ ] Failed payment leaves no order row, no outbox row, releases the reservation.
-- [ ] outbox row has the same idempotency_key as the order.
-- [ ] No import of fin-svc packages.
-- [ ] Migrations apply cleanly.
+- [ ] Order checkout → status transitions trigger expected outbox events.
+- [ ] Snapshot of commission/KDV is stored in `order_items` (not recomputed on read).
+- [ ] Property test of net + commission + kdv = gross passes.
+- [ ] `ecom.order.delivered.v1` payload includes all fields fin-svc needs.
 
 ---
 
-## Prompt 1.4 — Add catalog and order Routes to Caddyfile with Per-Endpoint Rate Limits
+## Prompt 1.4 — PSP Adapter (Sipay primary, Craftgate backup, iyzico fallback) — v7 DETAILED
 
-**Phase & Goal:** Phase 1. Expose Phase 1 endpoints through Caddy with the documented rate limits.
+**Phase & Goal:** Phase 1. Implement payment.Service with three TR PSP adapters following the official Sipay/Craftgate/iyzico API contracts. Webhook handlers verify provider signatures and emit normalized `ecom.payment.captured.v1`.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: PROMPTS.md Prompt 0.6, ARCHITECTURE.md § 1.
+READ FIRST: CLAUDE.md § 9, ARCHITECTURE.md § 8.2 + § 8.5 (PSP API Reference).
 
-Edit /deploy/caddy/Caddyfile under the api.moproshop.com block to add four matchers + handlers for catalog, cart, orders, auth (identity).
+Implement /internal/payment/ inside core-svc with the adapter pattern:
+  /internal/payment/api.go      ← provider-agnostic Service interface
+  /internal/payment/service.go  ← orchestration
+  /internal/payment/sipay/
+  /internal/payment/craftgate/
+  /internal/payment/iyzico/
+  /internal/payment/webhook.go  ← provider-agnostic dispatch
 
-REQUIRED MATCHERS AND LIMITS:
+Service interface (provider-agnostic):
+  CreatePaymentIntent(ctx, orderID, amountMinor, currency, cardOwnerInfo, threeDSReturnURL, idempotencyKey)
+    → (PaymentIntent { providerRef, status, hppRedirectURL?, threeDSHTML? }, error)
+  Capture(ctx, providerRef, idempotencyKey) → (Payment, error)
+  Refund(ctx, providerRef, amountMinor, reason, idempotencyKey) → (Refund, error)
+  TransferToSeller(ctx, sellerSubMerchantID, amountMinor, currency, idempotencyKey) → (Transfer, error)
+  HandleWebhook(ctx, providerName, headers, body) → (NormalizedEvent, error)
+  RegisterSubMerchant(ctx, sellerProfile) → (subMerchantID string, error)
 
-@auth path /v1/auth/*
-handle @auth {
-    rate_limit {
-        zone auth_per_ip {
-            key {remote_host}
-            events 10
-            window 1m
-        }
-    }
-    reverse_proxy core-svc:8080
+— SIPAY ADAPTER —
+Base URL (sandbox): https://provisioning.sipay.com.tr/ccpayment
+Base URL (prod):    https://app.sipay.com.tr/ccpayment
+
+Auth: Token-based. Get token via POST /api/token with merchant_key + app_id + app_secret.
+Token TTL ~30 min; cache in Redis with refresh-on-401.
+
+Endpoints:
+  POST /api/getPos              — list installments + commission
+  POST /api/paySmart3D          — initiate 3DS payment, returns HTML to render
+  POST /api/payCompleted        — webhook receiver (we IMPLEMENT this on our side at /v1/payments/webhook/sipay)
+  POST /api/refund              — refund a captured payment
+  POST /api/checkstatus         — poll payment status
+  POST /sub_merchant_register   — register a seller as sub-merchant
+  POST /sub_merchant_pay        — split-payment: charge buyer, credit sub-merchant balance
+  POST /sub_merchant_settlement — send sub-merchant balance to bank account
+
+Webhook signature:
+  Sipay sends `hash_key` header. Verify:
+    expected = base64(hmacSha256(rawBody, app_secret))
+    if expected != header → reject 401
+  See https://docs.sipay.com.tr (sandbox creds: contact integration@sipay.com.tr)
+
+Sandbox creds env names:
+  SIPAY_MERCHANT_KEY, SIPAY_APP_ID, SIPAY_APP_SECRET, SIPAY_MERCHANT_ID
+
+— CRAFTGATE ADAPTER —
+Base URL (sandbox): https://sandbox-api.craftgate.io
+Base URL (prod):    https://api.craftgate.io
+
+Auth: HMAC-SHA256. Each request:
+  x-api-key: <CRAFTGATE_API_KEY>
+  x-rnd-key: <random_uuid>
+  x-auth-version: 1
+  x-signature: hmacSha256( apiKey + rndKey + apiSecret + uriPath + jsonBody, secret )
+
+Endpoints:
+  POST /payment/v1/payments              — create payment (3DS or non-3DS)
+  POST /payment/v1/payments/{id}/refund  — refund
+  POST /payment/v1/init-3ds              — initiate 3DS
+  POST /payment/v1/complete-3ds          — finalize 3DS after returnURL hit
+  POST /onboarding/v1/sub-merchants      — create sub-merchant (seller)
+  POST /payout/v1/payout                 — payout to sub-merchant bank account
+  GET  /payment/v1/payments/{id}         — query status
+
+Webhook:
+  POST to our /v1/payments/webhook/craftgate
+  Signature: x-craftgate-signature header = hmacSha256(rawBody, CRAFTGATE_WEBHOOK_SECRET)
+
+Sandbox creds env names:
+  CRAFTGATE_API_KEY, CRAFTGATE_API_SECRET, CRAFTGATE_WEBHOOK_SECRET
+
+— IYZICO ADAPTER (fallback) —
+Base URL (sandbox): https://sandbox-api.iyzipay.com
+Base URL (prod):    https://api.iyzipay.com
+
+Auth: HMAC-SHA1 + Base64. Each request:
+  Authorization: IYZWS <apiKey>:<base64Hash>
+  x-iyzi-rnd: <random>
+  hash = sha1( apiKey + rndKey + secretKey + jsonBody ) → base64
+
+Endpoints:
+  POST /payment/auth                      — payment with 3DS
+  POST /payment/3dsecure/initialize       — start 3DS
+  POST /payment/3dsecure/auth             — finalize 3DS
+  POST /payment/refund                    — refund
+  POST /payment/cancel                    — cancel before settlement
+  POST /onboarding/sub-merchant           — create sub-merchant
+  POST /payment/iyzipos/marketplace/payout— payout to sub-merchant
+
+Sandbox creds env names:
+  IYZICO_API_KEY, IYZICO_SECRET_KEY
+
+— PROVIDER SELECTION —
+Active provider: env PSP_PROVIDER=sipay|craftgate|iyzico (default sipay).
+Per-payment override allowed via order metadata for A/B testing.
+
+— NORMALIZED PAYMENT EVENT —
+Adapter handlers normalize to internal struct:
+  PaymentCaptured {
+    OrderID         int64
+    ProviderName    string
+    ProviderRef     string
+    AmountMinor     int64
+    Currency        string
+    CapturedAt      time.Time
+    InstalmentCount int     // 1 = single payment
+    CardLast4       string  // PCI-safe to log
+    CardBrand       string  // visa, master, troy
+    BinCountry      string  // ISO-3166
+    RawPayload      json.RawMessage  // for audit
+  }
+
+Then writes outbox: ecom.payment.captured.v1 with this payload.
+
+— TESTS —
+1. Contract test: all 3 adapters satisfy the Service interface.
+2. Webhook tests: replay sandbox webhook samples, verify signature pass/fail, normalization.
+3. Idempotency: re-receive same webhook → no duplicate ecom.payment.captured.v1 in outbox.
+4. Failover test: when PSP_PROVIDER changes mid-test, old in-flight payments use original provider's ref.
+5. PCI safety: scan logs/errors → no full PAN, no CVV, no full track data.
+
+Report: 3 adapter files, contract test, webhook signature samples, sandbox curl examples.
+```
+
+**Verification / Done Criteria:**
+- [ ] All 3 PSP adapters compile + pass contract tests.
+- [ ] Sipay sandbox webhook → ecom.payment.captured.v1 in outbox (verifiable end-to-end).
+- [ ] Craftgate sub-merchant create + payout API exercised in sandbox.
+- [ ] iyzico cancel-before-settlement path tested.
+- [ ] Switching `PSP_PROVIDER` env requires only restart, no code change.
+- [ ] No card PAN/CVV in any log line (verified by `grep -E "[0-9]{16}"` against logs).
+
+---
+
+## Prompt 1.5 — Caddy Routes for Phase 1 Endpoints
+
+**Phase & Goal:** Phase 1. Verify all new endpoints are reachable through Caddy.
+
+**Copy-Paste Prompt:**
+
+```
+Update /deploy/caddy/Caddyfile to ensure all Phase 1 endpoints route correctly:
+  /v1/products, /v1/products/:id/*, /v1/categories/:id/commission → core-svc
+  /v1/cart/* → core-svc
+  /v1/orders/*, /v1/orders/:id/* → core-svc
+  /v1/payments/webhook/sipay → core-svc
+  /v1/payments/webhook/craftgate → core-svc
+  /v1/payments/webhook/iyzico → core-svc
+  /v1/shipping/webhook/{aras|yurtici|surat|mng|hepsijet|ptt} → core-svc
+  /api/v1/seller/orders/:id/breakdown → core-svc (transparency)
+
+After redeploying Caddy, run smoke tests on all routes.
+Report curl outputs.
+```
+
+---
+
+## Prompt 1.6 — Kargo Adapters (6 TR carriers) — v7 NEW
+
+**Phase & Goal:** Phase 1. Implement shipping.Service with 6 TR kargo adapters following the official APIs. Webhook handlers update order status; "delivered" event triggers cashback + seller payout.
+
+**Copy-Paste Prompt:**
+
+```
+READ FIRST: ARCHITECTURE.md § 8.4 + § 8.6 (Kargo API Reference).
+
+Implement /internal/shipping/ inside core-svc with 6 carrier adapters:
+  /internal/shipping/api.go      ← provider-agnostic Service interface
+  /internal/shipping/service.go  ← orchestration + carrier selection
+  /internal/shipping/aras/       ← SOAP+REST mixed
+  /internal/shipping/yurtici/    ← SOAP only
+  /internal/shipping/surat/      ← REST + JWT
+  /internal/shipping/mng/        ← REST + API-Key
+  /internal/shipping/hepsijet/   ← REST + OAuth2
+  /internal/shipping/ptt/        ← SOAP
+
+Service interface (provider-agnostic):
+  CalculateRate(ctx, in RateRequest) → ([]CarrierQuote, error)
+                  // returns quotes from ALL active carriers ranked by price+SLA
+  CreateLabel(ctx, carrier string, in ShipmentInput) → (ShipmentResult, error)
+  TrackShipment(ctx, carrier string, trackingNo string) → (TrackingState, error)
+  CreateReturnLabel(ctx, carrier string, originalTrackingNo string) → (ShipmentResult, error)
+  HandleWebhook(ctx, carrier string, headers, body) → (NormalizedShippingEvent, error)
+  CancelShipment(ctx, carrier string, trackingNo string, reason string) → error
+
+Per ARCHITECTURE.md § 8.6, each adapter wraps the official API:
+
+— ARAS KARGO (SOAP+REST hybrid) —
+Test base: https://test-customerservices.araskargo.com.tr/aras-rest-api/test/
+Auth: HTTP Basic with (username, password, customer_code).
+Implement REST endpoints (preferred):
+  POST /api/v1/shipment              { sender, receiver, package_dims, cod_amount? }
+  GET  /api/v1/shipment/{trackingNo}
+  POST /api/v1/shipment/{trackingNo}/cancel  { reason }
+  GET  /api/v1/rates                 { from_postal, to_postal, weight }
+NO native webhook → /internal/shipping/aras/poller.go runs a 5-min cron polling
+all 'in_transit' shipments and updates state. On state change → emit
+ecom.shipping.<state>.v1 via outbox.
+
+— YURTİÇİ KARGO (SOAP) —
+Test WSDL: https://testservis.yurticikargo.com/KOPSWebServices/services/ShippingOrderServiceV2?wsdl
+Auth: WS-Security UsernameToken (username + password).
+SOAP operations: createShippingOrder, queryShipment, cancelShippingOrder, getShipmentStatus.
+NO native webhook → polling cron (same as Aras).
+
+— SÜRAT KARGO (REST + JWT) —
+Test base: https://uatxapi.suratkargo.com.tr
+Auth: POST /api/auth/login → JWT (TTL 24h, cache).
+Endpoints:
+  POST /api/shipment/create      { senderInfo, receiverInfo, parcelInfo }
+  GET  /api/tracking/{barcode}
+  POST /api/return/create        { originalBarcode, reason }
+Native webhook: POST /v1/shipping/webhook/surat
+Signature: X-Surat-Sign header = hmacSha256(rawBody, SURAT_WEBHOOK_SECRET)
+
+— MNG KARGO (REST + API-Key) —
+Test base: https://testapi.mngkargo.com.tr/mngapi
+Auth: API-Key header + JWT bearer (POST /api/login).
+Endpoints:
+  POST /api/standardcmdapi/createOrder
+  GET  /api/cargotracking/{trackingNo}
+  POST /api/standardcmdapi/cancelOrder
+Native webhook: POST /v1/shipping/webhook/mng
+Signature: X-MNG-Signature = hmacSha256(rawBody, MNG_WEBHOOK_SECRET)
+
+— HEPSİJET (REST + OAuth2) —
+Test base: https://api-test.hepsijet.com
+Auth: OAuth2 client_credentials grant (POST /v1/auth/token; cache token).
+Endpoints:
+  POST /v1/shipments
+  GET  /v1/shipments/{id}
+  POST /v1/shipments/{id}/return
+  POST /v1/shipments/{id}/cancel
+Native webhook: POST /v1/shipping/webhook/hepsijet
+Auth: bearer token in webhook header validated against same OAuth2 token
+
+— PTT KARGO (SOAP) —
+Test WSDL: https://wstest.ptt.gov.tr/MusteriHizmetleriWS/services?wsdl
+Auth: HTTP Basic + customer_code.
+SOAP operations: BarkodOlustur, KargoTakip, IadeOlustur, KargoIptal.
+NO native webhook → daily batch reconcile (less critical than e-commerce carriers).
+
+— NORMALIZED SHIPPING EVENT (after webhook/poll dispatch) —
+ShippingStateChanged {
+    OrderID         int64
+    ShipmentID      int64
+    Carrier         string
+    TrackingNumber  string
+    State           string  // 'created'|'picked_up'|'in_transit'|'out_for_delivery'|'delivered'|'returned'|'cancelled'|'failed'
+    OccurredAt      time.Time
+    Location        string  // city or hub name
+    RawPayload      json.RawMessage
 }
 
-@catalog path /v1/products/* /v1/categories/* /v1/search
-handle @catalog {
-    rate_limit {
-        zone catalog_per_ip {
-            key {remote_host}
-            events 600
-            window 1m
-        }
-    }
-    reverse_proxy core-svc:8080
-}
+When State = 'delivered' → core-svc.order updates orders.delivered_at, then emits
+ecom.order.delivered.v1 (the trigger for cashback + seller payout in fin-svc).
 
-@cart path /v1/cart/*
-handle @cart {
-    rate_limit {
-        zone cart_per_ip {
-            key {remote_host}
-            events 120
-            window 1m
-        }
-    }
-    reverse_proxy core-svc:8080
-}
+— SCHEMA additions —
+ref_schema.shipping_carriers (carrier_code, name_tr, name_en, supports_cod, supports_return,
+                              supports_webhook BOOL, active BOOL)
+ref_schema.shipping_rules    (seller_id NULL=platform_default, carrier_code, free_threshold_minor,
+                              flat_rate_minor, currency, active)
+shipping_schema.shipments    (id, order_id, carrier, tracking_number, label_pdf_b2_key,
+                              estimated_delivery, cost_minor, currency, state, last_state_at,
+                              created_at, updated_at)
+shipping_schema.shipment_events (id, shipment_id, state, occurred_at, location, raw JSONB)
 
-@orders path /v1/orders/*
-handle @orders {
-    rate_limit {
-        zone orders_per_ip {
-            key {remote_host}
-            events 30
-            window 1m
-        }
-    }
-    reverse_proxy core-svc:8080
-}
+— TESTS —
+1. Contract test: all 6 adapters satisfy the Service interface.
+2. Polling cron (Aras+Yurtiçi+PTT): mock SOAP/REST responses, verify state transitions emit events.
+3. Webhook tests: replay sample payloads from each carrier, verify signature pass/fail.
+4. CalculateRate aggregation: 3 carriers return quotes → service returns sorted by price+SLA.
+5. Failover: when primary carrier API returns 5xx for > 5 min, next-cheapest is used.
 
-After all module matchers, the catch-all `handle { respond 404 }` must remain LAST.
-
-After editing:
-  docker compose exec caddy caddy validate --config /etc/caddy/Caddyfile
-  docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
-
-VERIFICATION:
-  - 11th request to /v1/auth/login from the same IP within a minute returns 429.
-  - 601st request to /v1/products from the same IP within a minute returns 429.
-  - /v1/orders requires Authorization header; missing header returns 401 from core-svc (not from Caddy).
-  - /v1/products is reachable for unauthenticated users (catalog browsing public).
-
-DO NOT add a catch-all reverse_proxy that swallows undefined routes.
-DO NOT lower the auth rate limit below 10/min — that is the bot threshold the team agreed on.
-DO NOT raise the orders rate limit; checkout abuse is a real fraud vector.
+Report: 6 adapter folders, contract test, sample webhook payloads (anonymized), failover log.
 ```
 
 **Verification / Done Criteria:**
-- [ ] `caddy validate` passes.
-- [ ] `caddy reload` succeeds with zero connection drops.
-- [ ] Synthetic 11th /v1/auth/* request from one IP returns 429.
-- [ ] Public catalog endpoint returns data without auth.
-- [ ] Default 404 still returned for unmapped paths.
+- [ ] All 6 carrier adapters compile + pass contract tests.
+- [ ] Polling cron picks up state changes within 5 min for Aras/Yurtiçi/PTT.
+- [ ] Webhook signature validation passes for Sürat/MNG/HepsiJet sample payloads.
+- [ ] Delivery state change triggers `ecom.order.delivered.v1` in outbox.
+- [ ] CalculateRate returns multi-carrier quotes within 2s p95.
 
 ---
 
-# PHASE 2 — FinTech Core & Ledger
+# PHASE 2 — FinTech Core, Cashback Engine, Seller Payout, Wallet
 
-The goal of Phase 2 is to bring the wallet, commission, and treasury modules online inside fin-svc, including the chart of accounts seeding, withdrawal flow, and hourly reconciliation.
+## Prompt 2.1 — Create wallet Module (Multi-Currency Chart of Accounts)
 
-## Prompt 2.1 — Create wallet Module in fin-svc with Chart of Accounts Seed
+**Phase & Goal:** Phase 2. wallet module exposes ledger primitives + balance reads.
 
-**Phase & Goal:** Phase 2. The wallet module owns the ledger; this prompt seeds the chart of accounts and exposes safe internal/private read APIs.
-
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: LEDGER_GUIDE.md (entire), CLAUDE.md § 4, DATA_DICTIONARY.md § 2.2.
+READ FIRST: LEDGER_GUIDE.md (entire file), DATA_DICTIONARY.md § 8.
 
-Create the wallet module inside fin-svc. It is the only module that writes to wallet_schema.ledger_entries.
+Implement /internal/wallet/ inside fin-svc.
 
-PATHS:
+Service interface:
+  Post(ctx, in PostInput) (txnID int64, error)
+  PostInTx(ctx, tx pgx.Tx, in PostInput) (txnID int64, error)
+  GetBalance(ctx, accountID) (int64, error)
+  FindAccount(ctx, type string, currency string) (accountID int64, error)
+  OpenOrFindUserWallet(ctx, userID, currency) (accountID int64, error)
+  FindOrOpenSellerPayable(ctx, sellerID, currency) (accountID int64, error)   ← v5
 
-/internal/wallet/api.go
-/internal/wallet/service.go
-/internal/wallet/repository.go
-/internal/wallet/domain.go
-/internal/wallet/errors.go
-/internal/wallet/http_handler.go
-/internal/wallet/{api,service}_test.go
-/internal/wallet/property_test.go
-/migrations/ledger/0010_seed_chart_of_accounts.sql
-/migrations/ledger/0011_create_balance_view.sql
+PostInput { Type, Reference, IdempotencyKey, Market, Currency, Entries []Entry }
+Entry { AccountID, Direction, AmountMinor }
 
-REQUIREMENTS:
+Implementation MUST follow the mandatory pattern in LEDGER_GUIDE.md § 6.
 
-1. domain.go:
-   type Account struct { ID int64; Type string; OwnerType, OwnerID *int64; Currency string; Status string; CreatedAt time.Time }
-   type Transaction struct { ID int64; Type string; Reference *string; IdempotencyKey string; Status string; CreatedAt time.Time }
-   type Entry struct { ID int64; TransactionID int64; AccountID int64; Direction string; AmountMinor int64; CreatedAt time.Time }
+Property tests (gopter):
+  - Per-currency D=C invariant (1000+ random ops)
+  - Idempotency: applying the same PostInput twice yields one ledger transaction
+  - No mixed-currency: any test that synthesizes a mixed-currency PostInput MUST cause a rollback
 
-2. errors.go:
-   ErrIdempotencyKeyRequired, ErrInvalidAmount, ErrAccountNotFound,
-   ErrAccountClosed, ErrInsufficientBalance, ErrDuplicateIdempotency,
-   ErrLedgerInvariantViolation (wraps the Postgres exception class 23514).
-
-3. api.go:
-   type Service interface {
-       OpenSellerWallet(ctx, sellerID int64) (Account, error)
-       GetBalance(ctx, accountID int64) (int64, error)            // returns minor units
-       Apply(ctx, in ApplyInput) (Transaction, error)             // generic D/C poster
-       PostCommissionRefund(ctx, in CommissionRefundInput) (Transaction, error)
-       PostWithdrawalReservation(ctx, in WithdrawInput) (Transaction, error)
-       PostWithdrawalCompleted(ctx, ref string, idemKey string) (Transaction, error)
-       PostReversal(ctx, originalTxnID int64, idemKey string) (Transaction, error)
-   }
-
-4. service.go: every public write follows the LEDGER_GUIDE.md § 6 mandatory pattern verbatim. Reuse the snippet for ApplyCommissionRefund.
-
-5. http_handler.go (read-only public endpoints):
-   GET /v1/wallet/me/balance       → uses authenticated user's seller_id
-   GET /v1/wallet/me/transactions  → cursor-based pagination
-
-   Caching: Redis SETEX wallet_balance:{account_id}, 5–10 sec TTL on GET balance. NEVER cache during a write critical path (withdraw).
-
-6. Migrations:
-
-   0010_seed_chart_of_accounts.sql:
-     INSERT INTO wallet_schema.accounts (type, owner_type, currency)
-     VALUES
-       ('asset:bank:escrow',          'platform', 'TRY_COIN'),
-       ('liability:platform_pool',    'platform', 'TRY_COIN'),
-       ('liability:bank_outbound',    'platform', 'TRY_COIN'),
-       ('equity:retained_float_income','platform','TRY_COIN')
-     ON CONFLICT DO NOTHING;
-
-   Per-seller wallet accounts are created on demand via OpenSellerWallet.
-
-   0011_create_balance_view.sql:
-     CREATE MATERIALIZED VIEW wallet_schema.balances AS
-       SELECT account_id,
-              SUM(CASE WHEN direction='C' THEN amount_minor ELSE -amount_minor END) AS balance_minor
-       FROM wallet_schema.ledger_entries
-       GROUP BY account_id;
-     CREATE UNIQUE INDEX balances_account_idx ON wallet_schema.balances(account_id);
-     -- REFRESH MATERIALIZED VIEW CONCURRENTLY wallet_schema.balances; in a periodic worker (Phase 3).
-
-7. Tests:
-   - service_test.go: idempotency_key replay (same input twice → one transaction).
-   - service_test.go: amount_minor <= 0 → ErrInvalidAmount.
-   - property_test.go (gopter): generate 1000 random ops; after applying, sum(D)-sum(C)=0.
-   - integration test: imbalance attempt → repository returns ErrLedgerInvariantViolation (sees Postgres 23514).
-
-DO NOT expose write endpoints publicly (no HTTP POST that posts to ledger).
-DO NOT bypass outbox.
-DO NOT use float types.
-DO NOT grant wallet_user UPDATE/DELETE on ledger_entries (RULES already block it).
-
-When done:
-  go test ./internal/wallet/...
-  go test -tags=integration ./internal/wallet/...
-  golangci-lint run ./internal/wallet/...
+Report: file list, property test output.
 ```
 
 **Verification / Done Criteria:**
-- [ ] gopter property test runs ≥ 1000 successful cases.
-- [ ] An imbalance attempt produces ErrLedgerInvariantViolation with Postgres ERRCODE 23514.
-- [ ] Idempotency replay returns the original transaction without duplicating ledger entries.
-- [ ] Materialized view returns correct balance for an account after a sequence of writes.
-- [ ] No public HTTP route posts to the ledger.
+- [ ] Property tests pass 1000+ iterations.
+- [ ] All ledger writes funnel through wallet.Post; depguard verifies no module bypasses.
 
 ---
 
-## Prompt 2.2 — Implement Wallet Withdrawal Request (Full Saga Slice)
+## Prompt 2.2 — Implement cashback-engine Module (THE CENTERPIECE) — v5 LOCKED MODEL
 
-**Phase & Goal:** Phase 2. The withdrawal flow is the strictest financial path: reserve from seller wallet via D/C entries, write outbox, later release to actual bank transfer. This prompt implements the request side. The completion side is wired in Phase 3.
+**Phase & Goal:** Phase 2. cashback-engine consumes `ecom.order.delivered.v1`, creates a FROZEN plan + 24 scheduled payments + the equity↔obligation ledger move, all idempotently.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: LEDGER_GUIDE.md § 6, § 7 reversal rule, § 11 withdraw critical path; CLAUDE.md § 4.
+READ FIRST: CLAUDE.md § 4.7, LEDGER_GUIDE.md § 7, DATA_DICTIONARY.md § 8.
 
-Implement WithdrawalRequest in fin-svc/internal/wallet.
+Implement /internal/cashback/ inside fin-svc (v6 PERPETUAL model).
 
-REQUIREMENTS:
+const ReferenceInterestRateBpsConst = 5000  // v6 LOCKED = %50.00. Changing requires constitution update.
 
-1. /internal/wallet/withdraw.go contains:
+Domain (v6):
+  Plan { ID, OrderID, UserID, MonthlyAmountMinor, Currency, ReferenceInterestRateBps,
+         StartDate, Status, DeliveredAt, Market, CommissionSnapshot, IdempotencyKey, ... }
+  Payment { ID, PlanID, PeriodYYYYMM, ScheduledDate, PaidDate, AmountMinor, Status,
+            LedgerTransactionID, IdempotencyKey, AttemptCount, ... }
 
-   type WithdrawInput struct {
-       SellerID            int64
-       AmountMinor         int64
-       BankAccountRef      string   // pre-validated, encrypted at rest
-       IdempotencyKey      string
-       UserStepUpVerifiedAt time.Time
-   }
+Service interface:
+  CreatePlanForOrder(ctx, ev OrderDeliveredEvent) error      ← idempotent on (order_id)
+  RunMonthlyPayments(ctx, runDate time.Time) error           ← idempotent per (plan_id, period_yyyymm)
+  CancelPlan(ctx, planID, reason string) error               ← reverses paid + sets status='cancelled' (cron will skip)
+  PartialRefund(ctx, planID, refundFraction float64, reason string) error   ← reduces monthly_amount_minor (audit-logged)
+  GetPlanByOrderID(ctx, orderID) (*Plan, error)
 
-   func (s *service) PostWithdrawalReservation(ctx context.Context, in WithdrawInput) (Transaction, error) {
-       if in.IdempotencyKey == "" { return Transaction{}, ErrIdempotencyKeyRequired }
-       if in.AmountMinor <= 0 { return Transaction{}, ErrInvalidAmount }
-       if time.Since(in.UserStepUpVerifiedAt) > 10*time.Minute {
-           return Transaction{}, ErrStepUpExpired
-       }
+CreatePlanForOrder logic per LEDGER_GUIDE.md § 7.1 (v6):
+  1. Idempotency: if plan exists for order_id → no-op.
+  2. commissionMinor = sum(items[i].CommissionAmountMinor)  ← from event payload, NOT recomputed
+  3. yearlyYieldMinor = commissionMinor * ReferenceInterestRateBpsConst / 10000
+  4. monthlyMinor = yearlyYieldMinor / 12       ← v6: NO total amount, NO remainder, perpetual
+  5. unlockAt = pkg/timex.AddBusinessDays(ev.DeliveredAt, 3, ref_schema.business_calendars[market])
+  6. startDate = unlockAt   ← NO end_date; perpetual
+  7. Single SERIALIZABLE tx:
+     a. INSERT plans row (frozen by trigger; only status mutable)
+     b. NO payment rows pre-seeded — cron creates them month by month.
+     c. NO ledger move at plan creation (perpetual model accrues period-by-period).
+     d. INSERT outbox fin.cashback.plan.created.v1
 
-       sellerWalletID, err := s.repo.FindSellerWalletAccountID(ctx, in.SellerID)
-       if err != nil { return Transaction{}, err }
-       bankOutboundID := s.cfg.BankOutboundAccountID
+RunMonthlyPayments per LEDGER_GUIDE.md § 7.2 (v6):
+  period := yyyymm(runDate)  // e.g., 202607
+  SELECT active plans WHERE start_date <= runDate (batch up to 1000)
+  For each plan, in own tx:
+     1. INSERT cashback_schema.payments row for (plan_id, period, monthly_amount_minor, 'scheduled')
+        — UNIQUE constraint on (plan_id, period_yyyymm) makes this idempotent.
+     2. wallet.PostInTx (TRY_COIN-only):
+        D equity:cashback_distribution:TRY_COIN  amount=plan.MonthlyAmountMinor
+        C liability:wallet:user_<id>:TRY_COIN     amount=plan.MonthlyAmountMinor
+     3. Mark payment as 'paid', record ledger_transaction_id.
+     4. INSERT outbox fin.cashback.payment.posted.v1.
 
-       var txn Transaction
-       err = s.repo.WithTx(ctx, sql.LevelSerializable, func(tx pgx.Tx) error {
-           // Lock the seller wallet row to serialize concurrent withdraws.
-           if err := s.repo.LockAccountRow(ctx, tx, sellerWalletID); err != nil { return err }
+CancelPlan per LEDGER_GUIDE.md § 7.4 (v6):
+  1. Sum paid coin so far for this plan.
+  2. Reversal: D liability:wallet:user / C equity:cashback_distribution for paid amount.
+  3. UPDATE plans SET status='cancelled' (allowed; only status mutable).
+  4. Future cron runs SKIP this plan (SELECT WHERE status='active').
+  5. Mopro's commission principal in equity:retained_commission:TRY is implicitly
+     released — no explicit ledger move needed (no upfront obligation in v6).
 
-           // Solvency check (using the materialized view OR live SUM)
-           bal, err := s.repo.BalanceOfTx(ctx, tx, sellerWalletID)
-           if err != nil { return err }
-           if bal < in.AmountMinor { return ErrInsufficientBalance }
+PartialRefund (v6):
+  1. Compute new_monthly = old_monthly * (1 - refundFraction)
+  2. INSERT plans_history audit row (BEFORE the UPDATE, because the trigger checks for it).
+  3. UPDATE plans SET monthly_amount_minor = new_monthly (allowed via the audit-trail exception).
+  4. Future cron runs use new monthly amount.
 
-           txnID, err := s.repo.InsertTransaction(ctx, tx, Transaction{
-               Type: "withdraw_reservation",
-               Reference: &in.BankAccountRef,
-               IdempotencyKey: in.IdempotencyKey,
-           })
-           if errors.Is(err, ErrDuplicateIdempotency) { return nil }
-           if err != nil { return err }
+Property tests (gopter, v6):
+  - For random (price, commissionPctBps): monthlyMinor = round(price × pct × 5000 / 10000 / 10000 / 12)
+    matches CreatePlanForOrder output deterministically.
+  - After N cron runs (N arbitrary), user wallet credited exactly N × plan.MonthlyAmountMinor.
+  - UPDATE on plan.monthly_amount_minor without plans_history row raises (immutability).
+  - Replay of same delivery event → exactly one plan, exactly one payment per period.
 
-           // DEBIT seller wallet, CREDIT bank_outbound
-           if err := s.repo.InsertEntry(ctx, tx, Entry{TransactionID: txnID, AccountID: sellerWalletID, Direction: "D", AmountMinor: in.AmountMinor}); err != nil { return err }
-           if err := s.repo.InsertEntry(ctx, tx, Entry{TransactionID: txnID, AccountID: bankOutboundID, Direction: "C", AmountMinor: in.AmountMinor}); err != nil { return err }
+Wire the consumer: fin-svc.event-consumer subscribes to ecom.order.delivered.v1 and dispatches to CreatePlanForOrder.
 
-           // Outbox event: fin.withdraw.requested.v1
-           if err := s.outbox.Insert(ctx, tx, outbox.Row{
-               Aggregate:      "wallet",
-               EventType:      eventbus.TopicWithdrawRequestedV1,
-               Payload:        marshalWithdrawPayload(txnID, in),
-               IdempotencyKey: in.IdempotencyKey,
-               TraceID:        traceIDFromCtx(ctx),
-               SpanID:         spanIDFromCtx(ctx),
-           }); err != nil { return err }
-
-           txn = Transaction{ID: txnID, Type: "withdraw_reservation", IdempotencyKey: in.IdempotencyKey, Status: "posted"}
-           return nil
-       })
-       if err != nil { return Transaction{}, err }
-       return txn, nil
-   }
-
-   FindSellerWalletAccountID returns the account row for liability:wallet:seller_<id>.
-   LockAccountRow runs SELECT id FROM wallet_schema.accounts WHERE id=$1 FOR UPDATE.
-   BalanceOfTx is a SELECT inside the tx to ensure consistency.
-
-2. Add a public HTTP endpoint:
-
-   POST /v1/wallet/withdraw
-     Headers: Authorization, Idempotency-Key, X-Step-Up-Token
-     Body: { amount_minor, bank_account_ref }
-
-   The handler:
-     - Validates step-up token via identity service (in-memory call only inside core-svc; from fin-svc, validate via shared JWT signing key).
-     - Calls PostWithdrawalReservation.
-     - Returns 201 with txn id and status "pending_bank_transfer".
-
-3. Caddyfile patch:
-
-   @withdraw path /v1/wallet/withdraw
-   handle @withdraw {
-       rate_limit {
-           zone withdraw_per_ip {
-               key {remote_host}
-               events 5
-               window 1m
-           }
-       }
-       reverse_proxy fin-svc:8080
-   }
-
-4. Tests:
-   - Concurrent withdraw with same Idempotency-Key → exactly one ledger entry pair.
-   - Concurrent withdraw with DIFFERENT Idempotency-Keys for the SAME seller exceeding balance → only the first succeeds; the rest get ErrInsufficientBalance.
-   - Property test: 1000 random withdraws; sum(D)=sum(C) holds.
-
-5. Caddy reload after edit.
-
-6. mopro CLI command `mopro outbox list --aggregate wallet --since "1h"` shows the new event.
-
-DO NOT release funds without a separate completion event (Phase 3 emits fin.withdraw.completed.v1).
-DO NOT skip the SELECT FOR UPDATE on the seller wallet row.
-DO NOT cache balance during the withdraw critical path.
-DO NOT log bank_account_ref in plaintext.
+Report: file list, property test output, sample event consumption log.
 ```
 
 **Verification / Done Criteria:**
-- [ ] Concurrent withdraw with same Idempotency-Key produces exactly one transaction.
-- [ ] Concurrent withdraw with different keys exceeding balance: only the first succeeds.
-- [ ] outbox row created in same DB tx as ledger entries.
-- [ ] Caddy rate limit caps withdraw requests at 5/minute per IP.
-- [ ] gopter property test passes after withdraw integration.
-- [ ] Step-up token older than 10 minutes is rejected.
+- [ ] Property tests pass 500+ iterations.
+- [ ] Re-emitting the same delivered event creates exactly one plan.
+- [ ] Cancellation reverses correctly per LEDGER_GUIDE § 7.4.
+- [ ] Mutating plan core fields is rejected by trigger.
 
 ---
 
-## Prompt 2.3 — Hourly Reconciliation Cron Job
+## Prompt 2.3 — Implement seller-payout-engine Module — NEW v5
 
-**Phase & Goal:** Phase 2. Schedule the hourly ledger invariant check that pages on-call and switches fin-svc to read-only on any non-zero delta.
+**Phase & Goal:** Phase 2. seller-payout-engine consumes the SAME `ecom.order.delivered.v1`, creates one FROZEN payout per (order, seller), schedules unlock_at = delivered + 3 BD, then a daily cron initiates PSP transfer.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: LEDGER_GUIDE.md § 8.2, DISASTER_RECOVERY.md § 2.
+READ FIRST: CLAUDE.md § 4.8, LEDGER_GUIDE.md § 8, DATA_DICTIONARY.md § 9.
 
-Implement the hourly reconciliation script and wire it.
+Implement /internal/sellerpayout/ inside fin-svc.
 
-PATHS TO TOUCH:
+const PayoutDelayBusinessDays = 3  // v5 LOCKED.
 
-/scripts/ledger-reconcile.sh    # complete bash file
-/cmd/fin-svc/main.go            # add a /admin/set-read-only endpoint (auth: shared static admin token)
-/internal/wallet/admin.go       # SetReadOnly(reason string) function
-/deploy/cron/mopro-cron         # cron file mounted into the host or a sidecar
+Domain:
+  Payout { ID, OrderID, SellerID, AmountMinor, Currency, DeliveredAt, UnlockAt, PaidAt,
+           PspTransferID, Status, Market, LedgerTransactionID, IdempotencyKey, ... }
 
-CONTENT REQUIREMENTS:
+Service interface:
+  SchedulePayoutForOrder(ctx, ev OrderDeliveredEvent) error      ← idempotent per (order_id, seller_id)
+  RunDailyPayouts(ctx, runDate time.Time) error                  ← idempotent per payout_id
+  ReconcileWithPSP(ctx, payoutID) error                          ← used when webhook missing
+  CancelPayout(ctx, payoutID, reason string) error               ← refund/order-cancel path
 
-1. /scripts/ledger-reconcile.sh — verbatim from LEDGER_GUIDE.md § 8.2:
+SchedulePayoutForOrder logic:
+  1. aggregateBySeller(ev.Items): map[seller_id] sum(items[i].SellerNetMinor)
+  2. unlockAt = pkg/timex.AddBusinessDays(ev.DeliveredAt, 3, calendarFor(ev.Market))
+  3. For each (sellerID, netMinor): if payout doesn't exist for (order, seller), INSERT.
+  4. NO ledger move at schedule time (escrow already holds funds from order capture).
 
-   #!/usr/bin/env bash
-   set -euo pipefail
+RunDailyPayouts logic:
+  SELECT WHERE unlock_at <= today AND status='scheduled' LIMIT 1000.
+  For each:
+    a. PSP InitiateTransfer (idempotency_key = payout.IdempotencyKey).
+    b. wallet.PostInTx:
+         D liability:seller_payable:TRY  amount=p.AmountMinor
+         C asset:bank:escrow:TRY         amount=p.AmountMinor
+    c. Mark payout 'processing', store psp_transfer_id and ledger_transaction_id.
+    d. Insert outbox fin.seller.payout.posted.v1.
 
-   DIFF=$(docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger -tAc \
-     "SELECT COALESCE(SUM(CASE WHEN direction='D' THEN amount_minor ELSE -amount_minor END), 0)
-      FROM wallet_schema.ledger_entries")
+ReconcileWithPSP:
+  Fetches PSP GET /transfers/<id>; updates status to 'paid' or 'failed' + records reasons.
 
-   if [ "$DIFF" -ne "0" ]; then
-       docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger -c \
-         "INSERT INTO wallet_schema.ledger_alerts(severity, message, detected_at)
-          VALUES ('CRITICAL', 'Sum D-C != 0 (delta=$DIFF)', now())"
+CancelPayout:
+  Reversal: D asset:bank:escrow:TRY / C liability:seller_payable:TRY.
+  UPDATE payout SET status='reversed' (only status is mutable; trigger blocks core fields).
 
-       curl -X POST "$PAGERDUTY_API" -H "Content-Type: application/json" \
-         -d "{\"event_action\":\"trigger\",\"payload\":{\"summary\":\"LEDGER INVARIANT VIOLATION delta=$DIFF\",\"severity\":\"critical\"}}"
+Property tests (gopter):
+  - For random delivered_at across 5 years, payout.UnlockAt == AddBusinessDays(delivered_at, 3, TR_calendar)
+  - Per-seller aggregation: items[a,b] both seller=42 → ONE payout row with sum(net)
+  - UPDATE on payout.amount_minor raises (immutability)
+  - Re-receiving the same delivered event does NOT create duplicate payouts
 
-       curl -X POST "http://fin-svc:8080/admin/set-read-only" \
-         -H "Authorization: Bearer ${ADMIN_INTERNAL_TOKEN}" \
-         -d "{\"reason\":\"ledger-invariant\"}"
-   fi
+Wire the consumer: fin-svc.event-consumer subscribes to ecom.order.delivered.v1 and dispatches to SchedulePayoutForOrder (same event, second consumer group).
 
-   curl -sf "https://hc-ping.com/$HEALTHCHECK_LEDGER_RECONCILE_UUID"
-
-2. /cmd/fin-svc/main.go: add admin sub-router with a single handler that calls wallet.SetReadOnly.
-
-3. /internal/wallet/admin.go:
-   - SetReadOnly flips an in-memory atomic flag and writes to wallet_schema.ledger_alerts.
-   - All write methods on Service check the flag and return ErrReadOnlyMode if set.
-   - UnsetReadOnly is human-only via mopro CLI; not auto.
-
-4. /deploy/cron/mopro-cron (host crontab fragment):
-   5 * * * * /opt/mopro/scripts/ledger-reconcile.sh >> /var/log/mopro/reconcile.log 2>&1
-
-5. mopro CLI command:
-   mopro ledger reconcile --dry-run
-   mopro ledger reconcile --confirm
-   The CLI shells out to the same script for "--confirm"; for "--dry-run" it just prints DIFF without alerting.
-
-6. Tests:
-   - Manual sabotage: insert a single D entry that bypasses the trigger via raw SQL as ledger_admin (a privileged DBA action) — the reconcile script SHOULD detect it and trigger PagerDuty + read-only.
-   - Healthchecks.io ping is required even when DIFF=0 (silence = alarm).
-
-DO NOT auto-recover from a non-zero diff. Only humans flip back to read-write after investigation.
-DO NOT log ADMIN_INTERNAL_TOKEN.
+Report: file list, property test output, sample payout schedule.
 ```
 
 **Verification / Done Criteria:**
-- [ ] Cron entry in place; first run after install logs success.
-- [ ] Manual diff sabotage triggers PagerDuty test (use a non-prod webhook in dev).
-- [ ] fin-svc switches to read-only after the script's POST.
-- [ ] All wallet writes return ErrReadOnlyMode while in read-only.
-- [ ] Healthchecks.io ping fires even on DIFF=0.
+- [ ] Property tests pass.
+- [ ] Mutating payout core fields is rejected.
+- [ ] One payout per (order, seller); duplicate event creates no extra rows.
 
 ---
 
-## Prompt 2.4 — commission Settlement Cron and Accrual Path
+## Prompt 2.4 — Hourly Per-Currency Reconciliation Cron + Cashback/Payout Sanity Checks
 
-**Phase & Goal:** Phase 2. Implement the monthly commission settlement that computes accrued amounts per seller and emits fin.commission.refund_requested.v1, plus the consumer that posts the actual ledger entries.
+**Phase & Goal:** Phase 2. The reconciliation script that, every hour, verifies per-currency D=C and cashback obligation/payout sums match.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: ARCHITECTURE.md § 5 step 7–10, LEDGER_GUIDE.md § 6, eventbus topics.
+READ FIRST: LEDGER_GUIDE.md § 9.
 
-Implement the commission module accrual + settlement.
+Implement /scripts/ledger-reconcile.sh per LEDGER_GUIDE.md § 9.2 verbatim.
+Add weekly /scripts/cashback-sanity.sh verifying:
+  SELECT SUM(amount_minor) FROM cashback_schema.payments WHERE status='paid'
+  ==
+  SELECT SUM(le.amount_minor)
+    FROM wallet_schema.ledger_entries le
+    JOIN wallet_schema.transactions t ON t.id = le.transaction_id
+    WHERE t.type='cashback_payment' AND le.direction='D'
+And /scripts/seller-payout-sanity.sh similarly for type='seller_payout'.
 
-PATHS:
+Wire all three into cron:
+  /etc/cron.d/mopro-reconcile
+    5 *  * * * deploy /opt/mopro/scripts/ledger-reconcile.sh
+    0 4  * * 0 deploy /opt/mopro/scripts/cashback-sanity.sh
+    15 4 * * 0 deploy /opt/mopro/scripts/seller-payout-sanity.sh
 
-/internal/commission/api.go
-/internal/commission/service.go
-/internal/commission/accrual.go
-/internal/commission/settlement.go
-/internal/commission/repository.go
-/internal/commission/domain.go
-/internal/commission/{api,service,settlement}_test.go
-/migrations/ledger/0020_create_commission_tables.sql
-/scripts/settlement-monthly.sh
+If any returns non-zero: PagerDuty trigger + fin-svc to read-only.
 
-REQUIREMENTS:
-
-1. domain.go:
-   type Rule struct { ID int64; CategoryID int64; Percent int32; Active bool }   // percent in basis points (e.g., 250 = 2.5%)
-   type Accrual struct { ID int64; OrderID int64; SellerID int64; AmountMinor int64; Period string; CreatedAt time.Time }
-   type Settlement struct { ID int64; SellerID int64; Period string; AmountMinor int64; Status string; CreatedAt time.Time }
-
-2. 0020_create_commission_tables.sql:
-   CREATE TABLE commission_schema.rules (
-       id BIGSERIAL PRIMARY KEY, category_id BIGINT NOT NULL, percent INTEGER NOT NULL CHECK (percent BETWEEN 0 AND 5000),
-       active BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-   );
-   CREATE TABLE commission_schema.accruals (
-       id BIGSERIAL PRIMARY KEY, order_id BIGINT NOT NULL, seller_id BIGINT NOT NULL,
-       amount_minor BIGINT NOT NULL CHECK (amount_minor > 0), period TEXT NOT NULL,
-       idempotency_key TEXT NOT NULL UNIQUE, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-   );
-   CREATE INDEX accruals_period_seller_idx ON commission_schema.accruals(period, seller_id);
-   CREATE TABLE commission_schema.settlements (
-       id BIGSERIAL PRIMARY KEY, seller_id BIGINT NOT NULL, period TEXT NOT NULL,
-       amount_minor BIGINT NOT NULL, status TEXT NOT NULL DEFAULT 'pending',
-       idempotency_key TEXT NOT NULL UNIQUE, created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-   );
-
-3. accrual.go consumer for ecom.order.completed.v1:
-   - On each event, compute commission per item using rules, insert one accruals row per (order_id, seller_id, period). idempotency_key = `accrual:${order_id}:${seller_id}`.
-   - The accrual itself does NOT post ledger entries; it accumulates obligations.
-
-4. settlement.go is the cron-triggered function:
-
-   func (s *service) RunSettlement(ctx context.Context, period string) error {
-       // 1. Aggregate accruals per seller for the period.
-       // 2. For each seller with > 0 accrued, insert a settlement row + emit fin.commission.refund_requested.v1 via outbox.
-       // 3. Mark accruals as settled (a status column is added in a later migration if needed).
-   }
-
-5. wallet consumer for fin.commission.refund_requested.v1:
-   - Posts ledger entries: D liability:platform_pool, C liability:wallet:seller_<id>, amount_minor.
-   - Idempotency: settlement.idempotency_key.
-   - Emits fin.commission.refund_posted.v1 via outbox.
-
-6. /scripts/settlement-monthly.sh:
-   #!/usr/bin/env bash
-   set -euo pipefail
-   PERIOD=$(date -u -d "yesterday" +%Y-%m)
-   docker exec fin-svc /app/app run-settlement --period "$PERIOD"
-
-7. Cron: 0 3 1 * * /opt/mopro/scripts/settlement-monthly.sh >> /var/log/mopro/settlement.log 2>&1
-
-8. Tests:
-   - Run-settlement twice for the same period → exactly one settlement row per seller (idempotent).
-   - Property test: total accruals = total settlements (per period, per seller, per amount).
-
-DO NOT post commission ledger entries directly from the order.completed consumer; only accruals there.
-DO NOT use float for percent calculations; use integer math with basis points.
+Report: scripts, cron file, sample dry-run.
 ```
 
-**Verification / Done Criteria:**
-- [ ] accrual consumer is idempotent across replays.
-- [ ] Settlement cron is idempotent across same-period runs.
-- [ ] After settlement, ledger entries appear with correct D/C and balance.
-- [ ] fin.commission.refund_posted.v1 events appear in Redis Streams.
-- [ ] No floats anywhere.
+---
+
+## Prompt 2.5 — Cashback Monthly Cron + Seller Payout Daily Cron Wiring
+
+**Phase & Goal:** Phase 2. Wire the two crons to fire on schedule with healthchecks.io ping.
+
+**Copy-Paste Prompt:**
+
+```
+READ FIRST: ARCHITECTURE.md § 4.2, INFRASTRUCTURE.md § 9.3.
+
+Add to /etc/cron.d/mopro-fin:
+  0 2 1 * * deploy docker exec fin-svc /app/app cashback-cron --month $(date -u +%Y-%m) && curl -sf https://hc-ping.com/$HEALTHCHECK_CASHBACK_CRON_UUID
+  30 2 * * * deploy docker exec fin-svc /app/app seller-payout-cron --date $(date -u +%Y-%m-%d) && curl -sf https://hc-ping.com/$HEALTHCHECK_SELLER_PAYOUT_CRON_UUID
+
+The CLI subcommands `cashback-cron` and `seller-payout-cron` invoke RunMonthlyPayments / RunDailyPayouts respectively.
+
+Both healthcheck UUIDs configured in healthchecks.io with grace period 30 minutes; alert on missing ping → SEV2 PagerDuty.
+
+Report cron file, healthcheck dashboard screenshot description.
+```
 
 ---
 
 # PHASE 3 — Distributed Sagas & Async Jobs
 
-The goal of Phase 3 is to wire the cross-service async flows: Redis Streams consumers, DLQ handling, retries, and the outbox-publisher worker.
+## Prompt 3.1 — Wire ecom.order.delivered.v1 → BOTH Cashback Plan AND Seller Payout
 
-## Prompt 3.1 — Wire `ecom.order.completed.v1` Saga End-to-End
+**Phase & Goal:** Phase 3. The single delivered event has TWO consumer groups (cashback-engine and sellerpayout-engine). Verify both fire on every delivered order, idempotently.
 
-**Phase & Goal:** Phase 3. Connect order-side outbox publication to fin-svc commission accrual consumption and jobs-svc notification dispatch.
-
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: ARCHITECTURE.md § 5, eventbus internals, LEDGER_GUIDE.md outbox rules.
+READ FIRST: ARCHITECTURE.md § 5, LEDGER_GUIDE.md § 7.1, § 8.1.
 
-Wire the `ecom.order.completed.v1` topic from production to consumption.
+Configure fin-svc.event-consumer with TWO Redis consumer groups on stream ecom.order.delivered.v1:
+  - Group "cashback-engine"  → handler: cashback.CreatePlanForOrder
+  - Group "sellerpayout-engine" → handler: sellerpayout.SchedulePayoutForOrder
 
-PRODUCER SIDE (core-svc):
+Both groups use XREADGROUP COUNT 100 BLOCK 5000.
+Both handlers MUST be idempotent (per their own key structure).
+On handler error: XACK is NOT called → message redelivered after timeout (5 min); after 3 deliveries, move to DLQ.
 
-1. /internal/payment/captured_listener.go:
-   When the PSP webhook reports payment.captured for an order:
-   - Begin postgres-ecom tx.
-   - UPDATE order_schema.orders SET status='paid' WHERE id=$1 AND status='pending_payment'.
-   - INSERT INTO order_schema.outbox VALUES (event_type='ecom.order.completed.v1', payload, idempotency_key=order_id::text).
-   - Commit.
+Add integration test: simulate one delivered event for an order with 3 items from 2 sellers.
+Assert:
+  - 1 cashback plan row created
+  - 24 cashback payment rows created
+  - 2 seller_payout rows created (one per seller)
+  - Re-emit the SAME event → no new rows in either table
 
-2. /internal/order/outbox_publisher.go:
-   Reuse internal/outbox.Publisher pointed at order_schema.outbox. Worker started in /cmd/core-svc/main.go.
-
-CONSUMER SIDE (fin-svc):
-
-3. /internal/commission/accrual_consumer.go:
-   group: "fin-commission"
-   consumer: hostname or container ID
-   On message: parse payload, compute commission per item, write accrual rows; idempotency via accruals.idempotency_key.
-   On success: XACK.
-   On error after 5 retries: DLQ (see Prompt 3.2).
-
-CONSUMER SIDE (jobs-svc):
-
-4. /internal/notification/order_completed_listener.go:
-   group: "jobs-notification"
-   On message: enqueue an SMS + push notification for the user. Idempotency: notification.id derived from event.idempotency_key.
-
-WIRING:
-
-5. /cmd/core-svc/main.go starts the publisher worker.
-   /cmd/fin-svc/main.go starts the accrual consumer.
-   /cmd/jobs-svc/main.go starts the notification consumer.
-
-6. Tracing:
-   Each consumer creates a child span from the trace_id in the event. Spans are exported to Grafana Tempo via OTLP.
-
-7. Tests (integration):
-   - Place an order, simulate payment.captured.
-   - Verify: order status=paid, outbox row published_at set, commission accrual row exists, notification queued.
-   - End-to-end: a single trace_id appears in all three services' logs.
-
-DO NOT auto-bridge the consumer with `if err == nil`; you MUST XACK only after Handler returns nil; on error, do not XACK so it stays in PEL for XCLAIM.
-DO NOT have multiple consumer groups for the same service+topic combination.
-DO NOT inline the consumer's handler logic into the eventbus; keep separation.
+Report: configuration, test output, Redis XINFO GROUPS output.
 ```
 
 **Verification / Done Criteria:**
-- [ ] After a simulated payment.captured, the order is paid, accrual exists, notification queued.
-- [ ] One trace_id is present across producer + both consumers.
-- [ ] Replaying the same event N times yields one accrual and one notification.
-- [ ] XPENDING on the consumer group is empty after success.
+- [ ] Both consumer groups receive every delivered event.
+- [ ] Replay creates no duplicates.
 
 ---
 
-## Prompt 3.2 — DLQ Handling for Failed Consumer
+## Prompt 3.2 — DLQ Handling
 
-**Phase & Goal:** Phase 3. Failures must not block the stream; after N retries an event lands in a DLQ stream for human inspection.
+**Phase & Goal:** Phase 3. Dead-letter queue for permanently failed events; CLI replay tools.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: eventbus.RedisBus, eventbus.DLQ.
+READ FIRST: DISASTER_RECOVERY.md § 5.
 
-Implement the per-topic DLQ.
+Implement DLQ behavior:
+  After 3 redelivery attempts of the same event, the consumer:
+    1. Inserts the event into wallet_schema.event_dlq table (id, original_topic, original_message_id, payload, attempt_count, error_history, created_at)
+    2. XACK the original to stop redelivery storm
+    3. Emits Slack alert SEV3 (or SEV2 if >10 messages in DLQ for the same topic in 10 min)
 
-REQUIREMENTS:
+Add CLI commands to /cmd/mopro/main.go:
+  mopro dlq list [--topic <name>] [--since "<duration>"]
+  mopro dlq inspect <dlq_id>
+  mopro dlq replay <dlq_id> [--dry-run]
+  mopro dlq replay --topic <name> --since "<duration>" --confirm
 
-1. /internal/eventbus/dlq.go RedisDLQ:
-   - For topic T, DLQ stream is `<T>.dlq`.
-   - Push records: {event_id, original_payload, first_failed_at, last_failed_at, failure_count, last_error, consumer_group}.
-   - MAXLEN ~ 5000 (approx) to bound storage.
+Replay re-publishes the original event to the original stream with the original idempotency key, so consumers see no duplicate effects.
 
-2. RedisBus.Run loop:
-   On handler error:
-     - Increment per-message retry counter in a hash key: pel:{group}:{message_id}.
-     - If retries < 5: do nothing (message remains in PEL; XCLAIM will retry after pendingTimeout).
-     - If retries == 5: dlq.Push, then XACK to clear the PEL entry.
-   - Use XCLAIM with idleTime=pendingTimeout (default 60s) to reclaim stuck messages from dead consumers.
-
-3. mopro CLI:
-   mopro outbox list --aggregate <name>                    # in DB outbox
-   mopro stream dlq list <topic>                           # show DLQ entries
-   mopro stream dlq replay <topic> --event-id <id>         # republish to original topic with idempotency_key preserved
-   mopro stream dlq purge <topic> --before "2025-01-01"
-
-4. Metrics:
-   mopro_eventbus_consumer_failures_total{topic,group,reason}
-   mopro_eventbus_dlq_pushes_total{topic}
-   mopro_eventbus_dlq_size{topic}    # gauge sampled every 30s
-
-5. Alerts:
-   - dlq_size > 10 → Slack alert.
-   - dlq_size > 100 → PagerDuty.
-
-6. Tests:
-   - Failing handler: after 5 retries, event lands on DLQ; further events on the topic still process.
-   - Reclaim: kill the consumer mid-handle; another consumer in the group picks up after pendingTimeout.
-
-DO NOT auto-replay from DLQ. Replay is a human decision via mopro CLI.
-DO NOT XACK before handler success.
+Report: DLQ schema, CLI invocations, sample alert payload.
 ```
-
-**Verification / Done Criteria:**
-- [ ] Permanently-failing handler routes the event to DLQ after 5 retries.
-- [ ] Other events on the same topic continue to process.
-- [ ] mopro stream dlq list shows the failed event.
-- [ ] PagerDuty alert wires fire on dlq_size > 100.
 
 ---
 
-## Prompt 3.3 — outbox-publisher Worker Shipping Daemon
+## Prompt 3.3 — Outbox Publisher Productionize
 
-**Phase & Goal:** Phase 3. Final hardening of the outbox-publisher to handle backpressure, monitoring, and graceful shutdown.
+**Phase & Goal:** Phase 3. Make the outbox-publisher robust against backpressure, Redis flaps, and partial failures.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: /internal/outbox/publisher.go (existing skeleton), eventbus.Publisher.
+READ FIRST: LEDGER_GUIDE.md § 5, DISASTER_RECOVERY.md § 5.
 
-Productionize the outbox-publisher.
+Productionize /internal/outbox/publisher.go:
+  - Adaptive batch size (start at 100, scale to 500 if no errors, fall back on transient errors).
+  - Exponential backoff on Redis errors (1s, 2s, 4s, 8s capped at 60s).
+  - Metric mopro_<svc>_outbox_lag_seconds (oldest unpublished row age).
+  - Alert if lag > 60s.
+  - Graceful shutdown drains in-flight batch before exit.
 
-REQUIREMENTS:
+Add chaos test: force Redis down for 30s during a publishing burst; verify no rows are lost; verify catch-up after recovery.
 
-1. Backpressure:
-   - If bus.Publish returns error for > 1 minute consecutively, slow down poll interval from 250 ms to 5 s.
-   - Recovery: as soon as one Publish succeeds, return to 250 ms.
-
-2. Metrics:
-   mopro_outbox_pending_count{aggregate}        # gauge
-   mopro_outbox_publish_total{aggregate,result} # counter
-   mopro_outbox_publish_latency_ms{aggregate}   # histogram
-
-3. Graceful shutdown:
-   - On SIGTERM: stop the polling loop, drain in-flight publishes (max 30 s), close DB pool.
-
-4. Multi-instance safety:
-   Use SELECT ... FROM <schema>.outbox WHERE published_at IS NULL ORDER BY id LIMIT 100 FOR UPDATE SKIP LOCKED.
-   This allows multiple publishers to coexist without double-publishing.
-
-5. Per-aggregate publishers:
-   core-svc runs publishers for order_schema.outbox, identity_schema.outbox (when added).
-   fin-svc runs publishers for wallet_schema.outbox, commission_schema.outbox.
-   Each is a separate goroutine with its own SELECT scope.
-
-6. Health endpoint:
-   GET /healthz/outbox returns {pending:<count>, oldest:<rfc3339>, lag_seconds:<int>}.
-
-7. Tests:
-   - Insert 10000 outbox rows; publisher empties them in < 60 s.
-   - Kill publisher mid-batch; a second instance picks up via SKIP LOCKED.
-   - Publish failure for 65 s → poll interval slows to 5 s.
-
-DO NOT publish a row twice (idempotency_key on bus side, but also UPDATE SET published_at upon success).
-DO NOT delete outbox rows; keep them for audit. A separate weekly job archives older-than-90-days rows.
+Report: code, chaos test output, lag metric example.
 ```
-
-**Verification / Done Criteria:**
-- [ ] 10k row drain in < 60 s.
-- [ ] Two publisher processes do not double-publish.
-- [ ] Backpressure activates and deactivates correctly.
-- [ ] /healthz/outbox lag matches reality.
 
 ---
 
-# PHASE 4 — Flutter Mobile App
+## Prompt 3.4 — Anti-Fraud ML Pipeline (Kategori Sahteciliği) — v7 NEW
 
-The goal of Phase 4 is to build the Flutter mobile app skeleton with Riverpod 2 + code generation, Dio with interceptors, and atomic-design widgets. The Wallet Summary widget below is the template; cart, catalog, etc. follow the same pattern.
+**Phase & Goal:** Phase 3+. Build the anti-fraud module that catches sellers who list a high-commission category product as a low-commission category to game the cashback formula. Two ML models + manual review queue.
 
-## Prompt 4.1 — Initialize Flutter Project with Riverpod 2 + Generator
+**Threat model (kritik):** v6 modelinde aylık coin = (price × commission_pct × %50) / 12. Bir satıcı 1000 TL'lik bir telefonu (gerçek %7 komisyon) "Atkı, Bere" kategorisinde (%20 komisyon) listelerse, alıcı yanlış fazla coin alır, Mopro yanlış fazla yükümlülük taşır. Bu doğrudan finansal saldırıdır.
 
-**Phase & Goal:** Phase 4. Bootstrap the mobile project with the chosen state management and code-generation toolchain.
-
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: PRD v3.2 § 5 (Mobile Application Architecture).
+READ FIRST: CLAUDE.md § 4.7 (cashback formula sensitivity), DATA_DICTIONARY.md § 6 (catalog).
 
-Initialize a Flutter app at /mobile/.
+Implement /internal/antifraud/ inside core-svc (NOT fin-svc — this is product
+classification, not financial). Module owns:
+  /internal/antifraud/api.go
+  /internal/antifraud/service.go
+  /internal/antifraud/nlp/        ← text classification client
+  /internal/antifraud/vision/     ← image classification client
+  /internal/antifraud/rules/      ← deterministic heuristic rules
+  /internal/antifraud/queue/      ← review queue repository
 
-REQUIREMENTS:
+Service interface:
+  ScoreNewListing(ctx, productID, categoryID, title, description, imageKeys[]) → (Decision, error)
+  Decision { Score 0-100, AutoAction 'auto_approve'|'auto_reject'|'manual_review', Reasons []string }
+  RescoreOnUpdate(ctx, productID) → recompute when seller edits
+  ApproveListing(ctx, productID, reviewerID) → release product to live
+  RejectListing(ctx, productID, reviewerID, reason) → notify seller
 
-1. Run: flutter create --org com.mopro --project-name mopro_shop mobile/
-2. /mobile/pubspec.yaml dependencies (latest stable as of 2026):
+Architecture decision: ML INFERENCE runs in jobs-svc (CPU-bound, isolated).
+core-svc.antifraud calls jobs-svc HTTP /internal/v1/antifraud/score.
 
-   dependencies:
-     flutter: { sdk: flutter }
-     flutter_riverpod: ^2.5.1
-     riverpod_annotation: ^2.3.5
-     dio: ^5.5.0
-     retrofit: ^4.4.1
-     cached_network_image: ^3.4.1
-     flutter_secure_storage: ^9.2.2
-     freezed_annotation: ^2.4.4
-     json_annotation: ^4.9.0
-     uuid: ^4.5.1
-     sentry_flutter: ^8.10.0
-     firebase_messaging: ^15.1.4
-     firebase_core: ^3.8.0
-     mixpanel_flutter: ^2.3.4
-     isar: ^3.1.0
-     isar_flutter_libs: ^3.1.0
+═══ MODEL 1: NLP TEXT CLASSIFIER ═══
+Task: Given (title + description + brand), predict the category.
+Compare predicted vs. seller-claimed category → mismatch score.
 
-   dev_dependencies:
-     flutter_test: { sdk: flutter }
-     build_runner: ^2.4.13
-     riverpod_generator: ^2.4.3
-     freezed: ^2.5.7
-     json_serializable: ^6.8.0
-     retrofit_generator: ^9.1.5
-     custom_lint: ^0.6.4
-     riverpod_lint: ^2.3.13
-     mocktail: ^1.0.4
+Model selection (May 2026 baseline):
+  - PRIMARY: dbmdz/bert-base-turkish-cased fine-tuned on TR e-commerce data.
+    Why: best F1 on Turkish, runs on CPU 200ms p95, 110M params.
+  - ALT: xlm-roberta-base (if multilingual needed for Phase 7+).
+  - Frame as multi-class classification over the 42 ref_schema.categories.
 
-3. Folder structure:
-   /mobile/lib/
-     main.dart
-     app.dart
-     core/
-       config/
-       errors/
-       network/             # dio, interceptors, retrofit clients
-       storage/             # secure storage wrappers
-       analytics/
-     features/
-       auth/
-       home/
-       catalog/
-       cart/
-       wallet/
-       support/
-       profile/
-     shared/
-       atoms/
-       molecules/
-       organisms/
-       theme/
+Training data:
+  - Bootstrap: scrape 100K product titles from Trendyol / Hepsiburada with category
+    labels (legal grey area; consult counsel; better: use public datasets like
+    GittiGidiyor open dataset or buy from a vendor like Sutucu Datasets).
+  - Active learning: as Mopro accumulates real listings + manual review verdicts,
+    add to training set. Retrain monthly.
 
-4. Riverpod root in main.dart:
-   void main() {
-     WidgetsFlutterBinding.ensureInitialized();
-     runZonedGuarded(() {
-       runApp(const ProviderScope(child: MoproApp()));
-     }, (e, s) => /* sentry capture */);
-   }
+Serving:
+  - Convert to ONNX format → run via /jobs-svc with onnxruntime-go.
+  - Container: gcr.io/distroless/cc-debian12:nonroot + onnxruntime native lib.
+  - Bundled model file: /models/tr-cat-bert-v1.onnx (~440 MB; mounted volume).
 
-5. Code generation working:
-   dart pub get
-   dart run build_runner build --delete-conflicting-outputs
+Output: { predictedCategoryID, confidence 0-1, top5: [{cat,prob}, ...] }
 
-6. Smoke test:
-   flutter test
-   flutter analyze
+═══ MODEL 2: VISION IMAGE CLASSIFIER ═══
+Task: Given product image(s), predict the category.
+Cross-check against seller's claim AND NLP model.
 
-7. iOS/Android baseline:
-   - Set min iOS to 13.0, min Android API to 23.
-   - Add release signing config placeholders (no real keys committed).
+Model selection:
+  - PRIMARY: efficientnet-b0 fine-tuned (5M params, fast on CPU 150ms p95).
+  - ALT: mobilenet-v3-large for even faster inference.
+  - Multi-label: an image can match multiple categories with different probabilities.
 
-DO NOT use any state management other than Riverpod 2.
-DO NOT use http package; only Dio.
-DO NOT include firebase_messaging without firebase_core (init order).
-DO NOT commit GoogleService-Info.plist or google-services.json (gitignore them).
+Training data:
+  - Bootstrap: ImageNet pretrained → fine-tune on 50K labeled product images
+    (same source as NLP).
+  - Augmentation: rotation, crop, color jitter (typical product photo variations).
+
+Serving: same ONNX pattern in jobs-svc.
+
+═══ MODEL 3: DETERMINISTIC RULES ═══
+Independent of ML:
+  - Rule 1: Title contains a brand name strongly associated with another category.
+    Example: title "iPhone 15" + claimed_category="Atkı, Bere" → flag.
+    Maintain ref_schema.brand_category_hints (brand TEXT, expected_category_id).
+  - Rule 2: Price out of range for the claimed category.
+    Maintain ref_schema.category_price_ranges (category_id, min_minor, max_minor, currency).
+    1000 TL "kalem" = suspicious.
+  - Rule 3: Commission rate exploitation pattern.
+    If commission_pct(claimed) > commission_pct(predicted_by_nlp) → high suspicion
+    (because attacker benefits when claimed > true).
+  - Rule 4: New seller with high-cashback listings.
+    First 30 days, all listings with predicted commission > %15 → manual review.
+
+═══ SCORE COMPUTATION ═══
+Combined score (0=safe, 100=fraud certain):
+  ml_disagreement_score = (1 - nlp_confidence_for_claimed_category) * 50
+                        + (1 - vision_confidence_for_claimed_category) * 30
+  rule_score = sum of rule weights (each rule 0-30 points)
+  final_score = clamp(ml_disagreement_score + rule_score, 0, 100)
+
+Decision matrix:
+  score ≤ 20  → auto_approve, listing goes live immediately
+  21-60       → manual_review, listing pending until reviewer acts
+  ≥ 61        → auto_reject, seller notified with reason, can re-submit
+
+═══ MANUAL REVIEW QUEUE ═══
+Queue rendering:
+  /internal/antifraud/queue/repository.go
+  Table: antifraud_schema.review_queue (id, product_id, score, reasons JSONB,
+         status, assigned_to, reviewed_at, decision, decision_reason, created_at)
+
+Admin UI: simple Vue/React page under admin.moproshop.com:
+  - List of pending items (sorted by created_at)
+  - Click → product details + ML scores + rule hits + image gallery
+  - "Approve" / "Reject (with reason)" buttons
+  - Bulk actions: select multiple, batch approve/reject
+
+SLA: items in queue > 24h → page on-call (high false positive cost: seller waits).
+
+═══ FEEDBACK LOOP ═══
+Every manual decision is appended to:
+  antifraud_schema.training_feedback (product_id, claimed_cat, true_cat,
+      reviewer_decision, created_at)
+
+Monthly cron: re-export training_feedback + retrain models offline (Jupyter
+notebook in /ml/notebooks/), produce new ONNX, swap atomically.
+
+═══ TESTS ═══
+1. Unit: rules trigger correctly for known patterns.
+2. Integration: mock ML inference, verify decision matrix.
+3. Property: monotonicity — higher rule_score never decreases final decision severity.
+4. Adversarial: seed 100 known fraud listings (synthetic) and 100 known good listings,
+   measure precision/recall. Target: precision ≥ 0.90, recall ≥ 0.85.
+5. Performance: p95 ScoreNewListing < 800ms (incl. 2 ML round-trips to jobs-svc).
+
+═══ SCHEMA ADDITIONS ═══
+catalog_schema.products: ADD COLUMN antifraud_status TEXT DEFAULT 'pending'
+                              CHECK IN ('pending','approved','rejected','live')
+                         ADD COLUMN antifraud_score INTEGER
+
+antifraud_schema (new):
+  - review_queue (above)
+  - training_feedback (above)
+  - rules_config: deterministic rule weights (mutable; admin UI to tune)
+  - model_versions: which ONNX file is active (for rollback)
+
+ref_schema additions:
+  - brand_category_hints
+  - category_price_ranges
+
+═══ CRON ═══
+- antifraud-rescore-cron (daily 03:00 UTC): re-score all 'pending' or 'live' products
+  whose category_rules updated in last 24h (catches ref data changes).
+
+═══ ESCALATION ═══
+If a product reaches 'live' status and IS later detected as fraudulent
+(buyer reports, manual audit), fin-svc.cashback CancelPlan + commission Reversal
++ block the seller, notify legal team. See LEDGER_GUIDE.md § 7.4.
+
+Report: module structure, sample inference call, sandbox test scores
+(precision/recall on adversarial set), admin UI wireframe.
 ```
 
 **Verification / Done Criteria:**
-- [ ] `flutter pub get` succeeds.
-- [ ] `dart run build_runner build` succeeds.
-- [ ] `flutter test` and `flutter analyze` are green.
-- [ ] No firebase config files committed.
-- [ ] App runs on iOS simulator and Android emulator (`flutter run`).
+- [ ] NLP + Vision models served by jobs-svc, both < 250ms p95.
+- [ ] Deterministic rules implemented and unit-tested.
+- [ ] Combined score logic deterministic, property-tested.
+- [ ] Adversarial set: precision ≥ 0.90, recall ≥ 0.85.
+- [ ] Admin review UI live; SLA cron pages on > 24h backlog.
+- [ ] Monthly retraining notebook checked in; documented run process.
 
 ---
 
-## Prompt 4.2 — Build Dio Client with Interceptors (Auth, Idempotency, Trace, Retry)
+# PHASE 4 — Flutter Mobile
 
-**Phase & Goal:** Phase 4. Every API call must carry a fresh Idempotency-Key for mutations, propagate trace_id for observability, attach the bearer token, and retry idempotent failures.
+## Prompt 4.1 — Initialize Flutter Project with Riverpod 2 + i18n
 
-**Copy-Paste Prompt for Claude Code:**
+**Phase & Goal:** Phase 4. Mobile app skeleton with state management, theming, localization-ready.
+
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: PRD v3.2 § 12 API design, DEVELOPMENT.md.
+READ FIRST: ARCHITECTURE.md § 1, DEVELOPMENT.md § 15.
 
-Implement the network stack.
+Create /mobile (Flutter project) with:
+  - Flutter 3.x, Dart 3.x
+  - flutter_riverpod 2.x
+  - go_router for navigation
+  - dio for HTTP
+  - easy_localization for i18n
+  - flutter_secure_storage for tokens
+  - cached_network_image
+  - uuid (for idempotency-key generation)
 
-PATHS:
+Folder layout:
+  /mobile/lib/
+    main.dart
+    app/             (theme, router, env)
+    core/            (network, storage, errors)
+    features/
+      auth/          (login, register, otp)
+      home/          (anasayfa, banner)
+      catalog/       (categories, product detail with cashback preview)
+      cart/
+      checkout/
+      orders/
+      wallet/        (cashback timeline, balance)
+      seller/        (panel webview placeholder)
+      support/
+      profile/
+    shared/
+      widgets/       (atomic design)
+      theme/
 
-/mobile/lib/core/network/dio_factory.dart
-/mobile/lib/core/network/interceptors/auth_interceptor.dart
-/mobile/lib/core/network/interceptors/idempotency_interceptor.dart
-/mobile/lib/core/network/interceptors/trace_interceptor.dart
-/mobile/lib/core/network/interceptors/retry_interceptor.dart
-/mobile/lib/core/network/interceptors/error_interceptor.dart
-/mobile/lib/core/network/api_client.dart           # @RestApi() retrofit client
-/mobile/lib/core/storage/secure_storage.dart
-/mobile/lib/core/network/network_test.dart
+/mobile/assets/translations/
+  tr-TR.json    ← seeded with all UI strings in Turkish
+  en-US.json    ← seeded with English
+  de-DE.json    ← placeholder
+  ar-AE.json    ← placeholder
 
-REQUIREMENTS:
+NO hardcoded user-facing strings in Dart files; ALL via context.tr('key').
 
-1. dio_factory.dart:
-   Dio buildDio({required String baseUrl}) {
-     final dio = Dio(BaseOptions(
-       baseUrl: baseUrl,
-       connectTimeout: const Duration(seconds: 6),
-       receiveTimeout: const Duration(seconds: 12),
-       sendTimeout:    const Duration(seconds: 6),
-       headers: { 'Accept': 'application/json' },
-     ));
-     dio.interceptors.addAll([
-       TraceInterceptor(),
-       AuthInterceptor(secureStorage),
-       IdempotencyInterceptor(),
-       RetryInterceptor(),
-       ErrorInterceptor(sentry),
-     ]);
-     return dio;
-   }
+Cashback preview key in catalog product detail:
+  tr-TR: "Bu üründen aylık {monthly} Mopro Coin alacaksınız — SÜRESİZ."
+  en-US: "You'll receive {monthly} Mopro Coin per month from this product — FOREVER."
 
-2. trace_interceptor.dart:
-   - On request: attach `X-Trace-ID: <uuid v4>` if absent.
-   - On response: read `X-Trace-ID` from server (if echoed) for log correlation.
-
-3. auth_interceptor.dart:
-   - Attach `Authorization: Bearer <jwt>` from secure storage.
-   - On 401 response: try refresh once via /v1/auth/refresh; on success, retry the original request.
-   - On second 401: clear tokens, push to login screen.
-
-4. idempotency_interceptor.dart:
-   - For methods POST, PUT, PATCH, DELETE: generate a UUID v4 and attach `Idempotency-Key`.
-   - Cache the (URL + body hash → key) mapping in-memory for 24 h so retries reuse the same key.
-
-5. retry_interceptor.dart:
-   - Retry up to 3 times for 5xx, network errors, 429.
-   - Exponential backoff: 200 ms, 600 ms, 1.2 s with jitter.
-   - DO NOT retry POST/PATCH/DELETE without an Idempotency-Key.
-
-6. error_interceptor.dart:
-   - Map HTTP errors to typed exceptions in /core/errors/.
-   - Forward to Sentry with breadcrumbs (URL, status, trace_id; NEVER body content).
-
-7. api_client.dart with retrofit:
-   @RestApi(baseUrl: '')
-   abstract class ApiClient {
-     factory ApiClient(Dio dio) = _ApiClient;
-
-     @GET('/v1/wallet/me/balance')
-     Future<WalletBalanceDto> walletBalance();
-
-     @POST('/v1/orders/checkout')
-     Future<CheckoutResponseDto> checkout(@Body() CheckoutRequestDto body);
-   }
-
-8. Tests with mocktail:
-   - 401 → refresh → retry happy path.
-   - 5xx → 3 retries → final failure surfaces typed exception.
-   - POST without explicit Idempotency-Key → interceptor adds one.
-   - Same logical request retried → same Idempotency-Key reused for 24 h.
-
-DO NOT log request/response bodies in production builds.
-DO NOT store tokens in SharedPreferences; only flutter_secure_storage.
-DO NOT swallow exceptions silently.
+Report: file tree, sample widget using context.tr.
 ```
-
-**Verification / Done Criteria:**
-- [ ] Tests for refresh, retry, idempotency-key cache pass.
-- [ ] Sentry captures errors with trace_id but never body content.
-- [ ] Retrofit client compiles after `build_runner build`.
 
 ---
 
-## Prompt 4.3 — Wallet Summary Widget Following Atomic Design
+## Prompt 4.2 — Dio Client + Interceptors (Locale, Auth, Idempotency, Trace, Retry)
 
-**Phase & Goal:** Phase 4. Build the mobile Wallet feature: data layer (provider, repository), presentation layer (atom→molecule→organism), with the Wallet Summary widget on the Home/Wallet screen.
+**Phase & Goal:** Phase 4. HTTP client wired with all required cross-cutting concerns.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: PRD v3.2 § 6.5 (Wallet flows), Prompt 4.2.
+Create /mobile/lib/core/network/dio_client.dart with these interceptors:
+  1. AuthInterceptor: adds Authorization: Bearer <jwt> from secure storage.
+  2. LocaleInterceptor: adds Accept-Language: <user_locale> (e.g., tr-TR).
+  3. IdempotencyInterceptor: for POST/PUT/PATCH, generates UUIDv7, attaches X-Idempotency-Key header.
+  4. TraceInterceptor: generates client-side trace_id, sets X-Trace-Id; reads X-Trace-Id from response.
+  5. RetryInterceptor: retries idempotent requests on 5xx with exponential backoff (250ms, 500ms, 1s); max 3 retries; respects X-Retry-After.
+  6. ErrorMappingInterceptor: maps server error codes to AppError (typed) for UI to render.
 
-Build the Wallet Summary feature.
+Base URL from env: API_BASE_URL=https://api.moproshop.com.
 
-PATHS:
+Add tests with mock server for each interceptor.
 
-/mobile/lib/features/wallet/data/wallet_dto.dart
-/mobile/lib/features/wallet/data/wallet_repository.dart
-/mobile/lib/features/wallet/data/wallet_repository_impl.dart
-/mobile/lib/features/wallet/application/wallet_provider.dart    # @riverpod
-/mobile/lib/features/wallet/presentation/wallet_summary_card.dart
-/mobile/lib/features/wallet/presentation/wallet_screen.dart
-/mobile/lib/shared/atoms/mopro_text.dart
-/mobile/lib/shared/atoms/mopro_button.dart
-/mobile/lib/shared/atoms/mopro_skeleton.dart
-/mobile/lib/shared/molecules/balance_chip.dart
-/mobile/lib/shared/organisms/transaction_list.dart
-/mobile/lib/shared/theme/mopro_theme.dart
-/mobile/test/features/wallet/wallet_provider_test.dart
+Report: code, test output.
+```
 
-REQUIREMENTS:
+---
 
-1. wallet_dto.dart with Freezed:
-   @freezed
-   class WalletBalanceDto with _$WalletBalanceDto {
-     const factory WalletBalanceDto({
-       required int balanceMinor,    // amount in minor units
-       required String currency,     // 'TRY_COIN'
-       required DateTime asOf,
-     }) = _WalletBalanceDto;
+## Prompt 4.3 — Wallet + Cashback Timeline Widget (Atomic Design)
 
-     factory WalletBalanceDto.fromJson(Map<String, dynamic> json) =>
-         _$WalletBalanceDtoFromJson(json);
-   }
+**Phase & Goal:** Phase 4. The wallet screen showing TRY_COIN balance + perpetual monthly cashback amount per active plan.
 
-2. wallet_repository.dart:
-   abstract class WalletRepository {
-     Future<WalletBalanceDto> getBalance();
-     Future<List<WalletTransactionDto>> listTransactions({String? cursor});
-     Future<WithdrawResponseDto> requestWithdraw({
-       required int amountMinor,
-       required String bankAccountRef,
-       required String stepUpToken,
-     });
-   }
+**Copy-Paste Prompt:**
 
-3. wallet_repository_impl.dart uses ApiClient (Prompt 4.2).
-   - getBalance: GET /v1/wallet/me/balance.
-   - listTransactions: GET /v1/wallet/me/transactions?after=<cursor>.
-   - requestWithdraw: POST /v1/wallet/withdraw with X-Step-Up-Token.
+```
+Implement /mobile/lib/features/wallet/:
+  - WalletScreen showing current TRY_COIN balance (formatted with locale)
+  - List of active cashback plans for the user
+  - Per plan: cumulative monthly coin earnings chart (last 12 months + projection of next 12; perpetual)
+  - Total earned to date, total scheduled, plan freeze badge ("Plan dondurulmuş")
+  - Pull to refresh
 
-4. wallet_provider.dart with riverpod_generator:
-   @riverpod
-   Future<WalletBalanceDto> walletBalance(WalletBalanceRef ref) async {
-     final repo = ref.watch(walletRepositoryProvider);
-     return repo.getBalance();
-   }
+API:
+  GET /v1/wallet/balance?currency=TRY_COIN
+  GET /v1/cashback/plans?status=active
+  GET /v1/cashback/plans/:id/payments
 
-   @riverpod
-   class WalletNotifier extends _$WalletNotifier {
-     @override
-     FutureOr<WalletBalanceDto> build() async {
-       final repo = ref.watch(walletRepositoryProvider);
-       return repo.getBalance();
-     }
-     Future<void> refresh() async {
-       state = const AsyncValue.loading();
-       state = await AsyncValue.guard(() => ref.read(walletRepositoryProvider).getBalance());
-     }
-   }
+State management: Riverpod 2 AsyncNotifier per resource.
 
-5. atoms (mopro_text, mopro_button, mopro_skeleton):
-   - Use only ThemeExtension tokens; no hardcoded colors.
-   - mopro_skeleton renders a shimmer placeholder.
+Atomic widgets used:
+  - CoinBalancePill (atom)
+  - PlanCard (molecule)
+  - MonthDot (atom)
+  - PlanTimelineRow (molecule)
+  - PlanList (organism)
 
-6. molecule balance_chip.dart:
-   - Pill-shaped chip with formatted amount + currency.
-   - Format: minor → human ("12.345,67 TL"). Use intl.
+Empty state: "Henüz aktif cashback planınız yok. İlk siparişiniz teslim edildiğinde plan oluşur."
 
-7. organism transaction_list.dart:
-   - Paginated list with pull-to-refresh.
-   - Empty state, error state, loading skeletons.
+Report: widget tree, sample screen render in golden tests, API request log.
+```
 
-8. wallet_summary_card.dart:
-   - Big balance + "Withdraw" button + recent 3 transactions.
-   - Wraps balance_chip and a small transaction_list slice.
-   - Listens to walletNotifierProvider; on AsyncLoading shows skeletons; on AsyncError shows retry button.
+---
 
-9. wallet_screen.dart:
-   - Pull-to-refresh.
-   - Withdraw button → opens a bottom sheet with amount input + bank account picker; after step-up auth (biometric or OTP modal), calls requestWithdraw with a fresh Idempotency-Key (handled by the Dio interceptor).
+## Prompt 4.4 — Seller Panel Web View (Trendyol Comparison)
 
-10. mopro_theme.dart:
-    - Define ThemeExtension<MoproColors> with primary, surface, onSurface, success, danger, warning.
-    - Define ThemeExtension<MoproRadii>, ThemeExtension<MoproSpacing>.
+**Phase & Goal:** Phase 4. Web view component (or web app deployed under seller.moproshop.com) showing the seller transparency table.
 
-11. wallet_provider_test.dart with mocktail:
-    - Initial state: AsyncValue.loading.
-    - Success: emits AsyncData with balance.
-    - Network error: emits AsyncError; refresh() recovers.
+**Copy-Paste Prompt:**
 
-DO NOT hardcode colors, paddings, or text styles in atoms; use ThemeExtension.
-DO NOT format money with toString(); always use intl.NumberFormat with locale.
-DO NOT call repository directly from a Widget; always go via a provider.
+```
+Implement /seller-panel (separate Vue/React app deployed under seller.moproshop.com).
+
+Sayfa: Sipariş Detay
+  - GET /api/v1/seller/orders/:id/breakdown
+  - Render rows: variant | qty | brüt | komisyon (% + ₺) | KDV | hizmet bedeli (0 ₺) | net
+  - Total row at the bottom
+  - Side panel: Trendyol vs Hepsiburada vs Mopro karşılaştırma (rendered from same data; service fee fields show 0 ₺ for Mopro, ~5/7 ₺ for competitors per PRD § 2.2.4)
+  - Footer: "Ödeme tarihi: Sipariş teslim + 3 iş günü = <DD.MM.YYYY>" (read from /v1/payouts/:order_id endpoint)
+
+Sayfa: Aylık Komisyon Faturası
+  - Lists all paid orders for the month
+  - Sum row: brüt, komisyon, KDV, net
+  - Download as PDF (KDV-dahil komisyon faturası, Mopro'nun keserek satıcıya verdiği)
+
+Login: SSO with the satıcı hesabı (existing identity service).
+
+Report: screenshot wireframe description, sample API response, UI text strings.
+```
+
+---
+
+## Prompt 4.5 — Mobil Uygulamanın 35 Ekranı — v7 KAPSAMLI SPESİFİKASYON
+
+**Phase & Goal:** Phase 4. Mobil uygulamanın TÜM ekranları için spec. Her ekran için: amaç, bileşenler, navigation, API çağrıları, state yönetimi.
+
+**Copy-Paste Prompt:**
+
+```
+READ FIRST: /mobile/lib/* skeleton (Prompt 4.1 sonucu), DEVELOPMENT.md § 15 (i18n).
+
+35 ekranı tek tek implement et. Her ekran kendi feature klasörü altında, atomic
+design (atom/molecule/organism) yapısıyla. Tüm metinler context.tr() ile.
+
+Her ekran için bu spec'i uygula. Ekran ekran:
+
+═══ AUTH ═══
+1. SplashScreen (/lib/features/auth/splash_screen.dart)
+   - 1.5s logo animasyon, sonra route: token varsa Home, yoksa Onboarding.
+   - Init: warm-up Riverpod providers (locale, theme, deepLink).
+
+2. OnboardingScreen — 3 sayfalık swipe carousel
+   - Sayfa 1: "Komisyon faizi sana iade — süresiz" + illüstrasyon
+   - Sayfa 2: "Trendyol kalitesi, Mopro şeffaflığı"
+   - Sayfa 3: "Hemen başla" → "Telefon ile Giriş" CTA
+   - SharedPrefs flag: shown_onboarding=true
+
+3. PhoneEntryScreen
+   - +90 country code prefix (kilitli; Phase 1)
+   - Telefon input, format mask "5XX XXX XX XX"
+   - "Devam" CTA → POST /v1/auth/otp/request
+   - Loading state, hata durumunda toast
+
+4. OtpVerifyScreen
+   - 6 haneli OTP, auto-advance, paste destekli
+   - 60s sayaç + "Tekrar gönder" disabled until 0
+   - POST /v1/auth/otp/verify → JWT + refresh token
+   - İlk girişse: route ProfileSetupScreen, değilse HomeScreen
+
+5. ProfileSetupScreen — Sadece ilk girişte
+   - Ad, soyad, doğum tarihi (opt), e-posta (opt)
+   - "Tamamla" → PUT /v1/me + route Home
+
+═══ DISCOVERY ═══
+6. HomeScreen (/lib/features/home/)
+   - Top bar: arama icon, sepet icon (badge), bildirim icon
+   - Banner carousel (3-5, GET /v1/banners?placement=home)
+   - "Bugün Cashback Şampiyonları" yatay scroll (en yüksek aylık coin/ürün)
+   - Kategori chip listesi (top 12)
+   - "Sana Özel" GET /v1/recommendations
+   - "Yeni Gelenler" GET /v1/products?sort=newest
+   - Pull-to-refresh
+   - Bottom nav: Anasayfa | Kategori | Sepet | Cüzdan | Profil
+
+7. CategoryListScreen
+   - 42 kategori grid (icon + isim)
+   - GET /v1/categories
+   - Tap → CategoryProductsScreen
+
+8. CategoryProductsScreen
+   - Filter (fiyat aralığı, marka, renk, beden, indirimli, hızlı kargo)
+   - Sort (önerilen, en yeni, fiyat artan/azalan, en çok satan)
+   - Sonsuz scroll, GET /v1/products?category_id=X&page=N
+   - Her kart: foto, başlık, fiyat, "Aylık X.XX coin/ay" rozeti, sepete ekle butonu
+
+9. SearchScreen
+   - Arama bar (autofocus on tap from home)
+   - Geçmiş aramalar (lokal storage)
+   - Trend aramalar (GET /v1/search/trending)
+   - Live suggestions: GET /v1/search/suggest?q=X (debounce 250ms)
+   - Sonuç sayfası: aynı CategoryProductsScreen widget'ı
+
+10. ProductDetailScreen — kritik
+   - Foto galeri (swipe + zoom)
+   - Başlık, fiyat (büyük), satıcı adı (tap → seller profili)
+   - "Bu üründen aylık X.XX Mopro Coin kazanırsın — SÜRESİZ" rozet (kalın, ACCENT renk)
+   - Cashback hesaplayıcı kartı: "5 yıl boyunca toplam Y.YY coin kazanırsın (=Y₺ değer)"
+   - Variant seçici (renk, beden) — out-of-stock disabled
+   - Adet stepper
+   - "Sepete Ekle" + "Hemen Al" sticky bottom
+   - Açıklama, özellikler, kargo süresi, iade koşulları (collapsible)
+   - "Müşteri Yorumları" (puanlar + filtreli liste)
+   - "Beraber Alınanlar" (yatay scroll)
+   - GET /v1/products/:id
+
+═══ CART & CHECKOUT ═══
+11. CartScreen
+   - Sepetteki tüm varyant satırları
+   - Her satır: foto, başlık, varyant, qty stepper, fiyat, kaldır
+   - Sticky bottom: ara toplam, "X coin/ay kazanacaksın" özet, "Devam Et" CTA
+   - Boş sepet state'i + CTA "Alışverişe Başla"
+   - GET /v1/cart, PATCH /v1/cart/items/:id, DELETE /v1/cart/items/:id
+
+12. AddressSelectScreen (checkout 1/4)
+   - Kayıtlı adres listesi
+   - "Yeni adres ekle" CTA → AddressFormScreen
+   - GET /v1/addresses
+
+13. AddressFormScreen
+   - Ad-soyad, telefon, il (dropdown 81 il), ilçe (dependent dropdown), mahalle, açık adres, posta kodu
+   - "Kaydet" → POST /v1/addresses
+
+14. CargoSelectScreen (checkout 2/4)
+   - Calculated rates from all carriers (CalculateRate API)
+   - Her kart: kargo logo, isim, tahmini teslim, ücret
+   - "Bedava kargo" rozeti (eşik üstü)
+   - Default seçili: en ucuz veya satıcı default
+
+15. PaymentMethodScreen (checkout 3/4)
+   - "Kredi/Banka Kartı" tab (3DS akışı)
+   - "Mopro Coin Bakiye" tab (varsa kullan)
+   - "Kapıda Ödeme" (gelecek; v1 disabled)
+   - Kart formu: kart numarası, isim, son kullanma, CVV (PSP HPP üzerinden render edilir, biz form'u host ETMEYİZ)
+   - "Bilgilerimi sakla" toggle (PSP-side tokenization)
+
+16. CheckoutSummaryScreen (checkout 4/4)
+   - Adres özeti
+   - Kargo özeti
+   - Ürün listesi
+   - Ödeme yöntemi
+   - Ara toplam, kargo, KDV, TOPLAM
+   - "Bu siparişten aylık X.XX Mopro Coin kazanacaksın — SÜRESİZ" highlight
+   - KVKK + satış sözleşmesi onay checkbox'ları (zorunlu)
+   - "Siparişi Tamamla" CTA → POST /v1/orders/checkout (Idempotency-Key header)
+   - Sonra 3DS HTML render veya direkt OrderConfirmedScreen
+
+17. ThreeDSWebViewScreen
+   - PSP hosted 3DS sayfası (WebView)
+   - returnURL'e geri dönünce yapılan POST'a göre Confirmed/Failed
+
+18. OrderConfirmedScreen
+   - "Siparişin alındı! 🎉" (NOT: emoji sadece kullanıcı isterse — bu spec'te illüstrasyon kullan)
+   - Sipariş numarası
+   - "Sipariş tamamlandığında her ay X.XX Mopro Coin kazanmaya başlayacaksın"
+   - "Siparişlerime Git" + "Alışverişe Devam" CTA
+
+═══ ORDER MANAGEMENT ═══
+19. OrderListScreen
+   - Sekmeler: Aktif | Tamamlanan | İptal/İade
+   - Her kart: sipariş no, tarih, durum (renkli badge), ürün adedi, toplam, "Detay" tap
+   - GET /v1/orders?status=X&page=N
+
+20. OrderDetailScreen
+   - Sipariş no, tarih, durum timeline (görsel: Sipariş alındı → Hazırlanıyor → Kargoda → Teslim edildi)
+   - Ürün listesi (tap → ProductDetail)
+   - Adres + kargo bilgisi + tracking link
+   - Ödeme özeti
+   - Cashback durumu: "Kazanmaya başlama tarihi: <DD.MM.YYYY>" veya "Aylık <X.XX> coin alıyorsun"
+   - "Faturayı Görüntüle" (e-arşiv PDF link)
+   - Aksiyon butonları: "İade Talebi" (delivered+14 gün içinde), "Destek Aç"
+
+21. ReturnRequestScreen
+   - İade edilecek ürünleri seç (qty)
+   - İade nedeni (dropdown: hatalı ürün, beğenmedim, hasarlı, diğer)
+   - Açıklama (text)
+   - Foto yükle (max 3)
+   - "İade Başlat" → POST /v1/orders/:id/returns
+   - Sonra: "İade kargo kodu yakında WhatsApp/SMS ile gelecek"
+
+22. ReturnTrackScreen
+   - İade durumu timeline (Talep alındı → Kargoda → Mopro deposu → Onaylandı/Reddedildi → Refund completed)
+   - Refund detayı: ne kadar geri verildi (TL + coin clawback özet)
+
+═══ WALLET (CASHBACK) ═══
+23. WalletScreen (Bottom nav)
+   - Bakiye kartı: büyük "TRY_COIN: X.XX" + "= ₺X.XX" eşdeğeri
+   - "TL'ye Çevir" CTA (lisans aktif değilse: "Yakında" disabled)
+   - Bu Ay Kazanılan: Y.YY coin
+   - Aktif planlar sayısı: "12 aktif plan, aylık toplam Z.ZZ coin"
+   - "Tüm Planlar" tap → CashbackPlansScreen
+   - Aylık coin akış grafiği (son 12 ay + 12 ay projeksiyon)
+   - GET /v1/wallet/balance, GET /v1/cashback/plans
+
+24. CashbackPlansScreen
+   - Aktif plan listesi
+   - Her kart: ürün foto, başlık, "X.XX coin/ay süresiz", sipariş tarihi, "Detay"
+   - Boş state: "Henüz cashback planın yok. İlk siparişin teslim edildiğinde başlar."
+
+25. CashbackPlanDetailScreen
+   - Ürün özet
+   - "Aylık coin: X.XX TRY_COIN"
+   - "Plan başlangıç tarihi: DD.MM.YYYY"
+   - "Bugüne kadar toplam: Y.YY coin (Z ay × X.XX)"
+   - "Plan dondurulmuş — TL devalüasyonundan etkilenmez"
+   - Ödeme geçmişi tablosu (ay, miktar, durum)
+
+26. CoinToFiatScreen — Phase 7+
+   - Çevrim miktarı slider/input
+   - Anlık kur + komisyon
+   - "Banka hesabıma gönder" → IBAN seç (kayıtlı listeden)
+   - Step-up auth (biometric/SMS OTP)
+   - Onay → POST /v1/wallet/convert
+
+═══ PROFILE ═══
+27. ProfileScreen (bottom nav)
+   - User avatar + ad + telefon (maskeli)
+   - Liste:
+     - Adreslerim
+     - Ödeme Yöntemlerim
+     - Bildirim Tercihleri
+     - Dil & Lokalizasyon
+     - KVKK & Veri
+     - Yardım & Destek
+     - Hakkında / Sürüm
+     - Çıkış Yap
+   - "Hesabımı Sil" (en altta, kırmızı; KVKK gereği zorunlu)
+
+28. NotificationPrefsScreen
+   - Push: Cashback ödemeleri, Sipariş güncellemeleri, Promosyonlar, Yeni ürünler
+   - SMS: Sipariş onay (zorunlu), Şifre sıfırlama (zorunlu), Kampanya (opt)
+   - E-posta: Aynı kategoriler
+
+29. AddressBookScreen
+   - Kayıtlı adres listesi (default işaretli)
+   - "Yeni adres", swipe-to-delete
+
+30. SavedPaymentMethodsScreen
+   - PSP-tokenize edilmiş kart listesi (last4 + brand)
+   - "Yeni kart ekle" (PSP HPP)
+   - Sil
+
+31. AccountDeletionScreen
+   - Uyarı: "Tüm aktif cashback planların iptal olur, kazanılmamış coin'in kaybolur"
+   - Sebep dropdown (zorunlu)
+   - Şifre/OTP onay
+   - "Hesabımı Kalıcı Olarak Sil" → POST /v1/me/delete (GDPR/KVKK 30 gün geri alınabilir)
+
+═══ SUPPORT ═══
+32. SupportHomeScreen
+   - "AI Asistana Sor" prominent CTA → SupportChatScreen
+   - SSS (kategorize): Cashback nedir? Coin'i nasıl harcarım? İade nasıl yapılır?
+   - "Talep Aç" CTA → SupportTicketFormScreen
+   - "Geçmiş Taleplerim"
+
+33. SupportChatScreen
+   - LLM-destekli chat (jobs-svc.support üzerinden)
+   - Bot intent → cevap veya "İnsana bağlıyorum" → ticket oluştur
+   - Mesaj geçmişi tutulur
+
+34. SupportTicketFormScreen
+   - Konu dropdown, açıklama, ekler (foto)
+   - "Gönder" → POST /v1/support/tickets
+
+35. SupportTicketListScreen
+   - Açık/Kapalı taleplerin listesi
+   - Tap → mesaj thread'i
+
+═══ COMMON ═══
+36. NotificationCenterScreen (top bar icon)
+   - Bildirim listesi (cashback ödendi, sipariş güncel, promosyon)
+   - Read/unread state, tap → ilgili sayfaya deeplink
+
+═══ SHARED PATTERNS ═══
+- Loading: skeleton placeholder (NOT spinner)
+- Error: tek tip ErrorView widget (illüstrasyon + mesaj + retry CTA)
+- Empty state: tek tip EmptyView widget (illüstrasyon + mesaj + primary CTA)
+- Bottom sheet for filters/sort
+- Snackbar (toast) for non-blocking feedback
+- Dialog for destructive confirms (iade, hesap sil)
+
+═══ DESIGN TOKENS ═══
+- Primary: #1F4E79 (Mopro Mavi)
+- Accent: #2E75B6
+- Success/Coin: #375623
+- Warning: #C65911
+- Error: #9B2226
+- Background: #FFFFFF / #121212 (dark)
+- Font family: Inter (Latin), Noto Sans Turkish
+
+═══ TESTS ═══
+- Golden tests for each screen (light + dark mode)
+- Widget tests for cart math, cashback math, address form validation
+- Integration test (e2e): onboarding → ürün ekle → checkout → siparişi gör
+
+Report:
+- 36 screen files compiled
+- Golden test count
+- Sample run on iOS simulator + Android emulator (screenshot batches)
 ```
 
 **Verification / Done Criteria:**
-- [ ] `flutter test` includes wallet_provider_test and passes.
-- [ ] `flutter analyze` is clean.
-- [ ] Pull-to-refresh updates the balance.
-- [ ] Withdraw flow shows step-up modal before sending the request.
-- [ ] Skeletons appear during initial load.
-- [ ] Idempotency-Key header is present on the withdraw POST (verified by network log in dev build).
+- [ ] 36 screen widgets compiled.
+- [ ] All user-facing strings via context.tr (no hardcoded TR/EN strings in widget code).
+- [ ] Golden tests cover happy path of every screen.
+- [ ] Bottom navigation 5 tabs: Anasayfa, Kategori, Sepet, Cüzdan, Profil.
+- [ ] Cashback preview text appears in: ProductDetail, Checkout, OrderConfirmed.
+- [ ] Account deletion flow respects KVKK 30-day reversibility window.
 
 ---
 
 # PHASE 5 — Observability & Hardening
 
-## Prompt 5.1 — Add slog + trace_id to Existing HTTP Handler
+## Prompt 5.1 — slog + trace_id + market label on Every HTTP Handler
 
-**Phase & Goal:** Phase 5. Convert any existing handler to emit structured slog logs with trace_id and span_id, and to start an OTel span propagated to downstream calls.
+**Phase & Goal:** Phase 5. Structured JSON logs with trace_id and market label everywhere.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: INFRASTRUCTURE.md § 9 logging contract, ARCHITECTURE.md § 5 trace flow.
+READ FIRST: INFRASTRUCTURE.md § 9.1.
 
-Add slog + OpenTelemetry tracing to the wallet GET /v1/wallet/me/balance handler. Use this work as the template; apply the same pattern to every other handler in a follow-up PR.
+Implement /pkg/logger/slog.go that wraps log/slog and:
+  - Emits JSON.
+  - Always includes time, level, service, module, market, currency (if set in ctx), trace_id, span_id, msg.
+  - PII is NEVER allowed; provide a sanitize helper that hashes PII fields.
 
-PATHS TO TOUCH OR CREATE:
+Implement /pkg/httpx/middleware.go:
+  TraceAndLog middleware that:
+    - Extracts X-Trace-Id from request (or generates one)
+    - Stores in ctx
+    - Logs request start + complete (with status, duration)
+  LocaleResolver middleware:
+    - Reads Accept-Language; resolves to user's stored locale (or default)
+    - Stores in ctx
+  IdempotencyMiddleware:
+    - For POST/PUT/PATCH: requires X-Idempotency-Key header; stores in ctx
+    - On duplicate (idempotency table): returns cached prior response
 
-/pkg/logger/logger.go             # initialize a process-global slog.Logger as JSON
-/pkg/tracing/tracing.go           # OTel tracer init shipping to grafana-agent OTLP
-/pkg/httpx/middleware.go          # mux middleware that creates a span and a request-scoped logger
-/internal/wallet/http_handler.go  # use the middleware
+Wire all three binaries to use these middlewares on all HTTP routes.
 
-REQUIREMENTS:
-
-1. /pkg/logger/logger.go:
-   func New(service string) *slog.Logger {
-       h := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
-       return slog.New(h).With(
-           slog.String("service", service),
-           slog.String("env", os.Getenv("ENV")),
-       )
-   }
-   PII MUST NEVER reach the logger. The handler accepts only typed values; do not pass user-controlled strings as keys.
-
-2. /pkg/tracing/tracing.go:
-   func InitTracer(ctx context.Context, service string) (func(context.Context) error, error) {
-       exp, err := otlptracegrpc.New(ctx, otlptracegrpc.WithEndpoint("grafana-agent:4317"), otlptracegrpc.WithInsecure())
-       if err != nil { return nil, err }
-       res, _ := resource.New(ctx, resource.WithAttributes(semconv.ServiceName(service)))
-       tp := sdktrace.NewTracerProvider(
-           sdktrace.WithBatcher(exp),
-           sdktrace.WithResource(res),
-           sdktrace.WithSampler(sdktrace.TraceIDRatioBased(1.0)),  // dev: 100%; prod: lower if needed
-       )
-       otel.SetTracerProvider(tp)
-       otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
-       return tp.Shutdown, nil
-   }
-
-3. /pkg/httpx/middleware.go TraceAndLog middleware:
-   func TraceAndLog(base *slog.Logger, tracer trace.Tracer) func(http.Handler) http.Handler {
-       return func(next http.Handler) http.Handler {
-           return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-               ctx, span := tracer.Start(r.Context(), r.Method + " " + r.URL.Path)
-               defer span.End()
-
-               // Trace ID propagation: prefer incoming X-Trace-ID, fall back to span ID.
-               traceID := r.Header.Get("X-Trace-ID")
-               if traceID == "" { traceID = span.SpanContext().TraceID().String() }
-
-               logger := base.With(
-                   slog.String("trace_id", traceID),
-                   slog.String("span_id", span.SpanContext().SpanID().String()),
-                   slog.String("module", chi.RouteContext(r.Context()).RoutePattern()),
-                   slog.String("http_method", r.Method),
-                   slog.String("http_path", r.URL.Path),
-               )
-               ctx = withLogger(ctx, logger)
-
-               start := time.Now()
-               rec := newStatusRecorder(w)
-               next.ServeHTTP(rec, r.WithContext(ctx))
-
-               logger.LogAttrs(ctx, slog.LevelInfo, "http_request_completed",
-                   slog.Int("http_status", rec.status),
-                   slog.Int64("duration_ms", time.Since(start).Milliseconds()),
-               )
-           })
-       }
-   }
-
-4. /internal/wallet/http_handler.go:
-   func (h *Handler) GetMyBalance(w http.ResponseWriter, r *http.Request) {
-       ctx := r.Context()
-       logger := loggerFromCtx(ctx)
-       sellerID := authSellerID(r)
-
-       balance, err := h.svc.GetBalance(ctx, h.repo.SellerWalletAccountID(sellerID))
-       if err != nil {
-           logger.LogAttrs(ctx, slog.LevelError, "wallet_balance_failed", slog.String("err", err.Error()))
-           writeProblem(w, http.StatusInternalServerError, "/errors/internal", "internal error")
-           return
-       }
-
-       logger.LogAttrs(ctx, slog.LevelInfo, "wallet_balance_served",
-           slog.Int64("amount_minor", balance),    // SAFE: not PII
-           slog.String("currency", "TRY_COIN"),
-       )
-       writeJSON(w, http.StatusOK, map[string]any{"balance_minor": balance, "currency": "TRY_COIN"})
-   }
-
-5. /cmd/fin-svc/main.go:
-   shutdown, _ := tracing.InitTracer(ctx, "fin-svc")
-   defer shutdown(ctx)
-   logger := logger.New("fin-svc")
-   r.Use(httpx.TraceAndLog(logger, otel.Tracer("fin-svc")))
-
-6. Verify locally:
-   - curl http://api.localhost/v1/wallet/me/balance with `X-Trace-ID: aaaa1111`.
-   - Logs in fin-svc include trace_id=aaaa1111 in JSON form.
-   - Tempo shows the span with the same trace_id.
-
-7. PII safety:
-   - Never log r.Header verbatim (Authorization leak).
-   - Never log request bodies.
-   - Never log seller phone/email/TC (use hashed lookup id only).
-
-DO NOT use log.Println; only the slog.Logger.
-DO NOT panic in handlers; recover middleware logs and returns 500.
+Report: example log line, middleware code, ctx flow.
 ```
-
-**Verification / Done Criteria:**
-- [ ] curl with X-Trace-ID propagates to logs and Tempo.
-- [ ] http_request_completed log entry has trace_id, span_id, status, duration.
-- [ ] No PII fields in any log entry on this path.
-- [ ] Tempo waterfall shows the span with correct service name.
 
 ---
 
 ## Prompt 5.2 — disk-watch.sh with Panic Mode at 92%
 
-**Phase & Goal:** Phase 5. Implement the disk pressure watchdog that escalates from Slack to PagerDuty to a Postgres read-only panic switch.
+**Phase & Goal:** Phase 5. The disk panic script per DISASTER_RECOVERY.md § 2.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: DISASTER_RECOVERY.md § 2.
+Implement /opt/mopro/scripts/disk-watch.sh exactly as in DISASTER_RECOVERY.md § 2.3.
+Wire as cron */5 * * * * deploy /opt/mopro/scripts/disk-watch.sh.
+Add /opt/mopro/scripts/disk-hygiene.sh per § 2.5.
 
-Create the disk watcher and wire its cron.
+Test by filling disk to 90% (sparse file) → verify Slack alert; to 93% → verify Postgres goes read-only.
+Restore by deleting the sparse file → verify ALTER SYSTEM SET default_transaction_read_only = off recovery procedure.
 
-PATHS:
+Verify cashback monthly cron AND seller payout daily cron both fail GRACEFULLY during read-only window (rollback, payments stay 'scheduled').
 
-/scripts/disk-watch.sh          # full bash script (verbatim from DISASTER_RECOVERY.md § 2.2)
-/scripts/disk-hygiene.sh        # weekly cron (verbatim from DISASTER_RECOVERY.md § 2.4)
-/deploy/cron/disk-cron          # crontab fragment
-
-CONTENT:
-
-1. /scripts/disk-watch.sh:
-
-   #!/usr/bin/env bash
-   # /opt/mopro/scripts/disk-watch.sh
-   # 5 dakikada bir cron ile çalışır
-   set -euo pipefail
-   USE=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
-
-   if [ "$USE" -ge 92 ]; then
-       docker exec postgres-ecom psql -U ecom_admin -d mopro_ecom -c \
-         "ALTER SYSTEM SET default_transaction_read_only = on;" || true
-       docker exec postgres-ecom psql -U ecom_admin -c "SELECT pg_reload_conf();" || true
-       docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger -c \
-         "ALTER SYSTEM SET default_transaction_read_only = on;" || true
-       docker exec postgres-ledger psql -U ledger_admin -c "SELECT pg_reload_conf();" || true
-       curl -X POST "$SLACK_PANIC_WEBHOOK" -d "{\"text\":\"PANIC: Disk %${USE} - Postgres read-only modda\"}"
-   elif [ "$USE" -ge 85 ]; then
-       curl -X POST "$BETTERSTACK_INCIDENT_API" -d "Disk %${USE}"
-   elif [ "$USE" -ge 75 ]; then
-       curl -X POST "$SLACK_WEBHOOK" -d "{\"text\":\"Uyarı: Disk %${USE} - cleanup düşün\"}"
-   fi
-
-2. /scripts/disk-hygiene.sh (weekly):
-
-   #!/usr/bin/env bash
-   # /opt/mopro/scripts/disk-hygiene.sh — Cron: 0 4 * * 1
-   set -euo pipefail
-   docker system prune -af --volumes
-   find /var/lib/docker/containers/ -name "*.log" -size +100M -delete
-   apt-get clean
-   find /opt/mopro/data/postgres-ecom/pg_wal/archive_status -name "*.done" -mtime +2 -delete
-   find /opt/mopro/data/postgres-ledger/pg_wal/archive_status -name "*.done" -mtime +2 -delete
-   find /tmp -type f -atime +7 -delete
-   echo "Disk: $(df / | awk 'NR==2 {print $5}')"
-   curl -sf "https://hc-ping.com/$HEALTHCHECK_DISK_HYGIENE_UUID" || true
-
-3. /deploy/cron/disk-cron:
-
-   */5 * * * * /opt/mopro/scripts/disk-watch.sh >> /var/log/mopro/disk-watch.log 2>&1
-   0 4 * * 1   /opt/mopro/scripts/disk-hygiene.sh >> /var/log/mopro/disk-hygiene.log 2>&1
-
-4. Lift-off ritual after panic:
-   Document in /docs/runbooks/disk-panic-recovery.md the operator steps from DISASTER_RECOVERY.md § 2.3 (run hygiene; check WAL backlog; lift read-only with ALTER SYSTEM SET default_transaction_read_only = off; SELECT pg_reload_conf()).
-
-5. Tests:
-   - Unit test (bash) using a mocked `df` that prints 92 → script issues the read-only command (use a stub `docker` shim).
-   - Integration: simulate ≥ 92% by running a temporary `dd if=/dev/zero of=/var/tmp/filler bs=1M count=N` until threshold; verify Postgres goes read-only; remove filler; manually lift.
-
-6. Permissions:
-   - Scripts owned by root, mode 700.
-   - `/opt/mopro/.env` referenced from scripts has chmod 600.
-
-DO NOT auto-undo panic mode. Only humans flip back to read-write.
-DO NOT delete Postgres data files.
-DO NOT delete .ready WAL files.
-DO NOT remove this cron when the cluster is healthy.
+Report: script, test logs.
 ```
-
-**Verification / Done Criteria:**
-- [ ] Script execution with mocked 76 → Slack alert, no escalation.
-- [ ] Mocked 86 → Better Stack incident.
-- [ ] Mocked 93 → Postgres switches to read-only on both clusters; Slack panic webhook fires.
-- [ ] After lifting read-only manually, normal writes resume.
-- [ ] Cron entries scheduled and listed by `crontab -l` for root.
 
 ---
 
 ## Prompt 5.3 — Backup Pipeline + Weekly Restore Drill
 
-**Phase & Goal:** Phase 5. Operationalize daily backups to Backblaze B2 with restic and weekly automated restore drills.
+**Phase & Goal:** Phase 5. Continuous WAL backup of both Postgres clusters + daily full dump + weekly restore verification.
 
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: DISASTER_RECOVERY.md § 4.
+READ FIRST: DISASTER_RECOVERY.md § 6.
 
-Implement backup and restore drill scripts.
+Implement:
+  /opt/mopro/scripts/backup.sh — daily full dump of both Postgres clusters via pg_dumpall; restic push to B2.
+  WAL archive_command in postgresql.conf for both clusters → wal-push to B2.
+  /opt/mopro/scripts/restore-drill.sh — weekly Sunday 04:00 per § 6.3.
 
-PATHS:
+Cron:
+  0 3 * * *  deploy /opt/mopro/scripts/backup.sh
+  0 4 * * 0  deploy /opt/mopro/scripts/restore-drill.sh
 
-/scripts/backup.sh
-/scripts/restore-drill.sh
-/deploy/cron/backup-cron
+Healthchecks: HEALTHCHECK_BACKUP_UUID + HEALTHCHECK_RESTORE_UUID.
 
-REQUIREMENTS:
+Verify: trigger restore-drill manually → fresh Postgres receives the dump → SELECT count(*) FROM catalog_schema.products > 0 → cleanup.
 
-1. /scripts/backup.sh (cron 0 3 * * *):
-
-   #!/usr/bin/env bash
-   set -euo pipefail
-   source /opt/mopro/.env
-   DATE=$(date +%Y%m%d_%H%M%S)
-   WORK=/opt/mopro/backups/$DATE
-   mkdir -p "$WORK"
-
-   docker exec postgres-ecom pg_dumpall -U ecom_admin     | gzip > "$WORK/postgres-ecom.sql.gz"
-   docker exec postgres-ledger pg_dumpall -U ledger_admin | gzip > "$WORK/postgres-ledger.sql.gz"
-
-   docker exec redis redis-cli -a "$REDIS_PASSWORD" SAVE
-   docker cp redis:/data/dump.rdb "$WORK/redis.rdb"
-
-   curl -s -X POST -H "Authorization: Bearer $MEILI_MASTER_KEY" http://localhost:7700/dumps
-   sleep 30
-   docker cp meilisearch:/meili_data/dumps "$WORK/meilisearch_dumps"
-
-   export RESTIC_REPOSITORY="b2:mopro-backups:/full"
-   export RESTIC_PASSWORD="$RESTIC_PASSWORD"
-   export B2_ACCOUNT_ID="$B2_KEY_ID"
-   export B2_ACCOUNT_KEY="$B2_APP_KEY"
-
-   restic backup --tag full --tag "$DATE" "$WORK"
-   find /opt/mopro/backups -maxdepth 1 -type d -mtime +2 -exec rm -rf {} +
-   restic forget --keep-daily 30 --keep-weekly 12 --keep-monthly 12 --prune
-   curl -sf "https://hc-ping.com/$HEALTHCHECK_BACKUP_UUID" || true
-
-2. /scripts/restore-drill.sh (cron 0 4 * * 0): verbatim from DISASTER_RECOVERY.md § 4.3.
-
-3. /deploy/cron/backup-cron:
-   0 3 * * *  /opt/mopro/scripts/backup.sh        >> /var/log/mopro/backup.log 2>&1
-   0 4 * * 0  /opt/mopro/scripts/restore-drill.sh >> /var/log/mopro/restore.log 2>&1
-
-4. Tests:
-   - Run backup once: a new restic snapshot appears in B2.
-   - Run restore-drill once: an ephemeral postgres-test container loads the dump and the test asserts product count > 0; container is cleaned up.
-
-5. Failure handling:
-   - If backup fails, healthchecks.io NOT pinged → silence → alarm fires within 6 hours.
-   - If restore drill fails, deployment freeze policy: PR merge blocked by a CI check that reads the last drill result file `/var/lib/mopro/last-drill-result`.
-
-DO NOT keep restic password in repo. Use .env (chmod 600).
-DO NOT delete B2 retention policies without an explicit human confirmation step.
+Report: scripts, restore-drill log, healthcheck pings.
 ```
-
-**Verification / Done Criteria:**
-- [ ] First scheduled backup creates a snapshot in B2.
-- [ ] First scheduled restore drill loads a fresh Postgres container and asserts data.
-- [ ] Healthchecks.io receives backup and drill pings on success.
-- [ ] CI check `last-drill-result` reads `OK` after a healthy drill.
 
 ---
 
-# PHASE 6 — Pre-Launch & Production Readiness
+## Prompt 5.4 — TR e-Fatura / e-Arşiv / GİB Entegrasyonu — v7 NEW
 
-The goal of Phase 6 is to validate the system end-to-end at expected load, finalize launch checklists, and freeze configuration.
+**Phase & Goal:** Phase 5. GİB üzerinden Foriba (veya alternatif) Bulut e-Fatura sağlayıcısı ile e-fatura kesme ve KDV beyanı altyapısı. Mopro her ay satıcılara komisyon faturası keser; Phase 5+ own-seller modunda alıcılara e-arşiv keser.
 
-## Prompt 6.1 — Build the Load Testing Harness (k6) and Run a Capacity Test
-
-**Phase & Goal:** Phase 6. Confirm the system holds at 30K users/hour (~300 RPS sustained, ~600 RPS bursts) with cache hit rates and DB QPS within budget.
-
-**Copy-Paste Prompt for Claude Code:**
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: PRD v3.2 § 13 capacity model.
+READ FIRST: ARCHITECTURE.md § 8.7, DATA_DICTIONARY.md § 11.
 
-Build a k6 load-test harness.
+Implement /internal/einvoice/ inside jobs-svc (heavy I/O + XML processing
+shouldn't block core-svc). Module owns:
+  /internal/einvoice/api.go        ← Service interface
+  /internal/einvoice/service.go    ← orchestration
+  /internal/einvoice/foriba/       ← active provider adapter
+  /internal/einvoice/provider.go   ← adapter interface (kolay swap için)
+  /internal/einvoice/templates/    ← UBL-TR XML templates (Go templates)
+  /internal/einvoice/repository.go ← einvoice_schema repo
+  /internal/einvoice/worker.go     ← async submitter cron
 
-PATHS:
+Service interface:
+  IssueCommissionInvoice(ctx, orderID, sellerID, amountMinor, kdvMinor) → (InvoiceRef, error)
+  IssueMonthlySummary(ctx, sellerID, periodYYYYMM) → (InvoiceRef, error)
+  IssueSaleInvoice(ctx, orderID, buyerInfo, lineItems[]) → (InvoiceRef, error)     // Phase 5+
+  IssueCreditNote(ctx, originalInvoiceID, reason, amountMinor) → (InvoiceRef, error)
+  CancelInvoice(ctx, invoiceID, reason) → error                                     // 8 gün içinde
+  GetInvoiceByOrderID(ctx, orderID, type) → (Invoice, error)
+  HandleProviderWebhook(ctx, providerName, body) → error                            // Foriba → bize
 
-/loadtest/k6/scenarios.js
-/loadtest/k6/lib/auth.js
-/loadtest/k6/lib/cart.js
-/loadtest/k6/lib/checkout.js
-/loadtest/k6/run.sh
+— FORIBA ADAPTER —
+Sandbox: https://earsivportaltest.foriba.com (login: kurumsal hesap)
+Prod:    https://earsivportal.foriba.com
 
-REQUIREMENTS:
+Auth: POST /auth/login { username, password } → JWT (24h TTL).
+  Cache token in Redis: einvoice:foriba:token; refresh on 401.
 
-1. scenarios.js: emulate the Phase-2 traffic mix:
-   - 45% home/feed reads
-   - 20% catalog browse + search
-   - 15% product detail
-   - 5% cart writes
-   - 3% checkout (POST /v1/orders/checkout with Idempotency-Key)
-   - 2% wallet balance read
-   - 10% misc
+Endpoints:
+  POST /einvoice/send
+    Headers: Authorization: Bearer <jwt>
+    Body: { invoice_xml: base64(UBL-TR XML), invoice_type: "TEMELFATURA"|"TICARIFATURA",
+            recipient: { vkn, title, address } }
+    Response: { foriba_id, ettn, status: "QUEUED" }
+  POST /earsiv/send
+    Body: { invoice_xml, recipient: { tckn, email, name, address } }
+  GET  /invoice/status/{foriba_id}
+    Response: { status, gib_response, errors[]? }
+  POST /einvoice/cancel/{foriba_id}
+    Body: { reason }   // only allowed if 8 days have not passed AND GİB not yet ACCEPTED
+  POST /webhook/register
+    Body: { url: "https://api.moproshop.com/v1/einvoice/webhook/foriba", events: ["sent","delivered","rejected","cancelled"] }
 
-2. Stages (export const options):
-   - 0 → 100 VUs over 2 minutes (warm up)
-   - hold 100 VUs for 10 minutes (steady)
-   - ramp to 300 VUs over 2 minutes
-   - hold 300 VUs for 5 minutes
-   - drain to 0 VUs over 1 minute
+Webhook receiver (in core-svc or jobs-svc):
+  POST /v1/einvoice/webhook/foriba
+    Verify X-Foriba-Signature = hmacSha256(rawBody, FORIBA_WEBHOOK_SECRET)
+    Update einvoice_schema.invoices.status accordingly.
 
-3. Thresholds:
-   http_req_duration{group:"home"} p(95) < 800
-   http_req_duration{group:"checkout"} p(95) < 1500
-   http_req_failed: rate<0.01
-   checks: rate>0.99
+Sandbox creds env names:
+  FORIBA_USERNAME, FORIBA_PASSWORD, FORIBA_WEBHOOK_SECRET, FORIBA_VKN
 
-4. Use scenarios for read mix vs. write mix to keep RPS-per-endpoint realistic.
+— UBL-TR XML TEMPLATE —
+Template at /internal/einvoice/templates/commission_invoice.xml:
+  Use TR-specific UBL-TR 2.1 schema.
+  Required fields:
+    - cbc:UBLVersionID, cbc:CustomizationID="TR1.2"
+    - cbc:ProfileID="TEMELFATURA" or "TICARIFATURA"
+    - cbc:ID = invoice_number (Mopro üretir; sequence'den)
+    - cbc:UUID = uuidv4
+    - cbc:IssueDate, cbc:IssueTime
+    - cbc:InvoiceTypeCode = "SATIS" | "IADE"
+    - cac:AccountingSupplierParty (Mopro VKN, ünvan, adres)
+    - cac:AccountingCustomerParty (satıcı VKN, ünvan, adres)
+    - cac:InvoiceLine (her satır: ürün/hizmet, miktar, birim fiyat, vergi)
+    - cac:TaxTotal (KDV %20 hesabı)
+    - cac:LegalMonetaryTotal (toplam)
+  Validate: xmllint against UBL-TR XSD before submission.
 
-5. /loadtest/k6/run.sh:
-   #!/usr/bin/env bash
-   set -euo pipefail
-   k6 run --vus-max 300 --out json=results.json /loadtest/k6/scenarios.js
+— SEQUENCE NUMBER GENERATION —
+Format: <Prefix><YY><sequence10>
+  Prefix: 'MPS' (Mopro Shop) for e-fatura; 'MPA' for e-arşiv.
+  Year: 2-digit (26, 27, ...).
+  Sequence: per year + type, 10-digit zero-padded, atomically incremented via:
+    UPDATE einvoice_schema.invoice_sequences
+       SET next_number = next_number + 1
+       WHERE year = $1 AND invoice_kind = $2
+       RETURNING next_number;
+  Example: "MPS260000000123"
+  TR mevzuat: sıralı VE atlamasız; bir fatura iptal edilirse sıra atlanmaz, ters fatura kesilir.
 
-6. Reporting:
-   - After run, the script summarizes pass/fail thresholds and uploads results.json to Backblaze B2 under loadtests/<date>/.
+— WORKER: einvoice-submitter (jobs-svc cron) —
+Every 5 minutes:
+  SELECT * FROM einvoice_schema.invoices WHERE status='pending' ORDER BY created_at LIMIT 100
+  For each:
+    1. Render XML from template + invoice data.
+    2. Submit to Foriba: POST /einvoice/send.
+    3. On success: UPDATE status='queued', store foriba_invoice_id + ettn.
+    4. On failure: UPDATE status with last_error; retry up to 5 times with exponential backoff.
+       Beyond 5: status='rejected', alert on-call (SEV2).
+  Insert audit row in invoice_history.
 
-7. Run on staging first, never directly on production. The first production load test is a Sunday 03:00 maintenance window with explicit human approval.
+— ORDER-TO-INVOICE FLOW —
+Triggered by ecom.order.delivered.v1 (yes, AGAIN — third consumer group):
+  jobs-svc.einvoice subscribes to ecom.order.delivered.v1
+  For each delivered order:
+    1. Per seller in order_items: aggregate commission_amount_minor + kdv_amount_minor.
+    2. Create einvoice_schema.invoices row:
+       type='commission', seller_id, amount_minor=sum(commission), kdv_minor=sum(kdv),
+       invoice_kind='e_fatura' (satıcı VKN'li mükellef ise) veya 'e_arsiv' (değilse),
+       status='pending', idempotency='einvoice:order_<id>:commission'.
+    3. Worker picks up and submits.
 
-DO NOT load-test fin-svc /v1/wallet/withdraw at high QPS without disabling the SMS provider integration to avoid charging real money.
-DO NOT skip the warm-up stage; cold caches will skew p95.
+— MONTHLY SUMMARY INVOICE —
+Cron: 1st of each month 03:00 UTC.
+  For each seller:
+    Aggregate all paid commissions for the previous month.
+    Issue ONE summary e-fatura instead of per-order (if seller prefers; configurable per seller).
+    type='monthly_summary'.
+
+— LEDGER INTEGRATION —
+Each issued commission invoice writes a ledger move (fin-svc.commission receives an event):
+  D liability:kdv_payable:TRY   amount=kdv_minor    (KDV devlete borç)
+  C equity:retained_commission:TRY amount=kdv_minor (Mopro'nun komisyon gelirinden ayrılan KDV payı)
+This already happens inside fin-svc at order capture time; we just CROSS-REFERENCE
+the einvoice number into the wallet_schema.transactions.reference for audit.
+
+— KDV BEYAN CRON —
+Cron: 25th of each month 08:00 UTC (1 gün önce hazırla, 26'sında imzala/gönder).
+  Compute for previous month (period_yyyymm = current - 1):
+    total_invoiced = SUM(einvoice_schema.invoices.amount_minor WHERE status IN ('sent','delivered') AND invoice_date IN month)
+    total_kdv_collected = SUM(kdv_minor) similarly
+    total_kdv_paid = SUM(KDV from Mopro's expense invoices — separate ingestion)
+    net_due = total_kdv_collected - total_kdv_paid
+  INSERT INTO einvoice_schema.kdv_declarations.
+  Send notification to muhasebe@moproshop.com with the summary.
+  Muhasebeci/CFO Foriba portalı üzerinden GİB'e gönderir (manual final step).
+
+— TESTS —
+1. UBL-TR XML validation against XSD (using xmllint or Go xsd lib).
+2. Sequence: 1000 concurrent IssueCommissionInvoice calls → no duplicate numbers, no gaps.
+3. Worker idempotency: re-process same pending row → no duplicate Foriba submission.
+4. Webhook signature: tamper with body → reject.
+5. Cancellation 8-day window: after 8 days, refuse cancel; suggest credit note.
+6. End-to-end: simulate delivered order → invoice issued + delivered → ledger references match.
+
+— SECURITY —
+- Mopro VKN is non-secret; recipient VKN/TCKN treated as PII (encrypt via crypto.EncryptPII).
+- Invoice XMLs stored in B2 with seller_id-prefixed key for fine-grained access.
+- 10-year retention (TR mevzuat zorunluluğu).
+- KEP adresi: ptt@mopro.kep.tr veya benzeri (Phase 0'da alın).
+
+Report: module structure, sandbox submission example, sequence number test,
+KDV beyanı dummy run.
 ```
 
 **Verification / Done Criteria:**
-- [ ] k6 run with 300 VUs sustained passes thresholds on staging.
-- [ ] DB QPS < 200 with cache enabled (verified via Postgres pg_stat_statements).
-- [ ] Outbox publish lag stays < 1 s p95.
-- [ ] No unhandled errors in fin-svc or core-svc logs.
+- [ ] All einvoice_schema tables created via migration.
+- [ ] Foriba sandbox: 10 commission invoices submitted, ETTN'leri alındı.
+- [ ] UBL-TR XML XSD validation passes.
+- [ ] Sequence numbers atomic, no duplicates under 1000 concurrent test.
+- [ ] Cancel-after-8-days returns proper error + credit-note suggestion.
+- [ ] KDV declaration cron runs end-to-end, summary email sent.
+- [ ] Webhook signature validation enforced.
 
 ---
 
-## Prompt 6.2 — Final Launch Checklist Automation
+# PHASE 6 — Pre-Launch Validation
 
-**Phase & Goal:** Phase 6. Encode the launch readiness criteria as a single script that returns 0 only when ALL items pass; block deploys until then.
+## Prompt 6.1 — k6 Load Testing Harness
 
-**Copy-Paste Prompt for Claude Code:**
+**Phase & Goal:** Phase 6. Load testing for 30K users/hour target with cashback + seller payout flow stress.
+
+**Copy-Paste Prompt:**
 
 ```
-READ FIRST: CLAUDE.md, DISASTER_RECOVERY.md, LEDGER_GUIDE.md, INFRASTRUCTURE.md.
+Create /tests/load/k6/ with scenarios:
+  - browse.js: anonymous + authenticated browsing (catalog, search) — 100 RPS sustained.
+  - checkout.js: end-to-end checkout including PSP sandbox — 5 RPS sustained, peaks of 20 RPS.
+  - delivered.js: simulate kargo webhooks delivering orders → cashback engine + seller payout engine fire.
+  - cashback-cron.js: simulate 10K active plans with payments due → run cashback cron, measure duration < 30s.
+  - seller-payout-cron.js: simulate 1000 due payouts → run cron, measure duration < 5min, PSP API mocked.
 
-Create /scripts/launch-readiness.sh that exits 0 iff every check passes; print a colored matrix showing which checks failed.
+Pass criteria:
+  - p95 < 300ms on browse.
+  - p95 < 800ms on checkout.
+  - cashback cron < 30s for 10K plans.
+  - seller payout cron < 5min for 1000 payouts.
+  - 0 errors on the cron paths.
 
-CHECKS:
+Run on a clone of production VDS (not production).
+Report: results JSON, p95 graphs, GC/CPU saturation chart.
+```
 
-1. All container hardening flags applied (parse `docker inspect` for security_opt, cap_drop, read_only).
-2. mem_limit set on every service; sum within 24 GB minus 8 GB headroom.
-3. postgres-ledger reachable ONLY from mopro-fin-net (run nc from core-svc and confirm failure).
-4. Last 7 daily backups present in B2 (restic snapshots --tag full --json | jq … >= 7).
-5. Last weekly restore drill result file shows OK.
-6. unattended-upgrades enabled (systemctl is-enabled apt-daily-upgrade.timer).
-7. UFW rules: only 80, 443, <ssh_high_port> open.
-8. SSH password authentication disabled (grep PasswordAuthentication /etc/ssh/sshd_config).
-9. CloudFlare proxy ON for api/seller/img.moproshop.com (curl with --resolve and check headers).
-10. Caddy validate clean.
-11. PgBouncer reachable from svc; pool sizes match config.
-12. Redis maxmemory-policy = allkeys-lru.
-13. Meilisearch master key set; no public access.
-14. Wallet trigger present (SELECT trigger_name FROM information_schema.triggers WHERE trigger_name='ledger_balance_check').
-15. wallet_schema.outbox count of unpublished < 100.
-16. Hourly reconcile cron present and last run delta = 0.
-17. Healthchecks.io: backup + restore + reconcile + disk-hygiene UUIDs all green.
-18. golangci-lint clean on tip of main.
-19. `go test -race ./...` passes on tip of main.
-20. property_test.go ledger invariant passes.
-21. mopro CLI available on PATH on the VDS.
-22. Sentry DSN configured for core-svc, fin-svc, jobs-svc.
-23. Grafana dashboards imported: HTTP RED, Outbox lag, Ledger balance time series, DLQ size.
+---
 
-Each check is implemented as a function returning 0/1 and a human-readable message. The script aggregates and prints a summary like:
+## Prompt 6.2 — Final Launch Readiness Script
 
-  [ OK ] hardening_flags
-  [ OK ] mem_limits
-  [FAIL] cloudflare_proxy_seller   reason: orange cloud OFF
-  [ OK ] caddy_validate
-  ...
-  Result: 22/23 passed. NOT READY.
+**Phase & Goal:** Phase 6. A pre-launch checklist script that verifies every invariant.
 
-Exit 0 only when all 23 pass.
+**Copy-Paste Prompt:**
 
-GitHub Actions adds a job that runs this script against staging before tagging a production deploy. The job fails the deploy on red.
+```
+Implement /scripts/launch-readiness.sh that runs and prints PASS/FAIL for each:
+  - All containers healthy (docker compose ps)
+  - mopro ledger reconcile --dry-run shows 0 deltas per currency
+  - mopro cashback obligation-check matches
+  - mopro payout obligation-check matches
+  - 42 commission rules seeded for TR
+  - 50+ business calendar entries seeded for TR (2026-2030)
+  - Backup last 24h ping received in healthchecks.io
+  - Restore drill last 7 days ping received
+  - Disk usage < 60%
+  - All Postgres extensions installed
+  - PSP webhook signature validated end-to-end with sandbox
+  - Caddy TLS valid (cert expiry > 30 days)
+  - JWT signing key present + > 32 bytes
+  - PII KEK present + 32 bytes
+  - i18n translations present for tr-TR and en-US (count of keys matches)
+  - Cashback monthly cron configured + healthcheck UUID set
+  - Seller payout daily cron configured + healthcheck UUID set
+  - Outbox lag < 10s
+  - Any DLQ messages? FAIL if > 0
 
-DO NOT skip a check. If a check is hard to automate, write a manual-attestation file `attest/launch.yaml` with a SIGNED entry and a 30-day expiry; the script reads it.
-DO NOT mark the system production-ready while any check is red.
+If ANY fails: launch is BLOCKED.
+
+Report: script, sample output, blocked vs go criteria.
+```
+
+---
+
+# PHASE 7 — Coin License Activation (Future)
+
+## Prompt 7.1 — Activate Coin → Fiat Conversion
+
+**Phase & Goal:** Phase 7. After Dubai VARA or AB EMI license is activated, enable the coin → fiat conversion flow.
+
+**Copy-Paste Prompt:**
+
+```
+READ FIRST: DISASTER_RECOVERY.md § 11, LEDGER_GUIDE.md § 4.2.
+
+Implement /internal/treasury/conversion.go:
+  Service:
+    QuoteConversion(ctx, userID, amountCoinMinor, targetCurrency) (Quote, error)
+    ExecuteConversion(ctx, userID, quoteID, idempotencyKey) (Conversion, error)
+
+  Quote structure: { CoinAmountMinor, FiatAmountMinor, Rate, ExpiresAt }
+  Quote validity: 60 seconds.
+  Rate source: Treasury internal mid-rate ± 1% spread.
+
+  Execute logic (TWO ledger transactions linked by fx_pair_id):
+    Transaction A (TRY_COIN-only):
+      D liability:wallet:user_<id>:TRY_COIN  amount=coinAmountMinor
+      C asset:fx_pool:TRY_COIN              amount=coinAmountMinor
+
+    Transaction B (TRY-only):
+      D asset:fx_pool:TRY              amount=fiatAmountMinor
+      C asset:bank:outbound_pending:TRY amount=fiatAmountMinor
+
+  PSP outbound transfer (Sipay/Craftgate marketplace API, same adapter as seller payout)
+  initiated to user's verified bank account.
+
+Feature flag: FEATURE_COIN_TO_FIAT_CONVERSION=true (off by default).
+Step-up auth: require biometric/OTP per CLAUDE.md § 6.
+
+Property test: For random (coinAmount, rate, spread), the two ledger transactions sum-balance independently per currency.
+
+Add /v1/wallet/convert endpoint in fin-svc (admin-only until launch day, then public).
+
+Report: code, property test output, end-to-end test with mock PSP.
 ```
 
 **Verification / Done Criteria:**
-- [ ] Script returns non-zero on first run (expected).
-- [ ] Each fix moves a row from FAIL to OK.
-- [ ] Eventually exits 0 with all 23 checks green.
-- [ ] CI job fails the deploy if the script is red.
+- [ ] Both transactions commit independently or both roll back together (saga).
+- [ ] fx_pair_id links them in audit log.
+- [ ] User cannot convert before step-up auth.
+- [ ] Existing cashback plans unaffected by license activation.
 
 ---
 
-## Closing Notes
+# Appendix A — Property Test Skeletons
 
-- Every prompt above is a contract: copy it verbatim, do not soften the constraints.
-- If Claude Code refuses or drifts, paste the relevant directive file (`CLAUDE.md`, `LEDGER_GUIDE.md`, …) into the conversation and re-run.
-- Tasks span hours not minutes; verify each Done Criteria before continuing to the next prompt.
-- When a task completes, run `make verify` and `./scripts/launch-readiness.sh` (Phase 6 onward) and only then move on.
+(Refer to DEVELOPMENT.md § 7.2 for full ledger and cashback property tests.)
 
-> The path from empty repo to launch is roughly 26 prompts in this file. Worked end-to-end, the system reaches a state where 30K users/hour land safely on a single VDS, with double-entry ledger guarantees, automatic disaster mitigations, and full observability. There is no shortcut.
+# Appendix B — Common Pitfalls
+
+| Pitfall | Symptom | Fix |
+|---|---|---|
+| Hardcoded fixed-term plan or finite total in v6 | Plan model conflict | Use perpetual model — only `monthly_amount_minor` + `start_date` |
+| Hardcoded reference rate other than 5000 bps | v6 model violation | Use `cashback.ReferenceInterestRateBpsConst` (=5000 = %50) |
+| Calendar-day delay | unlock_at off by weekends | Use `pkg/timex.AddBusinessDays(date, 3, calendar)` |
+| Recompute commission at plan time | Diverges from order snapshot | Read `order_items[i].commission_amount_minor` from event payload |
+| Forgetting one of the two consumer groups | Cashback fires but no seller payout (or vice versa) | Both groups subscribed to the same `ecom.order.delivered.v1` |
+| Mutating plan or payout core fields | Trigger raises | Use reversal pattern from LEDGER_GUIDE § 7.4 / § 8 |
+| Mixed-currency in one ledger transaction | Trigger raises | Split into TWO transactions linked by `fx_pair_id` |
+
+---
+
+**End of PROMPTS.md.** This is the canonical recipe book; deviations require an ADR in `/docs/adr/`.
