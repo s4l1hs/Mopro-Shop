@@ -13,6 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
+	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/pkg/dbx"
 	"github.com/mopro/platform/pkg/httpx"
@@ -39,6 +42,21 @@ func main() {
 	catalogRepo := catalog.NewRepository(pool)
 	catalogSvc := catalog.NewService(catalogRepo, defaultCurrency, defaultLocale)
 
+	// ── Redis client (cart stock reservation + future eventbus) ─────────────
+	rc, err := buildRedisClient(context.Background())
+	if err != nil {
+		slog.Error("cart: failed to connect to Redis", "err", err)
+		os.Exit(1)
+	}
+
+	// ── Cart module wiring (loads Lua EVALSHA at startup) ───────────────────
+	cartRepo, err := cart.NewRepository(context.Background(), rc)
+	if err != nil {
+		slog.Error("cart: failed to load Lua scripts", "err", err)
+		os.Exit(1)
+	}
+	cartSvc := cart.NewService(cartRepo, catalogSvc)
+
 	// ── HTTP router (Go 1.22+ stdlib mux with method+path patterns) ─────────
 	mux := http.NewServeMux()
 
@@ -61,6 +79,23 @@ func main() {
 	)
 	mux.Handle("GET /v1/categories/{id}/commission",
 		httpx.TraceAndLog(http.HandlerFunc(handleGetCommission(catalogSvc, market))),
+	)
+
+	// Cart routes
+	mux.Handle("POST /v1/cart/items",
+		httpx.TraceAndLog(http.HandlerFunc(handleCartAddItem(cartSvc))),
+	)
+	mux.Handle("DELETE /v1/cart/items/{variant_id}",
+		httpx.TraceAndLog(http.HandlerFunc(handleCartRemoveItem(cartSvc))),
+	)
+	mux.Handle("GET /v1/cart",
+		httpx.TraceAndLog(http.HandlerFunc(handleGetCart(cartSvc))),
+	)
+	mux.Handle("POST /v1/cart/reserve",
+		httpx.TraceAndLog(http.HandlerFunc(handleCartReserve(cartSvc))),
+	)
+	mux.Handle("POST /v1/cart/release",
+		httpx.TraceAndLog(http.HandlerFunc(handleCartRelease(cartSvc))),
 	)
 
 	srv := &http.Server{
@@ -91,6 +126,23 @@ func buildCatalogDSN() string {
 	return fmt.Sprintf("postgres://ecom_admin:%s@%s:%s/mopro_ecom", password, host, port)
 }
 
+// buildRedisClient constructs a Redis client from env vars and verifies connectivity.
+func buildRedisClient(ctx context.Context) (*redis.Client, error) {
+	addr := os.Getenv("REDIS_ADDR")
+	if addr == "" {
+		addr = "redis:6379"
+	}
+	pw := os.Getenv("REDIS_PASSWORD")
+	rc := redis.NewClient(&redis.Options{
+		Addr:     addr,
+		Password: pw,
+	})
+	if err := rc.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("redis ping %s: %w", addr, err)
+	}
+	return rc, nil
+}
+
 // requireIdempotencyKey returns false and writes 422 if the header is missing.
 func requireIdempotencyKey(w http.ResponseWriter, r *http.Request) bool {
 	if r.Header.Get("Idempotency-Key") == "" {
@@ -98,6 +150,17 @@ func requireIdempotencyKey(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	return true
+}
+
+// requireUserID extracts the user ID from X-Mopro-User-Id (dev-only; Phase 1.3 uses JWT).
+func requireUserID(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	s := r.Header.Get("X-Mopro-User-Id")
+	id, err := strconv.ParseInt(s, 10, 64)
+	if err != nil || id <= 0 {
+		jsonError(w, "X-Mopro-User-Id header required", http.StatusUnauthorized)
+		return 0, false
+	}
+	return id, true
 }
 
 // parseLocale extracts the best-match locale from Accept-Language, falling back to def.
@@ -133,7 +196,7 @@ func jsonOK(w http.ResponseWriter, status int, v any) {
 	}
 }
 
-// ── Handlers ─────────────────────────────────────────────────────────────────
+// ── Catalog handlers ──────────────────────────────────────────────────────────
 
 func handleCreateProduct(svc catalog.Service, defaultCurrency, defaultLocale string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -280,5 +343,118 @@ func handleGetCommission(svc catalog.Service, defaultMarket string) http.Handler
 			"commission_pct_bps": cc.CommissionPctBps,
 			"kdv_pct_bps":        cc.KdvPctBps,
 		})
+	}
+}
+
+// ── Cart handlers ─────────────────────────────────────────────────────────────
+
+func handleCartAddItem(svc cart.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := requireUserID(w, r)
+		if !ok {
+			return
+		}
+		var body struct {
+			VariantID int64 `json:"variant_id"`
+			Qty       int   `json:"qty"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			jsonError(w, "invalid JSON body", http.StatusBadRequest)
+			return
+		}
+		if err := svc.AddItem(r.Context(), userID, body.VariantID, body.Qty); err != nil {
+			if errors.Is(err, cart.ErrVariantNotFound) {
+				jsonError(w, "variant not found", http.StatusNotFound)
+				return
+			}
+			slog.Error("cart: AddItem", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func handleCartRemoveItem(svc cart.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := requireUserID(w, r)
+		if !ok {
+			return
+		}
+		variantID, err := strconv.ParseInt(r.PathValue("variant_id"), 10, 64)
+		if err != nil {
+			jsonError(w, "invalid variant_id", http.StatusBadRequest)
+			return
+		}
+		if err := svc.RemoveItem(r.Context(), userID, variantID); err != nil {
+			slog.Error("cart: RemoveItem", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func handleGetCart(svc cart.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := requireUserID(w, r)
+		if !ok {
+			return
+		}
+		c, err := svc.GetCart(r.Context(), userID)
+		if err != nil {
+			slog.Error("cart: GetCart", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		jsonOK(w, http.StatusOK, c)
+	}
+}
+
+func handleCartReserve(svc cart.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := requireUserID(w, r)
+		if !ok {
+			return
+		}
+		reservationID, expiresAt, err := svc.Reserve(r.Context(), userID)
+		if err != nil {
+			switch {
+			case errors.Is(err, cart.ErrCartEmpty):
+				jsonError(w, "cart is empty", http.StatusUnprocessableEntity)
+			case errors.Is(err, cart.ErrOutOfStock):
+				jsonError(w, "one or more items out of stock", http.StatusConflict)
+			default:
+				slog.Error("cart: Reserve", "err", err)
+				jsonError(w, "internal error", http.StatusInternalServerError)
+			}
+			return
+		}
+		jsonOK(w, http.StatusCreated, map[string]any{
+			"reservation_id": reservationID,
+			"expires_at":     expiresAt,
+		})
+	}
+}
+
+func handleCartRelease(svc cart.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			ReservationID string `json:"reservation_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			jsonError(w, "invalid JSON body", http.StatusBadRequest)
+			return
+		}
+		if err := svc.Release(r.Context(), body.ReservationID); err != nil {
+			if errors.Is(err, cart.ErrReservationNotFound) {
+				jsonError(w, "reservation not found", http.StatusNotFound)
+				return
+			}
+			slog.Error("cart: Release", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }

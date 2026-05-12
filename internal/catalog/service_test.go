@@ -17,6 +17,7 @@ type mockRepo struct {
 	searchProductsFn    func(ctx context.Context, query, locale, market string) ([]catalog.Product, error)
 	getCommissionFn     func(ctx context.Context, market string, categoryID int64) (catalog.CategoryCommission, error)
 	isCurrencyActiveFn  func(ctx context.Context, code string) (bool, error)
+	getVariantByIDFn    func(ctx context.Context, variantID int64) (catalog.Variant, error)
 }
 
 func (m *mockRepo) InsertProduct(ctx context.Context, p catalog.Product) (catalog.Product, error) {
@@ -68,6 +69,13 @@ func (m *mockRepo) IsCurrencyActive(ctx context.Context, code string) (bool, err
 		return m.isCurrencyActiveFn(ctx, code)
 	}
 	return true, nil
+}
+
+func (m *mockRepo) GetVariantByID(ctx context.Context, variantID int64) (catalog.Variant, error) {
+	if m.getVariantByIDFn != nil {
+		return m.getVariantByIDFn(ctx, variantID)
+	}
+	return catalog.Variant{ID: variantID}, nil
 }
 
 // newTestService returns a service wired to the given mock repo.

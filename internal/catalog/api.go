@@ -15,6 +15,7 @@ type Service interface {
 	GetByID(ctx context.Context, id int64) (Product, []Variant, []ProductTranslation, error)
 	Search(ctx context.Context, query, locale, market string) ([]Product, error)
 	GetCommissionForCategory(ctx context.Context, market string, categoryID int64) (CategoryCommission, error)
+	GetVariantByID(ctx context.Context, variantID int64) (Variant, error)
 }
 
 // Repository is the storage interface used only by service.go.
@@ -27,4 +28,5 @@ type Repository interface {
 	SearchProducts(ctx context.Context, query, locale, market string) ([]Product, error)
 	GetCommission(ctx context.Context, market string, categoryID int64) (CategoryCommission, error)
 	IsCurrencyActive(ctx context.Context, code string) (bool, error)
+	GetVariantByID(ctx context.Context, variantID int64) (Variant, error)
 }

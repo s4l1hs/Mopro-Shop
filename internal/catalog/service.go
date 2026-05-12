@@ -101,3 +101,7 @@ func (s *catalogService) Search(ctx context.Context, query, locale, market strin
 func (s *catalogService) GetCommissionForCategory(ctx context.Context, market string, categoryID int64) (CategoryCommission, error) {
 	return s.repo.GetCommission(ctx, market, categoryID)
 }
+
+func (s *catalogService) GetVariantByID(ctx context.Context, variantID int64) (Variant, error) {
+	return s.repo.GetVariantByID(ctx, variantID)
+}

@@ -176,7 +176,7 @@ func (r *pgxRepository) loadTranslations(ctx context.Context, productID int64) (
 
 func (r *pgxRepository) SearchProducts(ctx context.Context, query, locale, market string) ([]Product, error) {
 	// Phase 1.1: SQL ILIKE search via product_translations.
-	// TODO(Phase 1.3): replace with Meilisearch via search module.
+	// TODO(search-sprint): replace ILIKE with Meilisearch via /internal/search/ when launch volume warrants it.
 	rows, err := r.pool.Query(ctx,
 		`SELECT DISTINCT p.id, p.seller_id, p.category_id, p.brand,
 		        p.default_currency, p.default_locale, p.status, p.created_at, p.updated_at
@@ -206,6 +206,27 @@ func (r *pgxRepository) SearchProducts(ctx context.Context, query, locale, marke
 		products = append(products, p)
 	}
 	return products, rows.Err()
+}
+
+func (r *pgxRepository) GetVariantByID(ctx context.Context, variantID int64) (Variant, error) {
+	var v Variant
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, product_id, sku, color, size, price_minor, price_currency, stock, image_keys
+		FROM catalog_schema.variants
+		WHERE id = $1`,
+		variantID,
+	).Scan(&v.ID, &v.ProductID, &v.SKU, &v.Color, &v.Size,
+		&v.PriceMinor, &v.PriceCurrency, &v.Stock, &v.ImageKeys)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Variant{}, ErrNotFound
+		}
+		return Variant{}, fmt.Errorf("catalog.repo: GetVariantByID: %w", err)
+	}
+	if v.ImageKeys == nil {
+		v.ImageKeys = []string{}
+	}
+	return v, nil
 }
 
 func (r *pgxRepository) GetCommission(ctx context.Context, market string, categoryID int64) (CategoryCommission, error) {
