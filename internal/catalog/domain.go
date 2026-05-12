@@ -19,6 +19,8 @@ type Product struct {
 type Variant struct {
 	ID            int64    `json:"id"`
 	ProductID     int64    `json:"product_id"`
+	CategoryID    int64    `json:"category_id"`
+	SellerID      int64    `json:"seller_id"`
 	SKU           string   `json:"sku"`
 	Color         string   `json:"color"`
 	Size          string   `json:"size"`

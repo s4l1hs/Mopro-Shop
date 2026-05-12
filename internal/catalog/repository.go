@@ -107,7 +107,7 @@ func (r *pgxRepository) GetByID(ctx context.Context, id int64) (Product, []Varia
 		return Product{}, nil, nil, fmt.Errorf("catalog.repo: GetByID product: %w", err)
 	}
 
-	variants, err := r.loadVariants(ctx, id)
+	variants, err := r.loadVariants(ctx, id, p.CategoryID, p.SellerID)
 	if err != nil {
 		return Product{}, nil, nil, err
 	}
@@ -120,7 +120,7 @@ func (r *pgxRepository) GetByID(ctx context.Context, id int64) (Product, []Varia
 	return p, variants, translations, nil
 }
 
-func (r *pgxRepository) loadVariants(ctx context.Context, productID int64) ([]Variant, error) {
+func (r *pgxRepository) loadVariants(ctx context.Context, productID, categoryID, sellerID int64) ([]Variant, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT id, product_id, sku, color, size, price_minor, price_currency, stock, image_keys
 		FROM catalog_schema.variants
@@ -145,6 +145,8 @@ func (r *pgxRepository) loadVariants(ctx context.Context, productID int64) ([]Va
 		if v.ImageKeys == nil {
 			v.ImageKeys = []string{}
 		}
+		v.CategoryID = categoryID
+		v.SellerID = sellerID
 		variants = append(variants, v)
 	}
 	return variants, rows.Err()
@@ -211,11 +213,14 @@ func (r *pgxRepository) SearchProducts(ctx context.Context, query, locale, marke
 func (r *pgxRepository) GetVariantByID(ctx context.Context, variantID int64) (Variant, error) {
 	var v Variant
 	err := r.pool.QueryRow(ctx,
-		`SELECT id, product_id, sku, color, size, price_minor, price_currency, stock, image_keys
-		FROM catalog_schema.variants
-		WHERE id = $1`,
+		`SELECT v.id, v.product_id, p.category_id, p.seller_id,
+		        v.sku, v.color, v.size, v.price_minor, v.price_currency, v.stock, v.image_keys
+		FROM catalog_schema.variants v
+		JOIN catalog_schema.products p ON p.id = v.product_id
+		WHERE v.id = $1`,
 		variantID,
-	).Scan(&v.ID, &v.ProductID, &v.SKU, &v.Color, &v.Size,
+	).Scan(&v.ID, &v.ProductID, &v.CategoryID, &v.SellerID,
+		&v.SKU, &v.Color, &v.Size,
 		&v.PriceMinor, &v.PriceCurrency, &v.Stock, &v.ImageKeys)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

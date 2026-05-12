@@ -291,6 +291,37 @@ func TestIntegration_InactiveCurrencyReject(t *testing.T) {
 	}
 }
 
+func TestIntegration_GetVariantByIDPopulatesCategoryAndSeller(t *testing.T) {
+	ctx := context.Background()
+	repo := catalog.NewRepository(integPool)
+	svc := catalog.NewService(repo, "TRY", "tr-TR")
+
+	p, err := svc.CreateProduct(ctx, catalog.CreateProductRequest{
+		SellerID: 77, CategoryID: 30, Brand: "VarLookupTest",
+	})
+	if err != nil {
+		t.Fatalf("CreateProduct: %v", err)
+	}
+
+	v, err := svc.AddVariant(ctx, p.ID, catalog.AddVariantRequest{
+		SKU: "VLT-001", PriceMinor: 5000,
+	})
+	if err != nil {
+		t.Fatalf("AddVariant: %v", err)
+	}
+
+	got, err := svc.GetVariantByID(ctx, v.ID)
+	if err != nil {
+		t.Fatalf("GetVariantByID: %v", err)
+	}
+	if got.CategoryID != 30 {
+		t.Errorf("CategoryID: want 30, got %d", got.CategoryID)
+	}
+	if got.SellerID != 77 {
+		t.Errorf("SellerID: want 77, got %d", got.SellerID)
+	}
+}
+
 // TestIntegration_VariantImageKeys verifies TEXT[] roundtrip.
 func TestIntegration_VariantImageKeys(t *testing.T) {
 	ctx := context.Background()
