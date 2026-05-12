@@ -1,7 +1,8 @@
 COMPOSE := docker compose -f deploy/docker-compose.yml
 
 .PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger \
-        build-core build-fin build-jobs build-migrate build-mopro run-local down-local
+        build-core build-fin build-jobs build-migrate build-mopro run-local down-local \
+        caddy-validate caddy-reload
 
 # verify chains all static checks; must pass before every push.
 verify: fmt vet test lint boundaries property-cashback property-payout property-ledger
@@ -52,3 +53,9 @@ run-local:
 
 down-local:
 	$(COMPOSE) --env-file .env.local down
+
+caddy-validate:
+	$(COMPOSE) --env-file .env.local exec caddy caddy validate --config /etc/caddy/Caddyfile
+
+caddy-reload:
+	$(COMPOSE) --env-file .env.local exec caddy caddy reload --config /etc/caddy/Caddyfile
