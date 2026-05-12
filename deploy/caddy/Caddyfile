@@ -1,35 +1,154 @@
 {
-    email {$CADDY_EMAIL}
-    # CloudFlare-only: reject requests that don't come via CloudFlare
-    # TODO(mopro:placeholder): add trusted_proxies cloudflare once CF IP range is confirmed
+	email {$CADDY_EMAIL}
+	# TODO(production): add trusted_proxies cloudflare once CF IP range is confirmed
+	# trusted_proxies cloudflare
 }
 
+# ─── Snippets (imported by production + dev site blocks) ─────────────────────
+
+# Native Caddy health endpoint — does NOT proxy to any backend.
+# Used by Docker healthcheck and smoke tests.
+(healthz_native) {
+	handle /healthz {
+		respond "OK" 200
+	}
+}
+
+# fin-svc owns: wallet reads, cashback reads, payout reads, admin
+# ARCHITECTURE.md § 4.2 — fin-svc HTTP server: wallet/cashback/payout read
+(fin_routes) {
+	handle /v1/wallet/* {
+		reverse_proxy fin-svc:8080
+	}
+	handle /v1/cashback/* {
+		reverse_proxy fin-svc:8080
+	}
+	handle /v1/payouts/* {
+		reverse_proxy fin-svc:8080
+	}
+	handle /v1/admin/* {
+		reverse_proxy fin-svc:8080
+	}
+}
+
+# jobs-svc owns: notifications, media, support, sizefinder, antifraud-inference
+(jobs_routes) {
+	handle /v1/jobs/* {
+		reverse_proxy jobs-svc:8080
+	}
+}
+
+# ─── Production: api.moproshop.com ───────────────────────────────────────────
 api.moproshop.com {
-    # Wallet, cashback, and payout reads are served by fin-svc
-    @fin path /api/v1/wallet* /api/v1/cashback* /api/v1/payout* /api/v1/admin*
-    reverse_proxy @fin fin-svc:8080
+	# TODO(production): CloudFlare-only enforcer.
+	# Reject requests that do not carry CF-Connecting-IP (traffic that bypassed
+	# CloudFlare and hit the VDS IP directly). UFW must also block direct :80/:443
+	# access from non-CF IPs. Uncomment after verifying CF IP ranges.
+	# @not_cf {
+	#     not header CF-Connecting-IP *
+	# }
+	# respond @not_cf "Forbidden" 403
 
-    # All other API traffic goes to core-svc
-    reverse_proxy core-svc:8080
+	import healthz_native
+	import fin_routes
+	import jobs_routes
 
-    # TODO(Phase 0.6): rate_limit requires the caddy-ratelimit plugin; build a
-    # custom Caddy image with xcaddy or use the xcaddy-based image.
-    # rate_limit { zone dynamic { key {remote_host} events 200 window 1m } }
+	# ── PSP payment webhooks ──────────────────────────────────────────────────
+	# /v1/payments/webhook/{sipay,craftgate,iyzico} → core-svc (default catch-all)
+	# Signature verification: provider-specific inside /internal/payment/<provider>/
+	# Sipay:      hash_key = base64(hmacSha256(rawBody, app_secret))
+	# Craftgate:  x-craftgate-signature = hmacSha256(rawBody, webhook_secret)
+	# iyzico:     no header signature; verify via paymentId lookup
+
+	# ── Shipping carrier webhooks ─────────────────────────────────────────────
+	# /v1/shipping/webhook/{aras,yurtici,surat,mng,hepsijet,ptt} → core-svc (default)
+	# "delivered" status from any carrier updates delivered_at and triggers the
+	# ecom.order.delivered.v1 event → cashback + payout unlock. (ARCHITECTURE.md § 5)
+
+	# ── Seller transparency endpoint ──────────────────────────────────────────
+	# GET /api/v1/seller/orders/:id/breakdown → core-svc (default catch-all)
+	# Returns: gross, commission, KDV, net breakdown per CLAUDE.md § 4.8
+
+	# TODO(Phase 1.5): caddy-ratelimit plugin required (xcaddy custom build).
+	# rate_limit {
+	#     zone api_per_ip {
+	#         key     {client_ip}
+	#         window  1m
+	#         max     600
+	#     }
+	# }
+
+	# Default: all /v1/* and /api/* not matched above → core-svc
+	reverse_proxy core-svc:8080
 }
 
+# ─── Production: seller.moproshop.com ────────────────────────────────────────
 seller.moproshop.com {
-    reverse_proxy core-svc:8080
+	# TODO(production): CloudFlare-only enforcer (same pattern as api block above)
+
+	import healthz_native
+
+	# Seller panel SPA + transparency endpoints (ARCHITECTURE.md § 6)
+	# Primary: GET /api/v1/seller/orders/:id/breakdown  (CLAUDE.md § 4.8)
+	reverse_proxy core-svc:8080
 }
 
-# Local dev: plaintext HTTP on localhost
-localhost, :80 {
-    # Native Caddy health endpoint — does NOT proxy to core-svc.
-    # Used by Caddy's own healthcheck and the Prompt 0.5 verification curl.
-    handle /healthz {
-        respond "OK" 200
-    }
+# ─── Production: img.moproshop.com ───────────────────────────────────────────
+# CloudFlare proxies img.moproshop.com → VDS → Backblaze B2 public bucket.
+# B2_BUCKET_URL must be the Backblaze B2 public-facing HTTPS URL.
+# TODO(production): set B2_BUCKET_URL in /opt/mopro/.env and uncomment block below.
+# img.moproshop.com {
+#     reverse_proxy {$B2_BUCKET_URL} {
+#         header_up Host {upstream_hostport}
+#     }
+# }
 
-    @fin path /api/v1/wallet* /api/v1/cashback* /api/v1/payout* /api/v1/admin*
-    reverse_proxy @fin fin-svc:8080
-    reverse_proxy core-svc:8080
+# ─── Dev: api.localhost — HTTPS, Caddy internal CA ────────────────────────────
+# Caddy issues a self-signed cert for api.localhost.
+# Trust the CA once: caddy trust  (or copy /data/caddy/pki/... into system trust store)
+# Use curl -k or --cacert to skip verification in CI.
+api.localhost {
+	tls internal
+
+	import healthz_native
+	import fin_routes
+	import jobs_routes
+
+	# TODO(Phase 1.5): rate_limit — xcaddy required
+
+	reverse_proxy core-svc:8080
+}
+
+# ─── Dev: seller.localhost — HTTPS, Caddy internal CA ─────────────────────────
+seller.localhost {
+	tls internal
+
+	import healthz_native
+
+	# Seller panel + transparency endpoint
+	reverse_proxy core-svc:8080
+}
+
+# ─── Plain HTTP: localhost:80 ────────────────────────────────────────────────
+# Explicit port in the address disables Caddy's auto-HTTPS and HTTP→HTTPS
+# redirects for this site. Used by the Docker container healthcheck
+# (wget -qO- http://localhost/healthz) and plain-HTTP smoke tests.
+localhost:80 {
+	handle /healthz {
+		respond "OK" 200
+	}
+
+	@fin path /v1/wallet/* /v1/cashback/* /v1/payouts/* /v1/admin/*
+	handle @fin {
+		reverse_proxy fin-svc:8080
+	}
+
+	@jobs path /v1/jobs/*
+	handle @jobs {
+		reverse_proxy jobs-svc:8080
+	}
+
+	handle {
+		reverse_proxy core-svc:8080
+	}
 }
