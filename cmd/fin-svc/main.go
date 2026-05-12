@@ -15,6 +15,7 @@ import (
 	"github.com/mopro/platform/internal/cashback"
 	"github.com/mopro/platform/internal/eventbus"
 	"github.com/mopro/platform/internal/outbox"
+	"github.com/mopro/platform/internal/sellerpayout"
 	"github.com/mopro/platform/pkg/timex"
 )
 
@@ -22,10 +23,8 @@ func main() {
 	ctx := context.Background()
 
 	market := mustEnv("MARKET")
-	cashbackCurrency := os.Getenv("DEFAULT_CASHBACK_CURRENCY")
-	if cashbackCurrency == "" {
-		cashbackCurrency = "TRY_COIN"
-	}
+	defaultCurrency := mustEnv("DEFAULT_CURRENCY")
+	cashbackCurrency := mustEnv("DEFAULT_CASHBACK_CURRENCY")
 
 	// ── postgres-ledger pool ─────────────────────────────────────────────────
 	// pool.Close() is only called on graceful shutdown; log.Fatal exits directly
@@ -62,10 +61,21 @@ func main() {
 
 	bus := eventbus.NewRedisBus(redisClient, slog.Default())
 
+	// ── Seller payout engine ─────────────────────────────────────────────────
+	payoutRepo := sellerpayout.NewRepository(pool)
+	payoutSvc := sellerpayout.NewService(payoutRepo, calLoader, defaultCurrency)
+
 	// ── Start cashback consumer goroutine ────────────────────────────────────
 	go func() {
 		if err := cashback.StartConsumer(ctx, bus, cashbackSvc); err != nil {
 			slog.Error("fin-svc: cashback consumer exited", "err", err)
+		}
+	}()
+
+	// ── Start sellerpayout consumer goroutine ────────────────────────────────
+	go func() {
+		if err := sellerpayout.StartConsumer(ctx, bus, payoutSvc); err != nil {
+			slog.Error("fin-svc: sellerpayout consumer exited", "err", err)
 		}
 	}()
 
