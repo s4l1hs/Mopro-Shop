@@ -1,12 +1,12 @@
 COMPOSE := docker compose -f deploy/docker-compose.yml
 
-.PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger \
+.PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex \
         build-core build-fin build-jobs build-migrate build-mopro run-local down-local \
         caddy-validate caddy-reload \
         test-integration-catalog test-integration-outbox test-integration-cart
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries property-cashback property-payout property-ledger
+verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex
 
 fmt:
 	gofmt -l . | tee /tmp/gofmt.out
@@ -32,6 +32,9 @@ property-payout:
 
 property-ledger:
 	go test -tags=integration -run Property ./internal/wallet/...
+
+property-timex:
+	go test -tags=integration -run Property ./pkg/timex/...
 
 build-core:
 	go build -o /tmp/core-svc ./cmd/core-svc
