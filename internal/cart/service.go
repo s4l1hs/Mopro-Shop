@@ -112,6 +112,10 @@ func (s *cartService) Release(ctx context.Context, reservationID string) error {
 	return s.repo.ReleaseReservation(ctx, reservationID)
 }
 
+func (s *cartService) CommitReservation(ctx context.Context, reservationID string) error {
+	return s.repo.CommitReservation(ctx, reservationID)
+}
+
 func (s *cartService) SeedStock(ctx context.Context, variantID int64, stock int) error {
 	return s.repo.SeedStock(ctx, variantID, stock)
 }

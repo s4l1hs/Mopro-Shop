@@ -45,13 +45,14 @@ func (m *mockCatalogSvc) GetCommissionForCategory(_ context.Context, _ string, i
 // ── repo mock ─────────────────────────────────────────────────────────────────
 
 type mockRepo struct {
-	setItemFn            func(ctx context.Context, userID, variantID int64, qty int) error
-	removeItemFn         func(ctx context.Context, userID, variantID int64) error
-	getItemsFn           func(ctx context.Context, userID int64) ([]cart.CartItem, error)
-	tryReserveFn         func(ctx context.Context, variantID int64, qty int, reservationID string, userID int64, ttlSec int64) (bool, int, error)
-	setManifestFn        func(ctx context.Context, reservationID string, items []cart.CartItem, ttlSec int64) error
-	releaseReservationFn func(ctx context.Context, reservationID string) error
-	seedStockFn          func(ctx context.Context, variantID int64, stock int) error
+	setItemFn             func(ctx context.Context, userID, variantID int64, qty int) error
+	removeItemFn          func(ctx context.Context, userID, variantID int64) error
+	getItemsFn            func(ctx context.Context, userID int64) ([]cart.CartItem, error)
+	tryReserveFn          func(ctx context.Context, variantID int64, qty int, reservationID string, userID int64, ttlSec int64) (bool, int, error)
+	setManifestFn         func(ctx context.Context, reservationID string, items []cart.CartItem, ttlSec int64) error
+	releaseReservationFn  func(ctx context.Context, reservationID string) error
+	commitReservationFn   func(ctx context.Context, reservationID string) error
+	seedStockFn           func(ctx context.Context, variantID int64, stock int) error
 }
 
 func (m *mockRepo) SetItem(ctx context.Context, userID, variantID int64, qty int) error {
@@ -87,6 +88,12 @@ func (m *mockRepo) SetManifest(ctx context.Context, reservationID string, items 
 func (m *mockRepo) ReleaseReservation(ctx context.Context, reservationID string) error {
 	if m.releaseReservationFn != nil {
 		return m.releaseReservationFn(ctx, reservationID)
+	}
+	return nil
+}
+func (m *mockRepo) CommitReservation(ctx context.Context, reservationID string) error {
+	if m.commitReservationFn != nil {
+		return m.commitReservationFn(ctx, reservationID)
 	}
 	return nil
 }
@@ -335,6 +342,25 @@ func TestReserve_RejectsZeroQty(t *testing.T) {
 	}
 	if tryReserveCalled {
 		t.Error("TryReserve must not be called when qty <= 0")
+	}
+}
+
+func TestCommitReservation(t *testing.T) {
+	called := false
+	repo := &mockRepo{
+		commitReservationFn: func(_ context.Context, reservationID string) error {
+			called = true
+			if reservationID == "" {
+				return errors.New("empty reservationID")
+			}
+			return nil
+		},
+	}
+	if err := newTestService(repo, &mockCatalogSvc{}).CommitReservation(context.Background(), "abc123"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Fatal("CommitReservation not called on repo")
 	}
 }
 

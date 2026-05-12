@@ -186,3 +186,46 @@ func TestIntegration_Release_NotFound(t *testing.T) {
 		t.Fatalf("expected ErrReservationNotFound, got %v", err)
 	}
 }
+
+func TestIntegration_CommitReservation(t *testing.T) {
+	ctx := context.Background()
+	svc := newIntegService(t)
+	userID := int64(2001)
+	variantID := int64(501)
+
+	if err := svc.AddItem(ctx, userID, variantID, 5); err != nil {
+		t.Fatalf("AddItem: %v", err)
+	}
+	if err := svc.SeedStock(ctx, variantID, 20); err != nil {
+		t.Fatalf("SeedStock: %v", err)
+	}
+
+	reservationID, _, err := svc.Reserve(ctx, userID)
+	if err != nil {
+		t.Fatalf("Reserve: %v", err)
+	}
+	checkStock(t, ctx, variantID, 15) // 20-5=15
+
+	// Commit: must delete manifest but NOT restore stock.
+	if err := svc.CommitReservation(ctx, reservationID); err != nil {
+		t.Fatalf("CommitReservation: %v", err)
+	}
+
+	// Stock must remain at 15 — purchase consumed the units.
+	checkStock(t, ctx, variantID, 15)
+
+	// Manifest key must be gone.
+	mKey := "mopro:reservation:" + reservationID
+	exists, err := integRedis.Exists(ctx, mKey).Result()
+	if err != nil {
+		t.Fatalf("EXISTS manifest: %v", err)
+	}
+	if exists != 0 {
+		t.Error("manifest key must be deleted after CommitReservation")
+	}
+
+	// Double-commit must be a no-op (idempotent).
+	if err := svc.CommitReservation(ctx, reservationID); err != nil {
+		t.Fatalf("second CommitReservation must be no-op: %v", err)
+	}
+}

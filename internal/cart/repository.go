@@ -191,6 +191,35 @@ func (r *redisRepository) ReleaseReservation(ctx context.Context, reservationID 
 	return nil
 }
 
+func (r *redisRepository) CommitReservation(ctx context.Context, reservationID string) error {
+	mKey := manifestKey(reservationID)
+
+	data, err := r.rc.HGetAll(ctx, mKey).Result()
+	if err != nil {
+		return fmt.Errorf("cart.repo: CommitReservation HGetAll: %w", err)
+	}
+	// Manifest already gone (expired or double-commit) — nothing to clean up.
+	if len(data) == 0 {
+		return nil
+	}
+
+	// Delete per-item reservation keys; do NOT call IncrBy — stock was consumed by purchase.
+	for variantIDStr := range data {
+		variantID, errP := strconv.ParseInt(variantIDStr, 10, 64)
+		if errP != nil {
+			continue
+		}
+		if err := r.rc.Del(ctx, itemKey(reservationID, variantID)).Err(); err != nil {
+			return fmt.Errorf("cart.repo: CommitReservation Del item %d: %w", variantID, err)
+		}
+	}
+
+	if err := r.rc.Del(ctx, mKey).Err(); err != nil {
+		return fmt.Errorf("cart.repo: CommitReservation Del manifest: %w", err)
+	}
+	return nil
+}
+
 func (r *redisRepository) SeedStock(ctx context.Context, variantID int64, stock int) error {
 	if err := r.rc.Set(ctx, stockKey(variantID), stock, 0).Err(); err != nil {
 		return fmt.Errorf("cart.repo: SeedStock Set: %w", err)
