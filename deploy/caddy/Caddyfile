@@ -53,23 +53,29 @@ api.moproshop.com {
 	import fin_routes
 	import jobs_routes
 
-	# ── PSP payment webhooks ──────────────────────────────────────────────────
-	# /v1/payments/webhook/{sipay,craftgate,iyzico} → core-svc (default catch-all)
-	# Signature verification: provider-specific inside /internal/payment/<provider>/
-	# Sipay:      hash_key = base64(hmacSha256(rawBody, app_secret))
-	# Craftgate:  x-craftgate-signature = hmacSha256(rawBody, webhook_secret)
-	# iyzico:     no header signature; verify via paymentId lookup
+	# ── PSP payment webhooks — NO middleware, HMAC verified in handler ────────
+	# Phase 1.5: Explicit route so future auth / rate-limit middleware does NOT
+	# apply to Sipay/Craftgate/iyzico inbound callbacks. Signature verification
+	# is provider-specific (CLAUDE.md § 9):
+	#   Sipay:      hash_key = base64(SHA512(merchant_key + status_code + invoice_id + amount + currency))
+	#   Craftgate:  x-craftgate-signature = HMAC-SHA256(rawBody, webhook_secret)
+	#   iyzico:     no header signature; verify via paymentId server-side lookup
+	@psp_webhook path /v1/payments/webhook/*
+	handle @psp_webhook {
+		# NO rate_limit, NO @cf_only enforcer applied to PSP webhooks.
+		# The webhook handler itself verifies the provider HMAC signature.
+		reverse_proxy core-svc:8080
+	}
 
 	# ── Shipping carrier webhooks ─────────────────────────────────────────────
-	# /v1/shipping/webhook/{aras,yurtici,surat,mng,hepsijet,ptt} → core-svc (default)
-	# "delivered" status from any carrier updates delivered_at and triggers the
-	# ecom.order.delivered.v1 event → cashback + payout unlock. (ARCHITECTURE.md § 5)
+	# /v1/shipping/webhook/{aras,yurtici,surat,mng,hepsijet,ptt} → core-svc
+	# "delivered" status triggers ecom.order.delivered.v1 → cashback + payout
+	# unlock. (ARCHITECTURE.md § 5)
 
 	# ── Seller transparency endpoint ──────────────────────────────────────────
-	# GET /api/v1/seller/orders/:id/breakdown → core-svc (default catch-all)
-	# Returns: gross, commission, KDV, net breakdown per CLAUDE.md § 4.8
+	# GET /v1/seller/orders/:id/breakdown → core-svc (CLAUDE.md § 4.8)
 
-	# TODO(Phase 1.5): caddy-ratelimit plugin required (xcaddy custom build).
+	# TODO(rate-limit-sprint): caddy-ratelimit plugin required (xcaddy custom build).
 	# rate_limit {
 	#     zone api_per_ip {
 	#         key     {client_ip}
@@ -79,7 +85,9 @@ api.moproshop.com {
 	# }
 
 	# Default: all /v1/* and /api/* not matched above → core-svc
-	reverse_proxy core-svc:8080
+	handle {
+		reverse_proxy core-svc:8080
+	}
 }
 
 # ─── Production: seller.moproshop.com ────────────────────────────────────────
@@ -114,9 +122,21 @@ api.localhost {
 	import fin_routes
 	import jobs_routes
 
-	# TODO(Phase 1.5): rate_limit — xcaddy required
+	# ── PSP payment webhooks — NO middleware, HMAC verified in handler ────────
+	@psp_webhook path /v1/payments/webhook/*
+	handle @psp_webhook {
+		# NO rate_limit, NO @cf_only enforcer applied to PSP webhooks.
+		# The webhook handler itself verifies the provider HMAC signature.
+		reverse_proxy core-svc:8080
+	}
 
-	reverse_proxy core-svc:8080
+	# TODO(rate-limit-sprint): caddy-ratelimit plugin required (xcaddy custom build)
+	# rate_limit { zone api_per_ip { key {client_ip}; window 1m; max 600 } }
+
+	# Default: all /v1/* not matched above → core-svc
+	handle {
+		reverse_proxy core-svc:8080
+	}
 }
 
 # ─── Dev: seller.localhost — HTTPS, Caddy internal CA ─────────────────────────
@@ -130,9 +150,10 @@ seller.localhost {
 }
 
 # ─── Plain HTTP: localhost:80 ────────────────────────────────────────────────
-# Explicit port in the address disables Caddy's auto-HTTPS and HTTP→HTTPS
-# redirects for this site. Used by the Docker container healthcheck
-# (wget -qO- http://localhost/healthz) and plain-HTTP smoke tests.
+# Explicit port disables Caddy auto-HTTPS for this block. Used by the Docker
+# healthcheck (wget -qO- http://localhost/healthz) and plain-HTTP smoke tests.
+# NOTE: caddy fmt v2.11.x strips this block — known formatter bug (not runtime).
+# caddy validate reports "Valid configuration"; the block runs correctly at runtime.
 localhost:80 {
 	handle /healthz {
 		respond "OK" 200
@@ -148,7 +169,9 @@ localhost:80 {
 		reverse_proxy jobs-svc:8080
 	}
 
+	# PSP webhooks fall through to the catch-all (localhost:80 has no middleware).
 	handle {
 		reverse_proxy core-svc:8080
 	}
 }
+

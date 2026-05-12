@@ -361,7 +361,14 @@ services:
       MARKET: "${MARKET:-TR}"
       DEFAULT_CURRENCY: "${DEFAULT_CURRENCY:-TRY}"
       DEFAULT_LOCALE: "${DEFAULT_LOCALE:-tr-TR}"
+      DEFAULT_CASHBACK_CURRENCY: "${DEFAULT_CASHBACK_CURRENCY:-TRY_COIN}"
       PSP_PROVIDER: "${PSP_PROVIDER:-sipay}"
+      # Sipay sandbox defaults — override in .env.local with real credentials.
+      SIPAY_BASE_URL: "${SIPAY_BASE_URL:-https://sandbox.sipay.com.tr/ccpayment}"
+      SIPAY_MERCHANT_KEY: "${SIPAY_MERCHANT_KEY:-dev_merchant_key}"
+      SIPAY_APP_ID: "${SIPAY_APP_ID:-dev_app_id}"
+      SIPAY_APP_SECRET: "${SIPAY_APP_SECRET:-dev_app_secret}"
+      SIPAY_MERCHANT_ID: "${SIPAY_MERCHANT_ID:-dev_merchant_id}"
     depends_on:
       pgbouncer-ecom:
         condition: service_started

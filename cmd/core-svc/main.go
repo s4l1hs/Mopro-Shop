@@ -174,8 +174,9 @@ func main() {
 	mux.Handle("GET /v1/payments/{provider_ref}/status",
 		httpx.TraceAndLog(http.HandlerFunc(handlePaymentStatus(paymentSvc))),
 	)
-	// Webhook route is provider-specific and not wrapped in auth middleware.
-	mux.Handle("POST /webhooks/sipay",
+	// Webhook route — must match Caddyfile @psp_webhook path /v1/payments/webhook/*
+	// so the explicit no-middleware handle block applies (CLAUDE.md § 9).
+	mux.Handle("POST /v1/payments/webhook/sipay",
 		httpx.TraceAndLog(http.HandlerFunc(handleSipayWebhook(webhookHandler))),
 	)
 
