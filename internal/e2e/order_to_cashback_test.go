@@ -390,10 +390,45 @@ func (m *cartMock) SeedStock(_ context.Context, _ int64, _ int) error   { return
 func setupEcomSchema(ctx context.Context) error {
 	_, err := ecomPool.Exec(ctx, `
 CREATE SCHEMA IF NOT EXISTS order_schema;
+CREATE SCHEMA IF NOT EXISTS shipping_schema;
 
+DROP TABLE IF EXISTS shipping_schema.shipment_events CASCADE;
+DROP TABLE IF EXISTS shipping_schema.shipments CASCADE;
 DROP TABLE IF EXISTS order_schema.outbox CASCADE;
 DROP TABLE IF EXISTS order_schema.order_items CASCADE;
 DROP TABLE IF EXISTS order_schema.orders CASCADE;
+
+CREATE TABLE shipping_schema.shipments (
+  id                    BIGSERIAL    PRIMARY KEY,
+  order_id              BIGINT       NOT NULL,
+  carrier               TEXT         NOT NULL,
+  tracking_number       TEXT,
+  carrier_shipment_id   TEXT,
+  state                 TEXT         NOT NULL DEFAULT 'pending'
+                        CHECK (state IN ('pending','picked_up','in_transit',
+                                         'out_for_delivery','delivered',
+                                         'returned','cancelled','failed')),
+  label_pdf_b2_key      TEXT,
+  estimated_delivery_at TIMESTAMPTZ,
+  delivered_at          TIMESTAMPTZ,
+  last_polled_at        TIMESTAMPTZ,
+  idempotency_key       TEXT         NOT NULL UNIQUE,
+  cost_minor            BIGINT,
+  cost_currency         TEXT,
+  created_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at            TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_shipments_tracking ON shipping_schema.shipments (carrier, tracking_number) WHERE tracking_number IS NOT NULL;
+
+CREATE TABLE shipping_schema.shipment_events (
+  id          BIGSERIAL PRIMARY KEY,
+  shipment_id BIGINT    NOT NULL REFERENCES shipping_schema.shipments(id),
+  state       TEXT      NOT NULL,
+  source      TEXT      NOT NULL CHECK (source IN ('webhook','poll','api')),
+  carrier_raw JSONB,
+  event_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 CREATE TABLE order_schema.orders (
   id                BIGSERIAL    PRIMARY KEY,
