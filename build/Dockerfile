@@ -5,7 +5,15 @@
 ARG SERVICE=core-svc
 # RUNTIME_BASE default: distroless for production (CLAUDE.md § 6).
 # Phase 0.5 stubs set RUNTIME_BASE=alpine:3.19 so nc/wget are available for
-# network isolation verification; switch back to distroless in Phase 1+.
+# network isolation verification.
+#
+# TODO(Phase 1): Switch RUNTIME_BASE back to distroless.
+# VIOLATION: alpine:3.19 violates CLAUDE.md § 6 (distroless ONLY at runtime).
+# Fix: add a --health subcommand to each binary that does:
+#   resp, err := http.Get("http://localhost:8080/healthz"); exit 0 if 200, else exit 1
+# Then in docker-compose.yml use:
+#   healthcheck: { test: ["CMD", "/svc", "--health"], ... }
+# The binary runs its own healthcheck — no shell or nc needed → distroless works.
 ARG RUNTIME_BASE=gcr.io/distroless/static-debian12:nonroot
 
 # ── Build stage ──────────────────────────────────────────────────────────────
