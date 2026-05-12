@@ -3,7 +3,8 @@ COMPOSE := docker compose -f deploy/docker-compose.yml
 .PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order \
         build-core build-fin build-jobs build-migrate build-mopro run-local down-local \
         caddy-validate caddy-reload \
-        test-integration-catalog test-integration-outbox test-integration-cart test-integration-order
+        test-integration-catalog test-integration-outbox test-integration-cart test-integration-order \
+        test-e2e
 
 # verify chains all static checks; must pass before every push.
 verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order
@@ -109,3 +110,17 @@ test-integration-order:
 	ORDER_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
 	  go test -tags=integration -count=1 -race ./internal/order/... ; \
 	  STATUS=$$? ; docker rm -f pg-ecom-order-test ; exit $$STATUS
+
+test-e2e:
+	docker rm -f pg-ecom-e2e pg-ledger-e2e 2>/dev/null || true
+	docker run -d --name pg-ecom-e2e -p 6435:5432 \
+	  -e POSTGRES_USER=ecom_admin -e POSTGRES_PASSWORD=test123 \
+	  -e POSTGRES_DB=mopro_ecom postgres:16-alpine
+	docker run -d --name pg-ledger-e2e -p 6436:5432 \
+	  -e POSTGRES_USER=ledger_admin -e POSTGRES_PASSWORD=test123 \
+	  -e POSTGRES_DB=mopro_ledger postgres:16-alpine
+	sleep 3
+	ORDER_E2E_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	LEDGER_E2E_DSN=postgres://ledger_admin:test123@localhost:6436/mopro_ledger \
+	  go test -tags=integration -count=1 -race -v ./internal/e2e/... ; \
+	  STATUS=$$? ; docker rm -f pg-ecom-e2e pg-ledger-e2e ; exit $$STATUS

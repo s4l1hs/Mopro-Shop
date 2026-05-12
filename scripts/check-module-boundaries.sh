@@ -7,7 +7,7 @@ SCHEMAS="identity|catalog|cart|order|payment|seller|search|wallet|commission|tre
 if grep -rE "FROM\s+($SCHEMAS)_schema\." \
     --include='*.sql' --include='*.go' \
     internal/ migrations/ \
-    | grep -vE '/(identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|sellerpayout|notification|support|media|sizefinder)/' \
+    | grep -vE '/(identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|sellerpayout|notification|support|media|sizefinder|e2e)/' \
     | grep -vE 'ref_schema\.' ; then
     echo "ERROR: cross-schema reference detected"
     exit 1
@@ -56,7 +56,9 @@ if grep -rE 'PaybackMonths\s*=\s*(?!24\b)\d+' --include='*.go' internal/cashback
 fi
 
 # Hardcoded calendar-day delay for unlock_at (must use timex.AddBusinessDays)
-if grep -rE 'deliveredAt\.AddDate\(\s*0\s*,\s*0\s*,\s*3\s*\)' --include='*.go' internal/ ; then
+# e2e tests are exempt: AddDate(0,0,3) there is a lower-bound assertion, not a business rule.
+if grep -rE 'deliveredAt\.AddDate\(\s*0\s*,\s*0\s*,\s*3\s*\)' --include='*.go' internal/ \
+    | grep -v internal/e2e/ ; then
     echo "ERROR: use timex.AddBusinessDays for the 3-day delay, not calendar-day AddDate"
     exit 1
 fi
