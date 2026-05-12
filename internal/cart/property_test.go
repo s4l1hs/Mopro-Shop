@@ -3,14 +3,17 @@
 package cart_test
 
 // Property test: 100 concurrent Reserve attempts on a single variant with stock=10.
+// 5 workers attempt AddItem with qty=-1 first (must all get ErrInvalidQty).
 // Invariants:
+//   - negRejected == negWorkers (negative qty guard fires every time).
 //   - At most 10 succeed (Lua atomicity guarantees no over-sell).
-//   - Exactly stock units consumed → final Redis stock = 0.
-//   - successes + failures == 100.
+//   - finalStock == initialStock - successes (no phantom stock increase or loss).
+//   - successes + failures == workers.
 // Run with -race to catch data races.
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"sync"
 	"testing"
@@ -20,9 +23,10 @@ import (
 
 func TestProperty_ConcurrentReservationAtomicity(t *testing.T) {
 	const (
-		variantID = int64(9001)
-		stock     = 10
-		workers   = 100
+		variantID  = int64(9001)
+		stock      = 10
+		workers    = 100
+		negWorkers = 5 // first N workers use qty=-1; all must be rejected with ErrInvalidQty
 	)
 
 	ctx := context.Background()
@@ -41,10 +45,21 @@ func TestProperty_ConcurrentReservationAtomicity(t *testing.T) {
 		t.Fatalf("SeedStock: %v", err)
 	}
 
-	// Pre-populate each worker's cart with 1 unit of the variant.
-	for i := 0; i < workers; i++ {
-		userID := int64(i + 1)
-		if err := svc.AddItem(ctx, userID, variantID, 1); err != nil {
+	// Workers [0, negWorkers) attempt qty=-1 — must be rejected before any Lua call.
+	negRejected := 0
+	for i := 0; i < negWorkers; i++ {
+		if err := svc.AddItem(ctx, int64(i+1), variantID, -1); !errors.Is(err, cart.ErrInvalidQty) {
+			t.Fatalf("worker %d: expected ErrInvalidQty for qty=-1, got %v", i, err)
+		}
+		negRejected++
+	}
+	if negRejected != negWorkers {
+		t.Errorf("expected %d ErrInvalidQty rejections, got %d", negWorkers, negRejected)
+	}
+
+	// Workers [negWorkers, workers) add qty=1 normally.
+	for i := negWorkers; i < workers; i++ {
+		if err := svc.AddItem(ctx, int64(i+1), variantID, 1); err != nil {
 			t.Fatalf("AddItem worker %d: %v", i, err)
 		}
 	}
@@ -80,15 +95,20 @@ func TestProperty_ConcurrentReservationAtomicity(t *testing.T) {
 		t.Errorf("successes(%d) + failures(%d) != workers(%d)", successes, failures, workers)
 	}
 
-	// All 10 stock units must have been consumed (final stock = 0).
 	finalStr, err := integRedis.Get(ctx, "mopro:stock:"+strconv.FormatInt(variantID, 10)).Result()
 	if err != nil {
 		t.Fatalf("GET final stock: %v", err)
 	}
 	finalStock, _ := strconv.Atoi(finalStr)
-	if finalStock != 0 {
-		t.Errorf("expected final stock=0, got %d (successes=%d)", finalStock, successes)
+
+	if finalStock > stock {
+		t.Errorf("STOCK LEAK: final stock %d > initial %d (negative qty guard failed)", finalStock, stock)
+	}
+	if finalStock != stock-successes {
+		t.Errorf("stock accounting: initial=%d successes=%d expected_final=%d got=%d",
+			stock, successes, stock-successes, finalStock)
 	}
 
-	t.Logf("result: successes=%d failures=%d stock=%d workers=%d", successes, failures, stock, workers)
+	t.Logf("result: negRejected=%d successes=%d failures=%d initialStock=%d finalStock=%d workers=%d",
+		negRejected, successes, failures, stock, finalStock, workers)
 }

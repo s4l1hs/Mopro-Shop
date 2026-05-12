@@ -212,7 +212,7 @@ func handleCreateProduct(svc catalog.Service, defaultCurrency, defaultLocale str
 			return
 		}
 
-		// TODO(Phase 1.2): enforce idempotency dedup via idempotency store.
+		// TODO(idempotency-sprint): enforce idempotency dedup via idempotency store.
 		p, err := svc.CreateProduct(r.Context(), req)
 		if err != nil {
 			if errors.Is(err, catalog.ErrInvalidCurrency) {
@@ -363,12 +363,15 @@ func handleCartAddItem(svc cart.Service) http.HandlerFunc {
 			return
 		}
 		if err := svc.AddItem(r.Context(), userID, body.VariantID, body.Qty); err != nil {
-			if errors.Is(err, cart.ErrVariantNotFound) {
+			switch {
+			case errors.Is(err, cart.ErrInvalidQty):
+				jsonError(w, "qty must be positive", http.StatusUnprocessableEntity)
+			case errors.Is(err, cart.ErrVariantNotFound):
 				jsonError(w, "variant not found", http.StatusNotFound)
-				return
+			default:
+				slog.Error("cart: AddItem", "err", err)
+				jsonError(w, "internal error", http.StatusInternalServerError)
 			}
-			slog.Error("cart: AddItem", "err", err)
-			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -424,6 +427,8 @@ func handleCartReserve(svc cart.Service) http.HandlerFunc {
 				jsonError(w, "cart is empty", http.StatusUnprocessableEntity)
 			case errors.Is(err, cart.ErrOutOfStock):
 				jsonError(w, "one or more items out of stock", http.StatusConflict)
+			case errors.Is(err, cart.ErrInvalidQty):
+				jsonError(w, "qty must be positive", http.StatusUnprocessableEntity)
 			default:
 				slog.Error("cart: Reserve", "err", err)
 				jsonError(w, "internal error", http.StatusInternalServerError)

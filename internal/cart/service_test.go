@@ -302,6 +302,42 @@ func TestRelease(t *testing.T) {
 	}
 }
 
+func TestAddItem_RejectsZeroQty(t *testing.T) {
+	err := newTestService(&mockRepo{}, &mockCatalogSvc{}).AddItem(context.Background(), 1, 10, 0)
+	if !errors.Is(err, cart.ErrInvalidQty) {
+		t.Fatalf("expected ErrInvalidQty for qty=0, got %v", err)
+	}
+}
+
+func TestAddItem_RejectsNegativeQty(t *testing.T) {
+	err := newTestService(&mockRepo{}, &mockCatalogSvc{}).AddItem(context.Background(), 1, 10, -5)
+	if !errors.Is(err, cart.ErrInvalidQty) {
+		t.Fatalf("expected ErrInvalidQty for qty=-5, got %v", err)
+	}
+}
+
+func TestReserve_RejectsZeroQty(t *testing.T) {
+	// Cart contains an item with qty=0 (bypassed AddItem guard, e.g. via direct repo write).
+	// Reserve must reject it before calling TryReserve, so no Lua call happens.
+	tryReserveCalled := false
+	repo := &mockRepo{
+		getItemsFn: func(_ context.Context, _ int64) ([]cart.CartItem, error) {
+			return []cart.CartItem{{VariantID: 1, Qty: 0}}, nil
+		},
+		tryReserveFn: func(_ context.Context, _ int64, _ int, _ string, _ int64, _ int64) (bool, int, error) {
+			tryReserveCalled = true
+			return true, 0, nil
+		},
+	}
+	_, _, err := newTestService(repo, &mockCatalogSvc{}).Reserve(context.Background(), 1)
+	if !errors.Is(err, cart.ErrInvalidQty) {
+		t.Fatalf("expected ErrInvalidQty for cart item qty=0, got %v", err)
+	}
+	if tryReserveCalled {
+		t.Error("TryReserve must not be called when qty <= 0")
+	}
+}
+
 func TestSeedStock(t *testing.T) {
 	called := false
 	repo := &mockRepo{

@@ -254,6 +254,19 @@ Same idempotent design as cashback; safe to rerun:
 docker exec fin-svc /app/app seller-payout-cron --date $(date -u +%Y-%m-%d)
 ```
 
+### 4.6 Reservation Expiry Stock Leak (Phase 1.2 known limitation)
+
+When a cart Reserve succeeds but the order is never completed (browser
+abandoned, payment never finalized), the reservation TTL (15 min)
+expires but stock remains decremented in Redis. Mitigation deferred
+to Phase 2 via Redis keyspace notifications (subscribe to
+`__keyevent@0__:expired` for `mopro:reservation:*` keys → call IncrBy
+on the stock counter for each item in the manifest).
+
+For Phase 1 launch volume (~50 sellers, ~5K orders/month), the daily
+leak is bounded; manual reconciliation via `mopro stock reconcile`
+CLI (Phase 2.x) is the interim recovery path.
+
 ---
 
 ## 5. Stuck Saga / Outbox Backlog Runbook

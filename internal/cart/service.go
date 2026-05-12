@@ -25,6 +25,9 @@ func NewService(repo Repository, catalogSvc catalog.Service) Service {
 }
 
 func (s *cartService) AddItem(ctx context.Context, userID, variantID int64, qty int) error {
+	if qty <= 0 {
+		return ErrInvalidQty
+	}
 	if _, err := s.catalog.GetVariantByID(ctx, variantID); err != nil {
 		if errors.Is(err, catalog.ErrNotFound) {
 			return ErrVariantNotFound
@@ -68,6 +71,10 @@ func (s *cartService) Reserve(ctx context.Context, userID int64) (string, time.T
 	// Saga: track which items reserved so we can compensate on partial failure.
 	var reserved []CartItem
 	for _, item := range items {
+		if item.Qty <= 0 {
+			_ = s.releasePartial(ctx, reservationID, reserved)
+			return "", time.Time{}, fmt.Errorf("invalid qty %d for variant %d: %w", item.Qty, item.VariantID, ErrInvalidQty)
+		}
 		ok, _, tryErr := s.repo.TryReserve(ctx, item.VariantID, item.Qty, reservationID, userID, reservationTTLSec)
 		if tryErr != nil {
 			_ = s.releasePartial(ctx, reservationID, reserved)
