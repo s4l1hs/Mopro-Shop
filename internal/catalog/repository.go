@@ -1,1 +1,231 @@
 package catalog
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// pgxUniqueViolation is the PostgreSQL error code for unique constraint violation.
+const pgxUniqueViolation = "23505"
+
+type pgxRepository struct {
+	pool *pgxpool.Pool
+}
+
+// NewRepository returns a Repository backed by pgx connecting through PgBouncer.
+// The pool DSN must point to pgbouncer-ecom, not directly to Postgres.
+func NewRepository(pool *pgxpool.Pool) Repository {
+	return &pgxRepository{pool: pool}
+}
+
+func (r *pgxRepository) IsCurrencyActive(ctx context.Context, code string) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx,
+		`SELECT EXISTS(
+			SELECT 1 FROM ref_schema.currencies
+			WHERE code = $1 AND active = TRUE
+		)`,
+		code,
+	).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("catalog.repo: IsCurrencyActive: %w", err)
+	}
+	return exists, nil
+}
+
+func (r *pgxRepository) InsertProduct(ctx context.Context, p Product) (Product, error) {
+	err := r.pool.QueryRow(ctx,
+		`INSERT INTO catalog_schema.products
+			(seller_id, category_id, brand, default_currency, default_locale, status)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, created_at, updated_at`,
+		p.SellerID, p.CategoryID, p.Brand,
+		p.DefaultCurrency, p.DefaultLocale, p.Status,
+	).Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return Product{}, fmt.Errorf("catalog.repo: InsertProduct: %w", err)
+	}
+	return p, nil
+}
+
+func (r *pgxRepository) InsertVariant(ctx context.Context, v Variant) (Variant, error) {
+	err := r.pool.QueryRow(ctx,
+		`INSERT INTO catalog_schema.variants
+			(product_id, sku, color, size, price_minor, price_currency, stock, image_keys)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id`,
+		v.ProductID, v.SKU, v.Color, v.Size,
+		v.PriceMinor, v.PriceCurrency, v.Stock, v.ImageKeys,
+	).Scan(&v.ID)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgxUniqueViolation {
+			return Variant{}, ErrDuplicateSKU
+		}
+		return Variant{}, fmt.Errorf("catalog.repo: InsertVariant: %w", err)
+	}
+	return v, nil
+}
+
+func (r *pgxRepository) UpsertTranslation(ctx context.Context, t ProductTranslation) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO catalog_schema.product_translations
+			(product_id, locale, title, description)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (product_id, locale)
+		DO UPDATE SET title = EXCLUDED.title, description = EXCLUDED.description`,
+		t.ProductID, t.Locale, t.Title, t.Description,
+	)
+	if err != nil {
+		return fmt.Errorf("catalog.repo: UpsertTranslation: %w", err)
+	}
+	return nil
+}
+
+func (r *pgxRepository) GetByID(ctx context.Context, id int64) (Product, []Variant, []ProductTranslation, error) {
+	var p Product
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, seller_id, category_id, brand, default_currency, default_locale,
+		        status, created_at, updated_at
+		FROM catalog_schema.products
+		WHERE id = $1`,
+		id,
+	).Scan(
+		&p.ID, &p.SellerID, &p.CategoryID, &p.Brand,
+		&p.DefaultCurrency, &p.DefaultLocale,
+		&p.Status, &p.CreatedAt, &p.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Product{}, nil, nil, ErrNotFound
+		}
+		return Product{}, nil, nil, fmt.Errorf("catalog.repo: GetByID product: %w", err)
+	}
+
+	variants, err := r.loadVariants(ctx, id)
+	if err != nil {
+		return Product{}, nil, nil, err
+	}
+
+	translations, err := r.loadTranslations(ctx, id)
+	if err != nil {
+		return Product{}, nil, nil, err
+	}
+
+	return p, variants, translations, nil
+}
+
+func (r *pgxRepository) loadVariants(ctx context.Context, productID int64) ([]Variant, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, product_id, sku, color, size, price_minor, price_currency, stock, image_keys
+		FROM catalog_schema.variants
+		WHERE product_id = $1
+		ORDER BY id ASC`,
+		productID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: loadVariants: %w", err)
+	}
+	defer rows.Close()
+
+	var variants []Variant
+	for rows.Next() {
+		var v Variant
+		if err := rows.Scan(
+			&v.ID, &v.ProductID, &v.SKU, &v.Color, &v.Size,
+			&v.PriceMinor, &v.PriceCurrency, &v.Stock, &v.ImageKeys,
+		); err != nil {
+			return nil, fmt.Errorf("catalog.repo: scan variant: %w", err)
+		}
+		if v.ImageKeys == nil {
+			v.ImageKeys = []string{}
+		}
+		variants = append(variants, v)
+	}
+	return variants, rows.Err()
+}
+
+func (r *pgxRepository) loadTranslations(ctx context.Context, productID int64) ([]ProductTranslation, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT product_id, locale, title, description
+		FROM catalog_schema.product_translations
+		WHERE product_id = $1
+		ORDER BY locale ASC`,
+		productID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: loadTranslations: %w", err)
+	}
+	defer rows.Close()
+
+	var translations []ProductTranslation
+	for rows.Next() {
+		var t ProductTranslation
+		if err := rows.Scan(&t.ProductID, &t.Locale, &t.Title, &t.Description); err != nil {
+			return nil, fmt.Errorf("catalog.repo: scan translation: %w", err)
+		}
+		translations = append(translations, t)
+	}
+	return translations, rows.Err()
+}
+
+func (r *pgxRepository) SearchProducts(ctx context.Context, query, locale, market string) ([]Product, error) {
+	// Phase 1.1: SQL ILIKE search via product_translations.
+	// TODO(Phase 1.3): replace with Meilisearch via search module.
+	rows, err := r.pool.Query(ctx,
+		`SELECT DISTINCT p.id, p.seller_id, p.category_id, p.brand,
+		        p.default_currency, p.default_locale, p.status, p.created_at, p.updated_at
+		FROM catalog_schema.products p
+		JOIN catalog_schema.product_translations t ON t.product_id = p.id AND t.locale = $1
+		WHERE p.status = 'active'
+		  AND t.title ILIKE '%' || $2 || '%'
+		ORDER BY p.id ASC
+		LIMIT 50`,
+		locale, query,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: SearchProducts: %w", err)
+	}
+	defer rows.Close()
+
+	var products []Product
+	for rows.Next() {
+		var p Product
+		if err := rows.Scan(
+			&p.ID, &p.SellerID, &p.CategoryID, &p.Brand,
+			&p.DefaultCurrency, &p.DefaultLocale,
+			&p.Status, &p.CreatedAt, &p.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("catalog.repo: scan search result: %w", err)
+		}
+		products = append(products, p)
+	}
+	return products, rows.Err()
+}
+
+func (r *pgxRepository) GetCommission(ctx context.Context, market string, categoryID int64) (CategoryCommission, error) {
+	var c CategoryCommission
+	err := r.pool.QueryRow(ctx,
+		`SELECT category_id, market, commission_pct_bps, kdv_pct_bps
+		FROM ref_schema.commission_rules
+		WHERE market = $1
+		  AND category_id = $2
+		  AND active = TRUE
+		  AND (effective_to IS NULL OR effective_to > now())
+		ORDER BY effective_from DESC
+		LIMIT 1`,
+		market, categoryID,
+	).Scan(&c.CategoryID, &c.Market, &c.CommissionPctBps, &c.KdvPctBps)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return CategoryCommission{}, ErrCommissionNotFound
+		}
+		return CategoryCommission{}, fmt.Errorf("catalog.repo: GetCommission: %w", err)
+	}
+	return c, nil
+}
