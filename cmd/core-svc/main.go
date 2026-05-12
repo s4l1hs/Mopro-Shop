@@ -19,6 +19,7 @@ import (
 
 	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
+	"github.com/mopro/platform/internal/eventbus"
 	"github.com/mopro/platform/internal/order"
 	"github.com/mopro/platform/internal/outbox"
 	"github.com/mopro/platform/pkg/dbx"
@@ -69,6 +70,19 @@ func main() {
 	orderOutbox := outbox.NewRepository("order_schema.outbox")
 	orderRepo := order.NewRepository(pool)
 	orderSvc := order.NewService(orderRepo, cartSvc, catalogSvc, orderOutbox, market, cashbackCurrency)
+
+	// ── Outbox publisher — drains order_schema.outbox → Redis Streams ───────
+	bus := eventbus.NewRedisBus(rc, slog.Default())
+	pub, err := outbox.NewPublisher(pool, orderOutbox, bus, slog.Default())
+	if err != nil {
+		slog.Error("core-svc: outbox publisher init", "err", err)
+		os.Exit(1)
+	}
+	go func() {
+		if err := pub.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("core-svc: outbox publisher exited unexpectedly", "err", err)
+		}
+	}()
 
 	// ── HTTP router (Go 1.22+ stdlib mux with method+path patterns) ─────────
 	mux := http.NewServeMux()

@@ -70,17 +70,29 @@ func main() {
 	payoutRepo := sellerpayout.NewRepository(pool)
 	payoutSvc := sellerpayout.NewService(payoutRepo, calLoader, defaultCurrency)
 
+	// ── Outbox publisher — drains wallet_schema.outbox → Redis Streams ───────
+	pub, err := outbox.NewPublisher(pool, cashbackOutbox, bus, slog.Default())
+	if err != nil {
+		slog.Error("fin-svc: outbox publisher init", "err", err)
+		os.Exit(1)
+	}
+	go func() {
+		if err := pub.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("fin-svc: outbox publisher exited unexpectedly", "err", err)
+		}
+	}()
+
 	// ── Start cashback consumer goroutine ────────────────────────────────────
 	go func() {
-		if err := cashback.StartConsumer(ctx, bus, cashbackSvc); err != nil {
-			slog.Error("fin-svc: cashback consumer exited", "err", err)
+		if err := cashback.StartConsumer(ctx, bus, cashbackSvc); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("fin-svc: cashback consumer exited unexpectedly", "err", err)
 		}
 	}()
 
 	// ── Start sellerpayout consumer goroutine ────────────────────────────────
 	go func() {
-		if err := sellerpayout.StartConsumer(ctx, bus, payoutSvc); err != nil {
-			slog.Error("fin-svc: sellerpayout consumer exited", "err", err)
+		if err := sellerpayout.StartConsumer(ctx, bus, payoutSvc); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("fin-svc: sellerpayout consumer exited unexpectedly", "err", err)
 		}
 	}()
 
