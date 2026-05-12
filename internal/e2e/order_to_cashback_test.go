@@ -269,11 +269,15 @@ func TestE2E_OrderToCashbackAndPayout(t *testing.T) { //nolint:gocyclo,cyclop
 		t.Errorf("plan currency: want %s, got %s", coinCurrency, planCurrency)
 	}
 
-	// Verify formula: monthly = (commAmt * 5000 / 10000) / 12
+	// commAmt=3500, yearly=3500×5000÷10000=1750, monthly=1750÷12=145 (integer truncation)
+	const wantMonthlyMinor int64 = 145
 	expectedYearly := commAmt * int64(cashback.ReferenceInterestRateBpsConst) / 10000
 	expectedMonthly := expectedYearly / 12
-	if monthlyMinor != expectedMonthly {
-		t.Errorf("monthly_amount_minor: want %d, got %d", expectedMonthly, monthlyMinor)
+	if expectedMonthly != wantMonthlyMinor {
+		t.Fatalf("test invariant broken: formula or inputs changed — want %d, computed %d", wantMonthlyMinor, expectedMonthly)
+	}
+	if monthlyMinor != wantMonthlyMinor {
+		t.Errorf("monthly_amount_minor: want %d, got %d", wantMonthlyMinor, monthlyMinor)
 	}
 	t.Logf("cashback plan OK: planID=%d monthly=%d currency=%s", planID, monthlyMinor, planCurrency)
 
