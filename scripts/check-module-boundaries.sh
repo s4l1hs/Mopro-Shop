@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCHEMAS="identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|notification|support|media|sizefinder"
+SCHEMAS="identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|shipping|notification|support|media|sizefinder"
 
 # Cross-module-schema reads in raw SQL (ref_schema is exempt)
 if grep -rE "FROM\s+($SCHEMAS)_schema\." \
     --include='*.sql' --include='*.go' \
     internal/ migrations/ \
-    | grep -vE '/(identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|sellerpayout|notification|support|media|sizefinder|e2e)/' \
+    | grep -vE '/(identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|sellerpayout|shipping|notification|support|media|sizefinder|e2e)/' \
     | grep -vE 'ref_schema\.' ; then
     echo "ERROR: cross-schema reference detected"
     exit 1

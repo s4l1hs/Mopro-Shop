@@ -68,9 +68,13 @@ api.moproshop.com {
 	}
 
 	# ── Shipping carrier webhooks ─────────────────────────────────────────────
-	# /v1/shipping/webhook/{aras,yurtici,surat,mng,hepsijet,ptt} → core-svc
-	# "delivered" status triggers ecom.order.delivered.v1 → cashback + payout
-	# unlock. (ARCHITECTURE.md § 5)
+	# NO rate-limit / auth middleware — signature verification is carrier-specific
+	# and handled inside shippingService.HandleWebhook (HMAC for Sürat/MNG,
+	# Bearer token for HepsiJet). "delivered" triggers ecom.order.delivered.v1.
+	@shipping_webhook path /v1/shipping/webhook/*
+	handle @shipping_webhook {
+		reverse_proxy core-svc:8080
+	}
 
 	# ── Seller transparency endpoint ──────────────────────────────────────────
 	# GET /v1/seller/orders/:id/breakdown → core-svc (CLAUDE.md § 4.8)
@@ -127,6 +131,12 @@ api.localhost {
 	handle @psp_webhook {
 		# NO rate_limit, NO @cf_only enforcer applied to PSP webhooks.
 		# The webhook handler itself verifies the provider HMAC signature.
+		reverse_proxy core-svc:8080
+	}
+
+	# ── Shipping carrier webhooks ─────────────────────────────────────────────
+	@shipping_webhook path /v1/shipping/webhook/*
+	handle @shipping_webhook {
 		reverse_proxy core-svc:8080
 	}
 

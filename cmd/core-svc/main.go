@@ -25,6 +25,10 @@ import (
 	"github.com/mopro/platform/internal/outbox"
 	"github.com/mopro/platform/internal/payment"
 	"github.com/mopro/platform/internal/payment/sipay"
+	"github.com/mopro/platform/internal/shipping"
+	"github.com/mopro/platform/internal/shipping/hepsijet"
+	"github.com/mopro/platform/internal/shipping/mng"
+	"github.com/mopro/platform/internal/shipping/surat"
 	"github.com/mopro/platform/pkg/dbx"
 	"github.com/mopro/platform/pkg/httpx"
 )
@@ -110,6 +114,43 @@ func main() {
 		sipayAdapter, paymentRepo, paymentOutbox, rc, market, cashbackCurrency, slog.Default(),
 	)
 
+	// ── Shipping module wiring ───────────────────────────────────────────────
+	shippingRepo := shipping.NewRepository(pool)
+	shippingAdapters := map[string]shipping.Adapter{}
+
+	if cfg := (shipping.SuratConfig{
+		BaseURL:       os.Getenv("SURAT_BASE_URL"),
+		Username:      os.Getenv("SURAT_USERNAME"),
+		Password:      os.Getenv("SURAT_PASSWORD"),
+		WebhookSecret: os.Getenv("SURAT_WEBHOOK_SECRET"),
+	}); cfg.BaseURL != "" {
+		shippingAdapters["surat"] = surat.New(cfg)
+	}
+
+	if cfg := (shipping.MNGConfig{
+		BaseURL:       os.Getenv("MNG_BASE_URL"),
+		APIKey:        os.Getenv("MNG_API_KEY"),
+		WebhookSecret: os.Getenv("MNG_WEBHOOK_SECRET"),
+	}); cfg.BaseURL != "" {
+		shippingAdapters["mng"] = mng.New(cfg)
+	}
+
+	if cfg := (shipping.HepsiJetConfig{
+		BaseURL:      os.Getenv("HEPSIJET_BASE_URL"),
+		ClientID:     os.Getenv("HEPSIJET_CLIENT_ID"),
+		ClientSecret: os.Getenv("HEPSIJET_CLIENT_SECRET"),
+		WebhookToken: os.Getenv("HEPSIJET_WEBHOOK_TOKEN"),
+	}); cfg.BaseURL != "" {
+		shippingAdapters["hepsijet"] = hepsijet.New(cfg)
+	}
+
+	kargDefault := os.Getenv("KARGO_DEFAULT")
+	shippingSvc, err := shipping.NewService(kargDefault, shippingAdapters, shippingRepo, orderSvc)
+	if err != nil {
+		slog.Error("shipping: NewService failed", "err", err)
+		os.Exit(1)
+	}
+
 	// ── HTTP router (Go 1.22+ stdlib mux with method+path patterns) ─────────
 	mux := http.NewServeMux()
 
@@ -188,6 +229,17 @@ func main() {
 	// so the explicit no-middleware handle block applies (CLAUDE.md § 9).
 	mux.Handle("POST /v1/payments/webhook/sipay",
 		httpx.TraceAndLog(http.HandlerFunc(handleSipayWebhook(webhookHandler))),
+	)
+
+	// Shipping webhook routes — Caddyfile @shipping_webhook path /v1/shipping/webhook/*
+	mux.Handle("POST /v1/shipping/webhook/surat",
+		httpx.TraceAndLog(http.HandlerFunc(handleShippingWebhook(shippingSvc, "surat"))),
+	)
+	mux.Handle("POST /v1/shipping/webhook/mng",
+		httpx.TraceAndLog(http.HandlerFunc(handleShippingWebhook(shippingSvc, "mng"))),
+	)
+	mux.Handle("POST /v1/shipping/webhook/hepsijet",
+		httpx.TraceAndLog(http.HandlerFunc(handleShippingWebhook(shippingSvc, "hepsijet"))),
 	)
 
 	srv := &http.Server{
