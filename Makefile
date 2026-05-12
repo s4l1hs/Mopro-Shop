@@ -1,3 +1,5 @@
+COMPOSE := docker compose -f deploy/docker-compose.yml
+
 .PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger \
         build-core build-fin build-jobs build-migrate build-mopro run-local down-local
 
@@ -45,7 +47,8 @@ build-mopro:
 	go build -o /tmp/mopro ./cmd/mopro
 
 run-local:
-	docker compose --env-file .env.local up -d
+	mkdir -p ./data/postgres-ecom ./data/postgres-ledger ./data/redis ./data/meili
+	$(COMPOSE) --env-file .env.local up -d --build
 
 down-local:
-	docker compose --env-file .env.local down
+	$(COMPOSE) --env-file .env.local down
