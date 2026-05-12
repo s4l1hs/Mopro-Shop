@@ -112,7 +112,8 @@ test-integration-order:
 	  STATUS=$$? ; docker rm -f pg-ecom-order-test ; exit $$STATUS
 
 test-e2e:
-	docker rm -f pg-ecom-e2e pg-ledger-e2e 2>/dev/null || true
+	docker rm -f pg-ecom-e2e pg-ledger-e2e redis-e2e 2>/dev/null || true
+	docker run -d --name redis-e2e -p 6381:6379 redis:7-alpine
 	docker run -d --name pg-ecom-e2e -p 6435:5432 \
 	  -e POSTGRES_USER=ecom_admin -e POSTGRES_PASSWORD=test123 \
 	  -e POSTGRES_DB=mopro_ecom postgres:16-alpine
@@ -120,7 +121,8 @@ test-e2e:
 	  -e POSTGRES_USER=ledger_admin -e POSTGRES_PASSWORD=test123 \
 	  -e POSTGRES_DB=mopro_ledger postgres:16-alpine
 	sleep 3
+	REDIS_E2E_ADDR=localhost:6381 \
 	ORDER_E2E_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
 	LEDGER_E2E_DSN=postgres://ledger_admin:test123@localhost:6436/mopro_ledger \
 	  go test -tags=integration -count=1 -race -v ./internal/e2e/... ; \
-	  STATUS=$$? ; docker rm -f pg-ecom-e2e pg-ledger-e2e ; exit $$STATUS
+	  STATUS=$$? ; docker rm -f pg-ecom-e2e pg-ledger-e2e redis-e2e ; exit $$STATUS
