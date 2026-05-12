@@ -1,12 +1,12 @@
 COMPOSE := docker compose -f deploy/docker-compose.yml
 
-.PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex \
+.PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order \
         build-core build-fin build-jobs build-migrate build-mopro run-local down-local \
         caddy-validate caddy-reload \
-        test-integration-catalog test-integration-outbox test-integration-cart
+        test-integration-catalog test-integration-outbox test-integration-cart test-integration-order
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex
+verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order
 
 fmt:
 	gofmt -l . | tee /tmp/gofmt.out
@@ -35,6 +35,9 @@ property-ledger:
 
 property-timex:
 	go test -tags=integration -run Property ./pkg/timex/...
+
+property-order:
+	go test -run Property ./internal/order/...
 
 build-core:
 	go build -o /tmp/core-svc ./cmd/core-svc
@@ -96,3 +99,13 @@ test-integration-cart:
 	CART_TEST_REDIS=localhost:6380 \
 	  go test -tags=integration -count=1 -race ./internal/cart/... ; \
 	  STATUS=$$? ; docker rm -f redis-cart-test ; exit $$STATUS
+
+test-integration-order:
+	docker rm -f pg-ecom-order-test 2>/dev/null || true
+	docker run -d --name pg-ecom-order-test -p 6435:5432 \
+	  -e POSTGRES_USER=ecom_admin -e POSTGRES_PASSWORD=test123 \
+	  -e POSTGRES_DB=mopro_ecom postgres:16-alpine
+	sleep 2
+	ORDER_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	  go test -tags=integration -count=1 -race ./internal/order/... ; \
+	  STATUS=$$? ; docker rm -f pg-ecom-order-test ; exit $$STATUS

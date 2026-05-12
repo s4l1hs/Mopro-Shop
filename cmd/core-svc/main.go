@@ -17,6 +17,8 @@ import (
 
 	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
+	"github.com/mopro/platform/internal/order"
+	"github.com/mopro/platform/internal/outbox"
 	"github.com/mopro/platform/pkg/dbx"
 	"github.com/mopro/platform/pkg/httpx"
 )
@@ -57,6 +59,15 @@ func main() {
 	}
 	cartSvc := cart.NewService(cartRepo, catalogSvc)
 
+	// ── Order module wiring ──────────────────────────────────────────────────
+	cashbackCurrency := os.Getenv("DEFAULT_CASHBACK_CURRENCY")
+	if cashbackCurrency == "" {
+		cashbackCurrency = "TRY_COIN"
+	}
+	orderOutbox := outbox.NewRepository("order_schema.outbox")
+	orderRepo := order.NewRepository(pool)
+	orderSvc := order.NewService(orderRepo, cartSvc, catalogSvc, orderOutbox, market, cashbackCurrency)
+
 	// ── HTTP router (Go 1.22+ stdlib mux with method+path patterns) ─────────
 	mux := http.NewServeMux()
 
@@ -96,6 +107,23 @@ func main() {
 	)
 	mux.Handle("POST /v1/cart/release",
 		httpx.TraceAndLog(http.HandlerFunc(handleCartRelease(cartSvc))),
+	)
+
+	// Order routes
+	mux.Handle("POST /v1/orders",
+		httpx.TraceAndLog(http.HandlerFunc(handleCreateOrder(orderSvc))),
+	)
+	mux.Handle("GET /v1/orders/{id}",
+		httpx.TraceAndLog(http.HandlerFunc(handleGetOrder(orderSvc))),
+	)
+	mux.Handle("GET /v1/orders",
+		httpx.TraceAndLog(http.HandlerFunc(handleListOrders(orderSvc))),
+	)
+	mux.Handle("POST /v1/orders/{id}/status",
+		httpx.TraceAndLog(http.HandlerFunc(handleUpdateOrderStatus(orderSvc))),
+	)
+	mux.Handle("POST /v1/orders/{id}/deliver",
+		httpx.TraceAndLog(http.HandlerFunc(handleMarkDelivered(orderSvc))),
 	)
 
 	srv := &http.Server{
@@ -457,6 +485,146 @@ func handleCartRelease(svc cart.Service) http.HandlerFunc {
 				return
 			}
 			slog.Error("cart: Release", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+// ── Order handlers ────────────────────────────────────────────────────────────
+
+func handleCreateOrder(svc order.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := requireUserID(w, r)
+		if !ok {
+			return
+		}
+		if !requireIdempotencyKey(w, r) {
+			return
+		}
+		var body struct {
+			ReservationID string `json:"reservation_id"`
+			Market        string `json:"market"`
+			Currency      string `json:"currency"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			jsonError(w, "invalid JSON body", http.StatusBadRequest)
+			return
+		}
+		o, items, err := svc.Checkout(r.Context(), order.CheckoutRequest{
+			UserID:         userID,
+			ReservationID:  body.ReservationID,
+			Market:         body.Market,
+			Currency:       body.Currency,
+			IdempotencyKey: r.Header.Get("Idempotency-Key"),
+		})
+		if err != nil {
+			switch {
+			case errors.Is(err, order.ErrEmptyCart):
+				jsonError(w, "cart is empty", http.StatusUnprocessableEntity)
+			case errors.Is(err, order.ErrDuplicateIdempotency):
+				jsonError(w, "duplicate idempotency key", http.StatusConflict)
+			default:
+				slog.Error("order: Checkout", "err", err)
+				jsonError(w, "internal error", http.StatusInternalServerError)
+			}
+			return
+		}
+		jsonOK(w, http.StatusCreated, map[string]any{"order": o, "items": items})
+	}
+}
+
+func handleGetOrder(svc order.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			jsonError(w, "invalid order id", http.StatusBadRequest)
+			return
+		}
+		o, items, err := svc.GetOrder(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, order.ErrOrderNotFound) {
+				jsonError(w, "order not found", http.StatusNotFound)
+				return
+			}
+			slog.Error("order: GetOrder", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		jsonOK(w, http.StatusOK, map[string]any{"order": o, "items": items})
+	}
+}
+
+func handleListOrders(svc order.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := requireUserID(w, r)
+		if !ok {
+			return
+		}
+		orders, err := svc.ListOrders(r.Context(), userID)
+		if err != nil {
+			slog.Error("order: ListOrders", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if orders == nil {
+			orders = []order.Order{}
+		}
+		jsonOK(w, http.StatusOK, map[string]any{"orders": orders})
+	}
+}
+
+func handleUpdateOrderStatus(svc order.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			jsonError(w, "invalid order id", http.StatusBadRequest)
+			return
+		}
+		var body struct {
+			Status string `json:"status"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			jsonError(w, "invalid JSON body", http.StatusBadRequest)
+			return
+		}
+		if err := svc.UpdateStatus(r.Context(), id, order.OrderStatus(body.Status)); err != nil {
+			if errors.Is(err, order.ErrOrderNotFound) {
+				jsonError(w, "order not found", http.StatusNotFound)
+				return
+			}
+			slog.Error("order: UpdateStatus", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func handleMarkDelivered(svc order.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			jsonError(w, "invalid order id", http.StatusBadRequest)
+			return
+		}
+		var body struct {
+			DeliveredAt time.Time `json:"delivered_at"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			jsonError(w, "invalid JSON body", http.StatusBadRequest)
+			return
+		}
+		if body.DeliveredAt.IsZero() {
+			body.DeliveredAt = time.Now().UTC()
+		}
+		if err := svc.MarkDelivered(r.Context(), id, body.DeliveredAt); err != nil {
+			if errors.Is(err, order.ErrOrderNotFound) {
+				jsonError(w, "order not found", http.StatusNotFound)
+				return
+			}
+			slog.Error("order: MarkDelivered", "err", err)
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
