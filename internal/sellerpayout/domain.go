@@ -6,12 +6,12 @@ import "time"
 type PayoutStatus string
 
 const (
-	PayoutStatusScheduled   PayoutStatus = "scheduled"
-	PayoutStatusProcessing  PayoutStatus = "processing"
-	PayoutStatusPaid        PayoutStatus = "paid"
-	PayoutStatusFailed      PayoutStatus = "failed"
-	PayoutStatusCancelled   PayoutStatus = "cancelled"
-	PayoutStatusReversed    PayoutStatus = "reversed"
+	PayoutStatusScheduled  PayoutStatus = "scheduled"
+	PayoutStatusProcessing PayoutStatus = "processing"
+	PayoutStatusPaid       PayoutStatus = "paid"
+	PayoutStatusFailed     PayoutStatus = "failed"
+	PayoutStatusCancelled  PayoutStatus = "cancelled"
+	PayoutStatusReversed   PayoutStatus = "reversed"
 )
 
 // Payout is the in-memory representation of commission_schema.seller_payouts.

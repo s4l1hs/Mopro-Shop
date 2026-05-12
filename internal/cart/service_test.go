@@ -45,14 +45,14 @@ func (m *mockCatalogSvc) GetCommissionForCategory(_ context.Context, _ string, i
 // ── repo mock ─────────────────────────────────────────────────────────────────
 
 type mockRepo struct {
-	setItemFn             func(ctx context.Context, userID, variantID int64, qty int) error
-	removeItemFn          func(ctx context.Context, userID, variantID int64) error
-	getItemsFn            func(ctx context.Context, userID int64) ([]cart.CartItem, error)
-	tryReserveFn          func(ctx context.Context, variantID int64, qty int, reservationID string, userID int64, ttlSec int64) (bool, int, error)
-	setManifestFn         func(ctx context.Context, reservationID string, items []cart.CartItem, ttlSec int64) error
-	releaseReservationFn  func(ctx context.Context, reservationID string) error
-	commitReservationFn   func(ctx context.Context, reservationID string) error
-	seedStockFn           func(ctx context.Context, variantID int64, stock int) error
+	setItemFn            func(ctx context.Context, userID, variantID int64, qty int) error
+	removeItemFn         func(ctx context.Context, userID, variantID int64) error
+	getItemsFn           func(ctx context.Context, userID int64) ([]cart.CartItem, error)
+	tryReserveFn         func(ctx context.Context, variantID int64, qty int, reservationID string, userID int64, ttlSec int64) (bool, int, error)
+	setManifestFn        func(ctx context.Context, reservationID string, items []cart.CartItem, ttlSec int64) error
+	releaseReservationFn func(ctx context.Context, reservationID string) error
+	commitReservationFn  func(ctx context.Context, reservationID string) error
+	seedStockFn          func(ctx context.Context, variantID int64, stock int) error
 }
 
 func (m *mockRepo) SetItem(ctx context.Context, userID, variantID int64, qty int) error {

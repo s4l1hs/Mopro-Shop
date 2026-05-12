@@ -10,14 +10,15 @@ package e2e_test
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/mopro/platform/internal/cashback"
 	"github.com/mopro/platform/internal/cart"
+	"github.com/mopro/platform/internal/cashback"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/eventbus"
 	"github.com/mopro/platform/internal/order"
@@ -77,8 +78,8 @@ func TestE2E_FullCheckoutToPayoutViaRedis(t *testing.T) { //nolint:gocyclo,cyclo
 	payoutSvc := sellerpayout.NewService(payoutRepo, calLoader, payoutCurrency)
 
 	// ── Outbox publisher (ecom side) ─────────────────────────────────────────
-	bus := eventbus.NewRedisBus(rc, nil) // nil logger: suppress debug in tests
-	pub, err := outbox.NewPublisher(ecomPool, orderOutboxRepo, bus, nil)
+	bus := eventbus.NewRedisBus(rc, slog.Default())
+	pub, err := outbox.NewPublisher(ecomPool, orderOutboxRepo, bus, slog.Default())
 	if err != nil {
 		t.Fatalf("outbox publisher init: %v", err)
 	}
@@ -210,9 +211,12 @@ func TestE2E_FullCheckoutToPayoutViaRedis(t *testing.T) { //nolint:gocyclo,cyclo
 			if status != "scheduled" {
 				t.Errorf("payout status: want scheduled, got %s", status)
 			}
-			minUnlock := deliveredAt.AddDate(0, 0, 3)
-			if unlockAt.Before(minUnlock) {
-				t.Errorf("unlock_at %v is before deliveredAt+3d %v", unlockAt, minUnlock)
+			// unlock_at is stored as Postgres DATE (read back as midnight UTC).
+			// Compare date portions only — preserving time-of-day in deliveredAt
+			// would make any non-midnight deliveredAt fail this assertion incorrectly.
+			minUnlockDate := time.Date(deliveredAt.Year(), deliveredAt.Month(), deliveredAt.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, 3)
+			if unlockAt.Before(minUnlockDate) {
+				t.Errorf("unlock_at %v is before deliveredAt+3d %v", unlockAt, minUnlockDate)
 			}
 			t.Logf("seller payout OK: amount=%d unlock=%s", amount, unlockAt.Format("2006-01-02"))
 			break

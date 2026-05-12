@@ -113,15 +113,15 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	txErr := h.repo.WithTx(ctx, func(tx pgx.Tx) error {
 		rawJSON, _ := json.Marshal(json.RawMessage(body))
 		intent := payment.PaymentIntent{
-			OrderID:        ev.OrderID,
-			IdempotencyKey: ev.ProviderRef,
-			Provider:       "sipay",
-			ProviderRef:    ev.ProviderRef,
+			OrderID:         ev.OrderID,
+			IdempotencyKey:  ev.ProviderRef,
+			Provider:        "sipay",
+			ProviderRef:     ev.ProviderRef,
 			ProviderOrderNo: ev.ProviderOrderNo,
-			Status:         paymentStatusFromEvent(ev.Type),
-			AmountMinor:    ev.AmountMinor,
-			Currency:       ev.Currency,
-			RawResponse:    rawJSON,
+			Status:          paymentStatusFromEvent(ev.Type),
+			AmountMinor:     ev.AmountMinor,
+			Currency:        ev.Currency,
+			RawResponse:     rawJSON,
 		}
 		if ev.Type == payment.PaymentEventCaptured {
 			now := ev.OccurredAt
@@ -207,4 +207,3 @@ func outboxEventType(t payment.PaymentEventType) string {
 		return "ecom.payment.unknown.v1"
 	}
 }
-

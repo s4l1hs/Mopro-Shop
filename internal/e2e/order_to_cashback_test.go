@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	defaultOrderE2EDSN  = "postgres://ecom_admin:test123@localhost:6435/mopro_ecom"  //nolint:gosec
+	defaultOrderE2EDSN  = "postgres://ecom_admin:test123@localhost:6435/mopro_ecom"     //nolint:gosec
 	defaultLedgerE2EDSN = "postgres://ledger_admin:test123@localhost:6436/mopro_ledger" //nolint:gosec
 )
 
@@ -327,10 +327,12 @@ func TestE2E_OrderToCashbackAndPayout(t *testing.T) { //nolint:gocyclo,cyclop
 		t.Errorf("payout amount: want %d, got %d", sellerNet, payoutAmount)
 	}
 
-	// unlock_at must be >= delivered_at + 3 calendar days (at minimum; + weekend skip possible).
-	minUnlock := deliveredAt.AddDate(0, 0, 3)
-	if unlockAt.Before(minUnlock) {
-		t.Errorf("unlock_at %v is before deliveredAt+3d %v", unlockAt, minUnlock)
+	// unlock_at is stored as Postgres DATE (read back as midnight UTC).
+	// Compare date portions only — preserving time-of-day in deliveredAt would
+	// make any non-midnight deliveredAt fail this assertion incorrectly.
+	minUnlockDate := time.Date(deliveredAt.Year(), deliveredAt.Month(), deliveredAt.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, 3)
+	if unlockAt.Before(minUnlockDate) {
+		t.Errorf("unlock_at %v is before deliveredAt+3d %v", unlockAt, minUnlockDate)
 	}
 
 	t.Logf("seller payout OK: payoutID=%d amount=%d unlockAt=%s",
@@ -371,13 +373,17 @@ type cartMock struct {
 	items []cart.CartItem
 }
 
-func (m *cartMock) AddItem(_ context.Context, _, _ int64, _ int) error              { return nil }
-func (m *cartMock) RemoveItem(_ context.Context, _, _ int64) error                  { return nil }
-func (m *cartMock) GetCart(_ context.Context, _ int64) (cart.Cart, error)           { return cart.Cart{Items: m.items}, nil }
-func (m *cartMock) Reserve(_ context.Context, _ int64) (string, time.Time, error)   { return "", time.Time{}, nil }
-func (m *cartMock) Release(_ context.Context, _ string) error                       { return nil }
-func (m *cartMock) CommitReservation(_ context.Context, _ string) error             { return nil }
-func (m *cartMock) SeedStock(_ context.Context, _ int64, _ int) error               { return nil }
+func (m *cartMock) AddItem(_ context.Context, _, _ int64, _ int) error { return nil }
+func (m *cartMock) RemoveItem(_ context.Context, _, _ int64) error     { return nil }
+func (m *cartMock) GetCart(_ context.Context, _ int64) (cart.Cart, error) {
+	return cart.Cart{Items: m.items}, nil
+}
+func (m *cartMock) Reserve(_ context.Context, _ int64) (string, time.Time, error) {
+	return "", time.Time{}, nil
+}
+func (m *cartMock) Release(_ context.Context, _ string) error           { return nil }
+func (m *cartMock) CommitReservation(_ context.Context, _ string) error { return nil }
+func (m *cartMock) SeedStock(_ context.Context, _ int64, _ int) error   { return nil }
 
 // ── schema setup ─────────────────────────────────────────────────────────────
 

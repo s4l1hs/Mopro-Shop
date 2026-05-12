@@ -15,9 +15,9 @@ type Service interface {
 	RemoveItem(ctx context.Context, userID, variantID int64) error
 	GetCart(ctx context.Context, userID int64) (Cart, error)
 	Reserve(ctx context.Context, userID int64) (reservationID string, expiresAt time.Time, err error)
-	Release(ctx context.Context, reservationID string) error          // saga compensation; restores stock
+	Release(ctx context.Context, reservationID string) error           // saga compensation; restores stock
 	CommitReservation(ctx context.Context, reservationID string) error // order paid; deletes manifest without restoring stock
-	SeedStock(ctx context.Context, variantID int64, stock int) error  // test/CLI; TODO(eventbus-wireup)
+	SeedStock(ctx context.Context, variantID int64, stock int) error   // test/CLI; TODO(eventbus-wireup)
 }
 
 // Repository is the storage interface used only by service.go.

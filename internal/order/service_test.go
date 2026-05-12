@@ -17,7 +17,7 @@ import (
 // ── catalog mock ─────────────────────────────────────────────────────────────
 
 type mockCatalogSvc struct {
-	getVariantByIDFn          func(ctx context.Context, id int64) (catalog.Variant, error)
+	getVariantByIDFn           func(ctx context.Context, id int64) (catalog.Variant, error)
 	getCommissionForCategoryFn func(ctx context.Context, market string, catID int64) (catalog.CategoryCommission, error)
 }
 
@@ -55,8 +55,8 @@ func (m *mockCatalogSvc) Search(_ context.Context, _, _, _ string) ([]catalog.Pr
 // ── cart mock ─────────────────────────────────────────────────────────────────
 
 type mockCartSvc struct {
-	getCartFn            func(ctx context.Context, userID int64) (cart.Cart, error)
-	commitReservationFn  func(ctx context.Context, reservationID string) error
+	getCartFn           func(ctx context.Context, userID int64) (cart.Cart, error)
+	commitReservationFn func(ctx context.Context, reservationID string) error
 }
 
 func (m *mockCartSvc) GetCart(ctx context.Context, userID int64) (cart.Cart, error) {
@@ -72,11 +72,11 @@ func (m *mockCartSvc) CommitReservation(ctx context.Context, resID string) error
 	return nil
 }
 func (m *mockCartSvc) AddItem(_ context.Context, _, _ int64, _ int) error { return nil }
-func (m *mockCartSvc) RemoveItem(_ context.Context, _, _ int64) error      { return nil }
+func (m *mockCartSvc) RemoveItem(_ context.Context, _, _ int64) error     { return nil }
 func (m *mockCartSvc) Reserve(_ context.Context, _ int64) (string, time.Time, error) {
 	return "res-id", time.Now().Add(15 * time.Minute), nil
 }
-func (m *mockCartSvc) Release(_ context.Context, _ string) error        { return nil }
+func (m *mockCartSvc) Release(_ context.Context, _ string) error         { return nil }
 func (m *mockCartSvc) SeedStock(_ context.Context, _ int64, _ int) error { return nil }
 
 // ── repo mock ─────────────────────────────────────────────────────────────────

@@ -32,9 +32,9 @@ type InitiatePaymentResponse struct {
 type PaymentEventType string
 
 const (
-	PaymentEventCaptured  PaymentEventType = "captured"
-	PaymentEventFailed    PaymentEventType = "failed"
-	PaymentEventRefunded  PaymentEventType = "refunded"
+	PaymentEventCaptured PaymentEventType = "captured"
+	PaymentEventFailed   PaymentEventType = "failed"
+	PaymentEventRefunded PaymentEventType = "refunded"
 )
 
 // PaymentEvent is the provider-agnostic representation of a PSP webhook.
@@ -84,12 +84,12 @@ type RefundResponse struct {
 // All PII fields must be decrypted transiently by the caller; they are not stored
 // in this struct beyond the duration of the API call.
 type RegisterSubMerchantRequest struct {
-	SellerID   int64
-	Name       string // business name
-	TaxNumber  string // TR: vergi kimlik numarası (PII)
-	IBAN       string // bank IBAN (PII)
-	Address    string
-	Market     string
+	SellerID  int64
+	Name      string // business name
+	TaxNumber string // TR: vergi kimlik numarası (PII)
+	IBAN      string // bank IBAN (PII)
+	Address   string
+	Market    string
 }
 
 // SubMerchantRef is the PSP's persistent handle for a sub-merchant.

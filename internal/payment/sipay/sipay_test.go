@@ -3,8 +3,8 @@
 package sipay_test
 
 import (
-	"context"
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -326,6 +326,195 @@ func TestWebhookHandler_ValidCapture(t *testing.T) {
 	if rr.Code == http.StatusUnauthorized {
 		t.Errorf("signature verification failed unexpectedly")
 	}
+}
+
+// ─── Refund tests ────────────────────────────────────────────────────────────
+
+func TestRefund_FullRefund(t *testing.T) {
+	var capturedBody map[string]string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ccpayment/api/token", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"status_code": 100, "data": map[string]string{"token": "tok"}})
+	})
+	mux.HandleFunc("/ccpayment/api/refund", func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&capturedBody)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status_code": 100,
+			"data":        map[string]string{"refund_id": "ref-full-001"},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	adapter, err := sipay.NewAdapter(testConfig(srv.URL), newStubRepo(), nil)
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+
+	resp, err := adapter.Refund(context.Background(), payment.RefundRequest{
+		ProviderRef:    "inv-001",
+		AmountMinor:    0, // 0 = full refund
+		IdempotencyKey: "refund-idem-001",
+	})
+	if err != nil {
+		t.Fatalf("Refund: %v", err)
+	}
+	if resp.RefundRef != "ref-full-001" {
+		t.Errorf("RefundRef: want ref-full-001, got %q", resp.RefundRef)
+	}
+	// Full refund: amount sent to Sipay is "0" (adapter sends AmountMinor directly).
+	if capturedBody["amount"] != "0" {
+		t.Errorf("amount sent to Sipay: want \"0\" for full refund, got %q", capturedBody["amount"])
+	}
+	if capturedBody["invoice_id"] != "inv-001" {
+		t.Errorf("invoice_id: want inv-001, got %q", capturedBody["invoice_id"])
+	}
+}
+
+func TestRefund_PartialRefund(t *testing.T) {
+	var capturedBody map[string]string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ccpayment/api/token", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"status_code": 100, "data": map[string]string{"token": "tok"}})
+	})
+	mux.HandleFunc("/ccpayment/api/refund", func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&capturedBody)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status_code": 100,
+			"data":        map[string]string{"refund_id": "ref-partial-001"},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	adapter, err := sipay.NewAdapter(testConfig(srv.URL), newStubRepo(), nil)
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+
+	resp, err := adapter.Refund(context.Background(), payment.RefundRequest{
+		ProviderRef:    "inv-002",
+		AmountMinor:    50000, // 500.00 TRY in minor units (kuruş)
+		IdempotencyKey: "refund-idem-002",
+	})
+	if err != nil {
+		t.Fatalf("Refund: %v", err)
+	}
+	if resp.RefundRef != "ref-partial-001" {
+		t.Errorf("RefundRef: want ref-partial-001, got %q", resp.RefundRef)
+	}
+	if resp.AmountMinor != 50000 {
+		t.Errorf("AmountMinor in response: want 50000, got %d", resp.AmountMinor)
+	}
+	// Adapter sends AmountMinor as an integer string (kuruş / minor units).
+	if capturedBody["amount"] != "50000" {
+		t.Errorf("amount sent to Sipay: want \"50000\" (minor units), got %q", capturedBody["amount"])
+	}
+}
+
+func TestRefund_SipayError(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ccpayment/api/token", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{"status_code": 100, "data": map[string]string{"token": "tok"}})
+	})
+	mux.HandleFunc("/ccpayment/api/refund", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"status_code": 400,
+			"message":     "already refunded",
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	adapter, err := sipay.NewAdapter(testConfig(srv.URL), newStubRepo(), nil)
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+
+	_, err = adapter.Refund(context.Background(), payment.RefundRequest{
+		ProviderRef:    "inv-003",
+		AmountMinor:    10000,
+		IdempotencyKey: "refund-idem-003",
+	})
+	if err == nil {
+		t.Fatal("expected error from Sipay status_code != 100, got nil")
+	}
+	// Must not panic; error message should contain the Sipay status code.
+	if !containsStr(err.Error(), "400") {
+		t.Errorf("error should mention status code 400, got: %v", err)
+	}
+}
+
+// ─── Timing-safe signature mutation test ────────────────────────────────────
+
+// TestConfirmWebhook_TimingSafeCompare_Mutation flips individual bytes of a
+// correct hash_key and verifies that ErrInvalidSignature is returned in each
+// case. This proves the comparison is genuinely byte-by-byte (not a prefix
+// match or length-only check), and exercises the subtle.ConstantTimeCompare path.
+func TestConfirmWebhook_TimingSafeCompare_Mutation(t *testing.T) {
+	cfg := testConfig("http://localhost")
+	adapter, _ := sipay.NewAdapter(cfg, newStubRepo(), nil)
+
+	invoiceID := "inv-mutate-001"
+	statusCode := "100"
+	totalAmount := "9999"
+	currency := "TRY"
+
+	correctSig := sipay.ComputeHashKey(cfg.MerchantKey, statusCode, invoiceID, totalAmount, currency)
+
+	buildBody := func(sig string) []byte {
+		b, _ := json.Marshal(map[string]any{
+			"status_code":   100,
+			"invoice_id":    invoiceID,
+			"order_no":      "sipay-mutate",
+			"total_amount":  totalAmount,
+			"currency_code": currency,
+			"hash_key":      sig,
+		})
+		return b
+	}
+
+	// Flip the LAST byte — most likely to be missed by a naive prefix match.
+	mutLast := []byte(correctSig)
+	mutLast[len(mutLast)-1] ^= 0x01
+	_, err := adapter.ConfirmWebhook(context.Background(), buildBody(string(mutLast)), string(mutLast))
+	if err != payment.ErrInvalidSignature {
+		t.Errorf("last-byte mutation: want ErrInvalidSignature, got %v", err)
+	}
+
+	// Flip the FIRST byte.
+	mutFirst := []byte(correctSig)
+	mutFirst[0] ^= 0x01
+	_, err = adapter.ConfirmWebhook(context.Background(), buildBody(string(mutFirst)), string(mutFirst))
+	if err != payment.ErrInvalidSignature {
+		t.Errorf("first-byte mutation: want ErrInvalidSignature, got %v", err)
+	}
+
+	// Flip a MIDDLE byte.
+	mutMid := []byte(correctSig)
+	mutMid[len(mutMid)/2] ^= 0x01
+	_, err = adapter.ConfirmWebhook(context.Background(), buildBody(string(mutMid)), string(mutMid))
+	if err != payment.ErrInvalidSignature {
+		t.Errorf("middle-byte mutation: want ErrInvalidSignature, got %v", err)
+	}
+
+	// Control: correct sig must pass (not return ErrInvalidSignature).
+	_, err = adapter.ConfirmWebhook(context.Background(), buildBody(correctSig), correctSig)
+	if err == payment.ErrInvalidSignature {
+		t.Errorf("control (correct sig): should not return ErrInvalidSignature")
+	}
+}
+
+func containsStr(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		func() bool {
+			for i := 0; i <= len(s)-len(substr); i++ {
+				if s[i:i+len(substr)] == substr {
+					return true
+				}
+			}
+			return false
+		}())
 }
 
 // TestD2_ProductionGuard verifies that a sandbox MerchantKey is rejected in production.

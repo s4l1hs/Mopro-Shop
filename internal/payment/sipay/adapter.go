@@ -2,6 +2,7 @@ package sipay
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -13,15 +14,15 @@ import (
 // --- InitiatePayment ---
 
 type initPayReq struct {
-	InvoiceID     string `json:"invoice_id"`       // our IdempotencyKey (= ProviderRef)
-	Amount        string `json:"total_amount"`     // minor units as decimal string
-	Currency      string `json:"currency_code"`
-	MerchantID    string `json:"merchant_id"`
-	ReturnURL     string `json:"return_url"`
-	CancelURL     string `json:"cancel_url"`
-	Name          string `json:"cc_holder_name"`
-	Email         string `json:"invoice_description"` // used as user reference
-	Market        string `json:"market"`
+	InvoiceID  string `json:"invoice_id"`   // our IdempotencyKey (= ProviderRef)
+	Amount     string `json:"total_amount"` // minor units as decimal string
+	Currency   string `json:"currency_code"`
+	MerchantID string `json:"merchant_id"`
+	ReturnURL  string `json:"return_url"`
+	CancelURL  string `json:"cancel_url"`
+	Name       string `json:"cc_holder_name"`
+	Email      string `json:"invoice_description"` // used as user reference
+	Market     string `json:"market"`
 }
 
 type initPayResp struct {
@@ -107,7 +108,7 @@ func (a *Adapter) ConfirmWebhook(_ context.Context, rawBody []byte, sig string) 
 
 	expected := ComputeHashKey(a.cfg.MerchantKey,
 		strconv.Itoa(wh.StatusCode), wh.InvoiceID, wh.TotalAmount, wh.CurrencyCode)
-	if sig != expected {
+	if subtle.ConstantTimeCompare([]byte(sig), []byte(expected)) != 1 {
 		return payment.PaymentEvent{}, payment.ErrInvalidSignature
 	}
 

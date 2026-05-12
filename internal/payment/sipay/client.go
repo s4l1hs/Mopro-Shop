@@ -32,8 +32,8 @@ func init() {
 }
 
 const (
-	tokenTTL      = 25 * time.Minute // Sipay token lifetime minus 5-min buffer
-	maxRetries    = 2
+	tokenTTL       = 25 * time.Minute // Sipay token lifetime minus 5-min buffer
+	maxRetries     = 2
 	requestTimeout = 30 * time.Second
 )
 

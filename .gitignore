@@ -23,6 +23,13 @@ profile.cov
 *.so
 *.dylib
 
+# Compiled binaries at repo root (use /tmp/ per Makefile build targets)
+/core-svc
+/fin-svc
+/jobs-svc
+/migrate-tool
+/mopro
+
 # IDE
 .DS_Store
 .idea/

@@ -216,25 +216,25 @@ func (s *orderService) MarkDelivered(ctx context.Context, orderID int64, deliver
 // ── event payload types ───────────────────────────────────────────────────────
 
 type deliveredPayload struct {
-	OrderID     int64               `json:"order_id"`
-	UserID      int64               `json:"user_id"`
-	DeliveredAt time.Time           `json:"delivered_at"`
-	Market      string              `json:"market"`
-	Currency    string              `json:"currency"`
+	OrderID     int64                  `json:"order_id"`
+	UserID      int64                  `json:"user_id"`
+	DeliveredAt time.Time              `json:"delivered_at"`
+	Market      string                 `json:"market"`
+	Currency    string                 `json:"currency"`
 	Items       []deliveredItemPayload `json:"items"`
 }
 
 type deliveredItemPayload struct {
-	VariantID             int64  `json:"variant_id"`
-	SellerID              int64  `json:"seller_id"`
-	CategoryID            int64  `json:"category_id"`
-	Qty                   int    `json:"qty"`
-	UnitPriceMinor        int64  `json:"unit_price_minor"`
-	CommissionPctBps      int    `json:"commission_pct_bps"`
-	KdvPctBps             int    `json:"kdv_pct_bps"`
-	CommissionAmountMinor int64  `json:"commission_amount_minor"`
-	KdvAmountMinor        int64  `json:"kdv_amount_minor"`
-	SellerNetMinor        int64  `json:"seller_net_minor"`
+	VariantID             int64 `json:"variant_id"`
+	SellerID              int64 `json:"seller_id"`
+	CategoryID            int64 `json:"category_id"`
+	Qty                   int   `json:"qty"`
+	UnitPriceMinor        int64 `json:"unit_price_minor"`
+	CommissionPctBps      int   `json:"commission_pct_bps"`
+	KdvPctBps             int   `json:"kdv_pct_bps"`
+	CommissionAmountMinor int64 `json:"commission_amount_minor"`
+	KdvAmountMinor        int64 `json:"kdv_amount_minor"`
+	SellerNetMinor        int64 `json:"seller_net_minor"`
 }
 
 func buildDeliveredPayload(o Order, items []OrderItem, deliveredAt time.Time) deliveredPayload {

@@ -64,8 +64,8 @@ func TestMain(m *testing.M) {
 
 // ─── helpers ───────────────────────────────────────────────────────────────────
 
-func testRepo() outbox.Repository          { return outbox.NewRepository(testTable) }
-func testBus() *eventbus.RedisBus          { return eventbus.NewRedisBus(tRdb, slog.Default()) }
+func testRepo() outbox.Repository { return outbox.NewRepository(testTable) }
+func testBus() *eventbus.RedisBus { return eventbus.NewRedisBus(tRdb, slog.Default()) }
 func testPublisher() (*outbox.Publisher, error) {
 	return outbox.NewPublisher(tPool, testRepo(), testBus(), slog.Default())
 }
