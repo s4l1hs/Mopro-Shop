@@ -6,17 +6,34 @@ import (
 	"os"
 )
 
+// ProviderFactory is a constructor registered by each PSP sub-package via init().
+// The sipay sub-package calls RegisterProvider("sipay", ...) from its init().
+// NewService looks up the factory when PSP_PROVIDER=sipay.
+// import _ "github.com/mopro/platform/internal/payment/sipay" in main.go triggers init().
+type ProviderFactory func(cfg SipayConfig, repo Repository) Service
+
+var providerRegistry = map[string]ProviderFactory{}
+
+// RegisterProvider registers a PSP factory under name.
+// Called from PSP sub-package init() functions.
+func RegisterProvider(name string, fn ProviderFactory) {
+	providerRegistry[name] = fn
+}
+
 // NewService constructs the active PSP adapter from PSP_PROVIDER env.
 // Calls log.Fatal for unknown or missing PSP_PROVIDER (startup invariant; Q1).
 // Sipay requires cfg and repo; stub adapters ignore them.
-// The sipay sub-package is registered by Commit 6 (Track A); until then
-// PSP_PROVIDER=sipay panics with a clear message.
+// The sipay sub-package is registered by its init(); main.go must import it with _.
 func NewService(cfg SipayConfig, repo Repository) Service {
 	switch v := os.Getenv("PSP_PROVIDER"); v {
 	case "sipay":
-		// Wired in Commit 6 (Track A). Panics here until sipay package is added.
-		// TODO(sipay): replace with sipay.NewAdapter(cfg, repo)
-		panic("payment: sipay adapter not yet wired — see Track A Commit 6")
+		fn, ok := providerRegistry["sipay"]
+		if !ok {
+			panic(`payment: sipay adapter not registered — add
+	import _ "github.com/mopro/platform/internal/payment/sipay"
+to cmd/core-svc/main.go`)
+		}
+		return fn(cfg, repo)
 	case "craftgate":
 		return &craftgateStub{}
 	case "iyzico":
