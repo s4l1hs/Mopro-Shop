@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,22 +23,21 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	// Startup connections use plain Background; signal context begins after init.
+	initCtx := context.Background()
 
 	market := mustEnv("MARKET")
 	defaultCurrency := mustEnv("DEFAULT_CURRENCY")
 	cashbackCurrency := mustEnv("DEFAULT_CASHBACK_CURRENCY")
 
 	// ── postgres-ledger pool ─────────────────────────────────────────────────
-	// pool.Close() is only called on graceful shutdown; log.Fatal exits directly
-	// so cleanup runs only when the server exits cleanly (Phase 2+ adds SIGTERM handling).
 	ledgerDSN := mustEnv("LEDGER_DATABASE_URL")
-	pool, err := pgxpool.New(ctx, ledgerDSN)
+	pool, err := pgxpool.New(initCtx, ledgerDSN)
 	if err != nil {
 		slog.Error("fin-svc: postgres-ledger pool", "err", err)
 		os.Exit(1)
 	}
-	if err := pool.Ping(ctx); err != nil {
+	if err := pool.Ping(initCtx); err != nil {
 		slog.Error("fin-svc: postgres-ledger ping", "err", err)
 		os.Exit(1)
 	}
@@ -43,10 +45,13 @@ func main() {
 	// ── Redis client ─────────────────────────────────────────────────────────
 	redisAddr := mustEnv("REDIS_ADDR")
 	redisClient := redis.NewClient(&redis.Options{Addr: redisAddr})
-	if err := redisClient.Ping(ctx).Err(); err != nil {
+	if err := redisClient.Ping(initCtx).Err(); err != nil {
 		slog.Error("fin-svc: redis ping", "err", err)
 		os.Exit(1)
 	}
+
+	// ── Signal-aware context for goroutines + HTTP shutdown ─────────────────
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 
 	// ── Business calendar (static — fin-svc cannot reach postgres-ecom) ──────
 	// Holidays loaded from env BUSINESS_CALENDAR_<MARKET>=YYYY-MM-DD,YYYY-MM-DD,...
@@ -91,8 +96,19 @@ func main() {
 		WriteTimeout: 5 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+	go func() {
+		<-ctx.Done()
+		stop() // release signal resources; ctx is already cancelled
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			slog.Error("fin-svc: http shutdown failed", "err", err)
+		}
+	}()
 	slog.Info("fin-svc: starting", "market", market, "addr", srv.Addr)
-	log.Fatal(srv.ListenAndServe())
+	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		log.Fatal(err)
+	}
 }
 
 // buildCalendarMap reads BUSINESS_CALENDAR_<MARKET> env vars and builds a map

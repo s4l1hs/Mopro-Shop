@@ -9,8 +9,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -24,6 +26,9 @@ import (
 )
 
 func main() {
+	// Startup connections use plain Background; signal context begins after init.
+	initCtx := context.Background()
+
 	market := os.Getenv("MARKET")
 	defaultCurrency := os.Getenv("DEFAULT_CURRENCY")
 	defaultLocale := os.Getenv("DEFAULT_LOCALE")
@@ -31,39 +36,36 @@ func main() {
 
 	// ── Database pool for catalog (connects through pgbouncer-ecom) ──────────
 	catalogDSN := buildCatalogDSN()
-	pool, err := dbx.Connect(context.Background(), catalogDSN)
+	pool, err := dbx.Connect(initCtx, catalogDSN)
 	if err != nil {
 		slog.Error("catalog: failed to create DB pool", "err", err)
 		os.Exit(1)
 	}
-	// pool.Close() is called on graceful shutdown; log.Fatal will call os.Exit
-	// directly, so cleanup runs only when the server exits cleanly (Phase 2+
-	// adds SIGTERM handling with explicit pool.Close()).
 
 	// ── Catalog module wiring ────────────────────────────────────────────────
 	catalogRepo := catalog.NewRepository(pool)
 	catalogSvc := catalog.NewService(catalogRepo, defaultCurrency, defaultLocale)
 
-	// ── Redis client (cart stock reservation + future eventbus) ─────────────
-	rc, err := buildRedisClient(context.Background())
+	// ── Redis client (cart stock reservation + eventbus) ────────────────────
+	rc, err := buildRedisClient(initCtx)
 	if err != nil {
 		slog.Error("cart: failed to connect to Redis", "err", err)
 		os.Exit(1)
 	}
 
 	// ── Cart module wiring (loads Lua EVALSHA at startup) ───────────────────
-	cartRepo, err := cart.NewRepository(context.Background(), rc)
+	cartRepo, err := cart.NewRepository(initCtx, rc)
 	if err != nil {
 		slog.Error("cart: failed to load Lua scripts", "err", err)
 		os.Exit(1)
 	}
 	cartSvc := cart.NewService(cartRepo, catalogSvc)
 
+	// ── Signal-aware context for goroutines + HTTP shutdown ─────────────────
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
+
 	// ── Order module wiring ──────────────────────────────────────────────────
-	cashbackCurrency := os.Getenv("DEFAULT_CASHBACK_CURRENCY")
-	if cashbackCurrency == "" {
-		cashbackCurrency = "TRY_COIN"
-	}
+	cashbackCurrency := mustEnv("DEFAULT_CASHBACK_CURRENCY")
 	orderOutbox := outbox.NewRepository("order_schema.outbox")
 	orderRepo := order.NewRepository(pool)
 	orderSvc := order.NewService(orderRepo, cartSvc, catalogSvc, orderOutbox, market, cashbackCurrency)
@@ -133,7 +135,27 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
-	log.Fatal(srv.ListenAndServe())
+	go func() {
+		<-ctx.Done()
+		stop() // release signal resources; ctx is already cancelled
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			slog.Error("core-svc: http shutdown failed", "err", err)
+		}
+	}()
+	slog.Info("core-svc: starting", "market", market, "addr", srv.Addr)
+	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		log.Fatal(err)
+	}
+}
+
+func mustEnv(key string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		log.Fatalf("core-svc: required env %s is not set", key)
+	}
+	return v
 }
 
 // buildCatalogDSN constructs the DSN from env vars.
