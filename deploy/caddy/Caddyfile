@@ -12,14 +12,9 @@ api.moproshop.com {
     # All other API traffic goes to core-svc
     reverse_proxy core-svc:8080
 
-    # Rate limiting
-    rate_limit {
-        zone dynamic {
-            key {remote_host}
-            events 200
-            window 1m
-        }
-    }
+    # TODO(Phase 0.6): rate_limit requires the caddy-ratelimit plugin; build a
+    # custom Caddy image with xcaddy or use the xcaddy-based image.
+    # rate_limit { zone dynamic { key {remote_host} events 200 window 1m } }
 }
 
 seller.moproshop.com {
@@ -28,6 +23,12 @@ seller.moproshop.com {
 
 # Local dev: plaintext HTTP on localhost
 localhost, :80 {
+    # Native Caddy health endpoint — does NOT proxy to core-svc.
+    # Used by Caddy's own healthcheck and the Prompt 0.5 verification curl.
+    handle /healthz {
+        respond "OK" 200
+    }
+
     @fin path /api/v1/wallet* /api/v1/cashback* /api/v1/payout* /api/v1/admin*
     reverse_proxy @fin fin-svc:8080
     reverse_proxy core-svc:8080

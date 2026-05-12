@@ -1,10 +1,13 @@
 # Grafana Agent — ships metrics (Prometheus), logs (Loki), traces (Tempo) to Grafana Cloud Free
 # TODO(mopro:placeholder): fill in Grafana Cloud endpoints once credentials provisioned
-# Unblocked by: GRAFANA_PROM_USER, GRAFANA_LOKI_USER, GRAFANA_TEMPO_USER env vars
+# Schema: Grafana Agent static mode v0.36+ (grafana/agent:latest as of Phase 0.5)
 
 metrics:
   global:
-    scrape_interval: 15s
+    scrape_interval: 30s
+    external_labels:
+      cluster: mopro
+      market: "${MARKET:-TR}"
   configs:
     - name: mopro
       scrape_configs:
@@ -26,12 +29,6 @@ metrics:
               labels:
                 service: jobs-svc
                 market: "${MARKET:-TR}"
-        - job_name: postgres-ecom
-          static_configs:
-            - targets: ["pgbouncer-ecom:5432"]
-        - job_name: redis
-          static_configs:
-            - targets: ["redis:6379"]
       remote_write:
         - url: "https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push"
           basic_auth:
@@ -39,10 +36,11 @@ metrics:
             password: "${GRAFANA_PROM_PASS}"
 
 logs:
-  positions:
-    filename: /tmp/positions.yaml
   configs:
     - name: mopro-logs
+      # positions tracks which log offsets have been shipped; written to tmpfs.
+      positions:
+        filename: /tmp/positions.yaml
       clients:
         - url: "https://logs-prod-eu-west-0.grafana.net/loki/api/v1/push"
           basic_auth:
@@ -75,4 +73,4 @@ traces:
             username: "${GRAFANA_TEMPO_USER}"
             password: "${GRAFANA_TEMPO_PASS}"
           tls_config:
-            insecure: false
+            insecure_skip_verify: false

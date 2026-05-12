@@ -1,45 +1,82 @@
 name: mopro
 
+# ── YAML anchor: shared defaults for all three Go binaries (INFRASTRUCTURE.md § 5) ─────
+# jobs-svc OVERRIDES mem_limit/mem_reservation/cpus below (v7: ONNX ML + e-invoice XML).
+x-go-defaults: &go-defaults
+  restart: unless-stopped
+  mem_limit: 384m
+  mem_reservation: 192m
+  cpus: '0.5'
+  pids_limit: 256
+  security_opt:
+    - no-new-privileges:true
+  cap_drop: [ALL]
+  read_only: true
+  tmpfs:
+    - /tmp:size=64M,mode=1777
+  ulimits:
+    nofile: { soft: 4096, hard: 8192 }
+  logging:
+    driver: json-file
+    options: { max-size: "20m", max-file: "5" }
+  networks: [mopro-net]
+
+# ── Networks (ARCHITECTURE.md § 2, INFRASTRUCTURE.md § 6) ────────────────────
+# mopro-fin-net is internal: postgres-ledger has no internet egress path.
 networks:
   mopro-net:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
   mopro-fin-net:
     driver: bridge
-    internal: true  # no direct internet egress from FinTech network
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
 
+# ── Named volumes for Caddy TLS state only ───────────────────────────────────
+# Postgres, Redis, and Meilisearch use bind mounts so data is visible on the
+# host and survives "docker compose down --volumes".
+# DATA_DIR defaults to ../data (= ./data relative to project root when
+# compose file is at deploy/). Production: DATA_DIR=/opt/mopro/data.
 volumes:
-  postgres-ecom-data:
-    labels:
-      mopro.keep: "true"
-  postgres-ledger-data:
-    labels:
-      mopro.keep: "true"
-  redis-data:
-    labels:
-      mopro.keep: "true"
-  meilisearch-data:
   caddy-data:
+    labels: { mopro.keep: "true" }
   caddy-config:
+    labels: { mopro.keep: "true" }
 
 services:
 
   # ── PostgreSQL (e-commerce side) ────────────────────────────────────────────
+  # Exception block per INFRASTRUCTURE.md § 5.2: read_only false, cap_add for
+  # chown/fowner/setuid needed by the Postgres process tree.
   postgres-ecom:
+    container_name: postgres-ecom
     image: postgres:16-alpine
     restart: unless-stopped
     networks: [mopro-net]
     mem_limit: 5g
-    cpus: 2.0
+    mem_reservation: 3g
+    cpus: '2.0'
     shm_size: 256m
+    read_only: false
     cap_drop: [ALL]
-    cap_add: [SETUID, SETGID, DAC_OVERRIDE]
-    security_opt: [no-new-privileges:true]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+    env_file: [../.env.local]
     environment:
       POSTGRES_DB: mopro_ecom
       POSTGRES_USER: ecom_admin
       POSTGRES_PASSWORD: "${ECOM_DB_PASSWORD}"
     volumes:
-      - postgres-ecom-data:/var/lib/postgresql/data
+      - ${DATA_DIR:-../data}/postgres-ecom:/var/lib/postgresql/data
       - ./postgres-ecom/postgresql.conf:/etc/postgresql/postgresql.conf:ro
       - ./postgres-ecom/init:/docker-entrypoint-initdb.d:ro
     command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
@@ -48,24 +85,35 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
-  # ── PostgreSQL (ledger / fin-svc only) ──────────────────────────────────────
+  # ── PostgreSQL (ledger / fin-svc ONLY) ──────────────────────────────────────
+  # MUST NOT be on mopro-net — ARCHITECTURE.md § 2.3.
   postgres-ledger:
+    container_name: postgres-ledger
     image: postgres:16-alpine
     restart: unless-stopped
-    networks: [mopro-fin-net]   # NOT on mopro-net
+    networks: [mopro-fin-net]
     mem_limit: 3g
-    cpus: 1.5
+    mem_reservation: 2g
+    cpus: '1.5'
     shm_size: 128m
+    read_only: false
     cap_drop: [ALL]
-    cap_add: [SETUID, SETGID, DAC_OVERRIDE]
-    security_opt: [no-new-privileges:true]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+    env_file: [../.env.local]
     environment:
       POSTGRES_DB: mopro_ledger
       POSTGRES_USER: ledger_admin
       POSTGRES_PASSWORD: "${LEDGER_DB_PASSWORD}"
     volumes:
-      - postgres-ledger-data:/var/lib/postgresql/data
+      - ${DATA_DIR:-../data}/postgres-ledger:/var/lib/postgresql/data
       - ./postgres-ledger/postgresql.conf:/etc/postgresql/postgresql.conf:ro
       - ./postgres-ledger/init:/docker-entrypoint-initdb.d:ro
     command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
@@ -74,59 +122,146 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
 
-  # ── PgBouncer (ecom side) ───────────────────────────────────────────────────
-  pgbouncer-ecom:
-    image: bitnami/pgbouncer:latest
-    restart: unless-stopped
-    networks: [mopro-net]
-    mem_limit: 100m
-    cpus: 0.2
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    environment:
-      POSTGRESQL_HOST: postgres-ecom
-      POSTGRESQL_PORT: 5432
-      PGBOUNCER_DATABASE: mopro_ecom
-      PGBOUNCER_AUTH_TYPE: md5
-    volumes:
-      - ./pgbouncer/pgbouncer-ecom.ini:/bitnami/pgbouncer/conf/pgbouncer.ini:ro
+  # ── Password initialiser sidecar ─────────────────────────────────────────────
+  # Runs ONCE after both Postgres containers are healthy. Applies ALTER ROLE
+  # PASSWORD for all module-specific DB users using secrets from env_file.
+  # Addresses the deferred TODO from Phase 0.2 / 0.3 init script design.
+  # restart: "no" — intentionally a one-shot; compose restarts only failed containers.
+  init-passwords:
+    container_name: init-passwords
+    image: postgres:16-alpine
+    restart: "no"
+    networks: [mopro-net, mopro-fin-net]
+    env_file: [../.env.local]
     depends_on:
       postgres-ecom:
         condition: service_healthy
+      postgres-ledger:
+        condition: service_healthy
+    volumes:
+      - ./postgres-ecom/init/99-set-passwords.sh:/scripts/99-set-passwords-ecom.sh:ro
+      - ./postgres-ledger/init/99-set-passwords.sh:/scripts/99-set-passwords-ledger.sh:ro
+    command:
+      - sh
+      - -c
+      - |
+        PGHOST=postgres-ecom PGPORT=5432 PGUSER=ecom_admin \
+          PGDATABASE=mopro_ecom PGPASSWORD="$$ECOM_DB_PASSWORD" \
+          /scripts/99-set-passwords-ecom.sh &&
+        PGHOST=postgres-ledger PGPORT=5432 PGUSER=ledger_admin \
+          PGDATABASE=mopro_ledger PGPASSWORD="$$LEDGER_DB_PASSWORD" \
+          /scripts/99-set-passwords-ledger.sh
+
+  # ── PgBouncer (ecom side) ───────────────────────────────────────────────────
+  # bitnami/pgbouncer is no longer on Docker Hub. Use pgbouncer/pgbouncer which
+  # generates pgbouncer.ini from env vars at startup (DATABASES_HOST, etc.).
+  # The custom ini files in deploy/pgbouncer/ document the production target
+  # config; Phase 0.5 drives everything via env vars.
+  # auth_type defaults to "any" (no client auth) — acceptable for local dev with
+  # no host-exposed ports. Phase 1 TODO: switch to md5 + vault-injected userlist.
+  pgbouncer-ecom:
+    container_name: pgbouncer-ecom
+    image: pgbouncer/pgbouncer:latest
+    restart: unless-stopped
+    networks: [mopro-net]
+    mem_limit: 100m
+    cpus: '0.2'
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    environment:
+      DATABASES_HOST: postgres-ecom
+      DATABASES_PORT: "5432"
+      DATABASES_USER: ecom_admin
+      DATABASES_PASSWORD: "${ECOM_DB_PASSWORD}"
+      DATABASES_DBNAME: mopro_ecom
+      PGBOUNCER_LISTEN_PORT: "5432"
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: "400"
+      PGBOUNCER_DEFAULT_POOL_SIZE: "25"
+      PGBOUNCER_MIN_POOL_SIZE: "5"
+      PGBOUNCER_RESERVE_POOL_SIZE: "10"
+      PGBOUNCER_RESERVE_POOL_TIMEOUT: "3"
+    depends_on:
+      postgres-ecom:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "5432"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # ── PgBouncer (ledger side) ─────────────────────────────────────────────────
+  # MUST NOT be on mopro-net — ARCHITECTURE.md § 2.3.
   pgbouncer-ledger:
-    image: bitnami/pgbouncer:latest
+    container_name: pgbouncer-ledger
+    image: pgbouncer/pgbouncer:latest
     restart: unless-stopped
-    networks: [mopro-fin-net]   # NOT on mopro-net; fin-svc only
+    networks: [mopro-fin-net]
     mem_limit: 100m
-    cpus: 0.2
+    cpus: '0.2'
     cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
     environment:
-      POSTGRESQL_HOST: postgres-ledger
-      POSTGRESQL_PORT: 5432
-      PGBOUNCER_DATABASE: mopro_ledger
-      PGBOUNCER_AUTH_TYPE: md5
-    volumes:
-      - ./pgbouncer/pgbouncer-ledger.ini:/bitnami/pgbouncer/conf/pgbouncer.ini:ro
+      DATABASES_HOST: postgres-ledger
+      DATABASES_PORT: "5432"
+      DATABASES_USER: ledger_admin
+      DATABASES_PASSWORD: "${LEDGER_DB_PASSWORD}"
+      DATABASES_DBNAME: mopro_ledger
+      PGBOUNCER_LISTEN_PORT: "5432"
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: "200"
+      PGBOUNCER_DEFAULT_POOL_SIZE: "15"
+      PGBOUNCER_MIN_POOL_SIZE: "3"
+      PGBOUNCER_RESERVE_POOL_SIZE: "5"
+      PGBOUNCER_RESERVE_POOL_TIMEOUT: "3"
+      PGBOUNCER_SERVER_IDLE_TIMEOUT: "300"
+      PGBOUNCER_QUERY_TIMEOUT: "20"
     depends_on:
       postgres-ledger:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "5432"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # ── Redis 7 (cache + Streams event bus) ─────────────────────────────────────
+  # Joins BOTH networks: core-svc (mopro-net) and fin-svc (mopro-fin-net) need it.
+  # requirepass is NOT in redis.conf (Redis does not expand ${VAR}); passed via
+  # --requirepass arg so Docker Compose interpolates it from .env.local.
   redis:
+    container_name: redis
     image: redis:7-alpine
     restart: unless-stopped
-    networks: [mopro-net, mopro-fin-net]  # fin-svc needs Redis for event bus
+    networks: [mopro-net, mopro-fin-net]
     mem_limit: 1200m
-    cpus: 1.0
+    cpus: '1.0'
     cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    command: ["redis-server", "/etc/redis/redis.conf"]
+    cap_add: [SETUID, SETGID]
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    command:
+      - redis-server
+      - /etc/redis/redis.conf
+      - --requirepass
+      - "${REDIS_PASSWORD}"
     volumes:
-      - redis-data:/data
+      - ${DATA_DIR:-../data}/redis:/data
       - ./redis/redis.conf:/etc/redis/redis.conf:ro
     tmpfs:
       - /var/run/redis
@@ -135,37 +270,53 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # ── Meilisearch v1.6 ────────────────────────────────────────────────────────
   meilisearch:
+    container_name: meilisearch
     image: getmeili/meilisearch:v1.6
     restart: unless-stopped
     networks: [mopro-net]
     mem_limit: 1500m
-    cpus: 1.0
+    cpus: '1.0'
     cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    env_file: [../.env.local]
     environment:
       MEILI_MASTER_KEY: "${MEILI_MASTER_KEY}"
       MEILI_ENV: production
     volumes:
-      - meilisearch-data:/meili_data
+      - ${DATA_DIR:-../data}/meili:/meili_data
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:7700/health"]
       interval: 15s
       timeout: 5s
       retries: 5
+      start_period: 15s
 
   # ── Caddy 2 (reverse proxy + TLS) ───────────────────────────────────────────
+  # NET_BIND_SERVICE: bind to ports 80/443 as non-root.
+  # /healthz is served natively by Caddyfile (no dependency on core-svc).
   caddy:
+    container_name: caddy
     image: caddy:2-alpine
     restart: unless-stopped
     networks: [mopro-net]
     mem_limit: 256m
-    cpus: 0.5
+    cpus: '0.5'
     cap_drop: [ALL]
     cap_add: [NET_BIND_SERVICE]
-    security_opt: [no-new-privileges:true]
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "5" }
+    env_file: [../.env.local]
     ports:
       - "80:80"
       - "443:443"
@@ -175,119 +326,135 @@ services:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
-    depends_on: [core-svc, fin-svc, jobs-svc]
+    depends_on:
+      core-svc:
+        condition: service_healthy
+      fin-svc:
+        condition: service_healthy
+      jobs-svc:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
-  # ── core-svc ─────────────────────────────────────────────────────────────────
+  # ── core-svc ──────────────────────────────────────────────────────────────────
+  # Inherits x-go-defaults anchor: 384m / 0.5 CPU / distroless-compatible.
+  # RUNTIME_BASE=alpine:3.19 for Phase 0.5 stubs so nc is available for network
+  # isolation verification (TODO Phase 1: switch back to distroless once binary
+  # exposes --healthcheck self-probe or a sidecar healthcheck binary is added).
   core-svc:
+    <<: *go-defaults
+    container_name: core-svc
     image: ghcr.io/mopro/core-svc:${VERSION:-latest}
     build:
       context: ..
       dockerfile: build/Dockerfile
       args:
         SERVICE: core-svc
-    restart: unless-stopped
-    networks: [mopro-net]
-    mem_limit: 384m
-    cpus: 0.5
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    read_only: true
-    tmpfs:
-      - /tmp
+        RUNTIME_BASE: alpine:3.19
+    env_file: [../.env.local]
     environment:
       SVC_NAME: core-svc
       MARKET: "${MARKET:-TR}"
       DEFAULT_CURRENCY: "${DEFAULT_CURRENCY:-TRY}"
       DEFAULT_LOCALE: "${DEFAULT_LOCALE:-tr-TR}"
       PSP_PROVIDER: "${PSP_PROVIDER:-sipay}"
-    env_file: [/opt/mopro/.env]
     depends_on:
       pgbouncer-ecom:
         condition: service_started
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
       interval: 15s
       timeout: 5s
       retries: 3
+      start_period: 10s
 
-  # ── fin-svc ──────────────────────────────────────────────────────────────────
+  # ── fin-svc ───────────────────────────────────────────────────────────────────
+  # Overrides networks: needs BOTH mopro-net (Redis) and mopro-fin-net (postgres-ledger).
   fin-svc:
+    <<: *go-defaults
+    container_name: fin-svc
+    networks: [mopro-net, mopro-fin-net]
     image: ghcr.io/mopro/fin-svc:${VERSION:-latest}
     build:
       context: ..
       dockerfile: build/Dockerfile
       args:
         SERVICE: fin-svc
-    restart: unless-stopped
-    networks: [mopro-net, mopro-fin-net]  # mopro-net for Redis; mopro-fin-net for Postgres-ledger
-    mem_limit: 384m
-    cpus: 0.5
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    read_only: true
-    tmpfs:
-      - /tmp
+        RUNTIME_BASE: alpine:3.19
+    env_file: [../.env.local]
     environment:
       SVC_NAME: fin-svc
       MARKET: "${MARKET:-TR}"
       DEFAULT_CURRENCY: "${DEFAULT_CURRENCY:-TRY}"
-    env_file: [/opt/mopro/.env]
     depends_on:
       pgbouncer-ledger:
         condition: service_started
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
       interval: 15s
       timeout: 5s
       retries: 3
+      start_period: 10s
 
-  # ── jobs-svc ─────────────────────────────────────────────────────────────────
+  # ── jobs-svc ──────────────────────────────────────────────────────────────────
+  # Overrides mem_limit/mem_reservation/cpus from anchor: v7 ONNX ML inference
+  # (NLP ~440 MB + Vision ~25 MB) + e-fatura XML processing raise the ceiling.
   jobs-svc:
+    <<: *go-defaults
+    container_name: jobs-svc
+    mem_limit: 1.2g
+    mem_reservation: 384m
+    cpus: '0.8'
     image: ghcr.io/mopro/jobs-svc:${VERSION:-latest}
     build:
       context: ..
       dockerfile: build/Dockerfile
       args:
         SERVICE: jobs-svc
-    restart: unless-stopped
-    networks: [mopro-net]
-    mem_limit: 1200m   # v7: ONNX ML inference (NLP+vision) raises limit vs. CLAUDE.md §7
-    cpus: 0.8
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    read_only: true
-    tmpfs:
-      - /tmp
+        RUNTIME_BASE: alpine:3.19
+    env_file: [../.env.local]
     environment:
       SVC_NAME: jobs-svc
       MARKET: "${MARKET:-TR}"
-    env_file: [/opt/mopro/.env]
     depends_on:
       pgbouncer-ecom:
         condition: service_started
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      test: ["CMD", "nc", "-z", "localhost", "8080"]
       interval: 15s
       timeout: 5s
       retries: 3
+      start_period: 10s
 
   # ── Grafana Agent ─────────────────────────────────────────────────────────────
+  # Docker socket mount required for docker_sd_configs service discovery.
   grafana-agent:
+    container_name: grafana-agent
     image: grafana/agent:latest
     restart: unless-stopped
     networks: [mopro-net]
     mem_limit: 300m
-    cpus: 0.3
+    cpus: '0.3'
     cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    env_file: [../.env.local]
     volumes:
       - ./grafana-agent/agent.yaml:/etc/agent/agent.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     command: ["-config.file=/etc/agent/agent.yaml"]
     environment:
       GRAFANA_PROM_USER: "${GRAFANA_PROM_USER:-}"
@@ -296,3 +463,4 @@ services:
       GRAFANA_LOKI_PASS: "${GRAFANA_LOKI_PASS:-}"
       GRAFANA_TEMPO_USER: "${GRAFANA_TEMPO_USER:-}"
       GRAFANA_TEMPO_PASS: "${GRAFANA_TEMPO_PASS:-}"
+      MARKET: "${MARKET:-TR}"
