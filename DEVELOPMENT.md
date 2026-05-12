@@ -663,6 +663,140 @@ mopro calendar show TR --year 2026
 
 ---
 
+## 17. Sipay Sandbox Onboarding & Webhook Tunneling
+
+### 17.1 Getting Sipay Sandbox Credentials
+
+1. Register a sandbox merchant account at `https://sipay.com.tr/uye-isyeri-basvurusu`.
+2. Sipay support will email four sandbox values:
+   - `SIPAY_APP_ID`
+   - `SIPAY_APP_SECRET`
+   - `SIPAY_MERCHANT_ID`
+   - `SIPAY_MERCHANT_KEY`
+3. The sandbox base URL is `https://provisioning.sipay.com.tr/ccpayment` (confirm with Sipay support — it may differ for sandbox vs. production).
+4. Add the following to `.env.local` (never commit this file):
+
+```bash
+PSP_PROVIDER=sipay
+SIPAY_BASE_URL=https://provisioning.sipay.com.tr
+SIPAY_APP_ID=<your_sandbox_app_id>
+SIPAY_APP_SECRET=<your_sandbox_app_secret>
+SIPAY_MERCHANT_ID=<your_sandbox_merchant_id>
+SIPAY_MERCHANT_KEY=<your_sandbox_merchant_key>
+SIPAY_RETURN_URL=https://<your-tunnel-subdomain>/api/v1/payment/return
+SIPAY_CANCEL_URL=https://<your-tunnel-subdomain>/api/v1/payment/cancel
+```
+
+> **D2 guard**: If `GO_ENV=production` is set, the adapter rejects `SIPAY_MERCHANT_KEY` values
+> beginning with `test_` or `sandbox_`. Never set `GO_ENV=production` in your local `.env.local`.
+
+---
+
+### 17.2 Exposing the Webhook Endpoint Locally
+
+Sipay's 3DS callback and webhook POST are sent by Sipay's servers to your `SIPAY_RETURN_URL`.
+For local development you need a public HTTPS URL that forwards to `localhost:8080`.
+
+#### Option A — Cloudflare Tunnel (Recommended)
+
+Cloudflare Tunnel is free, persistent, and does not require a paid ngrok account.
+
+```bash
+# Install cloudflared (macOS)
+brew install cloudflare/cloudflare/cloudflared
+
+# One-time login (browser opens)
+cloudflared tunnel login
+
+# Create a named tunnel
+cloudflared tunnel create mopro-dev
+
+# Start the tunnel — forwards tunnel URL → localhost:8080
+cloudflared tunnel run --url http://localhost:8080 mopro-dev
+```
+
+The tunnel prints a public URL like `https://mopro-dev.abc123.trycloudflare.com`.
+Set this as `SIPAY_RETURN_URL` and `SIPAY_CANCEL_URL` base in `.env.local`.
+
+Sipay webhook URL to register in the Sipay merchant portal:
+```
+https://mopro-dev.abc123.trycloudflare.com/webhooks/sipay
+```
+
+#### Option B — ngrok
+
+```bash
+# Install ngrok (macOS)
+brew install ngrok
+
+# Authenticate (free tier — requires account)
+ngrok config add-authtoken <your_ngrok_authtoken>
+
+# Start tunnel
+ngrok http 8080
+```
+
+ngrok prints a URL like `https://abc123.ngrok-free.app`. Use this as the base.
+
+> **Note**: ngrok free tier URLs change on each restart. Cloudflare Tunnel with a named tunnel
+> is preferred for persistent local development — the URL stays stable across restarts.
+
+---
+
+### 17.3 Registering the Webhook in the Sipay Portal
+
+1. Log in to the Sipay merchant portal.
+2. Navigate to **Settings → Webhook / Notification URL**.
+3. Enter your tunnel webhook URL:
+   ```
+   https://<tunnel-subdomain>/webhooks/sipay
+   ```
+4. Save. Sipay will send a test POST to verify reachability.
+
+---
+
+### 17.4 Running the Sandbox Integration Tests
+
+Real-network sandbox tests are gated behind the `sipay_sandbox` build tag.
+
+```bash
+# Only runs when SIPAY_APP_ID is set and sipay_sandbox tag is present.
+SIPAY_APP_ID=<sandbox> SIPAY_APP_SECRET=<secret> \
+  go test -tags=sipay_sandbox -v ./internal/payment/sipay/...
+```
+
+Mock-only httptest integration tests (no credentials needed):
+```bash
+go test -tags=integration -v ./internal/payment/sipay/...
+```
+
+---
+
+### 17.5 Verifying Webhook Signature Locally
+
+Use `curl` to send a synthetic Sipay webhook and verify the 3-layer dedup:
+
+```bash
+# Compute the expected hash_key manually:
+# base64( SHA-512( merchant_key + status_code + invoice_id + total_amount + currency_code ) )
+
+# Send a synthetic captured webhook
+curl -s -X POST http://localhost:8080/webhooks/sipay \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status_code": 100,
+    "invoice_id": "test-idem-key",
+    "order_no": "sipay-test-123",
+    "total_amount": "5000",
+    "currency_code": "TRY",
+    "hash_key": "<computed_hash_key>"
+  }'
+# Expected: HTTP 200
+# Second identical POST: HTTP 200 (Redis fast-path dedup)
+```
+
+---
+
 ## 16. When in Doubt
 
 Read in this order:
