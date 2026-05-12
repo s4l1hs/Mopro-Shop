@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/mopro/platform/internal/cart"
@@ -165,6 +166,15 @@ func main() {
 	)
 	mux.Handle("POST /v1/orders/{id}/deliver",
 		httpx.TraceAndLog(http.HandlerFunc(handleMarkDelivered(orderSvc))),
+	)
+	mux.Handle("POST /v1/orders/{id}/cancel",
+		httpx.TraceAndLog(http.HandlerFunc(handleCancelOrder(orderSvc))),
+	)
+	mux.Handle("POST /v1/orders/{id}/refund",
+		httpx.TraceAndLog(http.HandlerFunc(handleRefundOrder(orderSvc, paymentSvc, paymentRepo, paymentOutbox, market, defaultCurrency))),
+	)
+	mux.Handle("GET /v1/seller/orders/{id}/breakdown",
+		httpx.TraceAndLog(http.HandlerFunc(handleSellerBreakdown(orderSvc))),
 	)
 
 	// Payment routes
@@ -712,5 +722,190 @@ func handleMarkDelivered(svc order.Service) http.HandlerFunc {
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func handleCancelOrder(svc order.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			jsonError(w, "invalid order id", http.StatusBadRequest)
+			return
+		}
+		var body struct {
+			Reason string `json:"reason"`
+		}
+		if err := decodeJSON(w, r, &body); err != nil {
+			return
+		}
+		if err := svc.CancelOrder(r.Context(), id, body.Reason); err != nil {
+			switch {
+			case errors.Is(err, order.ErrOrderNotFound):
+				jsonError(w, "order not found", http.StatusNotFound)
+			case errors.Is(err, order.ErrInvalidTransition):
+				jsonError(w, err.Error(), http.StatusConflict)
+			default:
+				slog.Error("order: CancelOrder", "err", err)
+				jsonError(w, "internal error", http.StatusInternalServerError)
+			}
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func handleRefundOrder(
+	orderSvc order.Service,
+	paymentSvc payment.Service,
+	paymentRepo payment.Repository,
+	paymentOutbox outbox.Repository,
+	market, defaultCurrency string,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !requireIdempotencyKey(w, r) {
+			return
+		}
+		orderID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			jsonError(w, "invalid order id", http.StatusBadRequest)
+			return
+		}
+
+		o, _, err := orderSvc.GetOrder(r.Context(), orderID)
+		if err != nil {
+			if errors.Is(err, order.ErrOrderNotFound) {
+				jsonError(w, "order not found", http.StatusNotFound)
+				return
+			}
+			slog.Error("order: GetOrder for refund", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if o.Status != order.StatusPaid && o.Status != order.StatusShipped && o.Status != order.StatusDelivered {
+			jsonError(w, "order cannot be refunded in current status", http.StatusConflict)
+			return
+		}
+
+		pi, err := paymentRepo.FindPaymentByOrderID(r.Context(), orderID)
+		if err != nil {
+			if errors.Is(err, payment.ErrPaymentNotFound) {
+				jsonError(w, "no payment found for order", http.StatusNotFound)
+				return
+			}
+			slog.Error("payment: FindPaymentByOrderID", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		idempKey := r.Header.Get("Idempotency-Key")
+		refundResp, err := paymentSvc.Refund(r.Context(), payment.RefundRequest{
+			ProviderRef:    pi.ProviderRef,
+			AmountMinor:    0, // full refund
+			IdempotencyKey: idempKey,
+			OrderID:        orderID,
+		})
+		if err != nil {
+			slog.Error("payment: Refund", "err", err)
+			jsonError(w, "refund failed: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+
+		now := time.Now().UTC()
+		refundedAtStr := now.Format(time.RFC3339)
+		if err := paymentRepo.WithTx(r.Context(), func(tx pgx.Tx) error {
+			if err := paymentRepo.UpdatePaymentStatus(
+				r.Context(), tx, pi.ProviderRef,
+				payment.PaymentStatusRefunded,
+				nil, nil, &refundedAtStr,
+				"", refundResp.RefundRef, refundResp.AmountMinor,
+			); err != nil {
+				return err
+			}
+			return orderSvc.UpdateStatus(r.Context(), orderID, order.StatusRefunded)
+		}); err != nil {
+			slog.Error("order: refund status update", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		_ = paymentOutbox
+		_ = market
+		_ = defaultCurrency
+
+		jsonOK(w, http.StatusOK, map[string]any{
+			"refund_ref":   refundResp.RefundRef,
+			"refunded_at":  refundResp.RefundedAt,
+			"amount_minor": refundResp.AmountMinor,
+		})
+	}
+}
+
+// sellerBreakdownItem is the per-line Trendyol-style transparent breakdown for sellers.
+type sellerBreakdownItem struct {
+	VariantID             int64  `json:"variant_id"`
+	Qty                   int    `json:"qty"`
+	GrossMinor            int64  `json:"gross_minor"`
+	CommissionPctBps      int    `json:"commission_pct_bps"`
+	KdvPctBps             int    `json:"kdv_pct_bps"`
+	CommissionAmountMinor int64  `json:"commission_amount_minor"`
+	KdvAmountMinor        int64  `json:"kdv_amount_minor"`
+	CargoMinor            int64  `json:"cargo_minor"` // always 0 in v1 (cargo handled separately)
+	SellerNetMinor        int64  `json:"seller_net_minor"`
+	Currency              string `json:"currency"`
+}
+
+func handleSellerBreakdown(svc order.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		sellerIDStr := r.Header.Get("X-Mopro-Seller-Id")
+		sellerID, err := strconv.ParseInt(sellerIDStr, 10, 64)
+		if err != nil || sellerID <= 0 {
+			jsonError(w, "X-Mopro-Seller-Id header required", http.StatusUnauthorized)
+			return
+		}
+		orderID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			jsonError(w, "invalid order id", http.StatusBadRequest)
+			return
+		}
+		o, items, err := svc.GetOrder(r.Context(), orderID)
+		if err != nil {
+			if errors.Is(err, order.ErrOrderNotFound) {
+				jsonError(w, "order not found", http.StatusNotFound)
+				return
+			}
+			slog.Error("order: GetOrder for breakdown", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		breakdown := make([]sellerBreakdownItem, 0, len(items))
+		for _, it := range items {
+			if it.SellerID != sellerID {
+				continue
+			}
+			gross := it.UnitPriceMinor * int64(it.Qty)
+			breakdown = append(breakdown, sellerBreakdownItem{
+				VariantID:             it.VariantID,
+				Qty:                   it.Qty,
+				GrossMinor:            gross,
+				CommissionPctBps:      it.CommissionPctBps,
+				KdvPctBps:             it.KdvPctBps,
+				CommissionAmountMinor: it.CommissionAmountMinor,
+				KdvAmountMinor:        it.KdvAmountMinor,
+				CargoMinor:            0,
+				SellerNetMinor:        it.SellerNetMinor,
+				Currency:              it.UnitPriceCurrency,
+			})
+		}
+		if len(breakdown) == 0 {
+			jsonError(w, "no items for this seller in this order", http.StatusNotFound)
+			return
+		}
+
+		jsonOK(w, http.StatusOK, map[string]any{
+			"order_id":      o.ID,
+			"order_status":  o.Status,
+			"seller_id":     sellerID,
+			"items":         breakdown,
+		})
 	}
 }

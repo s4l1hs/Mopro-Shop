@@ -308,7 +308,7 @@ See § 8.6 for per-carrier API endpoint reference.
 
 | Provider | Sandbox URL | Auth | Notable Endpoints | Webhook Signature |
 |---|---|---|---|---|
-| **Sipay** (primary) | `https://provisioning.sipay.com.tr/ccpayment` | Token (`/api/token` w/ merchant_key+app_id+app_secret); cache 30 min | `/api/paySmart3D`, `/api/refund`, `/api/checkstatus`, `/sub_merchant_register`, `/sub_merchant_pay`, `/sub_merchant_settlement` | `hash_key` header = `base64(hmacSha256(rawBody, app_secret))` |
+| **Sipay** (primary) | `https://provisioning.sipay.com.tr/ccpayment` | Token (`/api/token` w/ merchant_key+app_id+app_secret); cache 30 min | `/api/paySmart3D`, `/api/refund`, `/api/checkstatus`, `/sub_merchant_register`, `/sub_merchant_pay`, `/sub_merchant_settlement` | `hash_key` = `base64(SHA512(merchant_key + status_code + invoice_id + total_amount + currency_code))` — raw SHA-512 concatenation, NOT HMAC. TODO(sipay-sandbox-verify): confirm field order against live sandbox response. |
 | **Craftgate** (backup) | `https://sandbox-api.craftgate.io` | HMAC-SHA256 per request (`x-api-key`, `x-rnd-key`, `x-signature`) | `/payment/v1/payments`, `/payment/v1/init-3ds`, `/payment/v1/complete-3ds`, `/onboarding/v1/sub-merchants`, `/payout/v1/payout` | `x-craftgate-signature` = `hmacSha256(rawBody, webhook_secret)` |
 | **iyzico** (fallback) | `https://sandbox-api.iyzipay.com` | HMAC-SHA1 + Base64 (`Authorization: IYZWS <key>:<hash>`) | `/payment/3dsecure/initialize`, `/payment/3dsecure/auth`, `/payment/refund`, `/payment/cancel`, `/onboarding/sub-merchant`, `/payment/iyzipos/marketplace/payout` | (callback URL only, no header signature; verify via `paymentId` lookup) |
 

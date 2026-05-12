@@ -78,6 +78,33 @@ func (r *pgxPaymentRepository) FindPaymentIntentByIdempotencyKey(ctx context.Con
 	return p, nil
 }
 
+func (r *pgxPaymentRepository) FindPaymentByOrderID(ctx context.Context, orderID int64) (PaymentIntent, error) {
+	var p PaymentIntent
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, order_id, idempotency_key, provider, provider_ref, provider_order_no,
+		        status, amount_minor, currency,
+		        captured_at, failed_at, failure_reason, refunded_at, refund_ref,
+		        refund_amount_minor, raw_response, created_at, updated_at
+		   FROM order_schema.payments
+		  WHERE order_id = $1
+		  ORDER BY created_at DESC
+		  LIMIT 1`,
+		orderID,
+	).Scan(
+		&p.ID, &p.OrderID, &p.IdempotencyKey, &p.Provider, &p.ProviderRef, &p.ProviderOrderNo,
+		&p.Status, &p.AmountMinor, &p.Currency,
+		&p.CapturedAt, &p.FailedAt, &p.FailureReason, &p.RefundedAt, &p.RefundRef,
+		&p.RefundAmountMinor, &p.RawResponse, &p.CreatedAt, &p.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PaymentIntent{}, ErrPaymentNotFound
+	}
+	if err != nil {
+		return PaymentIntent{}, fmt.Errorf("payment.repo: FindPaymentByOrderID: %w", err)
+	}
+	return p, nil
+}
+
 func (r *pgxPaymentRepository) UpdatePaymentStatus(
 	ctx context.Context, tx pgx.Tx, providerRef string, status PaymentStatus,
 	capturedAt, failedAt, refundedAt *string, failureReason, refundRef string,

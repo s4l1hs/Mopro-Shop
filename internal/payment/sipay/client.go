@@ -219,8 +219,10 @@ func (a *Adapter) doJSON(ctx context.Context, path string, payload, dst any) err
 
 // --- HMAC signature helper used by webhook handler ---
 
-// ComputeHashKey produces the Sipay webhook HMAC-SHA512 signature.
-// hash_key = base64( SHA512( merchant_key + status_code + invoice_id + total_amount + currency_code ) )
+// ComputeHashKey produces the Sipay webhook hash_key for signature verification.
+// Algorithm: base64( SHA512( merchant_key + status_code + invoice_id + total_amount + currency_code ) )
+// This is raw SHA-512 string concatenation — NOT an HMAC (no separate signing key).
+// TODO(sipay-sandbox-verify): confirm field order against live sandbox webhook payload.
 func ComputeHashKey(merchantKey, statusCode, invoiceID, totalAmount, currencyCode string) string {
 	raw := merchantKey + statusCode + invoiceID + totalAmount + currencyCode
 	sum := sha512.Sum512([]byte(raw))

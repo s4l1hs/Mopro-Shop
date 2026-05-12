@@ -51,6 +51,10 @@ type Repository interface {
 	// Returns ErrPaymentNotFound if not found.
 	FindPaymentIntentByIdempotencyKey(ctx context.Context, key string) (PaymentIntent, error)
 
+	// FindPaymentByOrderID returns the most recent PaymentIntent for an order.
+	// Returns ErrPaymentNotFound if no payment exists for the order.
+	FindPaymentByOrderID(ctx context.Context, orderID int64) (PaymentIntent, error)
+
 	// UpdatePaymentStatus updates the status and relevant timestamp fields within tx.
 	UpdatePaymentStatus(ctx context.Context, tx pgx.Tx, providerRef string, status PaymentStatus,
 		capturedAt, failedAt, refundedAt *string, failureReason, refundRef string,

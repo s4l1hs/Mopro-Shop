@@ -376,6 +376,61 @@ func TestListOrders(t *testing.T) {
 	}
 }
 
+func TestCancelOrder_Success(t *testing.T) {
+	repo := &mockRepo{
+		getOrderFn: func(_ context.Context, id int64) (order.Order, []order.OrderItem, error) {
+			return order.Order{ID: id, Status: order.StatusPendingPayment}, nil, nil
+		},
+	}
+	if err := newTestService(repo, &mockCartSvc{}, &mockCatalogSvc{}, &mockOutbox{}).
+		CancelOrder(context.Background(), 1, "customer request"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCancelOrder_FromPaid(t *testing.T) {
+	repo := &mockRepo{
+		getOrderFn: func(_ context.Context, id int64) (order.Order, []order.OrderItem, error) {
+			return order.Order{ID: id, Status: order.StatusPaid}, nil, nil
+		},
+	}
+	if err := newTestService(repo, &mockCartSvc{}, &mockCatalogSvc{}, &mockOutbox{}).
+		CancelOrder(context.Background(), 1, "changed mind"); err != nil {
+		t.Fatalf("cancel from paid must succeed, got %v", err)
+	}
+}
+
+func TestCancelOrder_InvalidTransition(t *testing.T) {
+	for _, status := range []order.OrderStatus{
+		order.StatusShipped, order.StatusDelivered, order.StatusCancelled, order.StatusRefunded,
+	} {
+		st := status
+		repo := &mockRepo{
+			getOrderFn: func(_ context.Context, id int64) (order.Order, []order.OrderItem, error) {
+				return order.Order{ID: id, Status: st}, nil, nil
+			},
+		}
+		err := newTestService(repo, &mockCartSvc{}, &mockCatalogSvc{}, &mockOutbox{}).
+			CancelOrder(context.Background(), 1, "test")
+		if !errors.Is(err, order.ErrInvalidTransition) {
+			t.Errorf("status %q: expected ErrInvalidTransition, got %v", st, err)
+		}
+	}
+}
+
+func TestCancelOrder_NotFound(t *testing.T) {
+	repo := &mockRepo{
+		getOrderFn: func(_ context.Context, _ int64) (order.Order, []order.OrderItem, error) {
+			return order.Order{}, nil, order.ErrOrderNotFound
+		},
+	}
+	err := newTestService(repo, &mockCartSvc{}, &mockCatalogSvc{}, &mockOutbox{}).
+		CancelOrder(context.Background(), 999, "test")
+	if !errors.Is(err, order.ErrOrderNotFound) {
+		t.Fatalf("expected ErrOrderNotFound, got %v", err)
+	}
+}
+
 func TestCheckout_CommitReservationCalledBestEffort(t *testing.T) {
 	commitCalled := false
 	commitErr := errors.New("redis timeout")

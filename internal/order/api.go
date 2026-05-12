@@ -16,6 +16,8 @@ type Service interface {
 	ListOrders(ctx context.Context, userID int64) ([]Order, error)
 	UpdateStatus(ctx context.Context, orderID int64, status OrderStatus) error
 	MarkDelivered(ctx context.Context, orderID int64, deliveredAt time.Time) error
+	// CancelOrder transitions an order to cancelled. Only valid from pending_payment or paid.
+	CancelOrder(ctx context.Context, orderID int64, reason string) error
 }
 
 // Repository is the storage interface used only by service.go.

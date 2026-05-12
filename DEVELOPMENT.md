@@ -781,7 +781,7 @@ Use `curl` to send a synthetic Sipay webhook and verify the 3-layer dedup:
 # base64( SHA-512( merchant_key + status_code + invoice_id + total_amount + currency_code ) )
 
 # Send a synthetic captured webhook
-curl -s -X POST http://localhost:8080/webhooks/sipay \
+curl -s -X POST http://localhost:8080/v1/payments/webhook/sipay \
   -H "Content-Type: application/json" \
   -d '{
     "status_code": 100,
@@ -794,6 +794,52 @@ curl -s -X POST http://localhost:8080/webhooks/sipay \
 # Expected: HTTP 200
 # Second identical POST: HTTP 200 (Redis fast-path dedup)
 ```
+
+---
+
+## 18. Dev Stack Re-Initialization (After Adding New Migrations)
+
+Migration files in `deploy/postgres/init-ecom/` and `deploy/postgres/init-ledger/` only run
+automatically when their respective Docker volume is **empty** (i.e., on first `docker compose up`).
+If the stack was already running when new migrations were added, apply them manually using one of
+the two options below.
+
+### Option A — Apply without data loss (preferred)
+
+Apply a specific migration file to the running container:
+
+```bash
+# Replace filenames with the actual migration(s) to apply.
+docker exec -i postgres-ecom \
+  psql -U ecom_admin -d mopro_ecom \
+  < deploy/postgres-ecom/init/65-order-schema.sql
+
+docker exec -i postgres-ecom \
+  psql -U ecom_admin -d mopro_ecom \
+  < deploy/postgres-ecom/init/70-payments.sql
+
+# Verify the tables were created:
+docker exec postgres-ecom \
+  psql -U ecom_admin -d mopro_ecom -c "\dt order_schema.*"
+```
+
+Repeat the pattern for ledger migrations (`postgres-ledger` / `ledger_admin` / `mopro_ledger`,
+migrations live in `deploy/postgres-ledger/init/`).
+
+### Option B — Full teardown (destroys all dev data)
+
+Use when you want a clean slate or are debugging schema conflicts.
+
+```bash
+# Stop all containers AND delete all named volumes.
+docker compose -f deploy/docker-compose.yml down -v
+
+# Re-apply all init scripts from scratch on next start.
+docker compose -f deploy/docker-compose.yml up -d
+```
+
+**Warning:** `-v` permanently deletes all Postgres and Redis data. Use Option A unless you
+intentionally want to reset.
 
 ---
 

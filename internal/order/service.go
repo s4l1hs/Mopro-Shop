@@ -179,6 +179,23 @@ func (s *orderService) UpdateStatus(ctx context.Context, orderID int64, status O
 	})
 }
 
+// CancelOrder transitions an order to cancelled. Only valid from pending_payment or paid.
+// reason is logged for audit purposes but not persisted in v1 (no cancellation_reason column yet).
+func (s *orderService) CancelOrder(ctx context.Context, orderID int64, reason string) error {
+	o, _, err := s.repo.GetOrder(ctx, orderID)
+	if err != nil {
+		return err
+	}
+	if o.Status != StatusPendingPayment && o.Status != StatusPaid {
+		return fmt.Errorf("%w: cannot cancel order in status %q", ErrInvalidTransition, o.Status)
+	}
+	slog.Info("order: cancelling", "order_id", orderID, "from_status", o.Status, "reason", reason)
+	now := time.Now().UTC()
+	return s.repo.WithTx(ctx, func(tx pgx.Tx) error {
+		return s.repo.UpdateStatus(ctx, tx, orderID, StatusCancelled, now)
+	})
+}
+
 // MarkDelivered sets status='delivered', records delivered_at, and publishes
 // ecom.order.delivered.v1 to the outbox within the same transaction.
 // This event triggers both the cashback engine and seller payout engine.
