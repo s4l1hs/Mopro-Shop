@@ -22,6 +22,8 @@ import (
 	"github.com/mopro/platform/internal/eventbus"
 	"github.com/mopro/platform/internal/order"
 	"github.com/mopro/platform/internal/outbox"
+	"github.com/mopro/platform/internal/payment"
+	"github.com/mopro/platform/internal/payment/sipay"
 	"github.com/mopro/platform/pkg/dbx"
 	"github.com/mopro/platform/pkg/httpx"
 )
@@ -84,6 +86,29 @@ func main() {
 		}
 	}()
 
+	// ── Payment module wiring ────────────────────────────────────────────────
+	paymentRepo := payment.NewRepository(pool)
+	paymentOutbox := outbox.NewRepository("order_schema.outbox")
+	sipaycfg := payment.SipayConfig{
+		BaseURL:     mustEnv("SIPAY_BASE_URL"),
+		MerchantKey: mustEnv("SIPAY_MERCHANT_KEY"),
+		AppID:       mustEnv("SIPAY_APP_ID"),
+		AppSecret:   mustEnv("SIPAY_APP_SECRET"),
+		MerchantID:  mustEnv("SIPAY_MERCHANT_ID"),
+		ReturnURL:   os.Getenv("SIPAY_RETURN_URL"),
+		CancelURL:   os.Getenv("SIPAY_CANCEL_URL"),
+	}
+	paymentSvc := payment.NewService(sipaycfg, paymentRepo)
+
+	sipayAdapter, err := sipay.NewAdapter(sipaycfg, paymentRepo, slog.Default())
+	if err != nil {
+		slog.Error("sipay: adapter init failed", "err", err)
+		os.Exit(1)
+	}
+	webhookHandler := sipay.NewWebhookHandler(
+		sipayAdapter, paymentRepo, paymentOutbox, rc, market, cashbackCurrency, slog.Default(),
+	)
+
 	// ── HTTP router (Go 1.22+ stdlib mux with method+path patterns) ─────────
 	mux := http.NewServeMux()
 
@@ -140,6 +165,18 @@ func main() {
 	)
 	mux.Handle("POST /v1/orders/{id}/deliver",
 		httpx.TraceAndLog(http.HandlerFunc(handleMarkDelivered(orderSvc))),
+	)
+
+	// Payment routes
+	mux.Handle("POST /v1/payments",
+		httpx.TraceAndLog(http.HandlerFunc(handleInitiatePayment(paymentSvc))),
+	)
+	mux.Handle("GET /v1/payments/{provider_ref}/status",
+		httpx.TraceAndLog(http.HandlerFunc(handlePaymentStatus(paymentSvc))),
+	)
+	// Webhook route is provider-specific and not wrapped in auth middleware.
+	mux.Handle("POST /webhooks/sipay",
+		httpx.TraceAndLog(http.HandlerFunc(handleSipayWebhook(webhookHandler))),
 	)
 
 	srv := &http.Server{
@@ -249,6 +286,15 @@ func jsonError(w http.ResponseWriter, msg string, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	fmt.Fprintf(w, `{"error":%q}`, msg)
+}
+
+// decodeJSON decodes the request body into v, writing a 400 on failure and returning a non-nil error.
+func decodeJSON(w http.ResponseWriter, r *http.Request, v any) error {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		jsonError(w, "invalid JSON body", http.StatusBadRequest)
+		return err
+	}
+	return nil
 }
 
 // jsonOK writes a JSON-encoded value with the given status code.
