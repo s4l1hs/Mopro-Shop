@@ -144,12 +144,47 @@ func main() {
 		shippingAdapters["hepsijet"] = hepsijet.New(cfg)
 	}
 
+	// Poll-only carrier configs (built from env; adapters constructed inside poll worker).
+	arasCarrierCfg := shipping.ArasConfig{
+		BaseURL:      os.Getenv("ARAS_BASE_URL"),
+		Username:     os.Getenv("ARAS_USERNAME"),
+		Password:     os.Getenv("ARAS_PASSWORD"),
+		CustomerCode: os.Getenv("ARAS_CUSTOMER_CODE"),
+	}
+	yurticiCarrierCfg := shipping.YurticiConfig{
+		WSDLURL:      os.Getenv("YURTICI_WSDL_URL"),
+		Username:     os.Getenv("YURTICI_USERNAME"),
+		Password:     os.Getenv("YURTICI_PASSWORD"),
+		CustomerCode: os.Getenv("YURTICI_CUSTOMER_CODE"),
+	}
+	pttCarrierCfg := shipping.PTTConfig{
+		WSDLURL:      os.Getenv("PTT_WSDL_URL"),
+		Username:     os.Getenv("PTT_USERNAME"),
+		Password:     os.Getenv("PTT_PASSWORD"),
+		CustomerCode: os.Getenv("PTT_CUSTOMER_CODE"),
+	}
+
 	kargDefault := os.Getenv("KARGO_DEFAULT")
 	shippingSvc, err := shipping.NewService(kargDefault, shippingAdapters, shippingRepo, orderSvc)
 	if err != nil {
 		slog.Error("shipping: NewService failed", "err", err)
 		os.Exit(1)
 	}
+
+	// Env-configurable poll intervals (Answer A).
+	arasInterval := mustParseDuration("ARAS_POLL_INTERVAL", "5m")
+	yurticiInterval := mustParseDuration("YURTICI_POLL_INTERVAL", "5m")
+	pttInterval := mustParseDuration("PTT_POLL_INTERVAL", "6h")
+
+	go runShippingPollWorker(ctx, shippingSvc, shippingAdapters, pollConfig{
+		arasInterval:    arasInterval,
+		yurticiInterval: yurticiInterval,
+		pttInterval:     pttInterval,
+	}, struct {
+		Aras    shipping.ArasConfig
+		Yurtici shipping.YurticiConfig
+		PTT     shipping.PTTConfig
+	}{Aras: arasCarrierCfg, Yurtici: yurticiCarrierCfg, PTT: pttCarrierCfg})
 
 	// ── HTTP router (Go 1.22+ stdlib mux with method+path patterns) ─────────
 	mux := http.NewServeMux()
@@ -270,6 +305,21 @@ func mustEnv(key string) string {
 		log.Fatalf("core-svc: required env %s is not set", key)
 	}
 	return v
+}
+
+// mustParseDuration reads key from env; if absent or empty returns def.
+// If the value is present but not parseable, log.Fatal (bad config = startup abort).
+func mustParseDuration(key, def string) time.Duration {
+	v := os.Getenv(key)
+	if v == "" {
+		d, _ := time.ParseDuration(def)
+		return d
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		log.Fatalf("core-svc: env %s=%q is not a valid duration: %v", key, v, err)
+	}
+	return d
 }
 
 // buildCatalogDSN constructs the DSN from env vars.
