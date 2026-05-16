@@ -18,10 +18,12 @@ import (
 	"github.com/mopro/platform/internal/cashback"
 	"github.com/mopro/platform/internal/eventbus"
 	"github.com/mopro/platform/internal/outbox"
+	"github.com/mopro/platform/internal/reconcile"
 	"github.com/mopro/platform/internal/sellerpayout"
 	"github.com/mopro/platform/internal/sellerpayout/sipay"
 	"github.com/mopro/platform/internal/wallet"
 	"github.com/mopro/platform/pkg/healthcheck"
+	"github.com/mopro/platform/pkg/pagerduty"
 	"github.com/mopro/platform/pkg/timex"
 )
 
@@ -65,6 +67,9 @@ func main() {
 	walletRepo := wallet.NewRepository(pool)
 	walletOutbox := outbox.NewRepository("wallet_schema.outbox")
 	walletSvc := wallet.NewService(walletRepo, walletOutbox, slog.Default())
+
+	// Start wallet system_state background refresher.
+	walletSvc.StartRefresher(ctx)
 
 	// ── Cashback engine ──────────────────────────────────────────────────────
 	cashbackOutbox := outbox.NewRepository("wallet_schema.outbox")
@@ -135,10 +140,37 @@ func main() {
 	monthlyCron.Start()
 	defer monthlyCron.Stop()
 
-	// ── Seller payout daily cron (02:30 UTC) + reconcile (every 30 min) ───────
+	// ── Seller payout daily cron (02:30 UTC) ───────────────────────────────────
 	dailyCron := sellerpayout.NewDailyCron(payoutSvc, market, defaultCurrency, time.UTC, slog.Default())
 	dailyCron.Start()
 	defer dailyCron.Stop()
+
+	// ── Reconcile cron (weekly Sunday 03:05 Europe/Istanbul) ────────────────────
+	reconcileDSN := os.Getenv("RECONCILE_DATABASE_URL")
+	if reconcileDSN == "" {
+		reconcileDSN = ledgerDSN // fallback to wallet_user pool in dev (limited grants)
+	}
+	reconcilePool, err := pgxpool.New(initCtx, reconcileDSN)
+	if err != nil {
+		slog.Error("fin-svc: reconcile pool", "err", err)
+		os.Exit(1)
+	}
+	if err := reconcilePool.Ping(initCtx); err != nil {
+		slog.Error("fin-svc: reconcile pool ping", "err", err)
+		os.Exit(1)
+	}
+	reconcileRepo := reconcile.NewRepository(reconcilePool)
+	var pd *pagerduty.Client
+	if key := os.Getenv("PAGERDUTY_ROUTING_KEY"); key != "" {
+		pd = pagerduty.New(key, mustEnv("PAGERDUTY_API"))
+	} else {
+		pd = pagerduty.NewNoop()
+	}
+	dryRun := os.Getenv("LEDGER_RECONCILE_DRY_RUN") == "true"
+	reconcileSvc := reconcile.NewService(reconcileRepo, pd, walletSvc, dryRun, slog.Default())
+	weeklyCron := reconcile.NewWeeklyCron(reconcileSvc, istanbulLoc, slog.Default())
+	weeklyCron.Start(ctx)
+	defer weeklyCron.Stop()
 
 	// ── HTTP server ──────────────────────────────────────────────────────────
 	mux := http.NewServeMux()
