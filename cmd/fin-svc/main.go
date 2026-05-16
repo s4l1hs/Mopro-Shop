@@ -24,6 +24,7 @@ import (
 	"github.com/mopro/platform/internal/wallet"
 	"github.com/mopro/platform/pkg/healthcheck"
 	"github.com/mopro/platform/pkg/pagerduty"
+	"github.com/mopro/platform/pkg/slack"
 	"github.com/mopro/platform/pkg/timex"
 )
 
@@ -77,7 +78,19 @@ func main() {
 	calLoader := timex.NewStaticCalendarLoader(calendarMap)
 	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutbox, calLoader, cashbackCurrency, walletSvc, slog.Default())
 
-	bus := eventbus.NewRedisBus(redisClient, slog.Default())
+	// Slack client for DLQ alerts (EXCEPTION: fin-svc → Slack direct; see CLAUDE.md §5).
+	// SLACK_DLQ_WEBHOOK_URL is optional; no-op when absent.
+	slackDLQClient := slack.New(os.Getenv("SLACK_DLQ_WEBHOOK_URL"))
+
+	attemptRepo := eventbus.NewPgxAttemptRepository(pool)
+	dlqRepo := eventbus.NewPgxDLQRepository(pool)
+	bus := eventbus.NewRedisBus(
+		redisClient,
+		slog.Default(),
+		eventbus.WithAttemptRepo(attemptRepo),
+		eventbus.WithDLQRepo(dlqRepo),
+		eventbus.WithSlackPoster(eventbus.NewSlackPosterAdapter(slackDLQClient)),
+	)
 
 	// ── Seller payout engine ─────────────────────────────────────────────────
 	payoutRepo := sellerpayout.NewRepository(pool)
