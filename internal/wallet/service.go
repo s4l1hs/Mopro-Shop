@@ -124,9 +124,13 @@ func (s *walletService) PostInTx(ctx context.Context, tx pgx.Tx, in ledger.PostI
 	if err != nil {
 		return 0, fmt.Errorf("wallet: marshal outbox payload: %w", err)
 	}
+	eventType := outboxEventType(in.Type)
+	if in.EventType != "" {
+		eventType = in.EventType
+	}
 	outboxRow := outbox.Row{
 		Aggregate:      outboxAggregate(in.Type),
-		EventType:      outboxEventType(in.Type),
+		EventType:      eventType,
 		Payload:        json.RawMessage(payload),
 		IdempotencyKey: in.IdempotencyKey,
 		Market:         in.Market,
