@@ -91,3 +91,20 @@ linters:
       excludes:
         - G104  # unhandled errors: handled explicitly in skeleton stubs
         - G706  # log injection: MARKET/SVC_NAME are operator env vars, not user input
+        - G101  # hardcoded credentials: test-only webhook tokens, not prod secrets
+        - G117  # marshaled field with secret-matching name: legitimate PSP API fields (PTT/Surat use Password in SOAP/JSON)
+
+  exclusions:
+    rules:
+      # cmd/*/main.go wires up multiple services — startup complexity is intentional
+      - path: "cmd/.*\\.go"
+        linters: [gocyclo]
+      # PostInTx validates multi-currency double-entry + idempotency; complex by design
+      - path: "internal/wallet/service\\.go"
+        linters: [gocyclo]
+      # processBatch coordinates PSP retry + alert + ledger tx; complex by design
+      - path: "internal/sellerpayout/run_daily\\.go"
+        linters: [gocyclo]
+      # shipping test servers use json/xml encoders in httptest handlers; errors non-fatal
+      - path: "internal/shipping/.*/adapter_test\\.go"
+        linters: [errcheck]

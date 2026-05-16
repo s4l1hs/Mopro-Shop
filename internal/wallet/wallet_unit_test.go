@@ -347,7 +347,10 @@ func TestPostInTx_ErrSystemReadOnly(t *testing.T) {
 
 func TestSetReadOnly_EagerCache(t *testing.T) {
 	repo := &mockRepo{}
-	svc := NewService(repo, &mockOutbox{}, nil).(*walletService)
+	svc, ok := NewService(repo, &mockOutbox{}, nil).(*walletService)
+	if !ok {
+		t.Fatal("type assertion to *walletService failed")
+	}
 	if err := svc.SetReadOnly(context.Background(), "test reason"); err != nil {
 		t.Fatalf("SetReadOnly: %v", err)
 	}
@@ -361,7 +364,10 @@ func TestSetReadOnly_EagerCache(t *testing.T) {
 
 func TestClearReadOnly_EagerCache(t *testing.T) {
 	repo := &mockRepo{}
-	svc := NewService(repo, &mockOutbox{}, nil).(*walletService)
+	svc, ok := NewService(repo, &mockOutbox{}, nil).(*walletService)
+	if !ok {
+		t.Fatal("type assertion to *walletService failed")
+	}
 	// Pre-set to true
 	svc.sysReadOnly.Store(true)
 	if err := svc.ClearReadOnly(context.Background()); err != nil {
@@ -374,7 +380,10 @@ func TestClearReadOnly_EagerCache(t *testing.T) {
 
 func TestInvalidateReadOnlyCache_ForcesRefresh(t *testing.T) {
 	repo := &mockRepo{sysState: SystemState{ReadOnly: false}}
-	svc := NewService(repo, &mockOutbox{}, nil).(*walletService)
+	svc, ok := NewService(repo, &mockOutbox{}, nil).(*walletService)
+	if !ok {
+		t.Fatal("type assertion to *walletService failed")
+	}
 	// Set a non-zero refreshed time so cache is considered warm
 	svc.sysRefreshedAt.Store(99999999999999)
 	// Invalidate the cache

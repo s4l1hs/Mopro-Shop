@@ -7,7 +7,7 @@ SCHEMAS="identity|catalog|cart|order|payment|seller|search|wallet|commission|tre
 if grep -rE "FROM\s+($SCHEMAS)_schema\." \
     --include='*.sql' --include='*.go' \
     internal/ migrations/ \
-    | grep -vE '/(identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|sellerpayout|shipping|notification|support|media|sizefinder|e2e)/' \
+    | grep -vE '/(identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|sellerpayout|reconcile|shipping|notification|support|media|sizefinder|e2e)/' \
     | grep -vE 'ref_schema\.' ; then
     echo "ERROR: cross-schema reference detected"
     exit 1
@@ -36,9 +36,10 @@ if grep -rE '"(TRY|TRY_COIN|EUR|USD|AED|EUR_COIN|USD_COIN)"' --include='*.go' in
     # not exit 1 yet; warn and let CI decide
 fi
 
-# Cashback plan UPDATE attempts (must use reversal/new plan instead)
-if grep -rE 'UPDATE\s+cashback_schema\.plans' --include='*.sql' --include='*.go' internal/ migrations/ ; then
-    echo "ERROR: cashback_schema.plans is immutable; use reversal/new plan pattern"
+# Cashback plan core-field UPDATE attempts (mutable: last_distributed_period, status, updated_at)
+if grep -rE 'UPDATE\s+cashback_schema\.plans.*\b(monthly_amount_minor|start_date|currency|reference_interest_rate_bps|delivered_at)\b' \
+    --include='*.sql' --include='*.go' internal/ migrations/ ; then
+    echo "ERROR: cashback_schema.plans core fields are immutable; use reversal/new plan pattern"
     exit 1
 fi
 

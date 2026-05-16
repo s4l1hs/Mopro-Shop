@@ -51,17 +51,19 @@ func runWithWallet(ctx context.Context, fn func(wallet.Service) error) {
 	if err != nil {
 		log.Fatalf("mopro: connect to postgres-ledger: %v", err)
 	}
-	defer pool.Close()
 	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
 		log.Fatalf("mopro: ping postgres-ledger: %v", err)
 	}
 	// outboxRepo is nil: CLI only calls SetReadOnly/ClearReadOnly, never PostInTx.
 	repo := wallet.NewRepository(pool)
 	svc := wallet.NewService(repo, nil /* outboxRepo intentionally nil for CLI */, slog.Default())
 	if err := fn(svc); err != nil {
+		pool.Close()
 		slog.Error("mopro: command failed", "err", err)
 		os.Exit(1)
 	}
+	pool.Close()
 	fmt.Println("ok")
 }
 

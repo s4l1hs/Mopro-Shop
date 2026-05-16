@@ -134,18 +134,8 @@ func main() {
 		slog.Error("fin-svc: load Europe/Istanbul timezone", "err", err)
 		os.Exit(1)
 	}
-	cronMarkets := buildCronMarkets(market, cashbackCurrency)
-	hcPinger := healthcheck.New(os.Getenv("CASHBACK_CRON_HEALTHCHECK_URL"), 5*time.Second, slog.Default())
-	monthlyCron := cashback.NewMonthlyCron(cashbackSvc, cronMarkets, istanbulLoc, hcPinger, slog.Default())
-	monthlyCron.Start()
-	defer monthlyCron.Stop()
 
-	// ── Seller payout daily cron (02:30 UTC) ───────────────────────────────────
-	dailyCron := sellerpayout.NewDailyCron(payoutSvc, market, defaultCurrency, time.UTC, slog.Default())
-	dailyCron.Start()
-	defer dailyCron.Stop()
-
-	// ── Reconcile cron (weekly Sunday 03:05 Europe/Istanbul) ────────────────────
+	// ── Reconcile pool init (before any defers, so os.Exit is safe) ──────────
 	reconcileDSN := os.Getenv("RECONCILE_DATABASE_URL")
 	if reconcileDSN == "" {
 		reconcileDSN = ledgerDSN // fallback to wallet_user pool in dev (limited grants)
@@ -168,6 +158,19 @@ func main() {
 	}
 	dryRun := os.Getenv("LEDGER_RECONCILE_DRY_RUN") == "true"
 	reconcileSvc := reconcile.NewService(reconcileRepo, pd, walletSvc, dryRun, slog.Default())
+
+	cronMarkets := buildCronMarkets(market, cashbackCurrency)
+	hcPinger := healthcheck.New(os.Getenv("CASHBACK_CRON_HEALTHCHECK_URL"), 5*time.Second, slog.Default())
+	monthlyCron := cashback.NewMonthlyCron(cashbackSvc, cronMarkets, istanbulLoc, hcPinger, slog.Default())
+	monthlyCron.Start()
+	defer monthlyCron.Stop()
+
+	// ── Seller payout daily cron (02:30 UTC) ───────────────────────────────────
+	dailyCron := sellerpayout.NewDailyCron(payoutSvc, market, defaultCurrency, time.UTC, slog.Default())
+	dailyCron.Start()
+	defer dailyCron.Stop()
+
+	// ── Reconcile cron (weekly Sunday 03:05 Europe/Istanbul) ────────────────────
 	weeklyCron := reconcile.NewWeeklyCron(reconcileSvc, istanbulLoc, slog.Default())
 	weeklyCron.Start(ctx)
 	defer weeklyCron.Stop()
@@ -195,7 +198,8 @@ func main() {
 	}()
 	slog.Info("fin-svc: starting", "market", market, "addr", srv.Addr)
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		log.Fatal(err)
+		slog.Error("fin-svc: http server exited unexpectedly", "err", err)
+		// defers (cron stops) run as main returns
 	}
 }
 
