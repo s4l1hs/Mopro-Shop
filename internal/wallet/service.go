@@ -340,14 +340,10 @@ func (s *walletService) InvalidateReadOnlyCache() {
 // outboxAggregate maps a transaction type to the outbox aggregate name.
 func outboxAggregate(txType string) string {
 	switch txType {
-	case "cashback_payment", "cashback_reversal":
+	case "cashback_payment":
 		return "cashback"
 	case "seller_payout":
 		return "sellerpayout"
-	case "commission_accrual":
-		return "commission"
-	case "fx_outbound", "fx_inbound":
-		return "treasury"
 	default:
 		return "wallet"
 	}
@@ -358,16 +354,8 @@ func outboxEventType(txType string) string {
 	switch txType {
 	case "cashback_payment":
 		return "fin.cashback.payment.posted.v1"
-	case "cashback_reversal":
-		return "fin.cashback.reversal.posted.v1"
 	case "seller_payout":
-		return "fin.seller.payout.posted.v1"
-	case "commission_accrual":
-		return "fin.commission.accrual.posted.v1"
-	case "fx_outbound":
-		return "fin.fx.outbound.posted.v1"
-	case "fx_inbound":
-		return "fin.fx.inbound.posted.v1"
+		return "fin.seller.payout.batch.paid.v1"
 	default:
 		return "fin.ledger.posted.v1"
 	}

@@ -398,11 +398,7 @@ func TestInvalidateReadOnlyCache_ForcesRefresh(t *testing.T) {
 func TestOutboxEventType(t *testing.T) {
 	cases := []struct{ txType, want string }{
 		{"cashback_payment", "fin.cashback.payment.posted.v1"},
-		{"cashback_reversal", "fin.cashback.reversal.posted.v1"},
-		{"seller_payout", "fin.seller.payout.posted.v1"},
-		{"commission_accrual", "fin.commission.accrual.posted.v1"},
-		{"fx_outbound", "fin.fx.outbound.posted.v1"},
-		{"fx_inbound", "fin.fx.inbound.posted.v1"},
+		{"seller_payout", "fin.seller.payout.batch.paid.v1"},
 		{"unknown_type", "fin.ledger.posted.v1"},
 	}
 	for _, c := range cases {
