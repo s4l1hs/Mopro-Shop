@@ -69,10 +69,14 @@ func (s *payoutService) SchedulePayoutsForOrder(ctx context.Context, ev OrderDel
 	unlockAt := timex.AddBusinessDays(ev.DeliveredAt, 3, cal)
 
 	// 3. Insert one payout row per seller in a single transaction.
-	// If a concurrent worker beat us to it, InsertPayout returns ErrPayoutAlreadyExists
-	// which aborts the tx; WithTx rolls it back and returns that error — treat as success.
-	// All sellers for a given order are inserted atomically, so any conflict means the
-	// entire set was already committed by a previous attempt.
+	//
+	// INVARIANT: this transaction MUST contain ONLY the payout INSERT.
+	// ErrPayoutAlreadyExists (23505) aborts the tx; we catch it after
+	// WithTx as a success signal because all sellers for an order are
+	// inserted atomically — any conflict means the entire set was already
+	// committed by a prior attempt. Adding ANY other write here breaks
+	// idempotency: those writes would be silently rolled back on a
+	// concurrent retry, producing an inconsistent half-committed state.
 	err = s.repo.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
 		for sellerID, netMinor := range bySellerNet {
 			if netMinor <= 0 {
