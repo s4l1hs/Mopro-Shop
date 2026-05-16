@@ -29,4 +29,12 @@ var (
 	// ErrMaxRetriesExceeded is returned by WithTx after exhausting SERIALIZABLE
 	// retry attempts (pgError 40001 — serialization failure).
 	ErrMaxRetriesExceeded = errors.New("wallet: exceeded serialization retry limit")
+
+	// ErrSystemReadOnly is returned by PostInTx and Post when wallet_schema.system_state
+	// has read_only=TRUE. Both crons increment their Failed counter on this error.
+	ErrSystemReadOnly = errors.New("wallet: system is in read-only mode")
+
+	// ErrOutboxNotConfigured is returned when PostInTx is called but outboxRepo is nil.
+	// This prevents accidental use of wallet.NewService without an outbox in financial paths.
+	ErrOutboxNotConfigured = errors.New("wallet: outbox repository not configured")
 )
