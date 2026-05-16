@@ -1305,9 +1305,21 @@ Report: configuration, test output, Redis XINFO GROUPS output.
 
 ---
 
-## Prompt 3.2 — DLQ Handling
+## Prompt 3.2 — DLQ Handling ✅ COMPLETE (2026-05-16)
 
 **Phase & Goal:** Phase 3. Dead-letter queue for permanently failed events; CLI replay tools.
+
+**Implementation summary:**
+- `wallet_schema.event_dlq` table (migration 72) with `UNIQUE(consumer_group, original_message_id)` for idempotent inserts; `dlq_user` Postgres role with least-privilege grants.
+- `GRANT DELETE ON event_delivery_attempts TO reconcile_user` (migration 73) for weekly cleanup.
+- `DLQRepository` interface + `pgxDLQRepository` with `InsertIfThreshold` (READ COMMITTED tx, error_history snapshot, ON CONFLICT DO NOTHING).
+- `insertDLQIfThreshold` called synchronously in `dispatchMessage` defer, BEFORE XACK. DLQ failure → message stays in PEL. `DLQAlreadyExists` → XACK retry without Slack.
+- SEV3 alert on first insertion; SEV2 if >10 DLQ rows in 10-min window (per-topic `sync.Map` dedup, 10-min TTL).
+- `xackClient` interface as testable seam for unit tests without miniredis.
+- `mopro dlq list|inspect|replay|dismiss` subcommands with `--dry-run`, `--json`, `--by`, `--confirm` flags. XADD-first replay ordering (new message before `MarkReplayed`).
+- `reconcile.WeeklyCron` cleans `event_delivery_attempts` rows older than 7 days.
+- CLAUDE.md §5: fin-svc → Slack direct alerting exception documented.
+- 7 unit tests, 5 integration tests, 5 CLI tests, 3 e2e/property tests (including mandatory `TestE2E_ReplayReloops`).
 
 **Copy-Paste Prompt:**
 
@@ -1330,6 +1342,8 @@ Replay re-publishes the original event to the original stream with the original 
 
 Report: DLQ schema, CLI invocations, sample alert payload.
 ```
+
+Next: **Prompt 3.3 — Outbox Publisher Productionize** (backpressure, Redis flap handling).
 
 ---
 
