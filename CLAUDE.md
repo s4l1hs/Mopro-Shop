@@ -213,6 +213,19 @@ The `seller-payout-engine` module inside fin-svc owns seller net payout lifecycl
 - Cross-schema SQL `JOIN` is **FORBIDDEN**, with ONE exception: `ref_schema` (currencies, countries, locales, **categories**, **commission_rules**, **business_calendars**) is readable by every module.
 - See `DATA_DICTIONARY.md` for full schema rules.
 
+EXCEPTION: `internal/reconcile` is the sole module permitted to query
+across schemas in a single SQL statement. Its purpose is invariant
+verification across module boundaries. The `reconcile_user` Postgres
+role has SELECT grants on wallet_schema, cashback_schema, and
+commission_schema for this purpose. No other module may follow this
+pattern; all other cross-schema reads MUST go through the owning
+module's repository interface or the event/outbox pattern.
+
+ADDITIONAL EXCEPTION: `internal/reconcile` may call
+`internal/wallet.Repository` methods directly (NOT wallet.Service)
+when in-tx coordination is required (e.g. atomic insert of
+ledger_alerts + outbox + system_state update).
+
 ---
 
 ## 6. SECURITY RULES — IMMUTABLE
