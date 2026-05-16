@@ -360,10 +360,10 @@ func TestE2E_KargoWebhookToCashbackPlan(t *testing.T) { //nolint:gocyclo,cyclop
 
 	cashbackRepo := cashback.NewRepository(ledgerPool)
 	cashbackOutboxRepo := outbox.NewRepository("wallet_schema.outbox")
-	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutboxRepo, calLoader, coinCurrency)
+	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutboxRepo, calLoader, coinCurrency, nil, nil)
 
 	payoutRepo := sellerpayout.NewRepository(ledgerPool)
-	payoutSvc := sellerpayout.NewService(payoutRepo, calLoader, payoutCurrency)
+	payoutSvc := sellerpayout.NewService(payoutRepo, nil, nil, calLoader, payoutCurrency, nil)
 
 	cbItems := make([]cashback.CommissionSnapshotItem, len(evPayload.Items))
 	for i, it := range evPayload.Items {

@@ -99,10 +99,10 @@ func TestE2E_OrderToCashbackAndPayout(t *testing.T) { //nolint:gocyclo,cyclop
 
 	cashbackRepo := cashback.NewRepository(ledgerPool)
 	cashbackOutbox := outbox.NewRepository("wallet_schema.outbox")
-	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutbox, calLoader, coinCurrency)
+	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutbox, calLoader, coinCurrency, nil, nil)
 
 	payoutRepo := sellerpayout.NewRepository(ledgerPool)
-	payoutSvc := sellerpayout.NewService(payoutRepo, calLoader, payoutCurrency)
+	payoutSvc := sellerpayout.NewService(payoutRepo, nil, nil, calLoader, payoutCurrency, nil)
 
 	// Mock catalog and cart services — real DB not needed for this flow.
 	const variantID = int64(5001)
@@ -489,8 +489,13 @@ CREATE SCHEMA IF NOT EXISTS cashback_schema;
 CREATE SCHEMA IF NOT EXISTS commission_schema;
 CREATE SCHEMA IF NOT EXISTS wallet_schema;
 
+DROP TABLE IF EXISTS wallet_schema.event_delivery_attempts CASCADE;
+DROP TABLE IF EXISTS cashback_schema.payments CASCADE;
 DROP TABLE IF EXISTS cashback_schema.plans CASCADE;
 DROP TABLE IF EXISTS commission_schema.seller_payouts CASCADE;
+DROP TABLE IF EXISTS wallet_schema.ledger_entries CASCADE;
+DROP TABLE IF EXISTS wallet_schema.transactions CASCADE;
+DROP TABLE IF EXISTS wallet_schema.accounts CASCADE;
 DROP TABLE IF EXISTS wallet_schema.outbox CASCADE;
 
 CREATE TABLE cashback_schema.plans (
@@ -507,8 +512,27 @@ CREATE TABLE cashback_schema.plans (
   market                      TEXT NOT NULL,
   commission_snapshot         JSONB NOT NULL,
   idempotency_key             TEXT NOT NULL UNIQUE,
+  last_distributed_period     INTEGER,
   created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE cashback_schema.payments (
+  id                   BIGSERIAL PRIMARY KEY,
+  plan_id              BIGINT NOT NULL REFERENCES cashback_schema.plans(id),
+  period_yyyymm        INTEGER NOT NULL,
+  scheduled_date       DATE NOT NULL,
+  amount_minor         BIGINT NOT NULL CHECK (amount_minor > 0),
+  status               TEXT NOT NULL DEFAULT 'scheduled'
+    CHECK (status IN ('scheduled','paid','failed')),
+  ledger_transaction_id BIGINT,
+  paid_date            TIMESTAMPTZ,
+  attempt_count        INTEGER NOT NULL DEFAULT 0,
+  last_attempt_at      TIMESTAMPTZ,
+  last_error           TEXT,
+  idempotency_key      TEXT NOT NULL UNIQUE,
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (plan_id, period_yyyymm)
 );
 
 CREATE TABLE commission_schema.seller_payouts (
@@ -532,6 +556,41 @@ CREATE TABLE commission_schema.seller_payouts (
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE wallet_schema.accounts (
+  id         BIGSERIAL PRIMARY KEY,
+  type       TEXT NOT NULL,
+  owner_type TEXT,
+  owner_id   BIGINT,
+  currency   TEXT NOT NULL,
+  status     TEXT NOT NULL DEFAULT 'active',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX accounts_platform_type_currency_uq
+    ON wallet_schema.accounts(type, currency)
+    WHERE owner_type = 'platform' AND owner_id IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS accounts_owner_currency_uq
+    ON wallet_schema.accounts(type, owner_type, owner_id, currency)
+    WHERE owner_id IS NOT NULL;
+
+CREATE TABLE wallet_schema.transactions (
+  id              BIGSERIAL PRIMARY KEY,
+  type            TEXT NOT NULL,
+  reference       TEXT,
+  fx_pair_id      TEXT,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  status          TEXT NOT NULL DEFAULT 'posted',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE wallet_schema.ledger_entries (
+  id             BIGSERIAL PRIMARY KEY,
+  transaction_id BIGINT NOT NULL REFERENCES wallet_schema.transactions(id),
+  account_id     BIGINT NOT NULL REFERENCES wallet_schema.accounts(id),
+  direction      CHAR(1) NOT NULL CHECK (direction IN ('D','C')),
+  amount_minor   BIGINT NOT NULL CHECK (amount_minor > 0),
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE wallet_schema.outbox (
   id              BIGSERIAL PRIMARY KEY,
   aggregate       TEXT NOT NULL,
@@ -544,6 +603,18 @@ CREATE TABLE wallet_schema.outbox (
   currency        TEXT NOT NULL,
   published_at    TIMESTAMPTZ,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE wallet_schema.event_delivery_attempts (
+  id              BIGSERIAL PRIMARY KEY,
+  stream          TEXT NOT NULL,
+  message_id      TEXT NOT NULL,
+  consumer_group  TEXT NOT NULL,
+  consumer_name   TEXT NOT NULL,
+  attempt_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  outcome         TEXT NOT NULL CHECK (outcome IN ('success', 'error', 'panic')),
+  error_message   TEXT,
+  duration_ms     INTEGER
 );
 `)
 	return err
