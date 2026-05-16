@@ -489,6 +489,7 @@ CREATE SCHEMA IF NOT EXISTS cashback_schema;
 CREATE SCHEMA IF NOT EXISTS commission_schema;
 CREATE SCHEMA IF NOT EXISTS wallet_schema;
 
+DROP TABLE IF EXISTS wallet_schema.event_dlq CASCADE;
 DROP TABLE IF EXISTS wallet_schema.event_delivery_attempts CASCADE;
 DROP TABLE IF EXISTS cashback_schema.payments CASCADE;
 DROP TABLE IF EXISTS cashback_schema.plans CASCADE;
@@ -615,6 +616,27 @@ CREATE TABLE wallet_schema.event_delivery_attempts (
   outcome         TEXT NOT NULL CHECK (outcome IN ('success', 'error', 'panic')),
   error_message   TEXT,
   duration_ms     INTEGER
+);
+
+CREATE TABLE wallet_schema.event_dlq (
+  id                   BIGSERIAL PRIMARY KEY,
+  original_topic       TEXT NOT NULL,
+  original_message_id  TEXT NOT NULL,
+  consumer_group       TEXT NOT NULL,
+  idempotency_key      TEXT NOT NULL DEFAULT '',
+  payload              JSONB NOT NULL DEFAULT '{}',
+  attempt_count        INTEGER NOT NULL DEFAULT 0,
+  error_history        JSONB NOT NULL DEFAULT '[]',
+  status               TEXT NOT NULL DEFAULT 'open'
+    CHECK (status IN ('open','replayed','dismissed')),
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
+  replayed_at          TIMESTAMPTZ,
+  replayed_by          TEXT,
+  replayed_message_id  TEXT,
+  dismissed_at         TIMESTAMPTZ,
+  dismissed_by         TEXT,
+  dismissal_reason     TEXT,
+  UNIQUE (consumer_group, original_message_id)
 );
 `)
 	return err
