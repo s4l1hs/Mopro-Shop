@@ -67,8 +67,8 @@ func (r *pgxPayoutRepository) FindPayoutByKey(ctx context.Context, idempotencyKe
 	return p, nil
 }
 
-func (r *pgxPayoutRepository) WithTx(ctx context.Context, fn func(pgx.Tx) error) error {
-	tx, err := r.pool.Begin(ctx)
+func (r *pgxPayoutRepository) WithTx(ctx context.Context, level pgx.TxIsoLevel, fn func(pgx.Tx) error) error {
+	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: level})
 	if err != nil {
 		return err
 	}

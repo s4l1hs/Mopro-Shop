@@ -49,7 +49,7 @@ func (s *payoutService) SchedulePayoutsForOrder(ctx context.Context, ev OrderDel
 	unlockAt := timex.AddBusinessDays(ev.DeliveredAt, 3, cal)
 
 	// 3. Insert one payout row per seller in a single transaction.
-	return s.repo.WithTx(ctx, func(tx pgx.Tx) error {
+	return s.repo.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
 		for sellerID, netMinor := range bySellerNet {
 			if netMinor <= 0 {
 				continue

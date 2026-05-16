@@ -38,5 +38,5 @@ type Service interface {
 type Repository interface {
 	InsertPayout(ctx context.Context, tx pgx.Tx, p Payout) (Payout, error)
 	FindPayoutByKey(ctx context.Context, idempotencyKey string) (Payout, error)
-	WithTx(ctx context.Context, fn func(pgx.Tx) error) error
+	WithTx(ctx context.Context, level pgx.TxIsoLevel, fn func(pgx.Tx) error) error
 }
