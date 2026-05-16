@@ -124,6 +124,29 @@ func runDLQInspect(ctx context.Context, args []string, out, errOut io.Writer) {
 	printDLQInspect(out, row)
 }
 
+// hoistNumericPositional moves the first pure-integer positional argument (the DLQ row ID)
+// to the end of args so that Go's flag.Parse sees all flag arguments regardless of
+// where the caller placed the ID relative to the flags.
+// Input:  ["67", "--dry-run", "--by", "ops-demo"]
+// Output: ["--dry-run", "--by", "ops-demo", "67"]
+func hoistNumericPositional(args []string) []string {
+	var numArg string
+	out := make([]string, 0, len(args))
+	for _, a := range args {
+		if numArg == "" && !strings.HasPrefix(a, "-") {
+			if _, err := strconv.ParseInt(a, 10, 64); err == nil {
+				numArg = a
+				continue
+			}
+		}
+		out = append(out, a)
+	}
+	if numArg != "" {
+		out = append(out, numArg)
+	}
+	return out
+}
+
 // runDLQReplay re-publishes one or more DLQ rows to their original Redis stream.
 // Single-row form: mopro dlq replay <id> [--dry-run] [--by user]
 // Bulk form:       mopro dlq replay --topic <t> --since <d> --confirm [--dry-run] [--by user]
@@ -134,7 +157,10 @@ func runDLQReplay(ctx context.Context, args []string, out, errOut io.Writer) {
 	topic := fs.String("topic", "", "bulk mode: topic filter")
 	since := fs.String("since", "", "bulk mode: created_at window (e.g. 1h)")
 	confirm := fs.Bool("confirm", false, "bulk mode: required safety gate")
-	if err := fs.Parse(args); err != nil {
+	// Go's flag package stops at the first non-flag argument, so "replay 67 --dry-run"
+	// would leave --dry-run unparsed. Pre-hoist the sole numeric positional arg to the
+	// end so all flags are seen by fs.Parse regardless of invocation order.
+	if err := fs.Parse(hoistNumericPositional(args)); err != nil {
 		log.Fatalf("dlq replay: %v", err)
 	}
 

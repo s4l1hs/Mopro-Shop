@@ -203,3 +203,45 @@ func TestDLQCLI_Dismiss_SetsFields(t *testing.T) {
 		t.Errorf("MarkDismissed must be called with id=42; got %v", repo.markDismiss)
 	}
 }
+
+// ── Test 6: hoistNumericPositional correctly reorders args ────────────────────
+
+func TestDLQCLI_HoistNumericPositional(t *testing.T) {
+	cases := []struct {
+		in   []string
+		want []string
+	}{
+		{
+			// ID before flags — the problematic order that was silently wrong.
+			in:   []string{"67", "--dry-run", "--by", "ops-demo"},
+			want: []string{"--dry-run", "--by", "ops-demo", "67"},
+		},
+		{
+			// Flags before ID — already correct; hoist is a no-op.
+			in:   []string{"--dry-run", "--by", "ops-demo", "67"},
+			want: []string{"--dry-run", "--by", "ops-demo", "67"},
+		},
+		{
+			// No positional numeric arg — bulk-mode flags pass through unchanged.
+			in:   []string{"--topic", "ecom.order.delivered.v1", "--since", "1h"},
+			want: []string{"--topic", "ecom.order.delivered.v1", "--since", "1h"},
+		},
+		{
+			// Non-numeric positional (e.g. error) — left in place.
+			in:   []string{"bad-arg", "--dry-run"},
+			want: []string{"bad-arg", "--dry-run"},
+		},
+	}
+	for _, tc := range cases {
+		got := hoistNumericPositional(tc.in)
+		if len(got) != len(tc.want) {
+			t.Errorf("input %v: len got %d want %d", tc.in, len(got), len(tc.want))
+			continue
+		}
+		for i := range got {
+			if got[i] != tc.want[i] {
+				t.Errorf("input %v: pos %d got %q want %q", tc.in, i, got[i], tc.want[i])
+			}
+		}
+	}
+}
