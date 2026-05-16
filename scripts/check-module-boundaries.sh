@@ -7,7 +7,7 @@ SCHEMAS="identity|catalog|cart|order|payment|seller|search|wallet|commission|tre
 if grep -rE "FROM\s+($SCHEMAS)_schema\." \
     --include='*.sql' --include='*.go' \
     internal/ migrations/ \
-    | grep -vE '/(identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|sellerpayout|reconcile|shipping|notification|support|media|sizefinder|e2e)/' \
+    | grep -vE '/(identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|sellerpayout|reconcile|shipping|notification|support|media|sizefinder|eventbus|e2e)/' \
     | grep -vE 'ref_schema\.' ; then
     echo "ERROR: cross-schema reference detected"
     exit 1
@@ -22,7 +22,8 @@ fi
 # Direct redis.XAdd outside outbox
 if grep -rE 'redis.*XAdd' --include='*.go' internal/ \
     | grep -v internal/eventbus/redis_bus.go \
-    | grep -v internal/outbox/publisher.go ; then
+    | grep -v internal/outbox/publisher.go \
+    | grep -v '_test.go' ; then
     echo "ERROR: redis.XAdd outside outbox publisher; route through outbox"
     exit 1
 fi
