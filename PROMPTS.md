@@ -1196,6 +1196,11 @@ Report: implementation, test output, build output.
 
 ## Prompt 2.5 — Cashback Monthly Cron + Seller Payout Daily Cron Wiring
 
+<!-- v7.1 deviation: system cron /etc/cron.d replaced by in-process Go cron
+(robfig/cron/v3) for outbox + role parity. See Phase 2.5 implementation report
+for full justification. Healthchecks.io pings are made by the in-process pinger;
+UUIDs in env vars follow HEALTHCHECK_*_UUID convention (NewFromUUID builds full URL). -->
+
 **Phase & Goal:** Phase 2. Wire the two crons to fire on schedule with healthchecks.io ping.
 
 **Copy-Paste Prompt:**
