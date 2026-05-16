@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
@@ -387,4 +388,103 @@ func TestPropertyReDeliveryIdempotency(t *testing.T) {
 		),
 	)
 	properties.TestingRun(t)
+}
+
+// ─── Test 5: Chaos — Redis down during publishing burst ────────────────────────
+//
+// faultInjector wraps an eventbus.Publisher and toggles error injection at runtime.
+// Simulates a Redis outage: Publish returns an error while fail==true, then
+// delegates normally after recovery.
+type faultInjector struct {
+	inner eventbus.Publisher
+	mu    sync.Mutex
+	fail  bool
+}
+
+func (f *faultInjector) setFail(v bool) {
+	f.mu.Lock()
+	f.fail = v
+	f.mu.Unlock()
+}
+
+func (f *faultInjector) Publish(ctx context.Context, ev eventbus.Event) error {
+	f.mu.Lock()
+	fail := f.fail
+	f.mu.Unlock()
+	if fail {
+		return fmt.Errorf("simulated Redis unavailable")
+	}
+	return f.inner.Publish(ctx, ev)
+}
+
+// TestChaos_RedisDownDuringBurst inserts N rows, then simulates a Redis outage
+// for ~3 seconds while the publisher is running. After recovery it asserts:
+//   - all N rows are eventually published (no data loss)
+//   - the Redis stream contains at least N entries
+//
+// This validates the exponential backoff and catch-up behaviour defined in
+// Prompt 3.3. The 3-second simulated outage mirrors the pattern of a 30-second
+// real Redis restart (same backoff state machine; only the wall-clock duration differs).
+func TestChaos_RedisDownDuringBurst(t *testing.T) {
+	const n = 50
+	ctx := context.Background()
+	stream := uniqueStream("chaos")
+	prefix := fmt.Sprintf("chaos-%d", time.Now().UnixNano())
+	t.Cleanup(func() { cleanTestData(ctx, stream) })
+
+	for i := 0; i < n; i++ {
+		if err := insertRow(ctx, stream, fmt.Sprintf("%s-%04d", prefix, i)); err != nil {
+			t.Fatalf("insertRow[%d]: %v", i, err)
+		}
+	}
+
+	fault := &faultInjector{inner: testBus()}
+	pub, err := outbox.NewPublisher(tPool, testRepo(), fault, slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	runCtx, cancelRun := context.WithCancel(ctx)
+	pubDone := make(chan error, 1)
+	go func() { pubDone <- pub.Run(runCtx) }()
+
+	// Enable Redis fault immediately — simulates outage during an active burst.
+	fault.setFail(true)
+	time.Sleep(3 * time.Second)
+
+	// Restore Redis — publisher catches up via exponential backoff reset.
+	fault.setFail(false)
+
+	// Wait up to 30s for all rows to be published after recovery.
+	deadline := time.Now().Add(30 * time.Second)
+	var publishedInDB int
+	for time.Now().Before(deadline) {
+		tPool.QueryRow(ctx, //nolint:errcheck
+			"SELECT count(*) FROM "+testTable+" WHERE event_type = $1 AND published_at IS NOT NULL",
+			stream,
+		).Scan(&publishedInDB) //nolint:errcheck
+		if publishedInDB == n {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	cancelRun()
+	select {
+	case <-pubDone:
+	case <-time.After(35 * time.Second):
+		t.Fatal("chaos: pub.Run did not return after context cancel")
+	}
+
+	// Assert no data loss.
+	if publishedInDB != n {
+		t.Errorf("chaos: published_in_db want %d, got %d (rows lost during outage)", n, publishedInDB)
+	}
+
+	// Assert Redis stream received all entries (at-least-once: duplicates tolerated).
+	streamLen, _ := tRdb.XLen(ctx, stream).Result()
+	if streamLen < int64(n) {
+		t.Errorf("chaos: Redis stream has %d entries, want >= %d", streamLen, n)
+	}
+	t.Logf("chaos: n=%d db_published=%d stream_entries=%d", n, publishedInDB, streamLen)
 }

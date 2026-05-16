@@ -15,10 +15,12 @@ package outbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -28,26 +30,76 @@ import (
 )
 
 const (
-	defaultBatchSize = 100
-	idlePollInterval = 5 * time.Second
+	minBatchSize         = 100
+	maxBatchSize         = 500
+	initialBackoff       = time.Second
+	maxBackoff           = 60 * time.Second
+	lagAlertThreshold    = 60 * time.Second
+	gracefulDrainTimeout = 30 * time.Second
+	idlePollInterval     = 5 * time.Second
 )
+
+// Option configures a Publisher.
+type Option func(*Publisher)
+
+// WithServiceName sets the service identifier used in metric names.
+// Example: WithServiceName("fin") → metric "mopro.fin.outbox.lag.seconds".
+// Default is "mopro" when not set.
+func WithServiceName(name string) Option {
+	return func(p *Publisher) { p.svcName = name }
+}
+
+// WithLagTable sets the schema-qualified outbox table for lag metric queries.
+// When not set, the lag metric is not emitted.
+func WithLagTable(table string) Option {
+	return func(p *Publisher) { p.lagTable = table }
+}
 
 // Publisher is the outbox relay worker. It drains unpublished rows from the outbox
 // table to Redis Streams via eventbus.Publisher in at-least-once delivery order.
+// Batch size grows adaptively on clean cycles (100 → 500) and falls back to
+// minBatchSize on Redis errors. Redis errors trigger exponential backoff
+// (1s → 2s → 4s → … capped at 60s) before the next cycle.
 type Publisher struct {
-	pool           *pgxpool.Pool
-	repo           Repository
-	bus            eventbus.Publisher
-	log            *slog.Logger
+	pool     *pgxpool.Pool
+	repo     Repository
+	bus      eventbus.Publisher
+	log      *slog.Logger
+	svcName  string
+	lagTable string
+
+	// adaptive batch state — updated by RunBatch, read by Run (single-goroutine)
+	batchSize     int
+	redisErrCount int // Redis XADD failures in the last RunBatch call
+
+	// backoff state — managed exclusively by Run loop
+	backoff time.Duration
+
+	lagEnabled     bool
+	lagGauge       metric.Float64Gauge
 	publishCounter metric.Int64Counter
 }
 
 // NewPublisher constructs a Publisher.
-// Uses the global OTel MeterProvider for the publish counter — safe in tests
+// Uses the global OTel MeterProvider for metrics — safe in tests
 // (global no-op meter when OTel is uninitialised).
-func NewPublisher(pool *pgxpool.Pool, repo Repository, bus eventbus.Publisher, log *slog.Logger) (*Publisher, error) {
+func NewPublisher(pool *pgxpool.Pool, repo Repository, bus eventbus.Publisher, log *slog.Logger, opts ...Option) (*Publisher, error) {
+	p := &Publisher{
+		pool:      pool,
+		repo:      repo,
+		bus:       bus,
+		log:       log,
+		svcName:   "mopro",
+		batchSize: minBatchSize,
+	}
+	for _, o := range opts {
+		o(p)
+	}
+
 	meter := otel.GetMeterProvider().Meter("github.com/mopro/platform/internal/outbox")
-	counter, err := meter.Int64Counter(
+
+	var err error
+	p.publishCounter, err = meter.Int64Counter(
 		"mopro.outbox.publish.total",
 		metric.WithDescription("Total outbox events published to Redis Streams"),
 		metric.WithUnit("{events}"),
@@ -55,67 +107,110 @@ func NewPublisher(pool *pgxpool.Pool, repo Repository, bus eventbus.Publisher, l
 	if err != nil {
 		return nil, fmt.Errorf("outbox: create publish counter: %w", err)
 	}
-	return &Publisher{
-		pool:           pool,
-		repo:           repo,
-		bus:            bus,
-		log:            log,
-		publishCounter: counter,
-	}, nil
+
+	if p.lagTable != "" {
+		lagName := fmt.Sprintf("mopro.%s.outbox.lag.seconds", p.svcName)
+		p.lagGauge, err = meter.Float64Gauge(
+			lagName,
+			metric.WithDescription("Age in seconds of the oldest unpublished outbox row"),
+			metric.WithUnit("s"),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("outbox: create lag gauge: %w", err)
+		}
+		p.lagEnabled = true
+	}
+
+	return p, nil
 }
 
-// Run starts the infinite drain loop. Blocks until ctx is cancelled; returns nil.
-// Intended to be called in a goroutine as a background worker.
+// Run starts the adaptive drain loop. Blocks until ctx is cancelled.
+// On cancellation, attempts one graceful drain batch (up to gracefulDrainTimeout)
+// to flush rows queued just before shutdown, then returns nil.
 func (p *Publisher) Run(ctx context.Context) error {
 	for {
 		if ctx.Err() != nil {
-			return nil
+			return p.drainGraceful()
 		}
 
-		published, err := p.RunBatch(ctx)
+		n, err := p.RunBatch(ctx)
 		if err != nil {
 			p.log.Error("outbox.batch_error", slog.String("err", err.Error()))
 			select {
 			case <-ctx.Done():
-				return nil
+				return p.drainGraceful()
 			case <-time.After(idlePollInterval):
 			}
 			continue
 		}
 
-		if published == 0 {
-			p.log.Debug("outbox.idle",
-				slog.Float64("next_poll_seconds", idlePollInterval.Seconds()),
-			)
+		p.updateBatchSize()
+		p.updateBackoff()
+		p.recordLag(ctx)
+
+		if n == 0 {
+			// Idle: wait, honouring any active backoff.
+			delay := idlePollInterval
+			if p.backoff > delay {
+				delay = p.backoff
+			}
 			select {
 			case <-ctx.Done():
-				return nil
-			case <-time.After(idlePollInterval):
+				return p.drainGraceful()
+			case <-time.After(delay):
 			}
-			// Non-empty batch: immediately start next cycle (no sleep).
+		} else if p.backoff > 0 {
+			// Non-empty batch but Redis errors — throttle before next cycle.
+			select {
+			case <-ctx.Done():
+				return p.drainGraceful()
+			case <-time.After(p.backoff):
+			}
 		}
+		// Non-empty, error-free batch: loop immediately.
 	}
 }
 
-// RunBatch executes one drain cycle: claims up to defaultBatchSize rows from the outbox
+// drainGraceful runs one final RunBatch with a short-lived background context
+// to flush rows that arrived or were stranded just before shutdown.
+func (p *Publisher) drainGraceful() error {
+	drainCtx, cancel := context.WithTimeout(context.Background(), gracefulDrainTimeout)
+	defer cancel()
+	n, err := p.RunBatch(drainCtx)
+	if err != nil {
+		p.log.Warn("outbox.drain_error", slog.String("err", err.Error()))
+		return nil
+	}
+	if n > 0 {
+		p.log.Info("outbox.drain_completed", slog.Int("published", n))
+	}
+	return nil
+}
+
+// RunBatch executes one drain cycle: claims up to p.batchSize rows from the outbox
 // table (SELECT FOR UPDATE SKIP LOCKED), publishes each to Redis Streams, then marks
 // them published. Returns the number of rows successfully published.
 //
 // Exported for testing: integration tests call RunBatch directly to drive individual cycles
 // without the infinite loop.
 //
+// Redis XADD failures are counted in p.redisErrCount (read by Run for backoff and
+// batch-size adjustment) and logged; the row is skipped and retried on the next cycle.
+//
 // If MarkPublished fails (rare DB error), the entire batch transaction is rolled back. Any
 // rows already XADDed in this cycle will be re-published on the next RunBatch call.
 // This is the at-least-once guarantee — consumer handlers handle the duplicate via
 // idempotency checks.
 func (p *Publisher) RunBatch(ctx context.Context) (int, error) {
+	p.redisErrCount = 0
+
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("outbox: begin batch tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }() // no-op after Commit; cleans up on all error paths
 
-	rows, err := p.repo.FetchUnpublished(ctx, tx, defaultBatchSize)
+	rows, err := p.repo.FetchUnpublished(ctx, tx, p.batchSize)
 	if err != nil {
 		return 0, fmt.Errorf("outbox: fetch unpublished: %w", err)
 	}
@@ -123,13 +218,14 @@ func (p *Publisher) RunBatch(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 
-	p.log.Info("outbox.batch_fetched", slog.Int("count", len(rows)))
+	p.log.Info("outbox.batch_fetched", slog.Int("count", len(rows)), slog.Int("batch_size", p.batchSize))
 
 	published := 0
 	for _, row := range rows {
 		ev := rowToEvent(row)
 
 		if err := p.bus.Publish(ctx, ev); err != nil {
+			p.redisErrCount++
 			// XADD failed: log, skip row, leave it unpublished for next cycle.
 			// The PG transaction remains healthy — only the Redis call failed.
 			p.log.Error("outbox.publish_failed",
@@ -173,6 +269,66 @@ func (p *Publisher) RunBatch(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("outbox: commit batch tx: %w", err)
 	}
 	return published, nil
+}
+
+// updateBatchSize scales the batch size up by 50% on error-free cycles,
+// and resets to minBatchSize when Redis errors were detected.
+func (p *Publisher) updateBatchSize() {
+	if p.redisErrCount > 0 {
+		p.batchSize = minBatchSize
+		return
+	}
+	next := p.batchSize + p.batchSize/2
+	if next > maxBatchSize {
+		next = maxBatchSize
+	}
+	p.batchSize = next
+}
+
+// updateBackoff doubles the backoff delay on Redis errors (capped at maxBackoff),
+// and resets it to zero when a cycle completes without errors.
+func (p *Publisher) updateBackoff() {
+	if p.redisErrCount > 0 {
+		if p.backoff == 0 {
+			p.backoff = initialBackoff
+		} else {
+			p.backoff *= 2
+			if p.backoff > maxBackoff {
+				p.backoff = maxBackoff
+			}
+		}
+		return
+	}
+	p.backoff = 0
+}
+
+// recordLag queries the oldest unpublished outbox row, records the lag metric,
+// and logs a warning when lag exceeds lagAlertThreshold.
+func (p *Publisher) recordLag(ctx context.Context) {
+	if !p.lagEnabled {
+		return
+	}
+	var createdAt time.Time
+	// lagTable is operator-controlled (never user input); interpolation is safe.
+	err := p.pool.QueryRow(ctx, `
+		SELECT created_at FROM `+p.lagTable+`
+		WHERE published_at IS NULL ORDER BY id ASC LIMIT 1
+	`).Scan(&createdAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		p.lagGauge.Record(ctx, 0)
+		return
+	}
+	if err != nil {
+		return // transient DB error: skip this cycle's metric update
+	}
+	lag := time.Since(createdAt).Seconds()
+	p.lagGauge.Record(ctx, lag)
+	if lag > lagAlertThreshold.Seconds() {
+		p.log.Warn("outbox.lag_alert",
+			slog.Float64("lag_seconds", lag),
+			slog.String("table", p.lagTable),
+		)
+	}
 }
 
 // rowToEvent maps an outbox.Row to an eventbus.Event.

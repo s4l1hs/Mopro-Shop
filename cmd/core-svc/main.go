@@ -80,7 +80,10 @@ func main() {
 
 	// ── Outbox publisher — drains order_schema.outbox → Redis Streams ───────
 	bus := eventbus.NewRedisBus(rc, slog.Default())
-	pub, err := outbox.NewPublisher(pool, orderOutbox, bus, slog.Default())
+	pub, err := outbox.NewPublisher(pool, orderOutbox, bus, slog.Default(),
+		outbox.WithServiceName("core"),
+		outbox.WithLagTable("order_schema.outbox"),
+	)
 	if err != nil {
 		slog.Error("core-svc: outbox publisher init", "err", err)
 		os.Exit(1)

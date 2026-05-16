@@ -106,7 +106,10 @@ func main() {
 	payoutSvc := sellerpayout.NewService(payoutRepo, walletSvc, sipayClient, calLoader, defaultCurrency, slog.Default())
 
 	// ── Outbox publisher — drains wallet_schema.outbox → Redis Streams ───────
-	pub, err := outbox.NewPublisher(pool, cashbackOutbox, bus, slog.Default())
+	pub, err := outbox.NewPublisher(pool, cashbackOutbox, bus, slog.Default(),
+		outbox.WithServiceName("fin"),
+		outbox.WithLagTable("wallet_schema.outbox"),
+	)
 	if err != nil {
 		slog.Error("fin-svc: outbox publisher init", "err", err)
 		os.Exit(1)
