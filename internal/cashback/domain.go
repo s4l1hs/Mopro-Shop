@@ -5,6 +5,33 @@ import (
 	"time"
 )
 
+// Payment is the in-memory representation of cashback_schema.payments.
+type Payment struct {
+	ID                   int64
+	PlanID               int64
+	PeriodYYYYMM         int
+	ScheduledDate        time.Time
+	PaidDate             *time.Time
+	AmountMinor          int64
+	Status               string
+	LedgerTransactionID  *int64
+	IdempotencyKey       string
+	AttemptCount         int
+	LastAttemptAt        *time.Time
+	LastError            *string
+	CreatedAt            time.Time
+}
+
+// RunMonthResult summarises the outcome of a RunMonth call.
+type RunMonthResult struct {
+	Period       int // YYYYMM
+	Currency     string
+	Processed    int // plans for which a payment was written this run
+	Skipped      int // plans skipped (already paid, wallet frozen, etc.)
+	Failed       int // plans that errored and logged
+	TotalRetries int // total serialization retries across all plans
+}
+
 // CommissionSnapshotItem records the per-item commission breakdown frozen at order time.
 // Stored as JSONB in cashback_schema.plans.commission_snapshot for audit purposes.
 type CommissionSnapshotItem struct {

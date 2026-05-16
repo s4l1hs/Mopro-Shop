@@ -62,7 +62,8 @@ func main() {
 	cashbackOutbox := outbox.NewRepository("wallet_schema.outbox")
 	cashbackRepo := cashback.NewRepository(pool)
 	calLoader := timex.NewStaticCalendarLoader(calendarMap)
-	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutbox, calLoader, cashbackCurrency)
+	// walletPoster and logger wired in Commit 7; nil is safe until the monthly cron is registered.
+	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutbox, calLoader, cashbackCurrency, nil, nil)
 
 	bus := eventbus.NewRedisBus(redisClient, slog.Default())
 

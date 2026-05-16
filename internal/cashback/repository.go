@@ -3,6 +3,8 @@ package cashback
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -16,6 +18,35 @@ type pgxCashbackRepository struct {
 // NewRepository constructs a Repository backed by pool.
 func NewRepository(pool *pgxpool.Pool) Repository {
 	return &pgxCashbackRepository{pool: pool}
+}
+
+// WithTx runs fn inside a transaction at the given isolation level.
+// Retries up to 3 times on pgError 40001 (serialization failure) —
+// matching the pattern in wallet/repository.go.
+func (r *pgxCashbackRepository) WithTx(ctx context.Context, level pgx.TxIsoLevel, fn func(pgx.Tx) error) error {
+	const maxRetries = 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: level})
+		if err != nil {
+			return fmt.Errorf("cashback: begin tx: %w", err)
+		}
+		err = fn(tx)
+		if err != nil {
+			_ = tx.Rollback(ctx)
+			if isSerializationFailure(err) && attempt < maxRetries-1 {
+				continue
+			}
+			return err
+		}
+		if commitErr := tx.Commit(ctx); commitErr != nil {
+			if isSerializationFailure(commitErr) && attempt < maxRetries-1 {
+				continue
+			}
+			return fmt.Errorf("cashback: commit tx: %w", commitErr)
+		}
+		return nil
+	}
+	return ErrMaxRetriesExceeded
 }
 
 func (r *pgxCashbackRepository) InsertPlan(ctx context.Context, tx pgx.Tx, p Plan) (Plan, error) {
@@ -74,14 +105,144 @@ func (r *pgxCashbackRepository) FindPlanByOrderID(ctx context.Context, orderID i
 	return p, nil
 }
 
-func (r *pgxCashbackRepository) WithTx(ctx context.Context, fn func(pgx.Tx) error) error {
-	tx, err := r.pool.Begin(ctx)
+// FetchPlansBatch returns up to batchSize active plans due for period as of asOf,
+// using FOR UPDATE SKIP LOCKED so concurrent cron instances don't double-process.
+// The outer tx must be READ COMMITTED and committed immediately after the SELECT
+// to release locks (the caller is responsible for committing before processing each plan).
+func (r *pgxCashbackRepository) FetchPlansBatch(ctx context.Context, period int, asOf time.Time, currency string, batchSize int) ([]Plan, error) {
+	const q = `
+		SELECT id, order_id, user_id, monthly_amount_minor, currency,
+		       reference_interest_rate_bps, start_date, status,
+		       delivered_at, market, commission_snapshot, idempotency_key,
+		       created_at, updated_at, last_distributed_period
+		FROM cashback_schema.plans
+		WHERE status = 'active'
+		  AND currency = $1
+		  AND start_date <= $2
+		  AND (last_distributed_period IS NULL OR last_distributed_period < $3)
+		ORDER BY id
+		LIMIT $4
+		FOR UPDATE SKIP LOCKED`
+
+	rows, err := r.pool.Query(ctx, q, currency, asOf, period, batchSize)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("cashback: FetchPlansBatch: %w", err)
 	}
-	if err := fn(tx); err != nil {
-		_ = tx.Rollback(ctx)
-		return err
+	defer rows.Close()
+
+	var plans []Plan
+	for rows.Next() {
+		var p Plan
+		var statusStr string
+		var snapshot []byte
+		var lastPeriod *int
+		if err := rows.Scan(
+			&p.ID, &p.OrderID, &p.UserID, &p.MonthlyAmountMinor, &p.Currency,
+			&p.ReferenceInterestRateBps, &p.StartDate, &statusStr,
+			&p.DeliveredAt, &p.Market, &snapshot, &p.IdempotencyKey,
+			&p.CreatedAt, &p.UpdatedAt, &lastPeriod,
+		); err != nil {
+			return nil, fmt.Errorf("cashback: FetchPlansBatch scan: %w", err)
+		}
+		p.Status = PlanStatus(statusStr)
+		p.CommissionSnapshot = snapshot
+		plans = append(plans, p)
 	}
-	return tx.Commit(ctx)
+	return plans, rows.Err()
+}
+
+// InsertPayment inserts a cashback_schema.payments row within tx.
+// Uses SAVEPOINT so a 23505 (duplicate period) does not abort the outer tx.
+// Returns (Payment{}, ErrPaymentAlreadyExists) on duplicate.
+func (r *pgxCashbackRepository) InsertPayment(ctx context.Context, tx pgx.Tx, pay Payment) (Payment, error) {
+	if _, err := tx.Exec(ctx, "SAVEPOINT insert_payment"); err != nil {
+		return Payment{}, fmt.Errorf("cashback: savepoint insert_payment: %w", err)
+	}
+
+	const q = `
+		INSERT INTO cashback_schema.payments
+			(plan_id, period_yyyymm, scheduled_date, amount_minor, status, idempotency_key)
+		VALUES ($1, $2, $3, $4, 'scheduled', $5)
+		RETURNING id, created_at`
+
+	err := tx.QueryRow(ctx, q,
+		pay.PlanID, pay.PeriodYYYYMM, pay.ScheduledDate, pay.AmountMinor, pay.IdempotencyKey,
+	).Scan(&pay.ID, &pay.CreatedAt)
+	if err != nil {
+		_, _ = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT insert_payment")
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return Payment{}, ErrPaymentAlreadyExists
+		}
+		return Payment{}, fmt.Errorf("cashback: InsertPayment plan=%d period=%d: %w", pay.PlanID, pay.PeriodYYYYMM, err)
+	}
+
+	if _, err := tx.Exec(ctx, "RELEASE SAVEPOINT insert_payment"); err != nil {
+		return Payment{}, fmt.Errorf("cashback: release savepoint insert_payment: %w", err)
+	}
+	return pay, nil
+}
+
+// MarkPaymentPaid updates status='paid', sets ledger_transaction_id and paid_date.
+func (r *pgxCashbackRepository) MarkPaymentPaid(ctx context.Context, tx pgx.Tx, paymentID int64, ledgerTxnID int64, paidDate time.Time) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE cashback_schema.payments
+		 SET status='paid', ledger_transaction_id=$1, paid_date=$2,
+		     last_attempt_at=now(), attempt_count=attempt_count+1
+		 WHERE id=$3`,
+		ledgerTxnID, paidDate.UTC(), paymentID,
+	)
+	if err != nil {
+		return fmt.Errorf("cashback: MarkPaymentPaid id=%d: %w", paymentID, err)
+	}
+	return nil
+}
+
+// MarkPaymentFailed records a failed attempt; status remains 'scheduled' for retry.
+func (r *pgxCashbackRepository) MarkPaymentFailed(ctx context.Context, tx pgx.Tx, paymentID int64, errMsg string) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE cashback_schema.payments
+		 SET last_error=$1, last_attempt_at=now(), attempt_count=attempt_count+1
+		 WHERE id=$2`,
+		errMsg, paymentID,
+	)
+	if err != nil {
+		return fmt.Errorf("cashback: MarkPaymentFailed id=%d: %w", paymentID, err)
+	}
+	return nil
+}
+
+// UpdateLastDistributedPeriod stamps the plan's last_distributed_period after a successful payment.
+func (r *pgxCashbackRepository) UpdateLastDistributedPeriod(ctx context.Context, tx pgx.Tx, planID int64, period int) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE cashback_schema.plans SET last_distributed_period=$1, updated_at=now() WHERE id=$2`,
+		period, planID,
+	)
+	if err != nil {
+		return fmt.Errorf("cashback: UpdateLastDistributedPeriod plan=%d period=%d: %w", planID, period, err)
+	}
+	return nil
+}
+
+// GetWalletAccountStatus reads the status of a wallet_schema.accounts row.
+// Cross-schema read is permitted: cashback and wallet share postgres-ledger.
+// Returns "" if the account does not exist.
+func (r *pgxCashbackRepository) GetWalletAccountStatus(ctx context.Context, accountID int64) (string, error) {
+	var status string
+	err := r.pool.QueryRow(ctx,
+		`SELECT status FROM wallet_schema.accounts WHERE id = $1`,
+		accountID,
+	).Scan(&status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("cashback: GetWalletAccountStatus account=%d: %w", accountID, err)
+	}
+	return status, nil
+}
+
+func isSerializationFailure(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "40001"
 }

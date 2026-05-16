@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -21,22 +22,32 @@ type cashbackService struct {
 	repo             Repository
 	outbox           outbox.Repository
 	calLoader        timex.CalendarLoader
+	walletPoster     WalletPoster
+	log              *slog.Logger
 	cashbackCurrency string // coin currency code; read from env DEFAULT_CASHBACK_CURRENCY at startup
 }
 
 // NewService constructs a cashback Service.
 // cashbackCurrency should come from env DEFAULT_CASHBACK_CURRENCY (e.g. TRY_COIN).
+// walletPoster is satisfied by wallet.Service (injected by fin-svc/main.go via Commit 7).
 func NewService(
 	repo Repository,
 	outboxRepo outbox.Repository,
 	calLoader timex.CalendarLoader,
 	cashbackCurrency string,
+	walletPoster WalletPoster,
+	log *slog.Logger,
 ) Service {
+	if log == nil {
+		log = slog.Default()
+	}
 	return &cashbackService{
 		repo:             repo,
 		outbox:           outboxRepo,
 		calLoader:        calLoader,
 		cashbackCurrency: cashbackCurrency,
+		walletPoster:     walletPoster,
+		log:              log,
 	}
 }
 
@@ -102,7 +113,7 @@ func (s *cashbackService) CreatePlanForOrder(ctx context.Context, ev OrderDelive
 	outboxKey := fmt.Sprintf("fin:cashback:plan:created:order_%d", ev.OrderID)
 
 	// 6. Persist plan + outbox event in a single transaction (CLAUDE.md § 4.5).
-	return s.repo.WithTx(ctx, func(tx pgx.Tx) error {
+	return s.repo.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
 		created, txErr := s.repo.InsertPlan(ctx, tx, p)
 		if txErr != nil {
 			return txErr
@@ -130,6 +141,12 @@ func (s *cashbackService) CreatePlanForOrder(ctx context.Context, ev OrderDelive
 			Currency:       created.Currency,
 		})
 	})
+}
+
+// RunMonth processes all active plans due for period (YYYYMM) as of asOf.
+// Full implementation below — see processPlan/processPlanInTx.
+func (s *cashbackService) RunMonth(ctx context.Context, period int, asOf time.Time, currency string) (RunMonthResult, error) {
+	return s.runMonth(ctx, period, asOf, currency)
 }
 
 type planCreatedPayload struct {
