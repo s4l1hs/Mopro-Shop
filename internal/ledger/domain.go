@@ -14,6 +14,12 @@ type PostInput struct {
 	Market         string // ISO-3166 alpha-2 (e.g. 'TR')
 	Currency       string // MANDATORY. Single currency for ALL Entries.
 	Entries        []Entry
+	// EventType overrides the outbox event_type derived from Type.
+	// Leave empty to use the auto-derived value from outboxEventType(Type).
+	EventType string `json:"event_type,omitempty"`
+	// Metadata is included verbatim in the outbox payload JSON under "metadata".
+	// Callers may set plan_id, period_yyyymm, user_id, etc.
+	Metadata map[string]string `json:"metadata,omitempty"`
 }
 
 // Entry is one debit or credit line within a PostInput.
