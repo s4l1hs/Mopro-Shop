@@ -1223,6 +1223,39 @@ Report cron file, healthcheck dashboard screenshot description.
 
 # PHASE 3 — Distributed Sagas & Async Jobs
 
+## Phase 3.0 Deviation Note (pre-flight, inserted 2026-05-16)
+
+Before Phase 3.1 implementation began, a pre-flight event inventory audit (Phase 3.0)
+was performed. Six speculative event type strings with zero production call sites were
+discovered in `internal/wallet/service.go` (outboxEventType switch):
+
+  Deleted (no call sites):
+    - fin.cashback.reversal.posted.v1
+    - fin.commission.accrual.posted.v1
+    - fin.fx.outbound.posted.v1
+    - fin.fx.inbound.posted.v1
+
+  Renamed (confirmed active via explicit EventType override in run_daily.go):
+    - fin.seller.payout.posted.v1 → fin.seller.payout.batch.paid.v1
+
+Additionally, a defensive `default` case in `internal/payment/sipay/webhook.go` emitted
+`ecom.payment.unknown.v1` for unrecognised Sipay status codes. This was changed to return
+an error (HTTP 400) before outbox insertion, eliminating the speculative event type.
+
+Phase 3.0 deliverables committed:
+  1. notification_schema.slack_sent migration (postgres-ecom + pg-test)
+  2. internal/eventbus/registry.go — authoritative event type registry (17 entries)
+  3. Wallet outboxEventType cleanup (4 deleted, 1 renamed)
+  4. Sipay webhook unknown-type guard (error before outbox, no row written)
+  5. pkg/slack — Incoming Webhook client (modelled on pkg/pagerduty)
+  6. internal/notification — reconcile_consumer.go + dedup.go
+  7. cmd/jobs-svc/main.go — wired reconcile-drift consumer
+  8. Tests: C (dedup), D (503→200 retry), E (unknown type → 400)
+  9. ARCHITECTURE.md steps 5-8 corrected; steps 14-15 event name updated; registry link added
+  10. LEDGER_GUIDE.md:667 event name updated; DEVELOPMENT.md § 19 Naming Authority Rule added
+
+---
+
 ## Prompt 3.1 — Wire ecom.order.delivered.v1 → BOTH Cashback Plan AND Seller Payout
 
 **Phase & Goal:** Phase 3. The single delivered event has TWO consumer groups (cashback-engine and sellerpayout-engine). Verify both fire on every delivered order, idempotently.
