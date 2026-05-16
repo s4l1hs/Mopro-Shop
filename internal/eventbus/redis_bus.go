@@ -9,6 +9,7 @@ package eventbus
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -22,16 +23,19 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/semaphore"
+
+	"github.com/mopro/platform/pkg/slack"
 )
 
 const (
-	workerPoolSize   = 8   // concurrent handler goroutines per Subscribe call (PROMPTS.md § 0.4)
-	xreadCount       = 100 // messages per XREADGROUP batch (PROMPTS.md § 1237)
-	xreadBlockMS     = 5000 * time.Millisecond
-	defaultMaxLen    = 10000
-	attemptWorkers   = 4   // worker goroutines draining the attempt-log channel
-	attemptChanBuf   = 512 // buffered channel capacity for attempt-log rows
-	dlqThreshold     = 3   // failure count that triggers DLQ candidate WARN
+	workerPoolSize = 8    // concurrent handler goroutines per Subscribe call (PROMPTS.md § 0.4)
+	xreadCount     = 100  // messages per XREADGROUP batch (PROMPTS.md § 1237)
+	xreadBlockMS   = 5000 * time.Millisecond
+	defaultMaxLen  = 10000
+	attemptWorkers = 4    // worker goroutines draining the attempt-log channel
+	attemptChanBuf = 512  // buffered channel capacity for attempt-log rows
+	sev2Window     = 10   // minutes: window for SEV2 storm rate check
+	sev2Threshold  = 10   // DLQ count > sev2Threshold in window → SEV2 alert
 )
 
 // Option configures a RedisBus at construction time.
@@ -39,6 +43,8 @@ type Option func(*busOptions)
 
 type busOptions struct {
 	attemptRepo AttemptRepository
+	dlqRepo     DLQRepository
+	slackPoster SlackPoster
 }
 
 // WithAttemptRepo wires an AttemptRepository into the bus for dispatch attempt logging.
@@ -47,12 +53,35 @@ func WithAttemptRepo(r AttemptRepository) Option {
 	return func(o *busOptions) { o.attemptRepo = r }
 }
 
+// WithDLQRepo wires a DLQRepository into the bus for DLQ insertion after 3 failures.
+// Requires WithAttemptRepo to also be set; if not, DLQ check is skipped.
+func WithDLQRepo(r DLQRepository) Option {
+	return func(o *busOptions) { o.dlqRepo = r }
+}
+
+// WithSlackPoster wires a SlackPoster for DLQ alert messages.
+// SEV3 on first DLQ insertion; SEV2 when > 10 DLQ rows for same topic in 10 min.
+// Use eventbus.NewSlackPosterAdapter(*slack.Client) to adapt the production client.
+func WithSlackPoster(p SlackPoster) Option {
+	return func(o *busOptions) { o.slackPoster = p }
+}
+
+// xackClient wraps the Redis XAck call so it can be replaced in unit tests.
+// *redis.Client satisfies this interface.
+type xackClient interface {
+	XAck(ctx context.Context, stream, group string, ids ...string) *redis.IntCmd
+}
+
 // RedisBus is the Redis Streams implementation of both Publisher and Consumer.
 type RedisBus struct {
-	client     *redis.Client
-	tracer     trace.Tracer
-	log        *slog.Logger
+	client      *redis.Client
+	xack        xackClient // seam for testable DLQ XACK path; set to client in NewRedisBus
+	tracer      trace.Tracer
+	log         *slog.Logger
 	attemptRepo AttemptRepository
+	dlqRepo     DLQRepository
+	slackPoster SlackPoster
+	sev2Sent    sync.Map // key: string (topic) → time.Time of last SEV2 alert
 
 	// Attempt-log worker pool: buffered channel drained by attemptWorkers goroutines.
 	// Started lazily (once) on the first Subscribe call.
@@ -69,9 +98,12 @@ func NewRedisBus(client *redis.Client, log *slog.Logger, opts ...Option) *RedisB
 	}
 	b := &RedisBus{
 		client:      client,
+		xack:        client,
 		tracer:      otel.GetTracerProvider().Tracer("github.com/mopro/platform/internal/eventbus"),
 		log:         log,
 		attemptRepo: o.attemptRepo,
+		dlqRepo:     o.dlqRepo,
+		slackPoster: o.slackPoster,
 	}
 	if o.attemptRepo != nil {
 		b.attemptCh = make(chan AttemptRow, attemptChanBuf)
@@ -201,10 +233,10 @@ func (b *RedisBus) consumeBatch(
 	}
 }
 
-// dispatchMessage parses one stream entry, injects the remote OTel span (OQ3),
-// runs handler, and XACKs on success. Panics in the handler are recovered and
-// counted as errors (the message stays in PEL for redelivery). Attempt outcomes
-// are logged to AttemptRepository if configured.
+// dispatchMessage parses one stream entry, injects the remote OTel span,
+// runs handler, and XACKs on success. Panics are recovered and counted as errors.
+// On failure, attempt outcome is logged; when failure count >= DLQThreshold the
+// message is synchronously written to the DLQ and XACKed to break the retry loop.
 func (b *RedisBus) dispatchMessage(
 	ctx context.Context,
 	topic, group, consumerName string,
@@ -214,6 +246,8 @@ func (b *RedisBus) dispatchMessage(
 	start := time.Now()
 	outcome := "success"
 	var handlerErr error
+	// ev is declared before defer so the DLQ insertion path can use its idempotency_key.
+	var ev Event
 
 	defer func() {
 		// Recover from handler panics — convert to error, keep message in PEL.
@@ -226,36 +260,40 @@ func (b *RedisBus) dispatchMessage(
 				slog.Any("panic", r),
 			)
 		}
+		row := AttemptRow{
+			Stream:        topic,
+			MessageID:     msg.ID,
+			ConsumerGroup: group,
+			ConsumerName:  consumerName,
+			Outcome:       outcome,
+			ErrorMessage:  errString(handlerErr),
+			DurationMs:    int(time.Since(start).Milliseconds()),
+		}
 		if b.attemptRepo != nil {
-			row := AttemptRow{
-				Stream:        topic,
-				MessageID:     msg.ID,
-				ConsumerGroup: group,
-				ConsumerName:  consumerName,
-				Outcome:       outcome,
-				ErrorMessage:  errString(handlerErr),
-				DurationMs:    int(time.Since(start).Milliseconds()),
-			}
-			b.sendAttempt(row)
-			if outcome != "success" {
-				b.checkDLQCandidate(topic, msg.ID, group)
-			}
+			b.sendAttempt(row) // async, buffered
+		}
+		if outcome != "success" && b.dlqRepo != nil {
+			// Synchronous: may XACK if DLQ threshold is reached.
+			// Runs BEFORE returning from dispatchMessage — must complete before
+			// the semaphore slot is released so the caller's loop stays coherent.
+			b.insertDLQIfThreshold(ctx, topic, group, consumerName, msg, row, ev)
 		}
 	}()
 
-	ev, err := parseStreamEntry(msg)
-	if err != nil {
+	var parseErr error
+	ev, parseErr = parseStreamEntry(msg)
+	if parseErr != nil {
 		b.log.Error("eventbus.parse_failed",
 			slog.String("stream", topic),
 			slog.String("msg_id", msg.ID),
-			slog.String("err", err.Error()),
+			slog.String("err", parseErr.Error()),
 		)
 		outcome = "error"
-		handlerErr = err
-		return // no XACK — malformed message stays in PEL
+		handlerErr = parseErr
+		return // no XACK — malformed message stays in PEL (DLQ path fires via defer)
 	}
 
-	// Inject remote span context: links the consumer span to the producer span in Grafana Tempo.
+	// Inject remote span context: links consumer span to producer span in Grafana Tempo.
 	handlerCtx := injectRemoteSpan(ctx, ev)
 	handlerCtx, span := b.tracer.Start(handlerCtx,
 		"eventbus.handle:"+ev.EventType,
@@ -281,12 +319,13 @@ func (b *RedisBus) dispatchMessage(
 			slog.String("event_id", ev.EventID),
 			slog.String("idempotency_key", ev.IdempotencyKey),
 			slog.String("err", handlerErr.Error()),
-			slog.String("note", "NOT acked — Redis will redeliver"),
+			slog.String("note", "NOT acked — DLQ path will check threshold"),
 		)
-		return // do NOT XACK
+		return // do NOT XACK here — defer handles DLQ path
 	}
 
-	if ackErr := b.client.XAck(ctx, topic, group, msg.ID).Err(); ackErr != nil {
+	// Success: XACK to remove from PEL.
+	if ackErr := b.xack.XAck(ctx, topic, group, msg.ID).Err(); ackErr != nil {
 		b.log.Error("eventbus.xack_failed",
 			slog.String("stream", topic),
 			slog.String("msg_id", msg.ID),
@@ -300,6 +339,153 @@ func (b *RedisBus) dispatchMessage(
 		slog.String("event_id", ev.EventID),
 		slog.String("idempotency_key", ev.IdempotencyKey),
 	)
+}
+
+// insertDLQIfThreshold is called synchronously from the dispatchMessage defer block
+// when outcome != "success". It writes the DLQ row and XACKs the message when the
+// failure count crosses DLQThreshold. If the DB insert fails, XACK is NOT called
+// so the message stays in PEL for the next XAUTOCLAIM cycle.
+func (b *RedisBus) insertDLQIfThreshold(
+	ctx context.Context,
+	topic, group, consumerName string,
+	msg redis.XMessage,
+	current AttemptRow,
+	ev Event,
+) {
+	// Build DLQ payload from raw stream entry values — always available even when
+	// ev parse failed (ev.IdempotencyKey will be empty in that case).
+	payloadJSON, _ := json.Marshal(msg.Values)
+	idemKey := ev.IdempotencyKey
+	if idemKey == "" {
+		idemKey = msg.ID // fallback for malformed events
+	}
+
+	dlqRow := DLQRow{
+		OriginalTopic:     topic,
+		OriginalMessageID: msg.ID,
+		ConsumerGroup:     group,
+		IdempotencyKey:    idemKey,
+		Payload:           payloadJSON,
+	}
+
+	res, dlqID, err := b.dlqRepo.InsertIfThreshold(ctx, dlqRow, current)
+	if err != nil {
+		b.log.Error("eventbus.dlq_insert_failed",
+			slog.String("stream", topic),
+			slog.String("msg_id", msg.ID),
+			slog.String("err", err.Error()),
+			slog.String("note", "NOT acked — message stays in PEL"),
+		)
+		return // do NOT XACK — message stays in PEL for retry
+	}
+
+	switch res {
+	case DLQBelowThreshold:
+		return // failure count not reached; message stays in PEL
+
+	case DLQAlreadyExists:
+		// Row already exists from a prior cycle where XACK failed.
+		// Retry the XACK to stop the delivery storm.
+		if ackErr := b.xack.XAck(ctx, topic, group, msg.ID).Err(); ackErr != nil {
+			b.log.Error("eventbus.xack_retry_failed",
+				slog.String("stream", topic),
+				slog.String("msg_id", msg.ID),
+				slog.Int64("existing_dlq_id", dlqID),
+				slog.String("err", ackErr.Error()),
+			)
+		}
+
+	case DLQInserted:
+		// First insertion. XACK to break the retry loop.
+		if ackErr := b.xack.XAck(ctx, topic, group, msg.ID).Err(); ackErr != nil {
+			b.log.Error("eventbus.xack_failed_after_dlq",
+				slog.String("stream", topic),
+				slog.String("msg_id", msg.ID),
+				slog.Int64("dlq_id", dlqID),
+				slog.String("err", ackErr.Error()),
+				slog.String("note", "DLQ row exists; next redelivery will retry XACK via DLQAlreadyExists path"),
+			)
+			// Fall through: still log and alert even if XACK failed.
+		}
+		b.log.Info("eventbus.dlq_inserted",
+			slog.String("stream", topic),
+			slog.String("msg_id", msg.ID),
+			slog.String("group", group),
+			slog.Int64("dlq_id", dlqID),
+			slog.String("idempotency_key", idemKey),
+		)
+		b.sendDLQAlert(ctx, topic, group, idemKey, current, dlqID)
+	}
+}
+
+// sendDLQAlert posts a Slack alert for the newly-inserted DLQ row.
+// SEV3 on first insertion; SEV2 if count in last 10 min exceeds sev2Threshold.
+// Slack failures are logged but do not affect the DLQ insertion outcome.
+func (b *RedisBus) sendDLQAlert(
+	ctx context.Context,
+	topic, group, idemKey string,
+	current AttemptRow,
+	dlqID int64,
+) {
+	if b.slackPoster == nil {
+		return
+	}
+
+	// SEV2 storm check: count DLQ rows in last sev2Window minutes for this topic.
+	count, countErr := b.dlqRepo.CountInWindow(ctx, topic, sev2Window)
+	if countErr != nil {
+		b.log.Warn("eventbus.dlq_count_window_failed", slog.String("err", countErr.Error()))
+	}
+
+	var text string
+	if count > sev2Threshold && b.shouldSendSEV2(topic) {
+		text = fmt.Sprintf(
+			":rotating_light: *[SEV2] DLQ Storm — fin-svc* — %d messages in %d min | Topic: `%s` | Run: `mopro dlq list --topic %s --since %dm`",
+			count, sev2Window, topic, topic, sev2Window,
+		)
+	} else {
+		errSnip := current.ErrorMessage
+		if len(errSnip) > 120 {
+			errSnip = errSnip[:120] + "…"
+		}
+		text = fmt.Sprintf(
+			":warning: *[SEV3] DLQ Insertion — fin-svc* | DLQ ID: %d | Topic: `%s` | Group: `%s` | Key: `%s` | Error: %s | Run: `mopro dlq inspect %d`",
+			dlqID, topic, group, idemKey, errSnip, dlqID,
+		)
+	}
+
+	if err := b.slackPoster.PostDLQAlert(ctx, text); err != nil {
+		b.log.Error("eventbus.dlq_slack_alert_failed",
+			slog.Int64("dlq_id", dlqID),
+			slog.String("err", err.Error()),
+		)
+	}
+}
+
+// shouldSendSEV2 returns true if we have NOT sent a SEV2 alert for this topic
+// within the last sev2Window minutes. Uses an in-memory sync.Map to suppress
+// duplicate SEV2 pages during a sustained storm.
+func (b *RedisBus) shouldSendSEV2(topic string) bool {
+	now := time.Now()
+	if t, ok := b.sev2Sent.Load(topic); ok {
+		if now.Sub(t.(time.Time)) < time.Duration(sev2Window)*time.Minute {
+			return false
+		}
+	}
+	b.sev2Sent.Store(topic, now)
+	return true
+}
+
+// NewSlackPosterAdapter wraps a *slack.Client to satisfy SlackPoster.
+// Pass the result to WithSlackPoster when constructing RedisBus.
+func NewSlackPosterAdapter(c *slack.Client) SlackPoster {
+	return &slackPosterAdapter{c: c}
+}
+
+type slackPosterAdapter struct{ c *slack.Client }
+
+func (a *slackPosterAdapter) PostDLQAlert(ctx context.Context, text string) error {
+	return a.c.Post(ctx, slack.Message{Text: text})
 }
 
 // runXAutoClaim runs XAUTOCLAIM in a ticker loop for the duration of ctx.
@@ -431,29 +617,6 @@ func (b *RedisBus) sendAttempt(row AttemptRow) {
 	}
 }
 
-// checkDLQCandidate queries failure count and logs a WARN when >= dlqThreshold.
-// The count may be 1 behind (the just-sent row is still queued in the channel),
-// which is acceptable for a warning signal; the threshold is >= 3 so the WARN
-// fires no later than the 4th failure.
-func (b *RedisBus) checkDLQCandidate(stream, messageID, group string) {
-	count, err := b.attemptRepo.CountFailures(context.Background(), stream, messageID, group)
-	if err != nil {
-		b.log.Warn("eventbus: attempt count query failed",
-			slog.String("stream", stream),
-			slog.String("msg_id", messageID),
-			slog.String("err", err.Error()),
-		)
-		return
-	}
-	if count >= dlqThreshold {
-		b.log.Warn("eventbus: DLQ candidate (not yet inserted — Phase 3.2)",
-			slog.String("stream", stream),
-			slog.String("message_id", messageID),
-			slog.String("group", group),
-			slog.Int("attempts", count),
-		)
-	}
-}
 
 // maxLenFor returns the MAXLEN for a stream, reading a per-stream env override first.
 //
