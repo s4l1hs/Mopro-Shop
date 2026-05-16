@@ -19,6 +19,8 @@ import (
 	"github.com/mopro/platform/internal/eventbus"
 	"github.com/mopro/platform/internal/outbox"
 	"github.com/mopro/platform/internal/sellerpayout"
+	"github.com/mopro/platform/internal/wallet"
+	"github.com/mopro/platform/pkg/healthcheck"
 	"github.com/mopro/platform/pkg/timex"
 )
 
@@ -58,12 +60,16 @@ func main() {
 	// Example: BUSINESS_CALENDAR_TR=2026-01-01,2026-04-23,2026-05-01,...
 	calendarMap := buildCalendarMap(market)
 
+	// ── Wallet service (shared by cashback cron and future uses in fin-svc) ──
+	walletRepo := wallet.NewRepository(pool)
+	walletOutbox := outbox.NewRepository("wallet_schema.outbox")
+	walletSvc := wallet.NewService(walletRepo, walletOutbox, slog.Default())
+
 	// ── Cashback engine ──────────────────────────────────────────────────────
 	cashbackOutbox := outbox.NewRepository("wallet_schema.outbox")
 	cashbackRepo := cashback.NewRepository(pool)
 	calLoader := timex.NewStaticCalendarLoader(calendarMap)
-	// walletPoster and logger wired in Commit 7; nil is safe until the monthly cron is registered.
-	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutbox, calLoader, cashbackCurrency, nil, nil)
+	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutbox, calLoader, cashbackCurrency, walletSvc, slog.Default())
 
 	bus := eventbus.NewRedisBus(redisClient, slog.Default())
 
@@ -97,6 +103,18 @@ func main() {
 		}
 	}()
 
+	// ── Cashback monthly cron ─────────────────────────────────────────────────
+	istanbulLoc, err := time.LoadLocation("Europe/Istanbul")
+	if err != nil {
+		slog.Error("fin-svc: load Europe/Istanbul timezone", "err", err)
+		os.Exit(1)
+	}
+	cronMarkets := buildCronMarkets(market, cashbackCurrency)
+	hcPinger := healthcheck.New(os.Getenv("CASHBACK_CRON_HEALTHCHECK_URL"), 5*time.Second, slog.Default())
+	monthlyCron := cashback.NewMonthlyCron(cashbackSvc, cronMarkets, istanbulLoc, hcPinger, slog.Default())
+	monthlyCron.Start()
+	defer monthlyCron.Stop()
+
 	// ── HTTP server ──────────────────────────────────────────────────────────
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -122,6 +140,23 @@ func main() {
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
+}
+
+// buildCronMarkets builds the market config list for the cashback monthly cron.
+// CASHBACK_CRON_MARKETS env var overrides the single primary market (e.g. "TR:TRY_COIN,DE:EUR_COIN").
+// Defaults to primaryMarket:cashbackCurrency when env is not set.
+func buildCronMarkets(primaryMarket, cashbackCurrency string) []cashback.MarketConfig {
+	raw := os.Getenv("CASHBACK_CRON_MARKETS")
+	if raw != "" {
+		configs, err := cashback.ParseMarketConfigs(raw)
+		if err != nil {
+			slog.Warn("fin-svc: invalid CASHBACK_CRON_MARKETS, falling back to primary market",
+				"raw", raw, "err", err)
+		} else {
+			return configs
+		}
+	}
+	return []cashback.MarketConfig{{Market: primaryMarket, Currency: cashbackCurrency}}
 }
 
 // buildCalendarMap reads BUSINESS_CALENDAR_<MARKET> env vars and builds a map
