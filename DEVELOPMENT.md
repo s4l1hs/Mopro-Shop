@@ -859,4 +859,25 @@ If still unclear: STOP and ask the human owner.
 
 ---
 
+## 19. Naming Authority Rule
+
+**Code is the source of truth for event type strings, consumer group names, and stream
+topic constants. Documentation must match the code, never the other way around.**
+
+When renaming an event type or consumer group:
+
+1. Rename the constant in the producing module's code first.
+2. Rename the constant in every consuming module's code in the same commit or the
+   immediately following commit.
+3. Update `internal/eventbus/registry.go` in the same commit — mark the old name
+   as `StatusDeprecatedPendingDelete` and add the new name as the active entry.
+4. Update all documentation (ARCHITECTURE.md, LEDGER_GUIDE.md, PROMPTS.md) in the
+   same commit. A documentation-only rename with no code change is FORBIDDEN.
+5. If the old stream already has messages in PEL on any consumer group, the group must
+   drain (XACK all PEL entries) before the old name is deleted from the registry.
+
+**Never update docs to a name that does not yet exist in code.**
+
+---
+
 **End of DEVELOPMENT.md.**

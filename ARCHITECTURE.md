@@ -167,11 +167,13 @@ End-to-end happy path:
 2. Caddy ───► core-svc:8080
 3. core-svc.order calls cart, catalog (commission_pct snapshot), payment (in-memory)
 4. core-svc.payment calls PSP (HTTPS egress through CloudFlare to Sipay/Craftgate)
-5. core-svc.order writes orders + order_items (with commission_pct_bps snapshot) +
-   order_outbox row in postgres-ecom (one tx)
-6. ecom outbox-publisher XADDs ecom.payment.captured.v1 to Redis Streams
-7. fin-svc.commission XREADGROUPs the event
-8. fin-svc.commission writes accrual rows in postgres-ledger
+5. core-svc.order writes orders + order_items (with commission_pct_bps snapshot)
+   in postgres-ecom (one tx). No outbox row at this step — outbox emission for
+   ecom.payment.captured.v1 happens later in step 6 from the Sipay webhook handler.
+6. Sipay webhook POST arrives → core-svc.payment verifies HMAC, writes payment_intents
+   + outbox row (ecom.payment.captured.v1) in one tx. ecom outbox-publisher XADDs to Redis Streams.
+7. [NOT YET WIRED — Phase 3.2] fin-svc.commission will XREADGROUP the event
+8. [NOT YET WIRED — Phase 3.2] fin-svc.commission will write accrual rows in postgres-ledger
 9. (later, when delivery confirmed) Kargo webhook → core-svc.order
 10. core-svc.order updates order status='delivered', records delivered_at, writes outbox
     ecom.order.delivered.v1 with {order_id, delivered_at, market, items[]}
@@ -199,14 +201,16 @@ End-to-end happy path:
     - Ledger move: D liability:seller_payable:TRY
                    C asset:bank:escrow:TRY
     - Mark payout status='paid', paid_at=now()
-    - Outbox event fin.seller.payout.posted.v1
-15. jobs-svc.notification consumes fin.cashback.payment.posted.v1 → push notification
+    - Outbox event fin.seller.payout.batch.paid.v1
+15. [Phase 3.2] jobs-svc.notification will consume fin.cashback.payment.posted.v1 → push notification
     "Bu ay X Mopro Coin kazandın!"
-    AND fin.seller.payout.posted.v1 → seller email/push
+    AND fin.seller.payout.batch.paid.v1 → seller email/push
     "Sipariş #ABC için ₺Y net ödemen yapıldı"
 ```
 
 Every step is idempotent. Every event has a `trace_id` linking them in Grafana Tempo. Every event carries `market` and `currency` labels.
+
+See `internal/eventbus/registry.go` for the authoritative list of all event types, their status, and planned consumers.
 
 ---
 

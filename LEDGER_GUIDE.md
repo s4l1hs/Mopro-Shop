@@ -664,7 +664,7 @@ func (s *payoutService) payOnce(ctx context.Context, p sellerpayout.Payout) erro
 
         return s.outbox.Insert(ctx, tx, outbox.Row{
             Aggregate:      "sellerpayout",
-            EventType:      "fin.seller.payout.posted.v1",
+            EventType:      "fin.seller.payout.batch.paid.v1",
             Payload:        marshalPayoutEvent(p, txnID, transferRef),
             IdempotencyKey: p.IdempotencyKey,
             Market:         p.Market,
