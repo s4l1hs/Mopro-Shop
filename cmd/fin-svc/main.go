@@ -166,13 +166,13 @@ func main() {
 	defer monthlyCron.Stop()
 
 	// ── Seller payout daily cron (02:30 UTC) ───────────────────────────────────
-	payoutPinger := healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_PAYOUT_CRON_UUID"), 5*time.Second, slog.Default())
+	payoutPinger := healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_SELLER_PAYOUT_CRON_UUID"), 5*time.Second, slog.Default())
 	dailyCron := sellerpayout.NewDailyCron(payoutSvc, market, defaultCurrency, time.UTC, payoutPinger, slog.Default())
 	dailyCron.Start()
 	defer dailyCron.Stop()
 
 	// ── Reconcile cron (weekly Sunday 03:05 Europe/Istanbul) ────────────────────
-	reconcilePinger := healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_RECONCILE_CRON_UUID"), 5*time.Second, slog.Default())
+	reconcilePinger := healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_LEDGER_RECONCILE_UUID"), 5*time.Second, slog.Default())
 	weeklyCron := reconcile.NewWeeklyCron(reconcileSvc, istanbulLoc, reconcilePinger, slog.Default())
 	weeklyCron.Start(ctx)
 	defer weeklyCron.Stop()
