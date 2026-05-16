@@ -341,7 +341,7 @@ func printDLQTable(w io.Writer, rows []eventbus.DLQRow) {
 			r.Status,
 		)
 	}
-	tw.Flush()
+	_ = tw.Flush()
 }
 
 // printDLQInspect prints a human-readable detail view of one DLQ row.

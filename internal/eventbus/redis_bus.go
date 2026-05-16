@@ -468,7 +468,7 @@ func (b *RedisBus) sendDLQAlert(
 func (b *RedisBus) shouldSendSEV2(topic string) bool {
 	now := time.Now()
 	if t, ok := b.sev2Sent.Load(topic); ok {
-		if now.Sub(t.(time.Time)) < time.Duration(sev2Window)*time.Minute {
+		if ts, isTime := t.(time.Time); isTime && now.Sub(ts) < time.Duration(sev2Window)*time.Minute {
 			return false
 		}
 	}
