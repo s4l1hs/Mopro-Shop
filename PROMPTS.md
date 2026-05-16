@@ -1347,7 +1347,7 @@ Next: **Prompt 3.3 — Outbox Publisher Productionize** (backpressure, Redis fla
 
 ---
 
-## Prompt 3.3 — Outbox Publisher Productionize
+## Prompt 3.3 — Outbox Publisher Productionize ✅ COMPLETE (2026-05-16)
 
 **Phase & Goal:** Phase 3. Make the outbox-publisher robust against backpressure, Redis flaps, and partial failures.
 
@@ -1367,6 +1367,17 @@ Add chaos test: force Redis down for 30s during a publishing burst; verify no ro
 
 Report: code, chaos test output, lag metric example.
 ```
+
+**Implementation summary (2026-05-16):**
+- `internal/outbox/publisher.go`: adaptive batch (100→500, 50% growth per clean cycle, reset on Redis error); exponential backoff on Redis XADD errors (1s→2s→4s→…→60s cap); `mopro.<svc>.outbox.lag.seconds` Float64Gauge via `WithLagTable`+`WithServiceName` options; Warn log when lag > 60s; `drainGraceful()` runs one final RunBatch with 30s background context on shutdown.
+- `internal/outbox/publisher_test.go`: `TestChaos_RedisDownDuringBurst` — inserts 50 rows, faultInjector active for 3s, verifies all 50 published after recovery (no data loss, stream entries ≥ 50).
+- `cmd/fin-svc/main.go`: `WithServiceName("fin")`, `WithLagTable("wallet_schema.outbox")`.
+- `cmd/core-svc/main.go`: `WithServiceName("core")`, `WithLagTable("order_schema.outbox")`.
+
+Chaos test output: `chaos: n=50 db_published=50 stream_entries=50` — all rows published, no loss.
+Lag metric: `mopro.fin.outbox.lag.seconds{} = 0` when queue is empty; triggers `outbox.lag_alert` Warn log when > 60s.
+
+Next: **Prompt 3.4 — Anti-Fraud ML Pipeline**
 
 ---
 
