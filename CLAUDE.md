@@ -226,6 +226,15 @@ ADDITIONAL EXCEPTION: `internal/reconcile` may call
 when in-tx coordination is required (e.g. atomic insert of
 ledger_alerts + outbox + system_state update).
 
+ADDITIONAL EXCEPTION (Phase 3.2): `cmd/fin-svc/main.go` wires a
+`pkg/slack.Client` directly into `eventbus.NewSlackPosterAdapter` for
+DLQ alert delivery. This is the ONLY permitted direct Slack call from
+fin-svc; all other notification paths MUST go through jobs-svc. The
+Slack webhook URL is provided via `SLACK_DLQ_WEBHOOK_URL` env (no-op
+when absent). The eventbus package itself depends only on the
+`SlackPoster` interface — not on `pkg/slack` — so boundary integrity
+is preserved; only the wiring in main.go holds the concrete dependency.
+
 ---
 
 ## 6. SECURITY RULES — IMMUTABLE
