@@ -1,6 +1,7 @@
 package sipay
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,6 +23,12 @@ const (
 	webhookMaxBodyBytes   = 64 * 1024 // 64 KB
 )
 
+// webhookConfirmer is the subset of *Adapter needed by WebhookHandler.
+// Extracted to an interface so tests can inject stubs returning arbitrary event types.
+type webhookConfirmer interface {
+	ConfirmWebhook(ctx context.Context, rawBody []byte, sig string) (payment.PaymentEvent, error)
+}
+
 // WebhookHandler handles Sipay webhook POST calls with 3-layer deduplication:
 //
 //  1. Sipay HMAC-SHA512 signature verification.
@@ -33,7 +40,7 @@ const (
 // The Redis key is written AFTER the DB commit (not before) to avoid cache poisoning
 // on a failed transaction.
 type WebhookHandler struct {
-	adapter    *Adapter
+	adapter    webhookConfirmer
 	repo       payment.Repository
 	outboxRepo outbox.Repository
 	rdb        *redis.Client
@@ -56,6 +63,30 @@ func NewWebhookHandler(
 	}
 	return &WebhookHandler{
 		adapter:    adapter,
+		repo:       repo,
+		outboxRepo: outboxRepo,
+		rdb:        rdb,
+		market:     market,
+		currency:   currency,
+		log:        log,
+	}
+}
+
+// NewWebhookHandlerWithConfirmer is identical to NewWebhookHandler but accepts
+// any webhookConfirmer, enabling unit tests to inject stubs.
+func NewWebhookHandlerWithConfirmer(
+	confirmer webhookConfirmer,
+	repo payment.Repository,
+	outboxRepo outbox.Repository,
+	rdb *redis.Client,
+	market, currency string,
+	log *slog.Logger,
+) *WebhookHandler {
+	if log == nil {
+		log = slog.Default()
+	}
+	return &WebhookHandler{
+		adapter:    confirmer,
 		repo:       repo,
 		outboxRepo: outboxRepo,
 		rdb:        rdb,
@@ -95,6 +126,13 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.log.Error("sipay webhook: ConfirmWebhook", "err", err)
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Reject unknown event types before any DB or outbox work.
+	if _, known := knownPaymentEventTypes[ev.Type]; !known {
+		h.log.Warn("sipay webhook: unknown event type", "type", ev.Type, "provider_ref", ev.ProviderRef)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -195,15 +233,21 @@ func paymentStatusFromEvent(t payment.PaymentEventType) payment.PaymentStatus {
 	}
 }
 
+// knownPaymentEventTypes is the guard for the early-return check above.
+// outboxEventType must stay in sync with this set.
+var knownPaymentEventTypes = map[payment.PaymentEventType]struct{}{
+	payment.PaymentEventCaptured: {},
+	payment.PaymentEventFailed:   {},
+	payment.PaymentEventRefunded: {},
+}
+
 func outboxEventType(t payment.PaymentEventType) string {
 	switch t {
 	case payment.PaymentEventCaptured:
 		return "ecom.payment.captured.v1"
 	case payment.PaymentEventFailed:
 		return "ecom.payment.failed.v1"
-	case payment.PaymentEventRefunded:
+	default: // PaymentEventRefunded
 		return "ecom.payment.refunded.v1"
-	default:
-		return "ecom.payment.unknown.v1"
 	}
 }
