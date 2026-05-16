@@ -4,7 +4,7 @@ COMPOSE := docker compose -f deploy/docker-compose.yml
         build-core build-fin build-jobs build-migrate build-mopro run-local down-local \
         caddy-validate caddy-reload \
         test-integration-catalog test-integration-outbox test-integration-cart test-integration-order \
-        test-e2e
+        test-integration-sellerpayout test-e2e
 
 # verify chains all static checks; must pass before every push.
 verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order
@@ -110,6 +110,19 @@ test-integration-order:
 	ORDER_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
 	  go test -tags=integration -count=1 -race ./internal/order/... ; \
 	  STATUS=$$? ; docker rm -f pg-ecom-order-test ; exit $$STATUS
+
+test-integration-sellerpayout:
+	docker rm -f pg-ledger-sp-test 2>/dev/null || true
+	docker run -d --name pg-ledger-sp-test -p 6434:5432 \
+	  -e POSTGRES_USER=ledger_admin -e POSTGRES_PASSWORD=test123 \
+	  -e POSTGRES_DB=mopro_ledger postgres:16-alpine
+	sleep 3
+	for f in $$(ls deploy/postgres-ledger/init/*.sql | sort); do \
+	  docker exec -i pg-ledger-sp-test psql -U ledger_admin -d mopro_ledger < $$f || exit 1; \
+	done
+	SELLERPAYOUT_TEST_DSN=postgres://ledger_admin:test123@localhost:6434/mopro_ledger \
+	  go test -tags=integration -count=1 -race ./internal/sellerpayout/... ; \
+	  STATUS=$$? ; docker rm -f pg-ledger-sp-test ; exit $$STATUS
 
 test-e2e:
 	docker rm -f pg-ecom-e2e pg-ledger-e2e redis-e2e 2>/dev/null || true
