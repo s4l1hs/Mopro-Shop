@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync/atomic"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -13,10 +15,18 @@ import (
 	"github.com/mopro/platform/internal/outbox"
 )
 
+const sysStateTTL = 10 * time.Second
+
 type walletService struct {
 	repo       Repository
 	outboxRepo outbox.Repository
 	log        *slog.Logger
+
+	// system_state cache (Option A: DB-only with lazy + active refresh).
+	// sysReadOnly caches read_only. sysRefreshedAt records last refresh (UnixNano; 0=never).
+	// Two atomics avoid a mutex; a spurious double-refresh is benign.
+	sysReadOnly    atomic.Bool
+	sysRefreshedAt atomic.Int64
 }
 
 // NewService constructs a Service. repo and outboxRepo are wired by fin-svc/main.go
@@ -48,6 +58,14 @@ func (s *walletService) Post(ctx context.Context, in ledger.PostInput) (int64, e
 // Defensive currency check: queries all entry account currencies from pool and
 // rejects with ErrCurrencyMismatch before any write if they diverge from in.Currency.
 func (s *walletService) PostInTx(ctx context.Context, tx pgx.Tx, in ledger.PostInput) (int64, error) {
+	// ── 0. Read-only and outbox guards ──────────────────────────────────────────
+	if s.outboxRepo == nil {
+		return 0, ErrOutboxNotConfigured
+	}
+	if err := s.checkReadOnly(ctx); err != nil {
+		return 0, err
+	}
+
 	// ── 1. Validation ────────────────────────────────────────────────────────
 	if in.IdempotencyKey == "" {
 		return 0, ErrIdempotencyKeyRequired
@@ -244,6 +262,79 @@ func (s *walletService) openOrFind(ctx context.Context, accountType, ownerType s
 		return 0, fmt.Errorf("wallet: re-read after conflict: %w", err)
 	}
 	return acct.ID, nil
+}
+
+// checkReadOnly returns ErrSystemReadOnly if system_state.read_only=TRUE.
+// Uses a 10-second TTL cache to avoid hitting the DB on every PostInTx call.
+// On DB error, fails open (proceeds as if not read-only) to avoid blocking healthy writes.
+func (s *walletService) checkReadOnly(ctx context.Context) error {
+	if time.Since(time.Unix(0, s.sysRefreshedAt.Load())) < sysStateTTL {
+		if s.sysReadOnly.Load() {
+			return ErrSystemReadOnly
+		}
+		return nil
+	}
+	state, err := s.repo.GetSystemState(ctx)
+	if err != nil {
+		s.log.WarnContext(ctx, "wallet: system_state refresh failed, proceeding", "err", err)
+		return nil // fail open
+	}
+	s.sysReadOnly.Store(state.ReadOnly)
+	s.sysRefreshedAt.Store(time.Now().UnixNano())
+	if state.ReadOnly {
+		return ErrSystemReadOnly
+	}
+	return nil
+}
+
+// StartRefresher starts a background goroutine that refreshes the read-only cache
+// every 5 seconds. Must be called once from fin-svc/main.go after service construction.
+func (s *walletService) StartRefresher(ctx context.Context) {
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				state, err := s.repo.GetSystemState(ctx)
+				if err != nil {
+					s.log.WarnContext(ctx, "wallet: system_state background refresh failed", "err", err)
+					continue
+				}
+				s.sysReadOnly.Store(state.ReadOnly)
+				s.sysRefreshedAt.Store(time.Now().UnixNano())
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+// SetReadOnly marks the system as read-only. Writes to system_state and eagerly
+// updates the in-memory cache.
+func (s *walletService) SetReadOnly(ctx context.Context, reason string) error {
+	if err := s.repo.SetSystemState(ctx, nil, true, reason); err != nil {
+		return err
+	}
+	s.sysReadOnly.Store(true)
+	s.sysRefreshedAt.Store(time.Now().UnixNano())
+	return nil
+}
+
+// ClearReadOnly clears the read-only flag. Called by mopro CLI after human review.
+func (s *walletService) ClearReadOnly(ctx context.Context) error {
+	if err := s.repo.SetSystemState(ctx, nil, false, ""); err != nil {
+		return err
+	}
+	s.sysReadOnly.Store(false)
+	s.sysRefreshedAt.Store(time.Now().UnixNano())
+	return nil
+}
+
+// InvalidateReadOnlyCache forces sysRefreshedAt to 0, causing the next PostInTx call
+// to re-read system_state from DB.
+func (s *walletService) InvalidateReadOnlyCache() {
+	s.sysRefreshedAt.Store(0)
 }
 
 // outboxAggregate maps a transaction type to the outbox aggregate name.
