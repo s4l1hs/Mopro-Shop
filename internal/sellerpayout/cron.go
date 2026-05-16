@@ -2,10 +2,13 @@ package sellerpayout
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/robfig/cron/v3"
+
+	"github.com/mopro/platform/pkg/healthcheck"
 )
 
 // DailyCron wraps the daily payout cron (02:30 UTC) and the reconcile cron (every 30 min).
@@ -14,12 +17,17 @@ type DailyCron struct {
 	market   string
 	currency string
 	loc      *time.Location
+	pinger   healthcheck.Pinger
 	log      *slog.Logger
 	c        *cron.Cron
 }
 
 // NewDailyCron constructs a DailyCron. loc must be the configured timezone (e.g. UTC or Istanbul).
-func NewDailyCron(svc Service, market, currency string, loc *time.Location, log *slog.Logger) *DailyCron {
+// pinger signals job liveness to an external monitor; pass healthcheck.NewNoop() to disable.
+func NewDailyCron(svc Service, market, currency string, loc *time.Location, pinger healthcheck.Pinger, log *slog.Logger) *DailyCron {
+	if pinger == nil {
+		pinger = healthcheck.NewNoop()
+	}
 	if log == nil {
 		log = slog.Default()
 	}
@@ -28,6 +36,7 @@ func NewDailyCron(svc Service, market, currency string, loc *time.Location, log 
 		market:   market,
 		currency: currency,
 		loc:      loc,
+		pinger:   pinger,
 		log:      log,
 	}
 }
@@ -63,6 +72,8 @@ func (d *DailyCron) runDaily() {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
 	defer cancel()
 
+	d.pinger.Start(ctx)
+
 	today := time.Now().In(d.loc).Truncate(24 * time.Hour)
 	d.log.InfoContext(ctx, "sellerpayout: daily cron starting",
 		"payout_date", today.Format("2006-01-02"),
@@ -72,6 +83,7 @@ func (d *DailyCron) runDaily() {
 
 	res, err := d.svc.RunDailyPayouts(ctx, today, d.market, d.currency)
 	if err != nil {
+		d.pinger.Fail(ctx, err.Error())
 		d.log.ErrorContext(ctx, "sellerpayout: RunDailyPayouts error", "err", err)
 		return
 	}
@@ -85,6 +97,12 @@ func (d *DailyCron) runDaily() {
 		"skipped", res.Skipped,
 		"ambiguous", res.Ambiguous,
 	)
+
+	if res.Failed > 0 || res.Ambiguous > 0 {
+		d.pinger.Fail(ctx, fmt.Sprintf("failed=%d ambiguous=%d", res.Failed, res.Ambiguous))
+		return
+	}
+	d.pinger.Success(ctx)
 }
 
 func (d *DailyCron) runReconcile() {

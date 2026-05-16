@@ -166,7 +166,8 @@ func main() {
 	defer monthlyCron.Stop()
 
 	// ── Seller payout daily cron (02:30 UTC) ───────────────────────────────────
-	dailyCron := sellerpayout.NewDailyCron(payoutSvc, market, defaultCurrency, time.UTC, slog.Default())
+	payoutPinger := healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_PAYOUT_CRON_UUID"), 5*time.Second, slog.Default())
+	dailyCron := sellerpayout.NewDailyCron(payoutSvc, market, defaultCurrency, time.UTC, payoutPinger, slog.Default())
 	dailyCron.Start()
 	defer dailyCron.Stop()
 
