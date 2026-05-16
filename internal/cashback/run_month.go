@@ -84,26 +84,36 @@ func (s *cashbackService) processPlan(ctx context.Context, plan Plan, period int
 func (s *cashbackService) processPlanInTx(ctx context.Context, plan Plan, period int, asOf time.Time, equityAcctID int64, result *RunMonthResult) (bool, error) {
 	var done bool
 	err := s.repo.WithTx(ctx, pgx.Serializable, func(tx pgx.Tx) error {
-		// 1. Get or create the user's coin wallet account.
-		userAcctID, err := s.walletPoster.OpenOrFindUserWallet(ctx, plan.UserID, plan.Currency)
+		// 1. Pre-check wallet status before lazy creation.
+		//    FindAccountByOwnerAnyStatus returns (0,"",nil) when no row exists,
+		//    (id,status,nil) when found — regardless of status.
+		//    This avoids the "re-read after conflict" failure path that occurs when
+		//    OpenOrFindUserWallet tries to create an account that exists but is frozen.
+		acctID, status, err := s.walletPoster.FindAccountByOwnerAnyStatus(ctx, "user", plan.UserID, plan.Currency)
 		if err != nil {
-			return fmt.Errorf("open user wallet user=%d: %w", plan.UserID, err)
+			return fmt.Errorf("find wallet any status user=%d: %w", plan.UserID, err)
 		}
 
-		// 2. Check wallet is active (frozen wallet = skip, not fail).
-		status, err := s.repo.GetWalletAccountStatus(ctx, userAcctID)
-		if err != nil {
-			return fmt.Errorf("get wallet status account=%d: %w", userAcctID, err)
-		}
-		if status != "active" {
+		var userAcctID int64
+		switch {
+		case acctID == 0:
+			// Wallet never created — create lazily and proceed.
+			userAcctID, err = s.walletPoster.OpenOrFindUserWallet(ctx, plan.UserID, plan.Currency)
+			if err != nil {
+				return fmt.Errorf("open user wallet user=%d: %w", plan.UserID, err)
+			}
+		case status != "active":
+			// Wallet exists but is frozen/suspended — skip, do not fail.
 			s.log.InfoContext(ctx, "cashback: wallet not active, skipping",
-				"plan_id", plan.ID, "user_id", plan.UserID, "account_id", userAcctID, "status", status)
+				"plan_id", plan.ID, "user_id", plan.UserID, "account_id", acctID, "status", status)
 			result.Skipped++
 			done = true
 			return nil
+		default:
+			userAcctID = acctID
 		}
 
-		// 3. Insert payment row (SAVEPOINT guards against duplicate on re-run).
+		// 2. Insert payment row (SAVEPOINT guards against duplicate on re-run).
 		idemKey := fmt.Sprintf("cashback:%d:%d", plan.ID, period)
 		pay := Payment{
 			PlanID:         plan.ID,
@@ -124,7 +134,7 @@ func (s *cashbackService) processPlanInTx(ctx context.Context, plan Plan, period
 			return fmt.Errorf("insert payment plan=%d period=%d: %w", plan.ID, period, err)
 		}
 
-		// 4. Post ledger entries: D equity:cashback_distribution → C liability:wallet:user.
+		// 3. Post ledger entries: D equity:cashback_distribution → C liability:wallet:user.
 		postIn := ledger.PostInput{
 			Type:           "cashback_payment",
 			IdempotencyKey: idemKey,
@@ -146,12 +156,12 @@ func (s *cashbackService) processPlanInTx(ctx context.Context, plan Plan, period
 			return fmt.Errorf("PostInTx plan=%d period=%d: %w", plan.ID, period, err)
 		}
 
-		// 5. Mark payment paid.
+		// 4. Mark payment paid.
 		if err := s.repo.MarkPaymentPaid(ctx, tx, pay.ID, ledgerTxnID, asOf); err != nil {
 			return err
 		}
 
-		// 6. Stamp plan with this period so it won't be re-selected.
+		// 5. Stamp plan with this period so it won't be re-selected.
 		if err := s.repo.UpdateLastDistributedPeriod(ctx, tx, plan.ID, period); err != nil {
 			return err
 		}

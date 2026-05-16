@@ -44,6 +44,9 @@ type WalletPoster interface {
 	PostInTx(ctx context.Context, tx pgx.Tx, in ledger.PostInput) (int64, error)
 	FindAccount(ctx context.Context, accountType, currency string) (int64, error)
 	OpenOrFindUserWallet(ctx context.Context, userID int64, currency string) (int64, error)
+	// FindAccountByOwnerAnyStatus returns (id, status, nil) if the account exists
+	// regardless of status, or (0, "", nil) if it does not exist.
+	FindAccountByOwnerAnyStatus(ctx context.Context, ownerType string, ownerID int64, currency string) (int64, string, error)
 }
 
 // Repository is the storage interface of the cashback engine (fin-svc only).
@@ -62,9 +65,6 @@ type Repository interface {
 
 	// Cron path: post-payment plan stamp.
 	UpdateLastDistributedPeriod(ctx context.Context, tx pgx.Tx, planID int64, period int) error
-
-	// Cron path: wallet account status check.
-	GetWalletAccountStatus(ctx context.Context, accountID int64) (string, error)
 
 	// Transaction control.
 	// level must be pgx.Serializable for cron per-plan tx; pgx.ReadCommitted for plan creation.

@@ -15,16 +15,14 @@ import (
 // ── mock repository ───────────────────────────────────────────────────────────
 
 type mockCashbackRepo struct {
-	plans              []Plan
-	insertPaymentRet   Payment
-	insertPaymentErr   error
-	walletStatus       string
-	walletStatusErr    error
-	withTxErr          error
-	markPaidErr        error
-	markFailedErr      error
-	updatePeriodErr    error
-	lastDistribPeriod  int
+	plans             []Plan
+	insertPaymentRet  Payment
+	insertPaymentErr  error
+	withTxErr         error
+	markPaidErr       error
+	markFailedErr     error
+	updatePeriodErr   error
+	lastDistribPeriod int
 }
 
 func (m *mockCashbackRepo) InsertPlan(_ context.Context, _ pgx.Tx, p Plan) (Plan, error) {
@@ -54,9 +52,6 @@ func (m *mockCashbackRepo) UpdateLastDistributedPeriod(_ context.Context, _ pgx.
 	m.lastDistribPeriod = period
 	return m.updatePeriodErr
 }
-func (m *mockCashbackRepo) GetWalletAccountStatus(_ context.Context, _ int64) (string, error) {
-	return m.walletStatus, m.walletStatusErr
-}
 func (m *mockCashbackRepo) WithTx(_ context.Context, _ pgx.TxIsoLevel, fn func(pgx.Tx) error) error {
 	if m.withTxErr != nil {
 		return m.withTxErr
@@ -67,15 +62,20 @@ func (m *mockCashbackRepo) WithTx(_ context.Context, _ pgx.TxIsoLevel, fn func(p
 // ── mock WalletPoster ─────────────────────────────────────────────────────────
 
 type mockWalletPoster struct {
-	postTxnID      int64
-	postErr        error
-	findAccountID  int64
-	findAccountErr error
-	openWalletID   int64
-	openWalletErr  error
+	postTxnID             int64
+	postErr               error
+	findAccountID         int64
+	findAccountErr        error
+	openWalletID          int64
+	openWalletErr         error
+	findByOwnerAnyID      int64
+	findByOwnerAnyStat    string
+	findByOwnerAnyErr     error
+	postCalled            bool
 }
 
 func (m *mockWalletPoster) PostInTx(_ context.Context, _ pgx.Tx, _ ledger.PostInput) (int64, error) {
+	m.postCalled = true
 	return m.postTxnID, m.postErr
 }
 func (m *mockWalletPoster) FindAccount(_ context.Context, _, _ string) (int64, error) {
@@ -83,6 +83,9 @@ func (m *mockWalletPoster) FindAccount(_ context.Context, _, _ string) (int64, e
 }
 func (m *mockWalletPoster) OpenOrFindUserWallet(_ context.Context, _ int64, _ string) (int64, error) {
 	return m.openWalletID, m.openWalletErr
+}
+func (m *mockWalletPoster) FindAccountByOwnerAnyStatus(_ context.Context, _ string, _ int64, _ string) (int64, string, error) {
+	return m.findByOwnerAnyID, m.findByOwnerAnyStat, m.findByOwnerAnyErr
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -129,7 +132,7 @@ func TestRunMonth_NoPlansDue(t *testing.T) {
 
 func TestRunMonth_HappyPath(t *testing.T) {
 	plan := activePlan(1, 100)
-	repo := &mockCashbackRepo{plans: []Plan{plan}, walletStatus: "active"}
+	repo := &mockCashbackRepo{plans: []Plan{plan}}
 	wp := &mockWalletPoster{findAccountID: 10, openWalletID: 20, postTxnID: 99}
 	svc := newCronSvc(repo, wp)
 
@@ -147,8 +150,14 @@ func TestRunMonth_HappyPath(t *testing.T) {
 
 func TestRunMonth_WalletFrozen_Skipped(t *testing.T) {
 	plan := activePlan(1, 100)
-	repo := &mockCashbackRepo{plans: []Plan{plan}, walletStatus: "frozen"}
-	wp := &mockWalletPoster{findAccountID: 10, openWalletID: 20}
+	repo := &mockCashbackRepo{plans: []Plan{plan}}
+	// FindAccountByOwnerAnyStatus returns frozen account → skip without PostInTx.
+	wp := &mockWalletPoster{
+		findAccountID:      10,
+		openWalletID:       20,
+		findByOwnerAnyID:   20,
+		findByOwnerAnyStat: "frozen",
+	}
 	svc := newCronSvc(repo, wp)
 
 	res, err := svc.RunMonth(context.Background(), 202607, time.Now(), "TRY_COIN")
@@ -158,21 +167,31 @@ func TestRunMonth_WalletFrozen_Skipped(t *testing.T) {
 	if res.Skipped != 1 || res.Processed != 0 {
 		t.Fatalf("want skipped=1 processed=0, got %+v", res)
 	}
+	if wp.postCalled {
+		t.Fatal("PostInTx must not be called for frozen wallet")
+	}
 }
 
-func TestRunMonth_WalletMissing_Skipped(t *testing.T) {
+func TestRunMonth_WalletDoesNotExist_LazilyCreated(t *testing.T) {
 	plan := activePlan(1, 100)
-	// GetWalletAccountStatus returns "" (account not found) → treated as not active → skip
-	repo := &mockCashbackRepo{plans: []Plan{plan}, walletStatus: ""}
-	wp := &mockWalletPoster{findAccountID: 10, openWalletID: 20}
+	repo := &mockCashbackRepo{plans: []Plan{plan}}
+	// FindAccountByOwnerAnyStatus returns (0,"",nil) → wallet not yet created →
+	// OpenOrFindUserWallet is called → wallet created lazily → payment processed.
+	wp := &mockWalletPoster{
+		findAccountID:      10,
+		openWalletID:       20,
+		findByOwnerAnyID:   0,
+		findByOwnerAnyStat: "",
+		postTxnID:          99,
+	}
 	svc := newCronSvc(repo, wp)
 
 	res, err := svc.RunMonth(context.Background(), 202607, time.Now(), "TRY_COIN")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if res.Skipped != 1 {
-		t.Fatalf("want skipped=1, got %+v", res)
+	if res.Processed != 1 {
+		t.Fatalf("want processed=1 (lazy create), got %+v", res)
 	}
 }
 
@@ -180,7 +199,6 @@ func TestRunMonth_DuplicatePayment_Skipped(t *testing.T) {
 	plan := activePlan(1, 100)
 	repo := &mockCashbackRepo{
 		plans:            []Plan{plan},
-		walletStatus:     "active",
 		insertPaymentErr: ErrPaymentAlreadyExists,
 	}
 	wp := &mockWalletPoster{findAccountID: 10, openWalletID: 20}
@@ -197,7 +215,7 @@ func TestRunMonth_DuplicatePayment_Skipped(t *testing.T) {
 
 func TestRunMonth_PostInTxError_Failed(t *testing.T) {
 	plan := activePlan(1, 100)
-	repo := &mockCashbackRepo{plans: []Plan{plan}, walletStatus: "active"}
+	repo := &mockCashbackRepo{plans: []Plan{plan}}
 	wp := &mockWalletPoster{
 		findAccountID: 10,
 		openWalletID:  20,
@@ -227,7 +245,7 @@ func TestRunMonth_FindEquityAccountError_ReturnsError(t *testing.T) {
 
 func TestRunMonth_MultiplePlans(t *testing.T) {
 	plans := []Plan{activePlan(1, 101), activePlan(2, 102), activePlan(3, 103)}
-	repo := &mockCashbackRepo{plans: plans, walletStatus: "active"}
+	repo := &mockCashbackRepo{plans: plans}
 	wp := &mockWalletPoster{findAccountID: 10, openWalletID: 20, postTxnID: 99}
 	svc := newCronSvc(repo, wp)
 

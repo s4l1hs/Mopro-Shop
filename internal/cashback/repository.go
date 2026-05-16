@@ -224,23 +224,6 @@ func (r *pgxCashbackRepository) UpdateLastDistributedPeriod(ctx context.Context,
 	return nil
 }
 
-// GetWalletAccountStatus reads the status of a wallet_schema.accounts row.
-// Cross-schema read is permitted: cashback and wallet share postgres-ledger.
-// Returns "" if the account does not exist.
-func (r *pgxCashbackRepository) GetWalletAccountStatus(ctx context.Context, accountID int64) (string, error) {
-	var status string
-	err := r.pool.QueryRow(ctx,
-		`SELECT status FROM wallet_schema.accounts WHERE id = $1`,
-		accountID,
-	).Scan(&status)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return "", nil
-		}
-		return "", fmt.Errorf("cashback: GetWalletAccountStatus account=%d: %w", accountID, err)
-	}
-	return status, nil
-}
 
 func isSerializationFailure(err error) bool {
 	var pgErr *pgconn.PgError
