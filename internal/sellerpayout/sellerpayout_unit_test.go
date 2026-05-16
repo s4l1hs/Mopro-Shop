@@ -206,6 +206,56 @@ func strFromInt(n int64) string {
 	return fmt.Sprintf("%d", n)
 }
 
+// ── trackingRepo — records which repo methods are called inside WithTx ────────
+
+// trackingRepo embeds mockPayoutRepo and records every repository method call
+// that occurs while a WithTx callback is executing. Used to verify that
+// SchedulePayoutsForOrder's WithTx block contains ONLY InsertPayout.
+type trackingRepo struct {
+	*mockPayoutRepo
+	inTx    bool
+	txCalls []string // method names called while inTx==true
+}
+
+func (r *trackingRepo) WithTx(ctx context.Context, level pgx.TxIsoLevel, fn func(pgx.Tx) error) error {
+	r.inTx = true
+	r.txCalls = nil
+	err := fn(nil)
+	r.inTx = false
+	return err
+}
+
+func (r *trackingRepo) recordTx(name string) {
+	if r.inTx {
+		r.txCalls = append(r.txCalls, name)
+	}
+}
+
+func (r *trackingRepo) InsertPayout(ctx context.Context, tx pgx.Tx, p Payout) (Payout, error) {
+	r.recordTx("InsertPayout")
+	return r.mockPayoutRepo.InsertPayout(ctx, tx, p)
+}
+
+func (r *trackingRepo) InsertBatch(ctx context.Context, tx pgx.Tx, b PayoutBatch) (PayoutBatch, error) {
+	r.recordTx("InsertBatch")
+	return r.mockPayoutRepo.InsertBatch(ctx, tx, b)
+}
+
+func (r *trackingRepo) UpdatePayoutBatchID(ctx context.Context, tx pgx.Tx, payoutID, batchID int64) error {
+	r.recordTx("UpdatePayoutBatchID")
+	return r.mockPayoutRepo.UpdatePayoutBatchID(ctx, tx, payoutID, batchID)
+}
+
+func (r *trackingRepo) UpdateBatchPaid(ctx context.Context, tx pgx.Tx, batchID, ledgerTxnID int64, pspTransferID string, paidAt time.Time) error {
+	r.recordTx("UpdateBatchPaid")
+	return r.mockPayoutRepo.UpdateBatchPaid(ctx, tx, batchID, ledgerTxnID, pspTransferID, paidAt)
+}
+
+func (r *trackingRepo) MarkPayoutsPaidByBatch(ctx context.Context, tx pgx.Tx, batchID int64) error {
+	r.recordTx("MarkPayoutsPaidByBatch")
+	return r.mockPayoutRepo.MarkPayoutsPaidByBatch(ctx, tx, batchID)
+}
+
 // ── SchedulePayoutsForOrder ────────────────────────────────────────────────────
 
 func TestSchedulePayoutsForOrder_NoPreviousPayouts(t *testing.T) {
@@ -253,6 +303,46 @@ func TestSchedulePayoutsForOrder_NoItems(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("empty items should not error: %v", err)
+	}
+}
+
+// TestSchedulePayoutsForOrder_TxContainsOnlyInsert enforces the INVARIANT that
+// the WithTx block in SchedulePayoutsForOrder contains ONLY InsertPayout calls.
+// Any other write inside that tx would be silently discarded on a concurrent
+// retry (when ErrPayoutAlreadyExists aborts the tx).
+func TestSchedulePayoutsForOrder_TxContainsOnlyInsert(t *testing.T) {
+	repo := &trackingRepo{mockPayoutRepo: &mockPayoutRepo{}}
+	svc := newSvc(repo, &mockWalletPoster{}, &mockPsp{})
+
+	err := svc.SchedulePayoutsForOrder(context.Background(), OrderDeliveredEvent{
+		OrderID:     42,
+		DeliveredAt: time.Now(),
+		Market:      "TR",
+		Currency:    "TRY",
+		Items: []DeliveredItem{
+			{SellerID: 10, SellerNetMinor: 500},
+			{SellerID: 11, SellerNetMinor: 750},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Only InsertPayout is permitted inside the transaction.
+	for _, call := range repo.txCalls {
+		if call != "InsertPayout" {
+			t.Errorf("forbidden repo call inside WithTx: %q — only InsertPayout is permitted; "+
+				"any other write would be silently rolled back on concurrent retry", call)
+		}
+	}
+	// Two sellers → exactly two InsertPayout calls.
+	var insertCount int
+	for _, call := range repo.txCalls {
+		if call == "InsertPayout" {
+			insertCount++
+		}
+	}
+	if insertCount != 2 {
+		t.Errorf("expected 2 InsertPayout calls inside WithTx (one per seller), got %d", insertCount)
 	}
 }
 

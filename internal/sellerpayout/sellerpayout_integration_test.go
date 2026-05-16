@@ -478,3 +478,76 @@ func TestPayoutIntegration_ConcurrentSchedule_Idempotent(t *testing.T) {
 		t.Errorf("want 1 payout row, got %d (idempotency violated)", count)
 	}
 }
+
+// TestSchedulePayoutsForOrder_ConcurrentNoSideEffectLoss verifies the tx-invariant
+// from service.go: the WithTx block writes ONLY seller_payouts INSERT rows — no
+// payout_batches, no outbox events — even under 5-way concurrent execution.
+// If other writes were inside the tx, they would be rolled back on the losing
+// goroutines (ErrPayoutAlreadyExists aborts the tx) and the counts would be <5.
+func TestSchedulePayoutsForOrder_ConcurrentNoSideEffectLoss(t *testing.T) {
+	pool := setupPool(t)
+	svc := setupService(t, pool, &shadowPsp{})
+	ctx := context.Background()
+
+	orderID := uniqueID()
+	sellerA, sellerB := uniqueID(), uniqueID()
+
+	ev := sellerpayout.OrderDeliveredEvent{
+		OrderID:     orderID,
+		DeliveredAt: time.Now().AddDate(0, 0, -5),
+		Market:      "TR",
+		Currency:    "TRY",
+		Items: []sellerpayout.DeliveredItem{
+			{SellerID: sellerA, SellerNetMinor: 1000},
+			{SellerID: sellerB, SellerNetMinor: 2000},
+		},
+	}
+
+	const goroutines = 5
+	var wg sync.WaitGroup
+	errs := make([]error, goroutines)
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			errs[idx] = svc.SchedulePayoutsForOrder(ctx, ev)
+		}(i)
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Errorf("goroutine %d: unexpected error: %v", i, err)
+		}
+	}
+
+	// Exactly 2 payout rows — one per seller regardless of goroutine count.
+	var payoutCount int
+	pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM commission_schema.seller_payouts WHERE order_id=$1`, orderID,
+	).Scan(&payoutCount)
+	if payoutCount != 2 {
+		t.Errorf("want 2 payout rows (1 per seller), got %d", payoutCount)
+	}
+
+	// 0 payout_batches rows — scheduling does not create batches.
+	var batchCount int
+	pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM commission_schema.payout_batches WHERE seller_id IN ($1,$2)`,
+		sellerA, sellerB,
+	).Scan(&batchCount)
+	if batchCount != 0 {
+		t.Errorf("want 0 payout_batches rows (SchedulePayoutsForOrder must not create batches), got %d", batchCount)
+	}
+
+	// 0 outbox events — scheduling does not write outbox entries.
+	// (The batch ledger flow writes outbox; this method does not.)
+	var outboxCount int
+	pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM wallet_schema.outbox WHERE idempotency_key LIKE $1`,
+		fmt.Sprintf("payout:order_%d%%", orderID),
+	).Scan(&outboxCount)
+	if outboxCount != 0 {
+		t.Errorf("want 0 outbox rows (SchedulePayoutsForOrder must not write outbox), got %d", outboxCount)
+	}
+}
