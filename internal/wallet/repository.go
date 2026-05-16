@@ -52,6 +52,8 @@ func (r *walletRepository) WithTx(ctx context.Context, level pgx.TxIsoLevel, fn 
 
 // InsertTransaction inserts a wallet_schema.transactions row within tx.
 // Returns (0, ledger.ErrDuplicateIdempotency) on UNIQUE constraint violation (23505).
+// Uses a SAVEPOINT so that a 23505 error does not abort the outer transaction;
+// the caller can then look up the existing txnID and commit the (no-op) tx cleanly.
 func (r *walletRepository) InsertTransaction(ctx context.Context, tx pgx.Tx, txn ledger.Transaction) (int64, error) {
 	var id int64
 	var fxPairID *string
@@ -62,6 +64,11 @@ func (r *walletRepository) InsertTransaction(ctx context.Context, tx pgx.Tx, txn
 	if txn.Reference != "" {
 		reference = &txn.Reference
 	}
+
+	if _, err := tx.Exec(ctx, "SAVEPOINT insert_txn"); err != nil {
+		return 0, fmt.Errorf("wallet: savepoint: %w", err)
+	}
+
 	err := tx.QueryRow(ctx,
 		`INSERT INTO wallet_schema.transactions (type, reference, fx_pair_id, idempotency_key)
 		 VALUES ($1, $2, $3, $4)
@@ -69,11 +76,17 @@ func (r *walletRepository) InsertTransaction(ctx context.Context, tx pgx.Tx, txn
 		txn.Type, reference, fxPairID, txn.IdempotencyKey,
 	).Scan(&id)
 	if err != nil {
+		// Always roll back to the savepoint to keep the outer tx healthy.
+		_, _ = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT insert_txn")
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return 0, ledger.ErrDuplicateIdempotency
 		}
 		return 0, fmt.Errorf("wallet: insert transaction: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, "RELEASE SAVEPOINT insert_txn"); err != nil {
+		return 0, fmt.Errorf("wallet: release savepoint: %w", err)
 	}
 	return id, nil
 }

@@ -14,14 +14,17 @@ import (
 )
 
 type walletService struct {
-	repo      Repository
+	repo       Repository
 	outboxRepo outbox.Repository
-	log       *slog.Logger
+	log        *slog.Logger
 }
 
 // NewService constructs a Service. repo and outboxRepo are wired by fin-svc/main.go
-// at startup; no globals or service-locator patterns.
+// at startup; no globals or service-locator patterns. A nil log falls back to slog.Default().
 func NewService(repo Repository, outboxRepo outbox.Repository, log *slog.Logger) Service {
+	if log == nil {
+		log = slog.Default()
+	}
 	return &walletService{repo: repo, outboxRepo: outboxRepo, log: log}
 }
 
