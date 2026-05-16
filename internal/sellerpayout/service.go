@@ -2,6 +2,7 @@ package sellerpayout
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -68,18 +69,16 @@ func (s *payoutService) SchedulePayoutsForOrder(ctx context.Context, ev OrderDel
 	unlockAt := timex.AddBusinessDays(ev.DeliveredAt, 3, cal)
 
 	// 3. Insert one payout row per seller in a single transaction.
-	return s.repo.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
+	// If a concurrent worker beat us to it, InsertPayout returns ErrPayoutAlreadyExists
+	// which aborts the tx; WithTx rolls it back and returns that error — treat as success.
+	// All sellers for a given order are inserted atomically, so any conflict means the
+	// entire set was already committed by a previous attempt.
+	err = s.repo.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
 		for sellerID, netMinor := range bySellerNet {
 			if netMinor <= 0 {
 				continue
 			}
 			idempKey := fmt.Sprintf("payout:order_%d:seller_%d", ev.OrderID, sellerID)
-
-			// Idempotency: skip if already exists.
-			if _, findErr := s.repo.FindPayoutByKey(ctx, idempKey); findErr == nil {
-				continue
-			}
-
 			p := Payout{
 				OrderID:        ev.OrderID,
 				SellerID:       sellerID,
@@ -91,12 +90,16 @@ func (s *payoutService) SchedulePayoutsForOrder(ctx context.Context, ev OrderDel
 				Market:         ev.Market,
 				IdempotencyKey: idempKey,
 			}
-			if _, txErr := s.repo.InsertPayout(ctx, tx, p); txErr != nil {
-				return txErr
+			if _, insertErr := s.repo.InsertPayout(ctx, tx, p); insertErr != nil {
+				return insertErr
 			}
 		}
 		return nil
 	})
+	if errors.Is(err, ErrPayoutAlreadyExists) {
+		return nil
+	}
+	return err
 }
 
 // RunDailyPayouts — see run_daily.go.

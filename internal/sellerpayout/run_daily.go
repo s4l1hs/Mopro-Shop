@@ -12,9 +12,8 @@ import (
 )
 
 const (
-	dailyBatchSize       = 200
-	escrowAcctType       = "asset:bank:escrow"
-	sellerPayableAcctType = "liability:seller_payable"
+	dailyBatchSize = 200
+	escrowAcctType = "asset:bank:escrow"
 )
 
 // runDailyPayouts is the core implementation of Service.RunDailyPayouts.
@@ -237,6 +236,9 @@ func (s *payoutService) runTx2(
 
 		if markErr := s.repo.UpdateBatchPaid(ctx, tx, batchID, ledgerTxnID, pspTransferID, now); markErr != nil {
 			return fmt.Errorf("UpdateBatchPaid batch=%d: %w", batchID, markErr)
+		}
+		if markErr := s.repo.MarkPayoutsPaidByBatch(ctx, tx, batchID); markErr != nil {
+			return fmt.Errorf("MarkPayoutsPaidByBatch batch=%d: %w", batchID, markErr)
 		}
 		return nil
 	})

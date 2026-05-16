@@ -133,6 +133,20 @@ func seedScheduledPayouts(t *testing.T, pool *pgxpool.Pool, sellerID int64, coun
 	return ids
 }
 
+// cancelStaleScheduledPayouts marks any pre-existing 'scheduled' payouts as 'cancelled'
+// so they don't bleed into the current test's RunDailyPayouts call.
+// Safe to call at the start of any test that invokes RunDailyPayouts.
+func cancelStaleScheduledPayouts(t *testing.T, pool *pgxpool.Pool) {
+	t.Helper()
+	_, err := pool.Exec(context.Background(),
+		`UPDATE commission_schema.seller_payouts
+		 SET status='cancelled', updated_at=now()
+		 WHERE status='scheduled'`)
+	if err != nil {
+		t.Fatalf("cancelStaleScheduledPayouts: %v", err)
+	}
+}
+
 // paymentExists checks whether commission_schema.payout_batches has a paid row for seller+date.
 func batchPaidExists(t *testing.T, pool *pgxpool.Pool, sellerID int64, payoutDate time.Time) bool {
 	t.Helper()
@@ -155,6 +169,8 @@ func TestPayoutIntegration_BatchAggregation(t *testing.T) {
 	psp := &shadowPsp{}
 	svc := setupService(t, pool, psp)
 	ctx := context.Background()
+
+	cancelStaleScheduledPayouts(t, pool)
 
 	sellerID := uniqueID()
 	payoutDate := time.Now().UTC().Truncate(24 * time.Hour)
@@ -367,6 +383,8 @@ func TestPayoutIntegration_FraudHoldMidProcessing(t *testing.T) {
 func TestPayoutIntegration_BatchingAggregation_VaryingN(t *testing.T) {
 	pool := setupPool(t)
 	ctx := context.Background()
+
+	cancelStaleScheduledPayouts(t, pool)
 
 	const iterations = 20 // reduced from 500 for CI speed; property still holds
 

@@ -86,6 +86,8 @@ func (m *mockPayoutRepo) UpdateBatchPaid(_ context.Context, _ pgx.Tx, _, _ int64
 	return m.updateBatchPaidErr
 }
 
+func (m *mockPayoutRepo) MarkPayoutsPaidByBatch(_ context.Context, _ pgx.Tx, _ int64) error { return nil }
+
 func (m *mockPayoutRepo) UpdateBatchStatus(_ context.Context, _ int64, status BatchStatus, _ string) error {
 	m.lastBatchStatus = status
 	return m.updateBatchStatusErr

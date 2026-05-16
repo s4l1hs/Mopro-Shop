@@ -168,6 +168,16 @@ func (r *pgxPayoutRepository) UpdateBatchPaid(ctx context.Context, tx pgx.Tx, ba
 	return err
 }
 
+func (r *pgxPayoutRepository) MarkPayoutsPaidByBatch(ctx context.Context, tx pgx.Tx, batchID int64) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE commission_schema.seller_payouts
+		 SET status='paid', updated_at=now()
+		 WHERE batch_id=$1 AND status='scheduled'`,
+		batchID,
+	)
+	return err
+}
+
 func (r *pgxPayoutRepository) UpdateBatchStatus(ctx context.Context, batchID int64, status BatchStatus, lastError string) error {
 	_, err := r.pool.Exec(ctx,
 		`UPDATE commission_schema.payout_batches
@@ -276,11 +286,12 @@ type pgxScanner interface {
 func (r *pgxPayoutRepository) scanPayout(row pgxScanner) (Payout, error) {
 	var p Payout
 	var statusStr string
+	var pspTransferID, lastError *string
 	err := row.Scan(
 		&p.ID, &p.OrderID, &p.SellerID, &p.AmountMinor, &p.Currency,
-		&p.DeliveredAt, &p.UnlockAt, &p.PaidAt, &p.PspTransferID, &statusStr,
+		&p.DeliveredAt, &p.UnlockAt, &p.PaidAt, &pspTransferID, &statusStr,
 		&p.Market, &p.LedgerTransactionID, &p.IdempotencyKey, &p.BatchID,
-		&p.AttemptCount, &p.LastAttemptAt, &p.LastError,
+		&p.AttemptCount, &p.LastAttemptAt, &lastError,
 		&p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
@@ -290,16 +301,23 @@ func (r *pgxPayoutRepository) scanPayout(row pgxScanner) (Payout, error) {
 		return Payout{}, err
 	}
 	p.Status = PayoutStatus(statusStr)
+	if pspTransferID != nil {
+		p.PspTransferID = *pspTransferID
+	}
+	if lastError != nil {
+		p.LastError = *lastError
+	}
 	return p, nil
 }
 
 func (r *pgxPayoutRepository) scanBatch(row pgxScanner) (PayoutBatch, error) {
 	var b PayoutBatch
 	var statusStr string
+	var pspTransferID, lastError *string
 	err := row.Scan(
 		&b.ID, &b.SellerID, &b.Currency, &b.PayoutDate, &b.TotalAmountMinor,
-		&b.PspTransferID, &statusStr, &b.LedgerTransactionID, &b.PaidAt,
-		&b.IdempotencyKey, &b.AttemptCount, &b.LastAttemptAt, &b.LastError,
+		&pspTransferID, &statusStr, &b.LedgerTransactionID, &b.PaidAt,
+		&b.IdempotencyKey, &b.AttemptCount, &b.LastAttemptAt, &lastError,
 		&b.Market, &b.CreatedAt, &b.UpdatedAt,
 	)
 	if err != nil {
@@ -309,5 +327,11 @@ func (r *pgxPayoutRepository) scanBatch(row pgxScanner) (PayoutBatch, error) {
 		return PayoutBatch{}, err
 	}
 	b.Status = BatchStatus(statusStr)
+	if pspTransferID != nil {
+		b.PspTransferID = *pspTransferID
+	}
+	if lastError != nil {
+		b.LastError = *lastError
+	}
 	return b, nil
 }

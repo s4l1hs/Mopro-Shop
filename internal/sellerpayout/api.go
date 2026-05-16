@@ -93,6 +93,10 @@ type Repository interface {
 	// UpdateBatchPaid atomically marks the batch paid + records the ledger tx ID (Tx2).
 	UpdateBatchPaid(ctx context.Context, tx pgx.Tx, batchID, ledgerTxnID int64, pspTransferID string, paidAt time.Time) error
 
+	// MarkPayoutsPaidByBatch updates all seller_payouts linked to batchID from
+	// 'scheduled' to 'paid', preventing them from being re-fetched on future cron runs.
+	MarkPayoutsPaidByBatch(ctx context.Context, tx pgx.Tx, batchID int64) error
+
 	// UpdateBatchStatus marks the batch with a terminal or escalation status.
 	UpdateBatchStatus(ctx context.Context, batchID int64, status BatchStatus, lastError string) error
 
