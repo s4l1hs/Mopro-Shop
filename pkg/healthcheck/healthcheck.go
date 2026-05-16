@@ -23,6 +23,19 @@ type Pinger interface {
 	Fail(ctx context.Context, msg string)
 }
 
+// NewNoop returns a Pinger that silently discards all calls.
+func NewNoop() Pinger { return noopPinger{} }
+
+// NewFromUUID constructs a Pinger from a bare healthchecks.io UUID.
+// The full ping URL is built as https://hc-ping.com/<uuid>.
+// If uuid is empty, a no-op Pinger is returned.
+func NewFromUUID(uuid string, timeout time.Duration, log *slog.Logger) Pinger {
+	if uuid == "" {
+		return NewNoop()
+	}
+	return New("https://hc-ping.com/"+uuid, timeout, log)
+}
+
 // New returns a Pinger that sends HTTP GET requests to baseURL.
 // If baseURL is empty, a no-op implementation is returned.
 // timeout applies per HTTP call; 5 s is a safe default.
