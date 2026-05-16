@@ -1165,34 +1165,31 @@ Report: file list, property test output, sample payout schedule.
 
 ---
 
-## Prompt 2.4 — Hourly Per-Currency Reconciliation Cron + Cashback/Payout Sanity Checks
+## Prompt 2.4 — Weekly Ledger Reconciliation Cron (Phase 2.4)
 
-**Phase & Goal:** Phase 2. The reconciliation script that, every hour, verifies per-currency D=C and cashback obligation/payout sums match.
+// v7.1: shell scripts replaced by fin-svc Go cron for outbox + role parity.
+// See Phase 2.4 reconciliation report for full justification.
+// Checks 3/4/5 (escrow, seller_payable, user wallet) deferred to Phase 5.
+
+**Phase & Goal:** Phase 2. The weekly reconciliation cron (Go, inside fin-svc) that verifies
+per-currency D=C and cashback obligation sums match. Implemented as `internal/reconcile.WeeklyCron`.
 
 **Copy-Paste Prompt:**
 
 ```
-READ FIRST: LEDGER_GUIDE.md § 9.
+READ FIRST: LEDGER_GUIDE.md § 9, CLAUDE.md §5 (cross-schema exception for internal/reconcile).
 
-Implement /scripts/ledger-reconcile.sh per LEDGER_GUIDE.md § 9.2 verbatim.
-Add weekly /scripts/cashback-sanity.sh verifying:
-  SELECT SUM(amount_minor) FROM cashback_schema.payments WHERE status='paid'
-  ==
-  SELECT SUM(le.amount_minor)
-    FROM wallet_schema.ledger_entries le
-    JOIN wallet_schema.transactions t ON t.id = le.transaction_id
-    WHERE t.type='cashback_payment' AND le.direction='D'
-And /scripts/seller-payout-sanity.sh similarly for type='seller_payout'.
+The reconcile cron runs in internal/reconcile.WeeklyCron, scheduled "0 5 3 * * 0"
+(Sundays 03:05 Europe/Istanbul). Connects as reconcile_user (RECONCILE_DATABASE_URL).
 
-Wire all three into cron:
-  /etc/cron.d/mopro-reconcile
-    5 *  * * * deploy /opt/mopro/scripts/ledger-reconcile.sh
-    0 4  * * 0 deploy /opt/mopro/scripts/cashback-sanity.sh
-    15 4 * * 0 deploy /opt/mopro/scripts/seller-payout-sanity.sh
+On any invariant failure:
+  1. Inserts a ledger_alerts row (always, for audit) with alert_type='reconciliation_drift'.
+  2. Updates wallet_schema.system_state SET read_only=TRUE (if LEDGER_RECONCILE_DRY_RUN=false).
+  3. Triggers PagerDuty via PAGERDUTY_ROUTING_KEY + PAGERDUTY_API.
+  4. Emits fin.reconciliation.drift_critical.v1 outbox event.
+  5. wallet.PostInTx returns ErrSystemReadOnly until: mopro clear-read-only.
 
-If any returns non-zero: PagerDuty trigger + fin-svc to read-only.
-
-Report: scripts, cron file, sample dry-run.
+Report: implementation, test output, build output.
 ```
 
 ---

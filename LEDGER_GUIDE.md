@@ -732,40 +732,24 @@ The seller panel renders the comparison table from this endpoint's response. The
 
 The trigger above. Always on. DO NOT disable.
 
-### 9.2 Hourly per-currency reconcile
+### 9.2 Weekly ledger reconcile (Phase 2.4)
 
-`/opt/mopro/scripts/ledger-reconcile.sh`, cron `5 * * * *`:
+v7.1 deviation: The shell script has been replaced by a Go cron inside fin-svc
+for outbox + role parity. See Phase 2.4 implementation report for justification.
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
+The reconcile cron runs in `internal/reconcile.WeeklyCron`, scheduled "0 5 3 * * 0"
+(Sundays 03:05 Europe/Istanbul). It connects as `reconcile_user` (RECONCILE_DATABASE_URL).
 
-# Per-currency reconcile: every currency MUST balance independently.
-DIFFS=$(docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger -tAc \
-  "SELECT a.currency || '|' ||
-          COALESCE(SUM(CASE WHEN le.direction='D' THEN le.amount_minor ELSE -le.amount_minor END), 0)
-   FROM wallet_schema.ledger_entries le
-   JOIN wallet_schema.accounts a ON a.id = le.account_id
-   GROUP BY a.currency
-   HAVING COALESCE(SUM(CASE WHEN le.direction='D' THEN le.amount_minor ELSE -le.amount_minor END), 0) != 0")
+On any invariant failure:
+  1. Inserts a ledger_alerts row (always, for audit) with alert_type='reconciliation_drift'.
+  2. Updates wallet_schema.system_state SET read_only=TRUE (if LEDGER_RECONCILE_DRY_RUN=false).
+  3. Triggers PagerDuty via PAGERDUTY_ROUTING_KEY + PAGERDUTY_API.
+  4. Emits fin.reconciliation.drift_critical.v1 outbox event.
+  5. wallet.PostInTx returns ErrSystemReadOnly until operator runs: mopro clear-read-only.
 
-if [ -n "$DIFFS" ]; then
-    while IFS='|' read -r CUR DELTA; do
-        docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger -c \
-          "INSERT INTO wallet_schema.ledger_alerts(severity, message, detected_at)
-           VALUES ('CRITICAL', 'Currency '||quote_literal('$CUR')||' delta='||'$DELTA', now())"
-
-        curl -X POST "$PAGERDUTY_API" -H "Content-Type: application/json" \
-          -d "{\"event_action\":\"trigger\",\"payload\":{\"summary\":\"LEDGER VIOLATION currency=$CUR delta=$DELTA\",\"severity\":\"critical\"}}"
-    done <<< "$DIFFS"
-
-    docker exec fin-svc /app/app set-read-only --reason "ledger-invariant"
-fi
-
-curl -sf "https://hc-ping.com/$HEALTHCHECK_LEDGER_RECONCILE_UUID"
-```
-
-When the hourly reconcile sees a delta ≠ 0 for ANY currency, fin-svc is forced into read-only and on-call is paged.
+The CLI subcommand `mopro set-read-only --reason X` writes the same
+wallet_schema.system_state row that the reconcile cron writes programmatically.
+`mopro clear-read-only` restores normal operation after human review.
 
 ### 9.3 Daily audit
 
