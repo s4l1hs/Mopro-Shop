@@ -1271,14 +1271,30 @@ Configure fin-svc.event-consumer with TWO Redis consumer groups on stream ecom.o
 
 Both groups use XREADGROUP COUNT 100 BLOCK 5000.
 Both handlers MUST be idempotent (per their own key structure).
-On handler error: XACK is NOT called → message redelivered after timeout (5 min); after 3 deliveries, move to DLQ.
+On handler error: XACK is NOT called → message stays in PEL for redelivery.
+XAUTOCLAIM goroutine per consumer group: reclaims messages idle > 5 min from crashed consumers.
+Attempt counter: wallet_schema.event_delivery_attempts records every dispatch outcome.
+After 3 failures on the same message: WARN log "DLQ candidate (not yet inserted — Phase 3.2)".
+
+[v7.1 deviation: DLQ insertion (XACK to break retry loop, event_dlq table, Slack alert)
+ is deferred to Phase 3.2. Phase 3.1 ships XAUTOCLAIM + attempt counter + WARN-at-3.]
 
 Add integration test: simulate one delivered event for an order with 3 items from 2 sellers.
-Assert:
-  - 1 cashback plan row created
-  - 24 cashback payment rows created
-  - 2 seller_payout rows created (one per seller)
-  - Re-emit the SAME event → no new rows in either table
+Assert (v6 perpetual model):
+  - 1 cashback plan row created (status='active')
+  - 0 cashback payment rows created (payments fire from monthly cron, NOT at plan creation)
+  - 2 seller_payout rows created (one per seller, status='scheduled')
+  - event_delivery_attempts: >= 2 success rows (one per consumer group)
+Re-emit the SAME event:
+  - All counts unchanged (idempotency holds)
+Run cashback monthly cron once:
+  - cashback_payments: COUNT = 1 (status='paid')
+Run cashback monthly cron again same period:
+  - cashback_payments: still COUNT = 1 (idempotent — plan already distributed this period)
+
+NOTE: "24 cashback payment rows" in the original spec was pre-v6 fixed-term model.
+In the v6 PERPETUAL model there is NO total_payments pre-allocation. 0 rows at plan creation
+is the CORRECT invariant. See CLAUDE.md § 4.7 (PERPETUAL MODEL, no end_date, no fixed term).
 
 Report: configuration, test output, Redis XINFO GROUPS output.
 ```
