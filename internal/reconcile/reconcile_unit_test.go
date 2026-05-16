@@ -60,6 +60,7 @@ func (m *mockRepo) WithTx(_ context.Context, fn func(pgx.Tx) error) error {
 	}
 	return fn(nil)
 }
+func (m *mockRepo) CleanupOldAttempts(_ context.Context) (int, error) { return 0, nil }
 
 // ── mock SystemStateSetter ─────────────────────────────────────────────────────
 
@@ -249,6 +250,7 @@ func (r *repoWithCallCount) InsertAlertWithOutboxAndState(_ context.Context, _ p
 func (r *repoWithCallCount) WithTx(_ context.Context, fn func(pgx.Tx) error) error {
 	return fn(nil)
 }
+func (r *repoWithCallCount) CleanupOldAttempts(_ context.Context) (int, error) { return 0, nil }
 
 // ── Test 6: check1 runs before check2 ─────────────────────────────────────────
 
@@ -290,6 +292,7 @@ func (r *orderedRepo) InsertAlertWithOutboxAndState(_ context.Context, _ pgx.Tx,
 	return 0, nil
 }
 func (r *orderedRepo) WithTx(_ context.Context, fn func(pgx.Tx) error) error { return fn(nil) }
+func (r *orderedRepo) CleanupOldAttempts(_ context.Context) (int, error)     { return 0, nil }
 
 // ── Test 7: pagerduty Trigger verifies routing_key + dedup_key ─────────────
 
