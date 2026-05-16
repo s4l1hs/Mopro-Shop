@@ -33,6 +33,11 @@ type Repository interface {
 	// period_yyyymm. Cross-schema SQL approved under CLAUDE.md §5 exception.
 	Check2CashbackBackward(ctx context.Context, periodYYYYMM int) (paymentsTotal, ledgerTotal int64, err error)
 
+	// CleanupOldAttempts deletes event_delivery_attempts rows older than 7 days.
+	// Called at the end of RunWeekly. reconcile_user must have DELETE on the table
+	// (granted by migration 73).
+	CleanupOldAttempts(ctx context.Context) (int, error)
+
 	// HasUnacknowledgedAlert returns true if an unacknowledged alert exists for the
 	// given alert_type and dedup_key (stored in context->>'dedup_key').
 	HasUnacknowledgedAlert(ctx context.Context, alertType, dedupKey string) (bool, error)

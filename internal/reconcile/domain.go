@@ -22,7 +22,8 @@ type ReconcileAlert struct {
 
 // WeeklyResult summarises one RunWeekly execution.
 type WeeklyResult struct {
-	AsOf           time.Time
-	AlertsInserted int
-	Errors         []error
+	AsOf              time.Time
+	AlertsInserted    int
+	AttemptsCleanedUp int // rows deleted from event_delivery_attempts (> 7 days old)
+	Errors            []error
 }

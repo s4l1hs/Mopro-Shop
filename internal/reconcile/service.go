@@ -59,6 +59,19 @@ func (s *reconcileService) RunWeekly(ctx context.Context, asOf time.Time) (Weekl
 		s.log.InfoContext(ctx, "reconcile: all invariants pass",
 			"as_of", asOf.Format("2006-01-02"))
 	}
+
+	// Maintenance: delete event_delivery_attempts rows older than 7 days.
+	// Runs in both dry_run and live modes (operational cleanup, not a financial write).
+	cleaned, cleanErr := s.repo.CleanupOldAttempts(ctx)
+	if cleanErr != nil {
+		result.Errors = append(result.Errors, fmt.Errorf("cleanup attempts: %w", cleanErr))
+	} else {
+		result.AttemptsCleanedUp = cleaned
+		if cleaned > 0 {
+			s.log.InfoContext(ctx, "reconcile: cleaned stale attempt rows", "count", cleaned)
+		}
+	}
+
 	return result, nil
 }
 

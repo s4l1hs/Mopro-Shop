@@ -179,3 +179,14 @@ func (r *pgxReconcileRepository) InsertAlertWithOutboxAndState(ctx context.Conte
 
 	return alertID, nil
 }
+
+// CleanupOldAttempts deletes event_delivery_attempts rows older than 7 days.
+// reconcile_user requires DELETE on wallet_schema.event_delivery_attempts (migration 73).
+func (r *pgxReconcileRepository) CleanupOldAttempts(ctx context.Context) (int, error) {
+	tag, err := r.pool.Exec(ctx,
+		`DELETE FROM wallet_schema.event_delivery_attempts WHERE attempt_at < now() - INTERVAL '7 days'`)
+	if err != nil {
+		return 0, fmt.Errorf("reconcile: cleanup attempts: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}
