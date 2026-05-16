@@ -19,6 +19,7 @@ import (
 	"github.com/mopro/platform/internal/eventbus"
 	"github.com/mopro/platform/internal/outbox"
 	"github.com/mopro/platform/internal/sellerpayout"
+	"github.com/mopro/platform/internal/sellerpayout/sipay"
 	"github.com/mopro/platform/internal/wallet"
 	"github.com/mopro/platform/pkg/healthcheck"
 	"github.com/mopro/platform/pkg/timex"
@@ -75,7 +76,16 @@ func main() {
 
 	// ── Seller payout engine ─────────────────────────────────────────────────
 	payoutRepo := sellerpayout.NewRepository(pool)
-	payoutSvc := sellerpayout.NewService(payoutRepo, calLoader, defaultCurrency)
+	pspMode := sipay.Mode(os.Getenv("SELLERPAYOUT_PSP_MODE")) // default "" → shadow
+	sipayClient := sipay.New(
+		pspMode,
+		os.Getenv("SIPAY_BASE_URL"),
+		os.Getenv("SIPAY_APP_KEY"),
+		os.Getenv("SIPAY_APP_SECRET"),
+		os.Getenv("SIPAY_APP_ID"),
+		slog.Default(),
+	)
+	payoutSvc := sellerpayout.NewService(payoutRepo, walletSvc, sipayClient, calLoader, defaultCurrency, slog.Default())
 
 	// ── Outbox publisher — drains wallet_schema.outbox → Redis Streams ───────
 	pub, err := outbox.NewPublisher(pool, cashbackOutbox, bus, slog.Default())
@@ -96,10 +106,20 @@ func main() {
 		}
 	}()
 
-	// ── Start sellerpayout consumer goroutine ────────────────────────────────
+	// ── Start sellerpayout consumer goroutines ───────────────────────────────
 	go func() {
 		if err := sellerpayout.StartConsumer(ctx, bus, payoutSvc); err != nil && !errors.Is(err, context.Canceled) {
-			slog.Error("fin-svc: sellerpayout consumer exited unexpectedly", "err", err)
+			slog.Error("fin-svc: sellerpayout order consumer exited unexpectedly", "err", err)
+		}
+	}()
+	go func() {
+		if err := sellerpayout.StartPspOnboardedConsumer(ctx, bus, payoutSvc); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("fin-svc: sellerpayout psp_onboarded consumer exited unexpectedly", "err", err)
+		}
+	}()
+	go func() {
+		if err := sellerpayout.StartFraudHoldConsumer(ctx, bus, payoutSvc); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("fin-svc: sellerpayout fraud_hold consumer exited unexpectedly", "err", err)
 		}
 	}()
 
@@ -114,6 +134,11 @@ func main() {
 	monthlyCron := cashback.NewMonthlyCron(cashbackSvc, cronMarkets, istanbulLoc, hcPinger, slog.Default())
 	monthlyCron.Start()
 	defer monthlyCron.Stop()
+
+	// ── Seller payout daily cron (02:30 UTC) + reconcile (every 30 min) ───────
+	dailyCron := sellerpayout.NewDailyCron(payoutSvc, market, defaultCurrency, time.UTC, slog.Default())
+	dailyCron.Start()
+	defer dailyCron.Stop()
 
 	// ── HTTP server ──────────────────────────────────────────────────────────
 	mux := http.NewServeMux()
