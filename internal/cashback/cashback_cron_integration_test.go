@@ -5,6 +5,7 @@ package cashback_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
 	"sync"
@@ -58,6 +59,7 @@ func newCronTestSvc(t *testing.T, pool *pgxpool.Pool) cashback.Service {
 // Returns the plan ID.
 func seedCronPlan(t *testing.T, pool *pgxpool.Pool, userID int64, currency string, startDate time.Time, status string) int64 {
 	t.Helper()
+	uniqueID := cronUniqueID()
 	var id int64
 	err := pool.QueryRow(context.Background(), `
 		INSERT INTO cashback_schema.plans
@@ -67,8 +69,8 @@ func seedCronPlan(t *testing.T, pool *pgxpool.Pool, userID int64, currency strin
 		VALUES ($1, $2, 500, $3, 5000, $4, $5,
 		        now()-interval '5 days', 'TR', '[]'::jsonb, $6)
 		RETURNING id`,
-		cronUniqueID(), userID, currency, startDate.Format("2006-01-02"), status,
-		"cron:test:plan:"+currency+":"+startDate.Format("20060102")+":"+cron_idStr(),
+		uniqueID, userID, currency, startDate.Format("2006-01-02"), status,
+		fmt.Sprintf("cron:test:plan:%d", uniqueID),
 	).Scan(&id)
 	if err != nil {
 		t.Fatalf("seedCronPlan: %v", err)
@@ -76,7 +78,7 @@ func seedCronPlan(t *testing.T, pool *pgxpool.Pool, userID int64, currency strin
 	return id
 }
 
-// cronUniqueID produces a unique int64 order_id per call.
+// cronUniqueID produces a globally unique int64 per call (epoch-ms base).
 var (
 	cronIDBase    = time.Now().UnixMilli()
 	cronIDCounter int64
@@ -85,11 +87,6 @@ var (
 func cronUniqueID() int64 {
 	n := atomic.AddInt64(&cronIDCounter, 1)
 	return cronIDBase*1_000_000 + n
-}
-
-func cron_idStr() string {
-	n := atomic.AddInt64(&cronIDCounter, 1)
-	return "x" + string(rune('0'+n%10))
 }
 
 func paymentExists(t *testing.T, pool *pgxpool.Pool, planID int64, period int) bool {

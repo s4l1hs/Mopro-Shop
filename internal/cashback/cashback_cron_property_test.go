@@ -53,8 +53,8 @@ func propCronSvc(pool *pgxpool.Pool) cashback.Service {
 
 func seedPropPlan(t *testing.T, pool *pgxpool.Pool, userID int64, currency string, startDate time.Time) int64 {
 	t.Helper()
+	uniqueID := propUniqueID()
 	var id int64
-	suffix := propUniqueID()
 	err := pool.QueryRow(context.Background(), `
 		INSERT INTO cashback_schema.plans
 		    (order_id, user_id, monthly_amount_minor, currency,
@@ -63,8 +63,8 @@ func seedPropPlan(t *testing.T, pool *pgxpool.Pool, userID int64, currency strin
 		VALUES ($1, $2, 500, $3, 5000, $4, 'active',
 		        now()-interval '5 days', 'TR', '[]'::jsonb, $5)
 		RETURNING id`,
-		suffix, userID, currency, startDate.Format("2006-01-02"),
-		fmt.Sprintf("prop:cron:plan:%d", suffix),
+		uniqueID, userID, currency, startDate.Format("2006-01-02"),
+		fmt.Sprintf("prop:cron:plan:%d", uniqueID),
 	).Scan(&id)
 	if err != nil {
 		t.Fatalf("seedPropPlan: %v", err)
