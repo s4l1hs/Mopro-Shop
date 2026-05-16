@@ -160,7 +160,7 @@ func main() {
 	reconcileSvc := reconcile.NewService(reconcileRepo, pd, walletSvc, dryRun, slog.Default())
 
 	cronMarkets := buildCronMarkets(market, cashbackCurrency)
-	hcPinger := healthcheck.New(os.Getenv("CASHBACK_CRON_HEALTHCHECK_URL"), 5*time.Second, slog.Default())
+	hcPinger := healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_CASHBACK_CRON_UUID"), 5*time.Second, slog.Default())
 	monthlyCron := cashback.NewMonthlyCron(cashbackSvc, cronMarkets, istanbulLoc, hcPinger, slog.Default())
 	monthlyCron.Start()
 	defer monthlyCron.Stop()
