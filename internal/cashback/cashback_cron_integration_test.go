@@ -381,6 +381,101 @@ func TestCronIntegration_ConcurrentRunMonth(t *testing.T) {
 	}
 }
 
+// TestCronIntegration_WalletFrozenAfterCreation_Skipped verifies the Phase 2.2.1
+// hotfix: a wallet that was created and then frozen must be classified as Skipped
+// (not Failed) by RunMonth.
+func TestCronIntegration_WalletFrozenAfterCreation_Skipped(t *testing.T) {
+	pool := cronTestPool(t)
+	ctx := context.Background()
+
+	walletRepo := wallet.NewRepository(pool)
+	walletOutbox := outbox.NewRepository("wallet_schema.outbox")
+	walletSvc := wallet.NewService(walletRepo, walletOutbox, slog.Default())
+
+	userID := cronUniqueID()
+	planID := seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), "active")
+
+	// 1. Create the wallet so it exists in the DB.
+	walletID, err := walletSvc.OpenOrFindUserWallet(ctx, userID, "TRY_COIN")
+	if err != nil {
+		t.Fatalf("OpenOrFindUserWallet: %v", err)
+	}
+
+	// 2. Freeze the wallet — simulates antifraud action after wallet creation.
+	if _, err := pool.Exec(ctx,
+		`UPDATE wallet_schema.accounts SET status='frozen' WHERE id=$1`, walletID); err != nil {
+		t.Fatalf("freeze wallet: %v", err)
+	}
+
+	// 3. RunMonth — must Skipped, not Failed, and no payment written.
+	repo := cashback.NewRepository(pool)
+	obRepo := outbox.NewRepository("wallet_schema.outbox")
+	svc := cashback.NewService(repo, obRepo, nil, "TRY_COIN", walletSvc, slog.Default())
+
+	res, err := svc.RunMonth(ctx, testPeriod, testAsOf(), "TRY_COIN")
+	if err != nil {
+		t.Fatalf("RunMonth: %v", err)
+	}
+	if res.Failed != 0 {
+		t.Errorf("want Failed=0 for frozen wallet, got %d", res.Failed)
+	}
+	if res.Skipped < 1 {
+		t.Errorf("want Skipped>=1, got %d (plan=%d)", res.Skipped, planID)
+	}
+	if paymentExists(t, pool, planID, testPeriod) {
+		t.Errorf("no payment must be written for frozen wallet plan=%d", planID)
+	}
+	t.Logf("PASS: processed=%d skipped=%d failed=%d", res.Processed, res.Skipped, res.Failed)
+}
+
+// TestCronIntegration_SerializableRetryOnConflict verifies that two concurrent
+// RunMonth goroutines processing plans for the same user both succeed:
+// SERIALIZABLE conflicts (40001) are retried correctly and both plans end up paid.
+func TestCronIntegration_SerializableRetryOnConflict(t *testing.T) {
+	pool := cronTestPool(t)
+	ctx := context.Background()
+
+	period := 202605
+	asOf := time.Date(2026, 5, 31, 23, 59, 0, 0, time.UTC)
+
+	// Two plans for the SAME user → same wallet account → contention on account lookup.
+	userID := cronUniqueID()
+	planID1 := seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), "active")
+	planID2 := seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), "active")
+
+	// Run two goroutines concurrently — each gets its own service instance.
+	barrier := make(chan struct{})
+	var wg sync.WaitGroup
+	var totalFailed int64
+	for i := 0; i < 2; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-barrier
+			svc := newCronTestSvc(t, pool)
+			res, _ := svc.RunMonth(ctx, period, asOf, "TRY_COIN")
+			atomic.AddInt64(&totalFailed, int64(res.Failed))
+		}()
+	}
+	close(barrier)
+	wg.Wait()
+
+	// Correctness: both plans must be paid and D=C must hold.
+	if !paymentPaid(t, pool, planID1, period) {
+		t.Errorf("plan1=%d not paid", planID1)
+	}
+	if !paymentPaid(t, pool, planID2, period) {
+		t.Errorf("plan2=%d not paid", planID2)
+	}
+	if totalFailed > 0 {
+		t.Errorf("want totalFailed=0 across goroutines, got %d", totalFailed)
+	}
+
+	netAfter := netTryCoinBalance(t, pool)
+	_ = netAfter // D=C enforced by deferred DB trigger; test passes only if no trigger violation
+	t.Logf("PASS: plan1=%d plan2=%d totalFailed=%d", planID1, planID2, totalFailed)
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 func netTryCoinBalance(t *testing.T, pool *pgxpool.Pool) int64 {

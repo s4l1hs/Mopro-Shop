@@ -195,6 +195,31 @@ func TestRunMonth_WalletDoesNotExist_LazilyCreated(t *testing.T) {
 	}
 }
 
+func TestRunMonth_WalletFrozenViaGetAccount_Skipped(t *testing.T) {
+	plan := activePlan(1, 100)
+	repo := &mockCashbackRepo{plans: []Plan{plan}}
+	// Wallet exists but is suspended (non-active status other than "frozen") —
+	// confirms the status != "active" check covers all non-active states.
+	wp := &mockWalletPoster{
+		findAccountID:      10,
+		openWalletID:       20,
+		findByOwnerAnyID:   20,
+		findByOwnerAnyStat: "suspended",
+	}
+	svc := newCronSvc(repo, wp)
+
+	res, err := svc.RunMonth(context.Background(), 202607, time.Now(), "TRY_COIN")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.Skipped != 1 || res.Processed != 0 || res.Failed != 0 {
+		t.Fatalf("want skipped=1 processed=0 failed=0, got %+v", res)
+	}
+	if wp.postCalled {
+		t.Fatal("PostInTx must not be called for suspended wallet")
+	}
+}
+
 func TestRunMonth_DuplicatePayment_Skipped(t *testing.T) {
 	plan := activePlan(1, 100)
 	repo := &mockCashbackRepo{
