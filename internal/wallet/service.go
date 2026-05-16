@@ -181,6 +181,25 @@ func (s *walletService) FindOrOpenSellerPayable(ctx context.Context, sellerID in
 	return s.openOrFind(ctx, "liability:payable:seller", "seller", sellerID, currency)
 }
 
+// FindAccountByOwnerAnyStatus looks up a per-entity account without filtering by status.
+// Returns (0, "", nil) when the account does not exist (zero-value convention).
+// Returns (id, status, nil) when found; caller uses status to distinguish "frozen" from "active".
+func (s *walletService) FindAccountByOwnerAnyStatus(ctx context.Context, ownerType string, ownerID int64, currency string) (int64, string, error) {
+	acct, err := s.repo.FindAccountByOwnerAnyStatus(ctx, ownerType, ownerID, currency)
+	if err != nil {
+		if errors.Is(err, ErrAccountNotFound) {
+			return 0, "", nil
+		}
+		return 0, "", err
+	}
+	return acct.ID, acct.Status, nil
+}
+
+// GetAccount fetches an account row by primary key regardless of status.
+func (s *walletService) GetAccount(ctx context.Context, accountID int64) (Account, error) {
+	return s.repo.GetAccount(ctx, accountID)
+}
+
 // openOrFind is the shared lazy-create pattern used by OpenOrFindUserWallet and
 // FindOrOpenSellerPayable. Thread-safe via ON CONFLICT accounts_owner_currency_uq.
 func (s *walletService) openOrFind(ctx context.Context, accountType, ownerType string, ownerID int64, currency string) (int64, error) {

@@ -47,6 +47,15 @@ type Service interface {
 	// FindOrOpenSellerPayable returns the accountID of the seller's fiat payable
 	// account. Creates it lazily if it does not exist.
 	FindOrOpenSellerPayable(ctx context.Context, sellerID int64, currency string) (int64, error)
+
+	// FindAccountByOwnerAnyStatus looks up a per-entity account by (ownerType, ownerID, currency)
+	// regardless of status. Returns (0, "", nil) when no row exists for the triple.
+	// Returns (id, status, nil) when found. Use to distinguish "frozen" from "never created".
+	FindAccountByOwnerAnyStatus(ctx context.Context, ownerType string, ownerID int64, currency string) (int64, string, error)
+
+	// GetAccount fetches a wallet_schema.accounts row by primary key, regardless of
+	// status. Returns ErrAccountNotFound if no row exists.
+	GetAccount(ctx context.Context, accountID int64) (Account, error)
 }
 
 // Repository defines the storage interface of the wallet module.
@@ -78,7 +87,18 @@ type Repository interface {
 	FindAccountByType(ctx context.Context, accountType, currency string) (Account, error)
 
 	// FindAccountByOwner looks up a per-entity account by (ownerType, ownerID, currency).
+	// Only returns accounts with status='active'.
 	FindAccountByOwner(ctx context.Context, ownerType string, ownerID int64, currency string) (Account, error)
+
+	// FindAccountByOwnerAnyStatus is like FindAccountByOwner but does NOT filter by
+	// status. Returns ErrAccountNotFound if no row exists for the triple.
+	// Use when the caller needs to distinguish between "frozen/suspended" (account
+	// exists but not active) and "never created" (no row at all).
+	FindAccountByOwnerAnyStatus(ctx context.Context, ownerType string, ownerID int64, currency string) (Account, error)
+
+	// GetAccount fetches a wallet_schema.accounts row by primary key, regardless of
+	// status. Returns ErrAccountNotFound if no row exists.
+	GetAccount(ctx context.Context, accountID int64) (Account, error)
 
 	// InsertAccount inserts a new accounts row. Returns (0, nil) when an
 	// ON CONFLICT (accounts_owner_currency_uq) occurs so the caller can re-SELECT.

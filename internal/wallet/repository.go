@@ -193,6 +193,49 @@ func (r *walletRepository) FindAccountByOwner(ctx context.Context, ownerType str
 	return acct, nil
 }
 
+// FindAccountByOwnerAnyStatus looks up a per-entity account by (ownerType, ownerID, currency)
+// without filtering by status. Returns ErrAccountNotFound if no row exists.
+func (r *walletRepository) FindAccountByOwnerAnyStatus(ctx context.Context, ownerType string, ownerID int64, currency string) (Account, error) {
+	var acct Account
+	var dbOwnerID *int64
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, type, owner_type, owner_id, currency, status, created_at
+		 FROM wallet_schema.accounts
+		 WHERE owner_type = $1 AND owner_id = $2 AND currency = $3
+		 LIMIT 1`,
+		ownerType, ownerID, currency,
+	).Scan(&acct.ID, &acct.Type, &acct.OwnerType, &dbOwnerID, &acct.Currency, &acct.Status, &acct.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Account{}, ErrAccountNotFound
+		}
+		return Account{}, fmt.Errorf("wallet: FindAccountByOwnerAnyStatus: %w", err)
+	}
+	acct.OwnerID = dbOwnerID
+	return acct, nil
+}
+
+// GetAccount fetches a wallet_schema.accounts row by primary key, regardless of status.
+// Returns ErrAccountNotFound if no row exists.
+func (r *walletRepository) GetAccount(ctx context.Context, accountID int64) (Account, error) {
+	var acct Account
+	var dbOwnerID *int64
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, type, owner_type, owner_id, currency, status, created_at
+		 FROM wallet_schema.accounts
+		 WHERE id = $1`,
+		accountID,
+	).Scan(&acct.ID, &acct.Type, &acct.OwnerType, &dbOwnerID, &acct.Currency, &acct.Status, &acct.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Account{}, ErrAccountNotFound
+		}
+		return Account{}, fmt.Errorf("wallet: GetAccount id=%d: %w", accountID, err)
+	}
+	acct.OwnerID = dbOwnerID
+	return acct, nil
+}
+
 // InsertAccount inserts a new per-entity account row within tx.
 // Uses ON CONFLICT accounts_owner_currency_uq DO NOTHING for race safety.
 // Returns (0, nil) when another goroutine already created the account (caller re-SELECTs).

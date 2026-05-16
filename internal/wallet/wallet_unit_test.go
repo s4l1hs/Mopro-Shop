@@ -14,23 +14,27 @@ import (
 // ── mock repository ───────────────────────────────────────────────────────────
 
 type mockRepo struct {
-	insertTxnID      int64
-	insertTxnErr     error
-	getTxnID         int64
-	getTxnErr        error
-	insertEntryErr   error
-	getCurrencies    map[int64]string
-	getCurrErr       error
-	findByTypeAcct   Account
-	findByTypeErr    error
-	findByOwnerAcct  Account
-	findByOwnerErr   error
-	insertAcctID     int64
-	insertAcctErr    error
-	balanceMV        int64
-	balanceMVErr     error
-	balanceStrict    int64
-	balanceStrictErr error
+	insertTxnID           int64
+	insertTxnErr          error
+	getTxnID              int64
+	getTxnErr             error
+	insertEntryErr        error
+	getCurrencies         map[int64]string
+	getCurrErr            error
+	findByTypeAcct        Account
+	findByTypeErr         error
+	findByOwnerAcct       Account
+	findByOwnerErr        error
+	findByOwnerAnyAcct    Account
+	findByOwnerAnyErr     error
+	getAccountAcct        Account
+	getAccountErr         error
+	insertAcctID          int64
+	insertAcctErr         error
+	balanceMV             int64
+	balanceMVErr          error
+	balanceStrict         int64
+	balanceStrictErr      error
 }
 
 func (m *mockRepo) WithTx(ctx context.Context, level pgx.TxIsoLevel, fn func(pgx.Tx) error) error {
@@ -53,6 +57,12 @@ func (m *mockRepo) FindAccountByType(_ context.Context, _, _ string) (Account, e
 }
 func (m *mockRepo) FindAccountByOwner(_ context.Context, _ string, _ int64, _ string) (Account, error) {
 	return m.findByOwnerAcct, m.findByOwnerErr
+}
+func (m *mockRepo) FindAccountByOwnerAnyStatus(_ context.Context, _ string, _ int64, _ string) (Account, error) {
+	return m.findByOwnerAnyAcct, m.findByOwnerAnyErr
+}
+func (m *mockRepo) GetAccount(_ context.Context, _ int64) (Account, error) {
+	return m.getAccountAcct, m.getAccountErr
 }
 func (m *mockRepo) InsertAccount(_ context.Context, _ pgx.Tx, _ Account) (int64, error) {
 	return m.insertAcctID, m.insertAcctErr
