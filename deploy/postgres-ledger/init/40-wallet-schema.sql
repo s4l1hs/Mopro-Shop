@@ -21,10 +21,20 @@ CREATE INDEX accounts_owner_idx          ON wallet_schema.accounts(owner_type, o
 CREATE INDEX accounts_type_currency_idx  ON wallet_schema.accounts(type, currency);
 
 -- Unique index for platform (non-per-entity) accounts to support idempotent seeding.
--- Per-user and per-seller accounts are keyed by (type, currency, owner_id) via application logic.
+-- owner_type = 'platform', owner_id IS NULL → one account per (type, currency).
 CREATE UNIQUE INDEX accounts_platform_type_currency_uq
     ON wallet_schema.accounts(type, currency)
     WHERE owner_type = 'platform' AND owner_id IS NULL;
+
+-- Unique index for per-entity accounts (user wallets, seller payables).
+-- Required by wallet.OpenOrFindUserWallet and wallet.FindOrOpenSellerPayable so that
+-- ON CONFLICT (type, owner_type, owner_id, currency) WHERE owner_id IS NOT NULL
+-- resolves correctly during concurrent lazy-create races.
+-- owner_type = 'user'   → 'liability:wallet:user'    per user per coin currency
+-- owner_type = 'seller' → 'liability:payable:seller' per seller per fiat currency
+CREATE UNIQUE INDEX IF NOT EXISTS accounts_owner_currency_uq
+    ON wallet_schema.accounts(type, owner_type, owner_id, currency)
+    WHERE owner_id IS NOT NULL;
 
 -- ── transactions ──────────────────────────────────────────────────────────────
 CREATE TABLE wallet_schema.transactions (
