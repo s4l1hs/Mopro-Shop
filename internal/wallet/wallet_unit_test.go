@@ -35,6 +35,9 @@ type mockRepo struct {
 	balanceMVErr          error
 	balanceStrict         int64
 	balanceStrictErr      error
+	sysState              SystemState
+	sysStateErr           error
+	setSysStateCalled     bool
 }
 
 func (m *mockRepo) WithTx(ctx context.Context, level pgx.TxIsoLevel, fn func(pgx.Tx) error) error {
@@ -74,9 +77,10 @@ func (m *mockRepo) GetBalanceStrict(_ context.Context, _ int64) (int64, error) {
 	return m.balanceStrict, m.balanceStrictErr
 }
 func (m *mockRepo) GetSystemState(_ context.Context) (SystemState, error) {
-	return SystemState{}, nil
+	return m.sysState, m.sysStateErr
 }
 func (m *mockRepo) SetSystemState(_ context.Context, _ pgx.Tx, _ bool, _ string) error {
+	m.setSysStateCalled = true
 	return nil
 }
 
@@ -300,6 +304,83 @@ func TestFindAccount_NotFound(t *testing.T) {
 	_, err := svc.FindAccount(context.Background(), "no:such:type", "TRY")
 	if !errors.Is(err, ErrAccountNotFound) {
 		t.Fatalf("want ErrAccountNotFound, got %v", err)
+	}
+}
+
+// ── read-only guard tests ────────────────────────────────────────────────────
+
+func TestPostInTx_ErrOutboxNotConfigured(t *testing.T) {
+	repo := &mockRepo{getCurrencies: map[int64]string{1: "TRY", 2: "TRY"}}
+	// nil outboxRepo triggers ErrOutboxNotConfigured before any other work
+	svc := NewService(repo, nil, nil)
+	in := ledger.PostInput{
+		IdempotencyKey: "k", Currency: "TRY",
+		Entries: []ledger.Entry{
+			{AccountID: 1, Direction: ledger.Debit, AmountMinor: 100},
+			{AccountID: 2, Direction: ledger.Credit, AmountMinor: 100},
+		},
+	}
+	_, err := svc.PostInTx(context.Background(), nil, in)
+	if !errors.Is(err, ErrOutboxNotConfigured) {
+		t.Fatalf("want ErrOutboxNotConfigured, got %v", err)
+	}
+}
+
+func TestPostInTx_ErrSystemReadOnly(t *testing.T) {
+	repo := &mockRepo{
+		getCurrencies: map[int64]string{1: "TRY", 2: "TRY"},
+		sysState:      SystemState{ReadOnly: true, ReadOnlyReason: "test"},
+	}
+	svc := NewService(repo, &mockOutbox{}, nil)
+	in := ledger.PostInput{
+		IdempotencyKey: "k", Currency: "TRY",
+		Entries: []ledger.Entry{
+			{AccountID: 1, Direction: ledger.Debit, AmountMinor: 100},
+			{AccountID: 2, Direction: ledger.Credit, AmountMinor: 100},
+		},
+	}
+	_, err := svc.PostInTx(context.Background(), nil, in)
+	if !errors.Is(err, ErrSystemReadOnly) {
+		t.Fatalf("want ErrSystemReadOnly, got %v", err)
+	}
+}
+
+func TestSetReadOnly_EagerCache(t *testing.T) {
+	repo := &mockRepo{}
+	svc := NewService(repo, &mockOutbox{}, nil).(*walletService)
+	if err := svc.SetReadOnly(context.Background(), "test reason"); err != nil {
+		t.Fatalf("SetReadOnly: %v", err)
+	}
+	if !svc.sysReadOnly.Load() {
+		t.Fatal("sysReadOnly should be true after SetReadOnly")
+	}
+	if !repo.setSysStateCalled {
+		t.Fatal("SetSystemState should have been called on repo")
+	}
+}
+
+func TestClearReadOnly_EagerCache(t *testing.T) {
+	repo := &mockRepo{}
+	svc := NewService(repo, &mockOutbox{}, nil).(*walletService)
+	// Pre-set to true
+	svc.sysReadOnly.Store(true)
+	if err := svc.ClearReadOnly(context.Background()); err != nil {
+		t.Fatalf("ClearReadOnly: %v", err)
+	}
+	if svc.sysReadOnly.Load() {
+		t.Fatal("sysReadOnly should be false after ClearReadOnly")
+	}
+}
+
+func TestInvalidateReadOnlyCache_ForcesRefresh(t *testing.T) {
+	repo := &mockRepo{sysState: SystemState{ReadOnly: false}}
+	svc := NewService(repo, &mockOutbox{}, nil).(*walletService)
+	// Set a non-zero refreshed time so cache is considered warm
+	svc.sysRefreshedAt.Store(99999999999999)
+	// Invalidate the cache
+	svc.InvalidateReadOnlyCache()
+	if svc.sysRefreshedAt.Load() != 0 {
+		t.Fatal("sysRefreshedAt should be 0 after InvalidateReadOnlyCache")
 	}
 }
 
