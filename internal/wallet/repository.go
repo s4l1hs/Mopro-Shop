@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -292,6 +293,53 @@ func (r *walletRepository) GetBalanceStrict(ctx context.Context, accountID int64
 		return 0, fmt.Errorf("wallet: GetBalanceStrict account=%d: %w", accountID, err)
 	}
 	return balance, nil
+}
+
+// GetSystemState reads the singleton system_state row (id=1) from the pool.
+// Returns a zero-value SystemState{ReadOnly: false} if no row exists (safe default).
+func (r *walletRepository) GetSystemState(ctx context.Context) (SystemState, error) {
+	var s SystemState
+	var reason *string
+	var since *time.Time
+	err := r.pool.QueryRow(ctx,
+		`SELECT read_only, read_only_reason, read_only_since
+         FROM wallet_schema.system_state WHERE id = 1`,
+	).Scan(&s.ReadOnly, &reason, &since)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Should never happen after migration 67 seed. Fail safe: not read-only.
+			return SystemState{}, nil
+		}
+		return SystemState{}, fmt.Errorf("wallet: GetSystemState: %w", err)
+	}
+	if reason != nil {
+		s.ReadOnlyReason = *reason
+	}
+	if since != nil {
+		s.ReadOnlySince = since
+	}
+	return s, nil
+}
+
+// SetSystemState atomically sets read_only + reason + since in a single UPDATE WHERE id=1.
+// If tx is nil, executes against the pool directly.
+func (r *walletRepository) SetSystemState(ctx context.Context, tx pgx.Tx, readOnly bool, reason string) error {
+	q := `UPDATE wallet_schema.system_state
+          SET read_only        = $1,
+              read_only_reason = CASE WHEN $1 THEN $2 ELSE NULL END,
+              read_only_since  = CASE WHEN $1 THEN now() ELSE NULL END,
+              updated_at       = now()
+          WHERE id = 1`
+	var err error
+	if tx != nil {
+		_, err = tx.Exec(ctx, q, readOnly, reason)
+	} else {
+		_, err = r.pool.Exec(ctx, q, readOnly, reason)
+	}
+	if err != nil {
+		return fmt.Errorf("wallet: SetSystemState: %w", err)
+	}
+	return nil
 }
 
 func isSerializationFailure(err error) bool {

@@ -6,11 +6,19 @@ package wallet
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mopro/platform/internal/ledger"
 )
+
+// SystemState is the singleton read-only flag row from wallet_schema.system_state.
+type SystemState struct {
+	ReadOnly       bool
+	ReadOnlyReason string     // empty when ReadOnly=false
+	ReadOnlySince  *time.Time // nil when ReadOnly=false
+}
 
 // Service defines the public interface of the wallet module.
 // cashback and sellerpayout MUST call only these methods; they must NEVER
@@ -56,6 +64,23 @@ type Service interface {
 	// GetAccount fetches a wallet_schema.accounts row by primary key, regardless of
 	// status. Returns ErrAccountNotFound if no row exists.
 	GetAccount(ctx context.Context, accountID int64) (Account, error)
+
+	// SetReadOnly marks the system as read-only. Writes to system_state and eagerly
+	// updates the in-memory cache. Called by reconcile cron and mopro CLI.
+	SetReadOnly(ctx context.Context, reason string) error
+
+	// ClearReadOnly clears the read-only flag. Called by mopro CLI after human review.
+	ClearReadOnly(ctx context.Context) error
+
+	// InvalidateReadOnlyCache forces sysRefreshedAt to 0, causing the next PostInTx call
+	// to re-read system_state from DB. Called by reconcile service after the WithTx
+	// that writes system_state commits (so the eager cache update happens post-commit).
+	InvalidateReadOnlyCache()
+
+	// StartRefresher starts a background goroutine that refreshes the read-only cache
+	// every 5 seconds. Must be called once from fin-svc/main.go after service construction.
+	// No-op implementations satisfy test mocks.
+	StartRefresher(ctx context.Context)
 }
 
 // Repository defines the storage interface of the wallet module.
@@ -110,4 +135,13 @@ type Repository interface {
 
 	// GetBalanceStrict computes live balance from wallet_schema.ledger_entries.
 	GetBalanceStrict(ctx context.Context, accountID int64) (int64, error)
+
+	// GetSystemState reads the singleton system_state row from the pool (not tx).
+	// The seed row (id=1) always exists after migration 67; pgx.ErrNoRows is not expected.
+	GetSystemState(ctx context.Context) (SystemState, error)
+
+	// SetSystemState atomically sets read_only + reason + since in a single UPDATE WHERE id=1.
+	// Accepts an optional pgx.Tx; if tx is nil, executes against the pool directly.
+	// The tx parameter is required when the call must be atomic with other writes (OQ4).
+	SetSystemState(ctx context.Context, tx pgx.Tx, readOnly bool, reason string) error
 }
