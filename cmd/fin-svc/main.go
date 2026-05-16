@@ -172,7 +172,8 @@ func main() {
 	defer dailyCron.Stop()
 
 	// ── Reconcile cron (weekly Sunday 03:05 Europe/Istanbul) ────────────────────
-	weeklyCron := reconcile.NewWeeklyCron(reconcileSvc, istanbulLoc, slog.Default())
+	reconcilePinger := healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_RECONCILE_CRON_UUID"), 5*time.Second, slog.Default())
+	weeklyCron := reconcile.NewWeeklyCron(reconcileSvc, istanbulLoc, reconcilePinger, slog.Default())
 	weeklyCron.Start(ctx)
 	defer weeklyCron.Stop()
 
