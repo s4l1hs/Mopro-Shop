@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -11,18 +12,36 @@ import (
 )
 
 type payoutService struct {
-	repo      Repository
-	calLoader timex.CalendarLoader
-	currency  string // payout fiat currency; read from env at startup
+	repo         Repository
+	walletPoster WalletPoster
+	psp          PspTransferer
+	calLoader    timex.CalendarLoader
+	currency     string // payout fiat currency; read from env at startup
+	log          *slog.Logger
 }
 
 // NewService constructs a sellerpayout Service.
-// currency should come from env DEFAULT_CURRENCY (e.g. TRY for TR launch).
-func NewService(repo Repository, calLoader timex.CalendarLoader, currency string) Service {
+// currency is the fiat currency for payouts (e.g. TRY for TR launch).
+// walletPoster is satisfied by wallet.Service (injected by fin-svc/main.go).
+// psp is satisfied by sipay.Client.
+func NewService(
+	repo Repository,
+	walletPoster WalletPoster,
+	psp PspTransferer,
+	calLoader timex.CalendarLoader,
+	currency string,
+	log *slog.Logger,
+) Service {
+	if log == nil {
+		log = slog.Default()
+	}
 	return &payoutService{
-		repo:      repo,
-		calLoader: calLoader,
-		currency:  currency,
+		repo:         repo,
+		walletPoster: walletPoster,
+		psp:          psp,
+		calLoader:    calLoader,
+		currency:     currency,
+		log:          log,
 	}
 }
 
@@ -36,7 +55,7 @@ func (s *payoutService) SchedulePayoutsForOrder(ctx context.Context, ev OrderDel
 		bySellerNet[it.SellerID] += it.SellerNetMinor
 	}
 	if len(bySellerNet) == 0 {
-		slog.Warn("sellerpayout: no items in delivered event, skipping",
+		s.log.WarnContext(ctx, "sellerpayout: no items in delivered event, skipping",
 			"order_id", ev.OrderID)
 		return nil
 	}
@@ -78,4 +97,28 @@ func (s *payoutService) SchedulePayoutsForOrder(ctx context.Context, ev OrderDel
 		}
 		return nil
 	})
+}
+
+// RunDailyPayouts — see run_daily.go.
+func (s *payoutService) RunDailyPayouts(ctx context.Context, payoutDate time.Time, market, currency string) (RunDailyResult, error) {
+	return s.runDailyPayouts(ctx, payoutDate, market, currency)
+}
+
+// ReconcileProcessing — see reconcile.go.
+func (s *payoutService) ReconcileProcessing(ctx context.Context) error {
+	return s.reconcileProcessing(ctx)
+}
+
+// HandlePspOnboarded — see psp_event_handler.go.
+func (s *payoutService) HandlePspOnboarded(ctx context.Context, ev PspOnboardedEvent) error {
+	return s.repo.UpsertSellerPspAccount(ctx, SellerPspAccount{
+		SellerID:    ev.SellerID,
+		PspMemberID: ev.PspMemberID,
+		Market:      ev.Market,
+	})
+}
+
+// HandleFraudHoldSet — see fraud_event_handler.go.
+func (s *payoutService) HandleFraudHoldSet(ctx context.Context, ev FraudHoldSetEvent) error {
+	return s.handleFraudHoldSet(ctx, ev)
 }
