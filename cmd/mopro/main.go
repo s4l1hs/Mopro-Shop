@@ -38,6 +38,8 @@ func main() {
 		runWithWallet(ctx, func(svc wallet.Service) error {
 			return svc.ClearReadOnly(ctx)
 		})
+	case "dlq":
+		runDLQ(ctx, os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
 		usage()
@@ -72,6 +74,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "commands:")
 	fmt.Fprintln(os.Stderr, "  set-read-only --reason <text>   enable wallet read-only mode")
 	fmt.Fprintln(os.Stderr, "  clear-read-only                  clear wallet read-only mode")
+	fmt.Fprintln(os.Stderr, "  dlq <subcommand>                 dead-letter queue operations (run 'mopro dlq' for help)")
 }
 
 func mustEnv(key string) string {
