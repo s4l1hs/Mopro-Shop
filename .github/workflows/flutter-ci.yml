@@ -1,0 +1,73 @@
+name: Flutter CI
+
+on:
+  push:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/flutter-ci.yml'
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/flutter-ci.yml'
+
+defaults:
+  run:
+    working-directory: mobile
+
+jobs:
+  analyze:
+    name: flutter analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+      - run: flutter pub get
+      - run: flutter analyze
+
+  codegen:
+    name: build_runner (verify generated files up-to-date)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+      - run: flutter pub get
+      - run: dart run build_runner build
+      - name: Fail if generated files changed
+        run: |
+          git diff --exit-code || \
+            (echo "Generated files are out of date. Run build_runner locally." && exit 1)
+
+  test:
+    name: flutter test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+      - run: flutter pub get
+      - run: dart run build_runner build
+      - run: flutter test
+
+  dart-analyze-generated-client:
+    name: dart analyze (mopro_api generated client)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+      - name: pub get in mopro_api package
+        run: flutter pub get
+        working-directory: mobile/packages/mopro_api
+      - name: dart analyze mopro_api
+        run: dart analyze
+        working-directory: mobile/packages/mopro_api
