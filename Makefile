@@ -1,4 +1,11 @@
-COMPOSE := docker compose -f deploy/docker-compose.yml
+COMPOSE      := docker compose -f deploy/docker-compose.yml
+COMPOSE_PROD := docker compose -f deploy/docker-compose.prod.yml
+
+# Production deploy settings — override on CLI: make deploy SERVER=mopro@195.85.207.92
+SERVER   ?= mopro@195.85.207.92
+SSH_PORT ?= 4625
+SSH_USER ?= mopro
+VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 OAPI_CODEGEN_VERSION  := v2.4.1
 OPENAPI_GEN_VERSION   := v7.10.0
@@ -9,7 +16,8 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
         caddy-validate caddy-reload \
         test-integration-catalog test-integration-outbox test-integration-cart test-integration-order \
         test-integration-sellerpayout test-e2e \
-        api-gen-models api-gen-core api-gen-fin api-gen-dart api-gen api-lint contract-test
+        api-gen-models api-gen-core api-gen-fin api-gen-dart api-gen api-lint contract-test \
+        docker-build release deploy rollback
 
 # verify chains all static checks; must pass before every push.
 verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order
@@ -72,6 +80,34 @@ caddy-validate:
 
 caddy-reload:
 	$(COMPOSE) --env-file .env.local exec caddy caddy reload --config /etc/caddy/Caddyfile
+
+# ── Production build + deploy ─────────────────────────────────────────────────
+
+# Build all three service images with VERSION tag.
+docker-build:
+	docker build --build-arg SERVICE=core-svc \
+	  -t mopro/core-svc:$(VERSION) -f build/Dockerfile .
+	docker build --build-arg SERVICE=fin-svc \
+	  -t mopro/fin-svc:$(VERSION) -f build/Dockerfile .
+	docker build --build-arg SERVICE=jobs-svc \
+	  -t mopro/jobs-svc:$(VERSION) -f build/Dockerfile .
+
+# Save images as tarballs in bin/ ready for scp to VDS.
+release: docker-build
+	mkdir -p bin
+	docker save mopro/core-svc:$(VERSION) -o bin/core-svc-$(VERSION).tar
+	docker save mopro/fin-svc:$(VERSION)  -o bin/fin-svc-$(VERSION).tar
+	docker save mopro/jobs-svc:$(VERSION) -o bin/jobs-svc-$(VERSION).tar
+	@echo "Tarballs written to bin/ — run 'make deploy' to ship"
+
+# Upload + rolling restart on VDS.
+deploy: release
+	VERSION=$(VERSION) SERVER=$(SERVER) SSH_PORT=$(SSH_PORT) \
+	  ./deploy/scripts/deploy.sh $(VERSION)
+
+# Restore previous image set on VDS.
+rollback:
+	SERVER=$(SERVER) SSH_PORT=$(SSH_PORT) ./deploy/scripts/rollback.sh
 
 # Integration test targets — each spins up an ephemeral container, runs tests, then tears down.
 
