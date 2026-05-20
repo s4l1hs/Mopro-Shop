@@ -105,6 +105,28 @@ seller.moproshop.com {
 	reverse_proxy core-svc:8080
 }
 
+# ─── Production: moproshop.com + www.moproshop.com ──────────────────────────
+moproshop.com, www.moproshop.com {
+	import healthz_native
+	respond "Çok yakında / Coming soon" 200
+}
+
+# ─── Production: admin.moproshop.com ─────────────────────────────────────────
+# Internal admin panel. Phase 4.0.5: returns 503.
+# Phase N: restrict to VPN/office CIDRs before wiring to any backend.
+admin.moproshop.com {
+	import healthz_native
+	respond "Service Unavailable" 503
+}
+
+# ─── Production: fin.moproshop.com ───────────────────────────────────────────
+# fin-svc read endpoints (wallet / cashback / payouts). Phase 4.0.5: returns 404.
+# Phase N: restrict to authenticated internal callers before proxying fin-svc.
+fin.moproshop.com {
+	import healthz_native
+	respond "Not Found" 404
+}
+
 # ─── Production: img.moproshop.com ───────────────────────────────────────────
 # CloudFlare proxies img.moproshop.com → VDS → Backblaze B2 public bucket.
 # B2_BUCKET_URL must be the Backblaze B2 public-facing HTTPS URL.
