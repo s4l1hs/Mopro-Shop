@@ -1,0 +1,230 @@
+# Mopro VDS Runbook
+
+**Server:** 195.85.207.92 | **OS:** Debian 13 (trixie) | **SSH:** port 4625, user `mopro`  
+**Services:** core-svc · fin-svc · jobs-svc · caddy · postgres-ecom · postgres-ledger · postgres-config · redis · pgbouncer-ecom · pgbouncer-ledger · grafana-agent  
+**Deploy pattern:** `docker save` → `scp` → `docker load` (no container registry)
+
+---
+
+## SSH access
+
+```sh
+ssh -p 4625 mopro@195.85.207.92
+```
+
+Copy a file to VDS:
+```sh
+scp -P 4625 <local-file> mopro@195.85.207.92:/opt/mopro/
+```
+
+---
+
+## Day 0 — First production deploy
+
+### Prerequisites
+
+1. VDS is up with Debian 13 and user `mopro` exists, sshd on port 4625.
+2. Run bootstrap (as root on VDS):
+   ```sh
+   # Upload script from dev machine first:
+   scp -P 4625 deploy/setup-server.sh mopro@195.85.207.92:/tmp/
+   ssh -p 4625 mopro@195.85.207.92 "sudo bash /tmp/setup-server.sh"
+   ```
+3. Populate secrets (on VDS as root):
+   ```sh
+   sudo bash /opt/mopro/deploy/scripts/init-secrets.sh
+   ```
+4. Add the generated Hetzner backup SSH key to your Storage Box `authorized_keys`.
+
+### First deploy
+
+```sh
+# On dev machine:
+make deploy VERSION=0.1.0 SERVER=mopro@195.85.207.92
+```
+
+This runs: `docker build` → `docker save` → `scp` → `docker load` → rolling restart.
+
+### Install systemd backup timer (on VDS as root)
+
+```sh
+cp /opt/mopro/deploy/systemd/mopro-backup.{service,timer} /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now mopro-backup.timer
+systemctl status mopro-backup.timer
+```
+
+### Verify
+
+```sh
+curl -sf https://api.moproshop.com/healthz      # → OK
+curl -sf https://seller.moproshop.com/healthz   # → OK
+ssh -p 4625 mopro@195.85.207.92 "docker ps --format 'table {{.Names}}\t{{.Status}}'"
+```
+
+---
+
+## Routine operations
+
+### Check container health
+
+```sh
+ssh -p 4625 mopro@195.85.207.92 "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.RunningFor}}'"
+```
+
+### View logs
+
+```sh
+ssh -p 4625 mopro@195.85.207.92 "docker logs --tail 100 -f core-svc"
+ssh -p 4625 mopro@195.85.207.92 "docker logs --tail 100 -f fin-svc"
+ssh -p 4625 mopro@195.85.207.92 "docker logs --tail 100 -f jobs-svc"
+ssh -p 4625 mopro@195.85.207.92 "docker logs --tail 100 -f caddy"
+```
+
+### Deploy a new version
+
+```sh
+make deploy VERSION=1.2.3 SERVER=mopro@195.85.207.92
+```
+
+The script restarts in order: **jobs-svc → core-svc → fin-svc**. Health checks each before proceeding. Auto-rolls back if any service fails to become healthy within 60 s.
+
+### Rollback manually
+
+```sh
+make rollback SERVER=mopro@195.85.207.92
+```
+
+Restores from `bin/prev/` tarballs loaded during the previous deploy.
+
+### Apply a database migration
+
+```sh
+./deploy/scripts/apply-migration.sh \
+  --db ecom \
+  --file deploy/postgres-ecom/init/99-new-migration.sql
+```
+
+Tracks applied migrations in `_migrations` table. Safe to re-run (idempotent by name).
+
+### Reload Caddy config (without restart)
+
+```sh
+ssh -p 4625 mopro@195.85.207.92 \
+  "docker exec caddy caddy reload --config /etc/caddy/Caddyfile"
+```
+
+---
+
+## Backup & Restore
+
+### Manual backup trigger
+
+```sh
+ssh -p 4625 mopro@195.85.207.92 "sudo systemctl start mopro-backup.service"
+journalctl -u mopro-backup.service --no-pager | tail -30
+```
+
+### Verify backup timer
+
+```sh
+ssh -p 4625 mopro@195.85.207.92 "systemctl list-timers mopro-backup.timer"
+```
+
+### List available backups
+
+```sh
+ssh -p 4625 mopro@195.85.207.92 "ls -lh /opt/mopro/backups/"
+```
+
+### Restore ecom database
+
+```sh
+ssh -p 4625 mopro@195.85.207.92
+# On VDS:
+sudo bash /opt/mopro/deploy/scripts/restore-postgres.sh \
+  --db ecom \
+  --date 2026-05-20T040000Z \
+  --confirm YES
+```
+
+### Restore ledger database
+
+```sh
+sudo bash /opt/mopro/deploy/scripts/restore-postgres.sh \
+  --db ledger \
+  --date 2026-05-20T040000Z \
+  --confirm YES
+```
+
+**WARNING:** Restore stops dependent services, overwrites all data, then restarts services. Verify ledger invariants after restore:
+
+```sh
+docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger \
+  -c "SELECT SUM(CASE WHEN direction='D' THEN amount_minor ELSE -amount_minor END) FROM wallet_schema.ledger_entries;"
+# Must be 0 (balanced ledger)
+```
+
+---
+
+## Incident response
+
+### Service down
+
+```sh
+# Check status
+docker inspect --format='{{.State.Status}} {{.State.Health.Status}}' core-svc
+
+# Restart a single service
+ssh -p 4625 mopro@195.85.207.92 \
+  "cd /opt/mopro && docker compose -f docker-compose.prod.yml restart core-svc"
+
+# Check logs for crash reason
+ssh -p 4625 mopro@195.85.207.92 "docker logs --tail 200 core-svc 2>&1 | grep -i error"
+```
+
+### Disk full
+
+```sh
+ssh -p 4625 mopro@195.85.207.92 "df -h && du -sh /opt/mopro/*"
+
+# Clear old Docker images
+ssh -p 4625 mopro@195.85.207.92 "docker image prune -f"
+
+# Clear old logs
+ssh -p 4625 mopro@195.85.207.92 "docker system df"
+```
+
+### PgBouncer connection exhausted
+
+Check: `docker logs pgbouncer-ecom | grep "too many clients"`.  
+Mitigation: restart PgBouncer (zero-downtime — Postgres keeps connections):
+
+```sh
+ssh -p 4625 mopro@195.85.207.92 \
+  "docker compose -f /opt/mopro/docker-compose.prod.yml restart pgbouncer-ecom"
+```
+
+### Redis OOM
+
+Redis is configured with `maxmemory 800m` and `maxmemory-policy allkeys-lru`. If it OOMs, check:
+
+```sh
+ssh -p 4625 mopro@195.85.207.92 "docker exec redis redis-cli INFO memory | grep used_memory_human"
+```
+
+---
+
+## Known quirks
+
+| Quirk | Explanation |
+|---|---|
+| SSH port 4625 | Custom port — never use 22 in any SSH/SCP command for this VDS |
+| Hetzner Storage Box SSH port 23 | Hetzner uses port 23 (not 22) for Storage Box SFTP/rsync |
+| UFW uses nftables backend | Debian 13 default; inspect rules with `nft list ruleset` not `iptables -L` |
+| Caddy pinned `2.8-alpine` | Do NOT use `caddy:2-alpine` (unpinned); breaking changes in minor versions |
+| `docker load` pattern | No container registry; all images shipped as tarballs via `scp -P 4625` |
+| fin-svc dual-homed | fin-svc is on both `mopro-net` (Redis) and `mopro-fin-net` (postgres-ledger) |
+| postgres-config stub | Empty cluster, no services connect to it in Phase 4.0.5 |
+| Secrets at `/etc/mopro/.env` | chmod 600 root:root; `/opt/mopro/.env` is a symlink to this file |
+| Healthcheck: `["/svc", "--health"]` | Distroless containers have no shell/nc; binary must implement `--health` flag |
