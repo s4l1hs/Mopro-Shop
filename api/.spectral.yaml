@@ -1,0 +1,11 @@
+extends:
+  - spectral:oas
+
+rules:
+  operation-tags: error
+  operation-operationId: error
+  operation-success-response: error
+  no-$ref-siblings: error
+  info-contact: warn
+  openapi-tags: warn
+  tag-description: warn

@@ -1,10 +1,15 @@
 COMPOSE := docker compose -f deploy/docker-compose.yml
 
+OAPI_CODEGEN_VERSION  := v2.4.1
+OPENAPI_GEN_VERSION   := v7.10.0
+OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSION)
+
 .PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order \
         build-core build-fin build-jobs build-migrate build-mopro run-local down-local \
         caddy-validate caddy-reload \
         test-integration-catalog test-integration-outbox test-integration-cart test-integration-order \
-        test-integration-sellerpayout test-e2e
+        test-integration-sellerpayout test-e2e \
+        api-gen-models api-gen-core api-gen-fin api-gen-dart api-gen api-lint contract-test
 
 # verify chains all static checks; must pass before every push.
 verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order
@@ -123,6 +128,46 @@ test-integration-sellerpayout:
 	SELLERPAYOUT_TEST_DSN=postgres://ledger_admin:test123@localhost:6434/mopro_ledger \
 	  go test -tags=integration -count=1 -race ./internal/sellerpayout/... ; \
 	  STATUS=$$? ; docker rm -f pg-ledger-sp-test ; exit $$STATUS
+
+# ── OpenAPI codegen targets ────────────────────────────────────────────────────
+
+api-lint:
+	npx --yes @stoplight/spectral-cli@6 lint api/openapi.yaml
+
+api-gen-models:
+	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPI_CODEGEN_VERSION) \
+		--config api/oapi-codegen-models.yaml api/openapi.yaml
+
+api-gen-core:
+	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPI_CODEGEN_VERSION) \
+		--config api/oapi-codegen-core.yaml api/openapi.yaml
+
+api-gen-fin:
+	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPI_CODEGEN_VERSION) \
+		--config api/oapi-codegen-fin.yaml api/openapi.yaml
+
+api-gen-dart:
+	docker run --rm \
+		-v $$(pwd):/local \
+		$(OPENAPI_GEN_IMAGE) generate \
+		-i /local/api/openapi.yaml \
+		-g dart-dio \
+		-o /local/mobile/packages/mopro_api \
+		--additional-properties=pubName=mopro_api,nullSafe=true,serializationLibrary=json_serializable,hideGenerationTimestamp=true \
+		--skip-validate-spec
+
+api-gen: api-gen-models api-gen-core api-gen-fin api-gen-dart
+
+contract-test:
+	go test -tags=contract -v ./internal/api/...
+
+# ── Diff enforcement (called by CI) ────────────────────────────────────────────
+
+api-check-sync:
+	@git diff --exit-code internal/api/gen/ mobile/packages/mopro_api/ || \
+		(echo "\nERROR: Generated files out of sync with api/openapi.yaml. Run 'make api-gen' and commit." && exit 1)
+
+# ── e2e ────────────────────────────────────────────────────────────────────────
 
 test-e2e:
 	docker rm -f pg-ecom-e2e pg-ledger-e2e redis-e2e 2>/dev/null || true
