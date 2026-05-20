@@ -1,0 +1,85 @@
+{
+  "app_name": "Mopro",
+  "common": {
+    "ok": "OK",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "network_error": "Check your internet connection",
+    "unknown_error": "An unexpected error occurred"
+  },
+  "auth": {
+    "login_title": "Sign In",
+    "phone_hint": "Phone number",
+    "send_otp": "Send Verification Code",
+    "otp_title": "Verification Code",
+    "otp_hint": "6-digit code",
+    "verify": "Verify",
+    "otp_expired": "Verification code expired. Please try again.",
+    "step_up_required": "Additional verification required for this action."
+  },
+  "home": {
+    "title": "Discover"
+  },
+  "catalog": {
+    "categories": "Categories",
+    "search_hint": "Search products...",
+    "filter": "Filter",
+    "sort": "Sort"
+  },
+  "product": {
+    "add_to_cart": "Add to Cart",
+    "buy_now": "Buy Now",
+    "sold_by": "Sold by {seller}",
+    "stock_left": "{count} left in stock"
+  },
+  "cashback": {
+    "preview_title": "Mopro Cashback",
+    "cashback_preview": "You'll receive {monthly} Mopro Coin per month from this product — FOREVER.",
+    "monthly_coin": "{amount} Coin / month",
+    "perpetual_note": "Paid every month until cancelled.",
+    "plans_title": "My Cashback Plans",
+    "active": "Active",
+    "cancelled": "Cancelled",
+    "no_plans": "You have no cashback plans yet."
+  },
+  "cart": {
+    "title": "My Cart",
+    "empty": "Your cart is empty",
+    "checkout": "Checkout",
+    "total": "Total: {amount} TRY"
+  },
+  "order": {
+    "title": "My Orders",
+    "detail_title": "Order Detail",
+    "status_pending": "Pending",
+    "status_paid": "Paid",
+    "status_shipped": "Shipped",
+    "status_delivered": "Delivered",
+    "status_cancelled": "Cancelled",
+    "payout_info": "Seller payout occurs 3 business days after delivery."
+  },
+  "wallet": {
+    "title": "My Wallet",
+    "balance": "Balance",
+    "coin_balance": "Mopro Coin",
+    "transactions": "Transaction History"
+  },
+  "seller": {
+    "breakdown_title": "Order Summary",
+    "gross": "Gross Amount",
+    "commission": "Commission",
+    "kdv": "VAT",
+    "net": "Net Payout",
+    "payout_date": "Expected Payout: {date}"
+  },
+  "error": {
+    "unauthorized": "Your session has expired. Please sign in again.",
+    "not_found": "{resource} not found.",
+    "conflict": "{message}",
+    "rate_limited": "Too many requests. Please wait.",
+    "system_read_only": "System is under maintenance. Please try again later.",
+    "validation": "Please check your input."
+  }
+}

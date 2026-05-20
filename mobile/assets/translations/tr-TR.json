@@ -1,0 +1,85 @@
+{
+  "app_name": "Mopro",
+  "common": {
+    "ok": "Tamam",
+    "cancel": "İptal",
+    "retry": "Tekrar Dene",
+    "loading": "Yükleniyor...",
+    "error": "Bir hata oluştu",
+    "network_error": "İnternet bağlantısını kontrol edin",
+    "unknown_error": "Beklenmeyen bir hata oluştu"
+  },
+  "auth": {
+    "login_title": "Giriş Yap",
+    "phone_hint": "Telefon numarası",
+    "send_otp": "Doğrulama Kodu Gönder",
+    "otp_title": "Doğrulama Kodu",
+    "otp_hint": "6 haneli kod",
+    "verify": "Doğrula",
+    "otp_expired": "Doğrulama kodunun süresi doldu. Lütfen tekrar deneyin.",
+    "step_up_required": "Bu işlem için ek doğrulama gerekli."
+  },
+  "home": {
+    "title": "Keşfet"
+  },
+  "catalog": {
+    "categories": "Kategoriler",
+    "search_hint": "Ürün ara...",
+    "filter": "Filtrele",
+    "sort": "Sırala"
+  },
+  "product": {
+    "add_to_cart": "Sepete Ekle",
+    "buy_now": "Hemen Al",
+    "sold_by": "{seller} tarafından satılmaktadır",
+    "stock_left": "Son {count} ürün"
+  },
+  "cashback": {
+    "preview_title": "Mopro Cashback",
+    "cashback_preview": "Bu üründen aylık {monthly} Mopro Coin alacaksınız — SÜRESİZ.",
+    "monthly_coin": "Aylık {amount} Coin",
+    "perpetual_note": "Ödeme iptal edilene kadar her ay aktarılır.",
+    "plans_title": "Cashback Planlarım",
+    "active": "Aktif",
+    "cancelled": "İptal Edildi",
+    "no_plans": "Henüz cashback planınız bulunmuyor."
+  },
+  "cart": {
+    "title": "Sepetim",
+    "empty": "Sepetiniz boş",
+    "checkout": "Siparişi Tamamla",
+    "total": "Toplam: {amount} TL"
+  },
+  "order": {
+    "title": "Siparişlerim",
+    "detail_title": "Sipariş Detayı",
+    "status_pending": "Beklemede",
+    "status_paid": "Ödendi",
+    "status_shipped": "Kargoya Verildi",
+    "status_delivered": "Teslim Edildi",
+    "status_cancelled": "İptal Edildi",
+    "payout_info": "Satıcı ödemesi teslimattan 3 iş günü sonra gerçekleşir."
+  },
+  "wallet": {
+    "title": "Cüzdanım",
+    "balance": "Bakiye",
+    "coin_balance": "Mopro Coin",
+    "transactions": "İşlem Geçmişi"
+  },
+  "seller": {
+    "breakdown_title": "Sipariş Özeti",
+    "gross": "Brüt Tutar",
+    "commission": "Komisyon",
+    "kdv": "KDV",
+    "net": "Net Ödeme",
+    "payout_date": "Tahmini Ödeme: {date}"
+  },
+  "error": {
+    "unauthorized": "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
+    "not_found": "{resource} bulunamadı.",
+    "conflict": "{message}",
+    "rate_limited": "Çok fazla istek gönderildi. Lütfen bekleyin.",
+    "system_read_only": "Sistem şu anda bakımdadır. Lütfen daha sonra tekrar deneyin.",
+    "validation": "Lütfen girdiğiniz bilgileri kontrol edin."
+  }
+}
