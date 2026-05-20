@@ -1,0 +1,5 @@
+package: apitypes
+output: internal/api/gen/types/types.gen.go
+generate:
+  models: true
+  embedded-spec: false

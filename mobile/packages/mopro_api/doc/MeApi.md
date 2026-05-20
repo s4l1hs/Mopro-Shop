@@ -1,0 +1,239 @@
+# mopro_api.api.MeApi
+
+## Load the API package
+```dart
+import 'package:mopro_api/api.dart';
+```
+
+All URIs are relative to *https://api.moproshop.com*
+
+Method | HTTP request | Description
+------------- | ------------- | -------------
+[**deleteMe**](MeApi.md#deleteme) | **DELETE** /v1/me | Soft-delete the authenticated user account (KVKK / GDPR)
+[**getMe**](MeApi.md#getme) | **GET** /v1/me | Get authenticated user profile
+[**registerDevice**](MeApi.md#registerdevice) | **POST** /v1/me/devices | Register a device FCM token for push notifications
+[**unregisterDevice**](MeApi.md#unregisterdevice) | **DELETE** /v1/me/devices/{id} | Remove a registered device (deregister push notifications)
+[**updateMe**](MeApi.md#updateme) | **PUT** /v1/me | Update user profile fields
+
+
+# **deleteMe**
+> deleteMe(xIdempotencyKey, deleteMeRequest, xTraceId)
+
+Soft-delete the authenticated user account (KVKK / GDPR)
+
+Requires step-up authentication (`stepUpAuth` security scheme). Account enters a 30-day grace period before permanent deletion. All active cashback plans are cancelled on confirmation. 
+
+### Example
+```dart
+import 'package:mopro_api/api.dart';
+
+final api = MoproApi().getMeApi();
+final String xIdempotencyKey = 01926b7f-1234-7abc-8def-0123456789ab; // String | UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation. 
+final DeleteMeRequest deleteMeRequest = ; // DeleteMeRequest | 
+final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+
+try {
+    api.deleteMe(xIdempotencyKey, deleteMeRequest, xTraceId);
+} catch on DioException (e) {
+    print('Exception when calling MeApi->deleteMe: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **xIdempotencyKey** | **String**| UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation.  | 
+ **deleteMeRequest** | [**DeleteMeRequest**](DeleteMeRequest.md)|  | 
+ **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+[stepUpAuth](../README.md#stepUpAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getMe**
+> User getMe(xTraceId)
+
+Get authenticated user profile
+
+### Example
+```dart
+import 'package:mopro_api/api.dart';
+
+final api = MoproApi().getMeApi();
+final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+
+try {
+    final response = api.getMe(xTraceId);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling MeApi->getMe: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+
+### Return type
+
+[**User**](User.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **registerDevice**
+> Device registerDevice(xIdempotencyKey, registerDeviceRequest, xTraceId)
+
+Register a device FCM token for push notifications
+
+### Example
+```dart
+import 'package:mopro_api/api.dart';
+
+final api = MoproApi().getMeApi();
+final String xIdempotencyKey = 01926b7f-1234-7abc-8def-0123456789ab; // String | UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation. 
+final RegisterDeviceRequest registerDeviceRequest = ; // RegisterDeviceRequest | 
+final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+
+try {
+    final response = api.registerDevice(xIdempotencyKey, registerDeviceRequest, xTraceId);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling MeApi->registerDevice: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **xIdempotencyKey** | **String**| UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation.  | 
+ **registerDeviceRequest** | [**RegisterDeviceRequest**](RegisterDeviceRequest.md)|  | 
+ **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+
+### Return type
+
+[**Device**](Device.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **unregisterDevice**
+> unregisterDevice(xIdempotencyKey, id, xTraceId)
+
+Remove a registered device (deregister push notifications)
+
+### Example
+```dart
+import 'package:mopro_api/api.dart';
+
+final api = MoproApi().getMeApi();
+final String xIdempotencyKey = 01926b7f-1234-7abc-8def-0123456789ab; // String | UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation. 
+final int id = 789; // int | 
+final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+
+try {
+    api.unregisterDevice(xIdempotencyKey, id, xTraceId);
+} catch on DioException (e) {
+    print('Exception when calling MeApi->unregisterDevice: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **xIdempotencyKey** | **String**| UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation.  | 
+ **id** | **int**|  | 
+ **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **updateMe**
+> User updateMe(xIdempotencyKey, updateMeRequest, xTraceId)
+
+Update user profile fields
+
+### Example
+```dart
+import 'package:mopro_api/api.dart';
+
+final api = MoproApi().getMeApi();
+final String xIdempotencyKey = 01926b7f-1234-7abc-8def-0123456789ab; // String | UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation. 
+final UpdateMeRequest updateMeRequest = ; // UpdateMeRequest | 
+final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+
+try {
+    final response = api.updateMe(xIdempotencyKey, updateMeRequest, xTraceId);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling MeApi->updateMe: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **xIdempotencyKey** | **String**| UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation.  | 
+ **updateMeRequest** | [**UpdateMeRequest**](UpdateMeRequest.md)|  | 
+ **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+
+### Return type
+
+[**User**](User.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
