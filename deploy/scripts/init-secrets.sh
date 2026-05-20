@@ -121,7 +121,9 @@ _prompt PSP_MERCHANT_ID    "Sipay merchant ID"
 _prompt_secret PSP_WEBHOOK_SECRET "Sipay webhook secret"
 _prompt SIPAY_BASE_URL     "Sipay base URL" "https://app.sipay.com.tr/ccpayment"
 _write SIPAY_APP_ID        "REPLACE_ME"
+_write SIPAY_APP_SECRET    "REPLACE_ME"
 _write SIPAY_MERCHANT_KEY  "REPLACE_ME"
+_write SIPAY_MERCHANT_ID   "REPLACE_ME"
 
 # ── §6 Hetzner Storage Box backup ────────────────────────────────────────────
 echo "[6/8] Hetzner Storage Box backup..."
@@ -153,6 +155,14 @@ _write B2_KEY_ID  ""
 _write B2_APP_KEY ""
 _write B2_BUCKET  "mopro-backups"
 
+# ── Service connectivity (constructed from generated passwords) ───────────────
+# These are read directly by the Go binaries at startup.
+_ecom_pass=$(grep "^ECOM_DB_PASSWORD=" "${ENV_FILE}" | cut -d= -f2-)
+_ledger_pass=$(grep "^LEDGER_DB_PASSWORD=" "${ENV_FILE}" | cut -d= -f2-)
+_write REDIS_ADDR              "redis:6379"
+_write LEDGER_DATABASE_URL     "postgres://ledger_admin:${_ledger_pass}@pgbouncer-ledger:5432/mopro_ledger?sslmode=disable"
+_write NOTIFICATION_DATABASE_URL "postgres://ecom_admin:${_ecom_pass}@pgbouncer-ecom:5432/mopro_ecom?sslmode=disable"
+
 # ── Redis stream MAXLEN defaults ──────────────────────────────────────────────
 _write REDIS_STREAM_MAXLEN_ECOM_ORDER_DELIVERED_V1  "25000"
 _write REDIS_STREAM_MAXLEN_ECOM_PAYMENT_CAPTURED_V1 "25000"
@@ -178,11 +188,11 @@ for _k in ARAS_API_KEY YURTICI_API_KEY SURAT_API_KEY MNG_API_KEY \
   _write "${_k}" "REPLACE_ME"
 done
 
-chmod 600 "${ENV_FILE}"
-chown root:root "${ENV_FILE}"
+chown root:mopro "${ENV_FILE}"
+chmod 640 "${ENV_FILE}"
 
 echo ""
 echo "══════════════════════════════════════════════════════════"
-echo " ${ENV_FILE} written — chmod 600"
+echo " ${ENV_FILE} written — chmod 640 root:mopro"
 echo " IMPORTANT: back up the Restic passphrase offline now."
 echo "══════════════════════════════════════════════════════════"

@@ -340,7 +340,7 @@ func buildCatalogDSN() string {
 		port = "5432"
 	}
 	password := os.Getenv("ECOM_DB_PASSWORD")
-	return fmt.Sprintf("postgres://ecom_admin:%s@%s:%s/mopro_ecom", password, host, port)
+	return fmt.Sprintf("postgres://ecom_admin:%s@%s:%s/mopro_ecom?sslmode=disable", password, host, port)
 }
 
 // buildRedisClient constructs a Redis client from env vars and verifies connectivity.

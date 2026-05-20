@@ -50,7 +50,10 @@ func main() {
 
 	// ── Redis client ─────────────────────────────────────────────────────────
 	redisAddr := mustEnv("REDIS_ADDR")
-	redisClient := redis.NewClient(&redis.Options{Addr: redisAddr})
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     redisAddr,
+		Password: os.Getenv("REDIS_PASSWORD"),
+	})
 	if err := redisClient.Ping(initCtx).Err(); err != nil {
 		slog.Error("fin-svc: redis ping", "err", err)
 		os.Exit(1)

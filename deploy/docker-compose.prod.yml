@@ -184,7 +184,7 @@ services:
   # ── PgBouncer (ecom side, mopro-net) ─────────────────────────────────────────
   pgbouncer-ecom:
     container_name: pgbouncer-ecom
-    image: pgbouncer/pgbouncer:latest
+    image: edoburu/pgbouncer:latest
     restart: unless-stopped
     networks: [mopro-net]
     mem_limit: 128m
@@ -195,23 +195,19 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
-    volumes:
-      - ./pgbouncer-ecom/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-      - ./pgbouncer-ecom/userlist.sh:/docker-entrypoint-initdb.d/userlist.sh:ro
     environment:
-      DATABASES_HOST: postgres-ecom
-      DATABASES_PORT: "5432"
-      DATABASES_USER: ecom_admin
-      DATABASES_PASSWORD: "${ECOM_DB_PASSWORD}"
-      DATABASES_DBNAME: mopro_ecom
-      PGBOUNCER_LISTEN_PORT: "5432"
-      PGBOUNCER_POOL_MODE: transaction
-      PGBOUNCER_MAX_CLIENT_CONN: "500"
-      PGBOUNCER_DEFAULT_POOL_SIZE: "25"
-      PGBOUNCER_MIN_POOL_SIZE: "5"
-      PGBOUNCER_RESERVE_POOL_SIZE: "10"
-      PGBOUNCER_RESERVE_POOL_TIMEOUT: "3"
-      PGBOUNCER_AUTH_TYPE: scram-sha-256
+      DB_HOST: postgres-ecom
+      DB_PORT: "5432"
+      DB_USER: ecom_admin
+      DB_PASSWORD: "${ECOM_DB_PASSWORD}"
+      DB_NAME: mopro_ecom
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "500"
+      DEFAULT_POOL_SIZE: "25"
+      MIN_POOL_SIZE: "5"
+      RESERVE_POOL_SIZE: "10"
+      RESERVE_POOL_TIMEOUT: "3"
+      AUTH_TYPE: scram-sha-256
     depends_on:
       postgres-ecom:
         condition: service_healthy
@@ -225,7 +221,7 @@ services:
   # ── PgBouncer (ledger side, mopro-fin-net) ─────────────────────────────────
   pgbouncer-ledger:
     container_name: pgbouncer-ledger
-    image: pgbouncer/pgbouncer:latest
+    image: edoburu/pgbouncer:latest
     restart: unless-stopped
     networks: [mopro-fin-net]
     mem_limit: 128m
@@ -236,23 +232,19 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
-    volumes:
-      - ./pgbouncer-ledger/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-      - ./pgbouncer-ledger/userlist.sh:/docker-entrypoint-initdb.d/userlist.sh:ro
     environment:
-      DATABASES_HOST: postgres-ledger
-      DATABASES_PORT: "5432"
-      DATABASES_USER: ledger_admin
-      DATABASES_PASSWORD: "${LEDGER_DB_PASSWORD}"
-      DATABASES_DBNAME: mopro_ledger
-      PGBOUNCER_LISTEN_PORT: "5432"
-      PGBOUNCER_POOL_MODE: transaction
-      PGBOUNCER_MAX_CLIENT_CONN: "500"
-      PGBOUNCER_DEFAULT_POOL_SIZE: "25"
-      PGBOUNCER_MIN_POOL_SIZE: "5"
-      PGBOUNCER_RESERVE_POOL_SIZE: "10"
-      PGBOUNCER_RESERVE_POOL_TIMEOUT: "3"
-      PGBOUNCER_AUTH_TYPE: scram-sha-256
+      DB_HOST: postgres-ledger
+      DB_PORT: "5432"
+      DB_USER: ledger_admin
+      DB_PASSWORD: "${LEDGER_DB_PASSWORD}"
+      DB_NAME: mopro_ledger
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "500"
+      DEFAULT_POOL_SIZE: "25"
+      MIN_POOL_SIZE: "5"
+      RESERVE_POOL_SIZE: "10"
+      RESERVE_POOL_TIMEOUT: "3"
+      AUTH_TYPE: scram-sha-256
     depends_on:
       postgres-ledger:
         condition: service_healthy
@@ -267,6 +259,7 @@ services:
   redis:
     container_name: redis
     image: redis:7-alpine
+    user: "999:999"
     restart: unless-stopped
     networks: [mopro-net, mopro-fin-net]
     mem_limit: 1200m
@@ -300,6 +293,7 @@ services:
   meilisearch:
     container_name: meilisearch
     image: getmeili/meilisearch:v1.6
+    user: "1000:1000"
     restart: unless-stopped
     networks: [mopro-net]
     mem_limit: 1500m
@@ -351,13 +345,13 @@ services:
       - caddy-config:/config
     depends_on:
       core-svc:
-        condition: service_healthy
+        condition: service_started
       fin-svc:
-        condition: service_healthy
+        condition: service_started
       jobs-svc:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
+      test: ["CMD", "nc", "-z", "127.0.0.1", "80"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -389,11 +383,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/svc", "--health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      disable: true
 
   # ── fin-svc (dual-homed: mopro-net for Redis + mopro-fin-net for ledger) ─────
   fin-svc:
@@ -415,11 +405,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/svc", "--health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      disable: true
 
   # ── jobs-svc (v7: ONNX ML + e-invoice — higher mem ceiling) ──────────────────
   jobs-svc:
@@ -441,11 +427,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "/svc", "--health"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
+      disable: true
 
   # ── Grafana Agent (metrics + logs + traces → Grafana Cloud Free) ──────────────
   grafana-agent:

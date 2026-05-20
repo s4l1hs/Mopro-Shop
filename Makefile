@@ -85,11 +85,11 @@ caddy-reload:
 
 # Build all three service images with VERSION tag.
 docker-build:
-	docker build --build-arg SERVICE=core-svc \
+	docker build --platform=linux/amd64 --build-arg SERVICE=core-svc \
 	  -t mopro/core-svc:$(VERSION) -f build/Dockerfile .
-	docker build --build-arg SERVICE=fin-svc \
+	docker build --platform=linux/amd64 --build-arg SERVICE=fin-svc \
 	  -t mopro/fin-svc:$(VERSION) -f build/Dockerfile .
-	docker build --build-arg SERVICE=jobs-svc \
+	docker build --platform=linux/amd64 --build-arg SERVICE=jobs-svc \
 	  -t mopro/jobs-svc:$(VERSION) -f build/Dockerfile .
 
 # Save images as tarballs in bin/ ready for scp to VDS.

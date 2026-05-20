@@ -117,8 +117,10 @@ echo "[7/13] fail2ban configured (monitoring port 4625)"
 # ── §9 Directory structure ────────────────────────────────────────────────────
 for _dir in \
   "${MOPRO_DIR}" \
+  "${MOPRO_DIR}/deploy" \
   "${DATA_DIR}/postgres-ecom" \
   "${DATA_DIR}/postgres-ledger" \
+  "${DATA_DIR}/postgres-config" \
   "${DATA_DIR}/redis" \
   "${DATA_DIR}/meili" \
   "${MOPRO_DIR}/bin" \
@@ -131,6 +133,11 @@ for _dir in \
 done
 chmod 750 /etc/mopro
 chown root:root /etc/mopro
+
+# Redis container runs as UID 999 (bypasses root entrypoint with user: 999:999).
+# Meilisearch container runs as UID 1000 (same pattern).
+chown -R 999:999   "${DATA_DIR}/redis"
+chown -R 1000:1000 "${DATA_DIR}/meili"
 echo "[8/13] Directory tree under ${MOPRO_DIR} created"
 
 # ── §10 /etc/mopro/.env (secrets file) ───────────────────────────────────────
@@ -138,14 +145,19 @@ if [[ ! -f /etc/mopro/.env ]]; then
   touch /etc/mopro/.env
   echo "  NOTE: /etc/mopro/.env is empty — run deploy/scripts/init-secrets.sh next."
 fi
-chmod 600 /etc/mopro/.env
-chown root:root /etc/mopro/.env
+# root:mopro 640 — mopro user (running docker compose) needs read access
+chown root:mopro /etc/mopro/.env
+chmod 640 /etc/mopro/.env
 
-# Symlink so docker compose running from /opt/mopro can use .env
+# Symlink at deploy/.env so docker compose (run from deploy/) resolves env_file: [.env]
+if [[ ! -L "${MOPRO_DIR}/deploy/.env" ]] && [[ ! -f "${MOPRO_DIR}/deploy/.env" ]]; then
+  ln -sf /etc/mopro/.env "${MOPRO_DIR}/deploy/.env"
+fi
+# Also symlink at MOPRO_DIR root for convenience
 if [[ ! -L "${MOPRO_DIR}/.env" ]] && [[ ! -f "${MOPRO_DIR}/.env" ]]; then
   ln -sf /etc/mopro/.env "${MOPRO_DIR}/.env"
 fi
-echo "[9/13] /etc/mopro/.env ready (chmod 600)"
+echo "[9/13] /etc/mopro/.env ready (chmod 640 root:mopro)"
 
 # ── §11 Hetzner Storage Box backup SSH key ────────────────────────────────────
 _ssh_dir="/home/${MOPRO_USER}/.ssh"

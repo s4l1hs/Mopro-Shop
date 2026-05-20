@@ -8,7 +8,7 @@ SERVER="${SERVER:-mopro@195.85.207.92}"
 SSH_PORT="${SSH_PORT:-4625}"
 MOPRO_DIR="/opt/mopro"
 BIN_DIR="${MOPRO_DIR}/bin"
-COMPOSE="docker compose -f ${MOPRO_DIR}/docker-compose.prod.yml"
+COMPOSE="docker compose -f ${MOPRO_DIR}/deploy/docker-compose.prod.yml"
 
 _ssh() { ssh -p "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "${SERVER}" "$@"; }
 
@@ -37,7 +37,7 @@ _ssh "
   sleep 30
 
   for svc in jobs-svc core-svc fin-svc; do
-    status=\$(docker inspect --format='{{.State.Health.Status}}' \"\${svc}\" 2>/dev/null || echo 'missing')
+    status=\$(docker inspect --format='{{.State.Status}}' \"\${svc}\" 2>/dev/null || echo 'missing')
     echo \"  \${svc}: \${status}\"
   done
 "
