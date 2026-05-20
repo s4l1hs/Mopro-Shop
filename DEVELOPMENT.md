@@ -880,4 +880,77 @@ When renaming an event type or consumer group:
 
 ---
 
+## OpenAPI Contract and Codegen (Phase 4.0)
+
+### OpenAPI contract authority rule
+
+`api/openapi.yaml` is the **single source of truth** for all HTTP API shapes.
+Generated files (`internal/api/gen/`, `mobile/packages/mopro_api/`) are derived
+artifacts and must never be edited by hand.
+
+**When editing the spec:**
+1. Make changes in `api/openapi.yaml`.
+2. Run `make api-gen` to regenerate all outputs.
+3. Commit the spec and ALL generated files in the same commit.
+4. The pre-commit hook at `.githooks/pre-commit` enforces step 3.
+
+Activate the hook once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+### Generating API stubs
+
+```bash
+# Regenerate Go types + server stubs (requires Go 1.22+)
+make api-gen-models   # → internal/api/gen/types/types.gen.go
+make api-gen-core     # → internal/api/gen/core/server.gen.go
+make api-gen-fin      # → internal/api/gen/fin/server.gen.go
+
+# Regenerate Dart client (requires Docker)
+make api-gen-dart     # → mobile/packages/mopro_api/
+
+# Regenerate everything at once
+make api-gen
+
+# Lint the spec (0 errors required)
+make api-lint
+
+# Run contract tests (spec internal-consistency, not live handler tests)
+make contract-test
+```
+
+Tool versions are pinned in the Makefile:
+- `oapi-codegen`: `OAPI_CODEGEN_VERSION = v2.4.1`
+- `openapi-generator-cli` (Docker): `OPENAPI_GEN_VERSION = v7.10.0`
+
+### Auth bypass for local development (Phase 4.2a removal)
+
+In Phase 4.0 and earlier, `core-svc` accepts an `X-Mopro-User-Id` header as a
+dev-only auth bypass. The middleware reads this header and injects the user ID
+into the request context, skipping JWT validation.
+
+**This header is NOT part of the OpenAPI spec.** It is a temporary scaffolding
+mechanism and will be removed in Phase 4.2a when full JWT auth is implemented.
+The spec documents the target authentication flow (bearerAuth + stepUpAuth).
+
+Do NOT document `X-Mopro-User-Id` in the spec or in any client code.
+
+### CI: OpenAPI contract workflow
+
+`.github/workflows/openapi-ci.yml` runs four jobs on any change under `api/`,
+`internal/api/`, or `mobile/packages/mopro_api/`:
+
+| Job | What it checks |
+|---|---|
+| `lint-spec` | Spectral lint — 0 errors |
+| `generated-sync` | Re-generates and diffs; fails if committed files don't match |
+| `go-build` | Builds all 3 binaries + unit tests (race) + contract tests |
+| `dart-analyze` | `flutter pub get` → `build_runner` → `flutter analyze` |
+
+All four jobs must be green before merging to `main`.
+
+---
+
 **End of DEVELOPMENT.md.**

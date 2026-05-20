@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Pre-commit: fail if api/openapi.yaml is staged but generated files are not.
+set -euo pipefail
+
+SPEC_STAGED=$(git diff --cached --name-only | grep '^api/openapi.yaml' || true)
+
+if [ -z "$SPEC_STAGED" ]; then
+  exit 0
+fi
+
+echo "[pre-commit] openapi.yaml staged — checking generated files are also staged..."
+
+GENERATED_STAGED=$(git diff --cached --name-only | grep -E '^(internal/api/gen/|mobile/packages/mopro_api/)' || true)
+
+if [ -z "$GENERATED_STAGED" ]; then
+  echo ""
+  echo "ERROR: api/openapi.yaml is staged but generated files are not."
+  echo "Run 'make api-gen' and stage the output before committing:"
+  echo "  make api-gen"
+  echo "  git add internal/api/gen/ mobile/packages/mopro_api/"
+  echo ""
+  exit 1
+fi
+
+echo "[pre-commit] Generated files are staged. OK."

@@ -1,0 +1,113 @@
+name: OpenAPI Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - "internal/api/**"
+      - "mobile/packages/mopro_api/**"
+      - "go.mod"
+      - "go.sum"
+  pull_request:
+    paths:
+      - "api/**"
+      - "internal/api/**"
+      - "mobile/packages/mopro_api/**"
+      - "go.mod"
+      - "go.sum"
+
+jobs:
+  lint-spec:
+    name: Spectral OpenAPI lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Spectral
+        run: npx --yes @stoplight/spectral-cli@6 lint api/openapi.yaml
+        # 0 errors required; warnings are acceptable
+
+  generated-sync:
+    name: Generated files in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Re-generate Go types + server stubs
+        run: |
+          go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1 \
+            --config api/oapi-codegen-models.yaml api/openapi.yaml
+          go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1 \
+            --config api/oapi-codegen-core.yaml api/openapi.yaml
+          go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.4.1 \
+            --config api/oapi-codegen-fin.yaml api/openapi.yaml
+
+      - name: Re-generate Dart client
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/local \
+            openapitools/openapi-generator-cli:v7.10.0 generate \
+            -i /local/api/openapi.yaml \
+            -g dart-dio \
+            -o /local/mobile/packages/mopro_api \
+            --additional-properties=pubName=mopro_api,nullSafe=true,serializationLibrary=json_serializable,hideGenerationTimestamp=true \
+            --skip-validate-spec
+
+      - name: Diff check — generated files must match committed files
+        run: |
+          git diff --exit-code internal/api/gen/ mobile/packages/mopro_api/ || \
+            (echo "" && \
+             echo "ERROR: Generated files are out of sync with api/openapi.yaml." && \
+             echo "Run 'make api-gen' locally and commit the result." && \
+             exit 1)
+
+  go-build:
+    name: Go build + contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Build all binaries
+        run: |
+          go build -o /tmp/core-svc ./cmd/core-svc
+          go build -o /tmp/fin-svc  ./cmd/fin-svc
+          go build -o /tmp/jobs-svc ./cmd/jobs-svc
+
+      - name: Unit tests (race detector)
+        run: go test -race ./...
+
+      - name: Contract tests
+        run: go test -tags=contract -v ./internal/api/...
+
+  dart-analyze:
+    name: Flutter analyze (dart-dio client)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.x"
+          channel: stable
+
+      - name: Get dependencies
+        working-directory: mobile/packages/mopro_api
+        run: flutter pub get
+
+      - name: Run build_runner (generate .g.dart files)
+        working-directory: mobile/packages/mopro_api
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      - name: Flutter analyze
+        working-directory: mobile/packages/mopro_api
+        run: flutter analyze
