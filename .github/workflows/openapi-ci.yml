@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run Spectral
-        run: npx --yes @stoplight/spectral-cli@6 lint api/openapi.yaml
+        run: npx --yes @stoplight/spectral-cli@6 lint api/openapi.yaml --ruleset api/.spectral.yaml
         # 0 errors required; warnings are acceptable
 
   generated-sync:

@@ -132,7 +132,7 @@ test-integration-sellerpayout:
 # ── OpenAPI codegen targets ────────────────────────────────────────────────────
 
 api-lint:
-	npx --yes @stoplight/spectral-cli@6 lint api/openapi.yaml
+	npx --yes @stoplight/spectral-cli@6 lint api/openapi.yaml --ruleset api/.spectral.yaml
 
 api-gen-models:
 	go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@$(OAPI_CODEGEN_VERSION) \
