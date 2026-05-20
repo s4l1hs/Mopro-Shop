@@ -1,7 +1,15 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:mopro/core/network/dio_client.dart';
+import 'package:mopro/core/network/interceptors/auth_interceptor.dart';
 import 'package:mopro/core/storage/token_storage.dart';
+
+// Overridden at app startup via ProviderScope (from dart-define API_BASE_URL).
+final apiBaseUrlProvider = Provider<String>(
+  (_) => 'https://api.moproshop.com',
+);
 
 final secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
   return const FlutterSecureStorage(
@@ -15,4 +23,36 @@ final tokenStorageProvider = Provider<TokenStorage>((ref) {
 
 final localeStateProvider = StateProvider<Locale>((ref) {
   return const Locale('tr', 'TR');
+});
+
+final authInterceptorProvider = Provider<AuthInterceptor>((ref) {
+  final storage = ref.watch(tokenStorageProvider);
+  final baseUrl = ref.watch(apiBaseUrlProvider);
+  final logoutFn = ref.watch(_logoutFnProvider);
+
+  final refreshDio = Dio(BaseOptions(baseUrl: baseUrl));
+  return AuthInterceptor(
+    tokenStorage: storage,
+    refreshDio: refreshDio,
+    onLogout: logoutFn,
+  );
+});
+
+final dioProvider = Provider<Dio>((ref) {
+  final baseUrl = ref.watch(apiBaseUrlProvider);
+  final storage = ref.watch(tokenStorageProvider);
+  final locale = ref.watch(localeStateProvider);
+
+  return buildDio(
+    baseUrl: baseUrl,
+    tokenStorage: storage,
+    localeGetter: () => locale,
+    onLogout: ref.watch(_logoutFnProvider),
+  );
+});
+
+final _logoutFnProvider = Provider<Future<void> Function()>((ref) {
+  return () async {
+    await ref.read(tokenStorageProvider).clear();
+  };
 });
