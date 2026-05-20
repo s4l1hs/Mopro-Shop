@@ -1,0 +1,2658 @@
+openapi: "3.1.0"
+
+info:
+  title: Mopro Shop API
+  version: "1.0.0"
+  description: |
+    Mobile-first marketplace API for Mopro Shop. Buyer app + seller panel.
+
+    ## Money format
+    All monetary values are **integer minor units** (kuruş for TRY; coin-minor for TRY_COIN).
+    Every monetary field is accompanied by a `currency` string field.
+    Never use decimal values. Display layer divides by 100.
+
+    ## Timestamps
+    All timestamps are **RFC 3339 strings** (e.g. `"2026-01-15T10:00:00Z"`).
+    Dates (no time component) use ISO 8601 `YYYY-MM-DD`.
+
+    ## Locale resolution
+    Product `title` and `description` are resolved server-side from the
+    `Accept-Language` request header. The response always contains a single
+    resolved string — never a `translations[]` array.
+    Fallback chain: requested locale → `tr-TR` → first available locale.
+
+    ## Step-up authentication flow
+    Endpoints annotated with `stepUpAuth` require a short-lived step-up token
+    (TTL 5 min, claim `scope=high_sensitivity`). Sending a regular access token
+    to a `stepUpAuth` endpoint returns `403` with `code: step_up_required`.
+
+    Client flow:
+    1. Receive `403 step_up_required`.
+    2. Present OTP entry screen.
+    3. `POST /v1/auth/step-up` with access token + fresh OTP code → `step_up_token`.
+    4. Retry the original request with `Authorization: Bearer <step_up_token>`.
+
+    ## X-Trace-Id
+    Clients should generate a UUID per request and attach it as `X-Trace-Id`.
+    The server echoes the value in `error.trace_id`. Falls back to a
+    server-generated UUID if the header is absent.
+
+    ## Idempotency
+    All state-mutating endpoints (POST/PUT/PATCH/DELETE, except OTP request)
+    require `X-Idempotency-Key` (UUIDv7). Duplicate keys within 24 hours return
+    the cached response without re-executing the operation.
+
+    ## Binary routing
+    Caddy routes by path prefix:
+    - `/v1/wallet/*` → fin-svc
+    - `/v1/cashback/*` → fin-svc
+    - All other `/v1/*` → core-svc
+    See `deploy/CADDY-ROUTING.md` for the authoritative mapping.
+  contact:
+    name: Mopro Platform Team
+    email: platform@moproshop.com
+
+servers:
+  - url: https://api.moproshop.com
+    description: Production (Caddy ingress — routes wallet/cashback to fin-svc, rest to core-svc)
+  - url: http://localhost:8080
+    description: Local core-svc
+  - url: http://localhost:8081
+    description: Local fin-svc
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: auth
+    description: Authentication — OTP, tokens, step-up
+  - name: me
+    description: Authenticated user profile and devices
+  - name: address
+    description: Delivery address book
+  - name: catalog
+    description: Products, variants, categories
+  - name: search
+    description: Full-text search powered by Meilisearch
+  - name: discovery
+    description: Banners and personalised recommendations
+  - name: cart
+    description: Shopping cart management
+  - name: orders
+    description: Order lifecycle and returns
+  - name: seller
+    description: Seller transparency and payout breakdown
+  - name: wallet
+    description: Coin wallet balance and transaction history (served by fin-svc)
+  - name: cashback
+    description: Perpetual cashback plans and monthly payments (served by fin-svc)
+  - name: admin
+    description: Internal admin operations. Not exposed to mobile clients.
+  - name: health
+    description: Health check
+
+paths:
+
+  # ── Auth ──────────────────────────────────────────────────────────────────────
+
+  /v1/auth/otp/request:
+    post:
+      operationId: RequestOtp
+      tags: [auth]
+      summary: Request a one-time password via SMS
+      description: |
+        Dispatches a 6-digit OTP to the provided phone number.
+        Rate-limited per phone: max 3 requests per 5 minutes.
+        X-Idempotency-Key is NOT honored here — each call always dispatches
+        a new OTP to avoid replay-suppression attacks.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+                  pattern: '^\+90[5][0-9]{9}$'
+                  example: "+905321234567"
+                  description: "Turkish mobile number in E.164 format. Must start with +905."
+      responses:
+        '204':
+          description: OTP dispatched
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/auth/otp/verify:
+    post:
+      operationId: VerifyOtp
+      tags: [auth]
+      summary: Verify OTP and issue access + refresh token pair
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone:
+                  type: string
+                  pattern: '^\+90[5][0-9]{9}$'
+                code:
+                  type: string
+                  pattern: '^\d{6}$'
+                  example: "123456"
+      responses:
+        '200':
+          description: Token pair issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '401':
+          description: OTP invalid or expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/auth/token/refresh:
+    post:
+      operationId: RefreshToken
+      tags: [auth]
+      summary: Exchange a refresh token for a new token pair
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: New token pair issued; old refresh token revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '401':
+          description: Refresh token invalid, expired, or revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/auth/logout:
+    post:
+      operationId: Logout
+      tags: [auth]
+      summary: Revoke the provided refresh token
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '204':
+          description: Refresh token revoked
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/auth/step-up:
+    post:
+      operationId: StepUp
+      tags: [auth]
+      summary: Exchange access token + fresh OTP for a step-up token (TTL 5 min)
+      description: |
+        Call this after receiving `403 step_up_required`. The caller must have
+        already called `/v1/auth/otp/request` to obtain a fresh OTP for the
+        currently authenticated phone number.
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [otp_code]
+              properties:
+                otp_code:
+                  type: string
+                  pattern: '^\d{6}$'
+      responses:
+        '200':
+          description: Step-up token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepUpTokenResponse'
+        '401':
+          description: OTP invalid, expired, or access token invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Me ────────────────────────────────────────────────────────────────────────
+
+  /v1/me:
+    get:
+      operationId: GetMe
+      tags: [me]
+      summary: Get authenticated user profile
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      operationId: UpdateMe
+      tags: [me]
+      summary: Update user profile fields
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name_first:
+                  type: string
+                name_last:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                locale:
+                  type: string
+                  example: tr-TR
+      responses:
+        '200':
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      operationId: DeleteMe
+      tags: [me]
+      summary: Soft-delete the authenticated user account (KVKK / GDPR)
+      description: |
+        Requires step-up authentication (`stepUpAuth` security scheme).
+        Account enters a 30-day grace period before permanent deletion.
+        All active cashback plans are cancelled on confirmation.
+      security:
+        - stepUpAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  enum: [no_longer_needed, privacy_concern, bad_experience, switching_platform, other]
+      responses:
+        '204':
+          description: Account scheduled for deletion
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/StepUpRequired'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/me/devices:
+    post:
+      operationId: RegisterDevice
+      tags: [me]
+      summary: Register a device FCM token for push notifications
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fcm_token, device_model, os_version]
+              properties:
+                fcm_token:
+                  type: string
+                device_model:
+                  type: string
+                  example: "Samsung Galaxy S25"
+                os_version:
+                  type: string
+                  example: "Android 16"
+      responses:
+        '201':
+          description: Device registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/me/devices/{id}:
+    delete:
+      operationId: UnregisterDevice
+      tags: [me]
+      summary: Remove a registered device (deregister push notifications)
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Device removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Addresses ─────────────────────────────────────────────────────────────────
+
+  /v1/addresses:
+    get:
+      operationId: ListAddresses
+      tags: [address]
+      summary: List the authenticated user's delivery addresses
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+      responses:
+        '200':
+          description: Address list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Address'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      operationId: CreateAddress
+      tags: [address]
+      summary: Add a new delivery address
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressInput'
+      responses:
+        '201':
+          description: Address created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/addresses/{id}:
+    put:
+      operationId: UpdateAddress
+      tags: [address]
+      summary: Update an existing address
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddressInput'
+      responses:
+        '200':
+          description: Updated address
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Address'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      operationId: DeleteAddress
+      tags: [address]
+      summary: Delete an address
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Address deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Catalog ───────────────────────────────────────────────────────────────────
+
+  /v1/categories:
+    get:
+      operationId: ListCategories
+      tags: [catalog]
+      summary: List all 42 product categories (locale-resolved names)
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+      responses:
+        '200':
+          description: Category list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Category'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/categories/{id}/commission:
+    get:
+      operationId: GetCategoryCommission
+      tags: [catalog, admin]
+      summary: Get live commission and KDV rates for a category + market pair
+      security:
+        - adminAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: market
+          in: query
+          required: false
+          schema:
+            type: string
+            example: TR
+            default: TR
+      responses:
+        '200':
+          description: Category commission rates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CategoryCommission'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/products:
+    get:
+      operationId: ListProducts
+      tags: [catalog]
+      summary: List products with optional category filter, pagination, and sort
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: category_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [recommended, newest, price_asc, price_desc, best_selling]
+            default: recommended
+      responses:
+        '200':
+          description: Paginated product list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductSummary'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      operationId: CreateProduct
+      tags: [catalog, admin]
+      summary: Create a new product listing (admin / seller onboarding)
+      security:
+        - adminAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [seller_id, category_id, brand, default_currency, default_locale]
+              properties:
+                seller_id:
+                  type: integer
+                  format: int64
+                category_id:
+                  type: integer
+                  format: int64
+                brand:
+                  type: string
+                default_currency:
+                  type: string
+                  example: TRY
+                default_locale:
+                  type: string
+                  example: tr-TR
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/products/{id}:
+    get:
+      operationId: GetProduct
+      tags: [catalog]
+      summary: Get full product detail including variants and cashback preview
+      description: |
+        Server resolves `title` and `description` from `Accept-Language` header.
+        `cashback_preview.monthly_coin_minor` is computed handler-layer:
+        `round(variant.price_minor × commission_pct_bps/10000 × 5000/10000 / 12)`.
+        Uses the lowest-priced active variant for the preview amount.
+        `seller_name` is joined from the seller module (in-process, core-svc only).
+        `image_urls` are CDN-resolved (not raw storage keys).
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Search ────────────────────────────────────────────────────────────────────
+
+  /v1/search/suggest:
+    get:
+      operationId: SearchSuggest
+      tags: [search]
+      summary: Autocomplete suggestions (debounce 250 ms on client)
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+      responses:
+        '200':
+          description: Suggestion list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [suggestions]
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/search/trending:
+    get:
+      operationId: SearchTrending
+      tags: [search]
+      summary: Current trending search terms
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+      responses:
+        '200':
+          description: Trending terms
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [terms]
+                properties:
+                  terms:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/search:
+    get:
+      operationId: Search
+      tags: [search]
+      summary: Full-text product search with filters
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: category_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: min_price
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            description: Minimum price in minor units
+        - name: max_price
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            description: Maximum price in minor units
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [recommended, newest, price_asc, price_desc, best_selling]
+            default: recommended
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProductSummary'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Discovery ─────────────────────────────────────────────────────────────────
+
+  /v1/banners:
+    get:
+      operationId: ListBanners
+      tags: [discovery]
+      summary: Promotional banners for a given placement
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: placement
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [home, category, checkout]
+            default: home
+      responses:
+        '200':
+          description: Banner list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Banner'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/recommendations:
+    get:
+      operationId: ListRecommendations
+      tags: [discovery]
+      summary: Personalised product recommendations for the authenticated user
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+      responses:
+        '200':
+          description: Recommendation list (up to 20 items)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Recommendation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Cart ──────────────────────────────────────────────────────────────────────
+
+  /v1/cart:
+    get:
+      operationId: GetCart
+      tags: [cart]
+      summary: Get the authenticated user's cart (enriched with product data)
+      description: |
+        Returns enriched cart items joining variant/product data.
+        Per-item `monthly_coin_minor` is the cashback preview.
+        `subtotal_minor` and `total_monthly_coin_minor` are pre-computed sums.
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+      responses:
+        '200':
+          description: Cart contents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/cart/items:
+    post:
+      operationId: AddCartItem
+      tags: [cart]
+      summary: Add a variant to the cart; returns the updated enriched cart
+      description: |
+        Returns the full enriched cart (same schema as GET /v1/cart) in the
+        response, eliminating the need for a follow-up GET round-trip.
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variant_id, quantity]
+              properties:
+                variant_id:
+                  type: integer
+                  format: int64
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: Updated cart
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/cart/items/{variant_id}:
+    delete:
+      operationId: RemoveCartItem
+      tags: [cart]
+      summary: Remove a variant from the cart
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: variant_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Item removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/cart/reserve:
+    post:
+      operationId: ReserveCart
+      tags: [cart]
+      summary: Reserve inventory for all cart items before checkout
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Reservation created (expires in 10 min)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reservation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: One or more items out of stock
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: Cart is empty
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/cart/release:
+    post:
+      operationId: ReleaseCart
+      tags: [cart]
+      summary: Release an active reservation (cancel checkout flow)
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reservation_id]
+              properties:
+                reservation_id:
+                  type: string
+      responses:
+        '204':
+          description: Reservation released
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Orders ────────────────────────────────────────────────────────────────────
+
+  /v1/orders/checkout:
+    post:
+      operationId: Checkout
+      tags: [orders]
+      summary: Atomically reserve cart → create order → initiate PSP payment
+      description: |
+        Single-shot convenience endpoint for the mobile checkout flow.
+        Internally calls cart.Reserve → order.Create → payment.Initiate.
+        Returns immediately with redirect_url for 3DS if required,
+        or order details for non-3DS payment methods.
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+      responses:
+        '200':
+          description: Checkout initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Out of stock or cart modified concurrently
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/orders:
+    post:
+      operationId: CreateOrder
+      tags: [orders, admin]
+      summary: Create an order from a reservation (admin / internal)
+      security:
+        - adminAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reservation_id, address_id]
+              properties:
+                reservation_id:
+                  type: string
+                address_id:
+                  type: integer
+                  format: int64
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      operationId: ListOrders
+      tags: [orders]
+      summary: List the authenticated user's orders
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, confirmed, preparing, shipped, delivered, cancelled, refunded]
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: per_page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Paginated order list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  pagination:
+                    $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/orders/{id}:
+    get:
+      operationId: GetOrder
+      tags: [orders]
+      summary: Get order detail
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/orders/{id}/cancel:
+    post:
+      operationId: CancelOrder
+      tags: [orders]
+      summary: Cancel an order (only while in pending/confirmed status)
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Order cancelled
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Order cannot be cancelled in its current status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/orders/{id}/refund:
+    post:
+      operationId: RefundOrder
+      tags: [orders, admin]
+      summary: Trigger a full refund for a delivered order (admin only)
+      security:
+        - adminAuth: []
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+      responses:
+        '204':
+          description: Refund initiated
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Order not in a refundable status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/orders/{id}/returns:
+    post:
+      operationId: CreateReturn
+      tags: [orders]
+      summary: Submit a return request for delivered order items
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReturnRequest'
+      responses:
+        '201':
+          description: Return request created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Return'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Return window expired (>14 days after delivery)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      operationId: ListReturns
+      tags: [orders]
+      summary: List return requests for an order
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Return list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Return'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Seller ────────────────────────────────────────────────────────────────────
+
+  /v1/seller/orders/{id}/breakdown:
+    get:
+      operationId: GetSellerOrderBreakdown
+      tags: [seller]
+      summary: Seller transparency breakdown for a specific order
+      description: |
+        Returns per-item commission, KDV, service fee (always 0 for Mopro),
+        and net payout amounts. Used by the seller panel web app.
+
+        **Current auth:** Requires `X-Mopro-Seller-Id` header containing the
+        seller's integer ID. Phase 4.2a replaces this with seller JWT (`bearerAuth`).
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: X-Mopro-Seller-Id
+          in: header
+          required: true
+          deprecated: true
+          description: "Seller ID header. Replaced by JWT in Phase 4.2a."
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order breakdown for the seller
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SellerOrderBreakdown'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Wallet ────────────────────────────────────────────────────────────────────
+
+  /v1/wallet/balance:
+    get:
+      operationId: GetWalletBalance
+      tags: [wallet]
+      summary: Get the authenticated user's coin wallet balance
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: currency
+          in: query
+          required: false
+          schema:
+            type: string
+            default: TRY_COIN
+      responses:
+        '200':
+          description: Wallet balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WalletBalance'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/wallet/transactions:
+    get:
+      operationId: ListWalletTransactions
+      tags: [wallet]
+      summary: List wallet transaction history (cursor-paginated)
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            description: Opaque base64 cursor from a previous response
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 24
+      responses:
+        '200':
+          description: Wallet transaction list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WalletTransaction'
+                  pagination:
+                    $ref: '#/components/schemas/CursorPaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Cashback ──────────────────────────────────────────────────────────────────
+
+  /v1/cashback/plans:
+    get:
+      operationId: ListCashbackPlans
+      tags: [cashback]
+      summary: List the authenticated user's perpetual cashback plans
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [active, cancelled, suspended]
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Cashback plan list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CashbackPlan'
+                  pagination:
+                    $ref: '#/components/schemas/CursorPaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/cashback/plans/{id}:
+    get:
+      operationId: GetCashbackPlan
+      tags: [cashback]
+      summary: Get a single cashback plan
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Cashback plan detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashbackPlan'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /v1/cashback/plans/{id}/payments:
+    get:
+      operationId: ListCashbackPayments
+      tags: [cashback]
+      summary: List monthly payment history for a cashback plan (cursor-paginated)
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 24
+      responses:
+        '200':
+          description: Cashback payment history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, pagination]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CashbackPayment'
+                  pagination:
+                    $ref: '#/components/schemas/CursorPaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ── Health ────────────────────────────────────────────────────────────────────
+
+  /healthz:
+    get:
+      operationId: Healthz
+      tags: [health]
+      summary: Health check (liveness probe)
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+
+# ── Components ────────────────────────────────────────────────────────────────
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        HS256 access token. TTL 15 min.
+        Claims: sub (user_id as string), iat, exp.
+        Issued by POST /v1/auth/otp/verify or POST /v1/auth/token/refresh.
+    stepUpAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Short-lived JWT with claim `scope=high_sensitivity`. TTL 5 min.
+        Issued by POST /v1/auth/step-up after re-verifying OTP.
+        Required for: DELETE /v1/me (account deletion).
+        If a regular bearerAuth token is sent instead, the server returns
+        403 with code=step_up_required.
+    adminAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Admin / internal token. Only for POST /v1/products, POST /v1/orders,
+        POST /v1/orders/{id}/refund, and GET /v1/categories/{id}/commission.
+        Not exposed to mobile clients.
+
+  parameters:
+    IdempotencyKey:
+      name: X-Idempotency-Key
+      in: header
+      required: true
+      description: |
+        UUIDv7 generated client-side. Server caches the response for 24 hours
+        keyed on this value. Duplicate requests within that window return the
+        cached response without re-executing the operation.
+      schema:
+        type: string
+        format: uuid
+        example: "01926b7f-1234-7abc-8def-0123456789ab"
+
+    TraceId:
+      name: X-Trace-Id
+      in: header
+      required: false
+      description: |
+        Client-generated trace identifier (UUID or opaque string).
+        Echoed in error responses as `error.trace_id`.
+        Falls back to a server-generated UUID if absent.
+      schema:
+        type: string
+        example: "4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e"
+
+  responses:
+    Unauthorized:
+      description: Missing, invalid, or expired access token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+    StepUpRequired:
+      description: |
+        Regular access token provided but step-up token required.
+        Client must call POST /v1/auth/step-up to obtain a step-up token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: step_up_required
+              message: "This action requires step-up authentication. Please complete OTP verification."
+              trace_id: "4f3a2b1c"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+    Conflict:
+      description: Request conflicts with current resource state
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+    UnprocessableEntity:
+      description: Request body failed schema or business-rule validation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+    ServiceUnavailable:
+      description: |
+        System is in read-only mode (maintenance window, migration in progress,
+        or circuit breaker open). Retry after the `Retry-After` header value.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: service_unavailable
+              message: "System is temporarily in read-only mode. Please try again shortly."
+              trace_id: "4f3a2b1c"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
+  schemas:
+
+    # ── Common ────────────────────────────────────────────────────────────────
+
+    FieldError:
+      type: object
+      description: A field-level validation error within an ErrorEnvelope
+      required: [name, message]
+      properties:
+        name:
+          type: string
+          example: phone
+        message:
+          type: string
+          example: "must start with +905"
+
+    ErrorEnvelope:
+      type: object
+      description: Standard error response wrapper used by all error status codes
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, trace_id]
+          properties:
+            code:
+              type: string
+              description: Machine-readable error slug
+              example: validation_error
+            message:
+              type: string
+              description: Human-readable error message (locale from Accept-Language)
+              example: "Telefon numarası geçersiz."
+            trace_id:
+              type: string
+              description: Request trace ID. Echoes X-Trace-Id or server-generated UUID.
+              example: "4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e"
+            fields:
+              type: array
+              description: Per-field validation errors. Present only for 422 responses.
+              items:
+                $ref: '#/components/schemas/FieldError'
+
+    PaginationMeta:
+      type: object
+      description: Page-based pagination metadata (used for product browse and order lists)
+      required: [page, per_page, total, total_pages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        per_page:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          format: int64
+        total_pages:
+          type: integer
+          minimum: 0
+
+    CursorPaginationMeta:
+      type: object
+      description: Cursor-based pagination metadata (used for wallet transactions and cashback payments)
+      required: [has_more]
+      properties:
+        has_more:
+          type: boolean
+        next_cursor:
+          type: string
+          nullable: true
+          description: |
+            Opaque base64-encoded cursor. Pass as `cursor=` on the next request.
+            Null when has_more=false. Never parse or construct manually.
+
+    # ── Auth schemas ──────────────────────────────────────────────────────────
+
+    TokenPair:
+      type: object
+      required: [access_token, token_type, expires_in, refresh_token, refresh_expires_at]
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_in:
+          type: integer
+          description: "Seconds until access token expiry. Always 900 (15 min)."
+          example: 900
+        refresh_token:
+          type: string
+        refresh_expires_at:
+          type: string
+          format: date-time
+
+    StepUpTokenResponse:
+      type: object
+      required: [step_up_token, expires_in]
+      properties:
+        step_up_token:
+          type: string
+          description: Bearer token with scope=high_sensitivity. Use as Authorization header.
+        expires_in:
+          type: integer
+          description: "Seconds until step-up token expiry. Always 300 (5 min)."
+          example: 300
+
+    # ── User / Identity ───────────────────────────────────────────────────────
+
+    User:
+      type: object
+      required: [id, phone, locale, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        phone:
+          type: string
+          example: "+905321234567"
+        name_first:
+          type: string
+          nullable: true
+        name_last:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        locale:
+          type: string
+          example: tr-TR
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Device:
+      type: object
+      required: [id, fcm_token, device_model, os_version, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        fcm_token:
+          type: string
+        device_model:
+          type: string
+          example: "Samsung Galaxy S25"
+        os_version:
+          type: string
+          example: "Android 16"
+        created_at:
+          type: string
+          format: date-time
+
+    # ── Address ───────────────────────────────────────────────────────────────
+
+    Address:
+      type: object
+      required: [id, label, name, phone, city, district, full_address, is_default]
+      properties:
+        id:
+          type: integer
+          format: int64
+        label:
+          type: string
+          example: "Ev"
+        name:
+          type: string
+        phone:
+          type: string
+        city:
+          type: string
+        district:
+          type: string
+        neighborhood:
+          type: string
+          nullable: true
+        full_address:
+          type: string
+        postal_code:
+          type: string
+          nullable: true
+        is_default:
+          type: boolean
+
+    AddressInput:
+      type: object
+      required: [label, name, phone, city, district, full_address]
+      properties:
+        label:
+          type: string
+          example: "Ev"
+        name:
+          type: string
+        phone:
+          type: string
+        city:
+          type: string
+        district:
+          type: string
+        neighborhood:
+          type: string
+        full_address:
+          type: string
+        postal_code:
+          type: string
+        is_default:
+          type: boolean
+          default: false
+
+    # ── Catalog ───────────────────────────────────────────────────────────────
+
+    Category:
+      type: object
+      required: [id, name, slug, commission_pct_bps]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+          description: Locale-resolved category name
+        slug:
+          type: string
+        parent_id:
+          type: integer
+          format: int64
+          nullable: true
+        icon_url:
+          type: string
+          format: uri
+          nullable: true
+        commission_pct_bps:
+          type: integer
+          description: Commission rate in basis points (e.g. 1500 = 15%)
+
+    CategoryCommission:
+      type: object
+      required: [category_id, market, commission_pct_bps, kdv_pct_bps]
+      properties:
+        category_id:
+          type: integer
+          format: int64
+        market:
+          type: string
+          example: TR
+        commission_pct_bps:
+          type: integer
+          description: Commission rate in basis points
+        kdv_pct_bps:
+          type: integer
+          description: KDV (VAT) rate in basis points
+
+    CashbackPreview:
+      type: object
+      description: |
+        Preview of the perpetual monthly cashback amount for a product.
+        Computed handler-layer using the formula:
+        round(lowest_variant_price_minor × commission_pct_bps/10000 × 5000/10000 / 12).
+        Not a committed plan; serves as a display hint.
+      required: [monthly_coin_minor, currency]
+      properties:
+        monthly_coin_minor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          example: TRY_COIN
+
+    Variant:
+      type: object
+      required: [id, sku, price_minor, price_currency, stock, image_urls]
+      properties:
+        id:
+          type: integer
+          format: int64
+        sku:
+          type: string
+        color:
+          type: string
+          nullable: true
+        size:
+          type: string
+          nullable: true
+        price_minor:
+          type: integer
+          format: int64
+          description: Price in minor units (kuruş)
+        price_currency:
+          type: string
+          example: TRY
+        stock:
+          type: integer
+          minimum: 0
+        image_urls:
+          type: array
+          description: CDN-resolved full URLs. Never raw storage keys.
+          items:
+            type: string
+            format: uri
+
+    Product:
+      type: object
+      description: |
+        Full product detail. Title and description are locale-resolved server-side.
+        cashback_preview uses the lowest-priced active variant.
+        seller_name is joined from the seller module (in-process, core-svc only).
+      required: [id, seller_id, seller_name, category_id, brand, status, title,
+                 description, variants, cashback_preview, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        seller_id:
+          type: integer
+          format: int64
+        seller_name:
+          type: string
+        category_id:
+          type: integer
+          format: int64
+        brand:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, draft]
+        title:
+          type: string
+          description: Locale-resolved from Accept-Language header
+        description:
+          type: string
+          description: Locale-resolved. Falls back to tr-TR if requested locale unavailable.
+        variants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Variant'
+        cashback_preview:
+          $ref: '#/components/schemas/CashbackPreview'
+        created_at:
+          type: string
+          format: date-time
+
+    ProductSummary:
+      type: object
+      description: Lightweight product representation for list / search results
+      required: [id, seller_id, category_id, brand, status, title,
+                 price_minor, price_currency, cashback_preview]
+      properties:
+        id:
+          type: integer
+          format: int64
+        seller_id:
+          type: integer
+          format: int64
+        category_id:
+          type: integer
+          format: int64
+        brand:
+          type: string
+        status:
+          type: string
+          enum: [active, inactive, draft]
+        title:
+          type: string
+          description: Locale-resolved
+        price_minor:
+          type: integer
+          format: int64
+          description: Lowest-priced active variant price in minor units
+        price_currency:
+          type: string
+        cover_image_url:
+          type: string
+          format: uri
+          nullable: true
+          description: First image URL of the lowest-priced variant
+        cashback_preview:
+          $ref: '#/components/schemas/CashbackPreview'
+
+    # ── Cart ──────────────────────────────────────────────────────────────────
+
+    CartItem:
+      type: object
+      description: Enriched cart line item. Domain CartItem has only variant_id + qty; enrichment is handler-layer.
+      required: [variant_id, product_id, title, price_minor, price_currency,
+                 quantity, monthly_coin_minor, coin_currency]
+      properties:
+        variant_id:
+          type: integer
+          format: int64
+        product_id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        color:
+          type: string
+          nullable: true
+        size:
+          type: string
+          nullable: true
+        price_minor:
+          type: integer
+          format: int64
+        price_currency:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        monthly_coin_minor:
+          type: integer
+          format: int64
+          description: Cashback preview per item per month
+        coin_currency:
+          type: string
+          example: TRY_COIN
+
+    Cart:
+      type: object
+      required: [user_id, items, subtotal_minor, subtotal_currency,
+                 total_monthly_coin_minor, coin_currency]
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartItem'
+        subtotal_minor:
+          type: integer
+          format: int64
+          description: Sum of price_minor × quantity across all items
+        subtotal_currency:
+          type: string
+        total_monthly_coin_minor:
+          type: integer
+          format: int64
+          description: Sum of monthly_coin_minor across all items
+        coin_currency:
+          type: string
+          example: TRY_COIN
+
+    Reservation:
+      type: object
+      required: [id, expires_at]
+      properties:
+        id:
+          type: string
+          description: Reservation ID; pass to POST /v1/orders or POST /v1/orders/checkout
+        expires_at:
+          type: string
+          format: date-time
+          description: Reservation is released automatically after this time (typically 10 min)
+
+    # ── Checkout / Orders ─────────────────────────────────────────────────────
+
+    CheckoutRequest:
+      type: object
+      required: [address_id, cargo_option, payment_method]
+      properties:
+        address_id:
+          type: integer
+          format: int64
+        cargo_option:
+          type: string
+          enum: [aras, yurtici, surat, mng, hepsijet, ptt]
+        payment_method:
+          type: object
+          required: [type]
+          properties:
+            type:
+              type: string
+              enum: [card, coin_balance]
+            saved_card_id:
+              type: string
+              nullable: true
+              description: PSP-tokenized card ID. Required when type=card and using a saved card.
+
+    CheckoutResponse:
+      type: object
+      required: [order_id, status, total_minor, currency, payment]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [awaiting_payment, confirmed]
+        total_minor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        payment:
+          type: object
+          required: [requires_3ds]
+          properties:
+            requires_3ds:
+              type: boolean
+            redirect_url:
+              type: string
+              format: uri
+              nullable: true
+              description: PSP 3DS redirect URL. Null when requires_3ds=false.
+
+    OrderItem:
+      type: object
+      required: [id, variant_id, product_id, title, quantity,
+                 price_minor, price_currency, commission_pct_bps]
+      properties:
+        id:
+          type: integer
+          format: int64
+        variant_id:
+          type: integer
+          format: int64
+        product_id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+        price_minor:
+          type: integer
+          format: int64
+        price_currency:
+          type: string
+        commission_pct_bps:
+          type: integer
+          description: "Snapshotted at sale time from ref_schema.commission_rules. Never changes after order creation."
+
+    Order:
+      type: object
+      required: [id, user_id, status, items, total_minor, currency, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        user_id:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [pending, confirmed, preparing, shipped, delivered, cancelled, refunded]
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        total_minor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        cargo_option:
+          type: string
+          nullable: true
+          enum: [aras, yurtici, surat, mng, hepsijet, ptt]
+        cashback_unlock_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            When the cashback plan becomes active.
+            Computed as delivered_at + 3 business days (TR calendar).
+            Null until the order is delivered.
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ReturnRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          enum: [wrong_product, not_as_described, damaged, size_issue, changed_mind, other]
+        description:
+          type: string
+        items:
+          type: array
+          description: Specific items and quantities to return. If absent, full order return.
+          items:
+            type: object
+            required: [order_item_id, quantity]
+            properties:
+              order_item_id:
+                type: integer
+                format: int64
+              quantity:
+                type: integer
+                minimum: 1
+
+    Return:
+      type: object
+      required: [id, order_id, status, reason, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        order_id:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [pending, approved, rejected, refunded]
+        reason:
+          type: string
+        description:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    # ── Seller ────────────────────────────────────────────────────────────────
+
+    SellerOrderBreakdown:
+      type: object
+      description: Per-seller order transparency breakdown for the seller panel
+      required: [order_id, items, totals, unlock_at]
+      properties:
+        order_id:
+          type: integer
+          format: int64
+        items:
+          type: array
+          items:
+            type: object
+            required: [product_title, quantity, gross_minor, commission_minor,
+                       kdv_minor, service_fee_minor, net_minor, currency]
+            properties:
+              product_title:
+                type: string
+              quantity:
+                type: integer
+              gross_minor:
+                type: integer
+                format: int64
+              commission_minor:
+                type: integer
+                format: int64
+              commission_pct:
+                type: number
+                format: float
+              kdv_minor:
+                type: integer
+                format: int64
+              service_fee_minor:
+                type: integer
+                format: int64
+                description: "Always 0 for Mopro. Non-zero in competitor comparison."
+              net_minor:
+                type: integer
+                format: int64
+              currency:
+                type: string
+        totals:
+          type: object
+          required: [gross_minor, commission_minor, kdv_minor, net_minor, currency]
+          properties:
+            gross_minor:
+              type: integer
+              format: int64
+            commission_minor:
+              type: integer
+              format: int64
+            kdv_minor:
+              type: integer
+              format: int64
+            net_minor:
+              type: integer
+              format: int64
+            currency:
+              type: string
+        unlock_at:
+          type: string
+          format: date-time
+          description: Payout unlock date — delivered_at + 3 business days (TR calendar)
+
+    # ── Discovery ─────────────────────────────────────────────────────────────
+
+    Banner:
+      type: object
+      required: [id, placement, image_url, action_type]
+      properties:
+        id:
+          type: integer
+          format: int64
+        placement:
+          type: string
+          example: home
+        image_url:
+          type: string
+          format: uri
+        action_type:
+          type: string
+          enum: [deeplink, external, none]
+        action_url:
+          type: string
+          nullable: true
+          description: Deep link path or external URL; null when action_type=none
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    Recommendation:
+      type: object
+      required: [product]
+      properties:
+        score:
+          type: number
+          format: float
+          nullable: true
+          description: Internal ranking score (opaque; may be omitted)
+        product:
+          $ref: '#/components/schemas/ProductSummary'
+
+    # ── Wallet ────────────────────────────────────────────────────────────────
+
+    WalletBalance:
+      type: object
+      required: [currency, amount_minor, last_updated_at]
+      properties:
+        currency:
+          type: string
+          example: TRY_COIN
+        amount_minor:
+          type: integer
+          format: int64
+        last_updated_at:
+          type: string
+          format: date-time
+
+    WalletTransaction:
+      type: object
+      required: [id, type, amount_minor, currency, occurred_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+          enum: [credit, debit]
+        amount_minor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        description:
+          type: string
+          nullable: true
+        reference_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: plan_id for cashback credits; payout_id for debits. Null for manual adjustments.
+        reference_type:
+          type: string
+          nullable: true
+          enum: [cashback_payment, payout, adjustment]
+        occurred_at:
+          type: string
+          format: date-time
+
+    # ── Cashback ──────────────────────────────────────────────────────────────
+
+    CashbackPlan:
+      type: object
+      required: [id, order_id, product_id, product_title, monthly_amount_minor,
+                 currency, status, start_date, reference_interest_rate_bps, created_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        order_id:
+          type: integer
+          format: int64
+        product_id:
+          type: integer
+          format: int64
+        product_title:
+          type: string
+        product_image_url:
+          type: string
+          format: uri
+          nullable: true
+        monthly_amount_minor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          example: TRY_COIN
+        status:
+          type: string
+          enum: [active, cancelled, suspended]
+        start_date:
+          type: string
+          format: date
+          description: "ISO 8601 date (YYYY-MM-DD). First instalment paid on or after this date."
+        reference_interest_rate_bps:
+          type: integer
+          description: |
+            Reference rate in basis points (5000 = 50%). Frozen at plan creation
+            time per the v6 perpetual cashback formula. Existing plans retain
+            their original rate even if the platform's reference rate changes
+            later. See LEDGER_GUIDE.md §3.4 for the formula derivation.
+        created_at:
+          type: string
+          format: date-time
+
+    CashbackPayment:
+      type: object
+      required: [id, plan_id, period_yyyymm, amount_minor, currency, status]
+      properties:
+        id:
+          type: integer
+          format: int64
+        plan_id:
+          type: integer
+          format: int64
+        period_yyyymm:
+          type: string
+          pattern: '^\d{6}$'
+          example: "202601"
+          description: "Year-month of the payment period. e.g. 202601 = January 2026."
+        amount_minor:
+          type: integer
+          format: int64
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [scheduled, paid, failed]
+        paid_at:
+          type: string
+          format: date-time
+          nullable: true
