@@ -1,0 +1,4 @@
+{
+  "_comment": "Copy to dev.json and adjust. Phase 4.1: raw core-svc. Switch to https://api.localhost after local Caddy tls-internal ships (Phase 4.0.5).",
+  "API_BASE_URL": "http://localhost:8080"
+}
