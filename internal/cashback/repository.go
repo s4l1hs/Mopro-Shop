@@ -225,6 +225,115 @@ func (r *pgxCashbackRepository) UpdateLastDistributedPeriod(ctx context.Context,
 }
 
 
+// ListPlansByUserID returns up to limit plans for userID, ordered by id DESC.
+// Pass beforeID > 0 to cursor-paginate. Pass non-nil status to filter by status.
+func (r *pgxCashbackRepository) ListPlansByUserID(ctx context.Context, userID int64, limit int, beforeID int64, status *PlanStatus) ([]Plan, error) {
+	var statusVal *string
+	if status != nil {
+		s := string(*status)
+		statusVal = &s
+	}
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, order_id, user_id, monthly_amount_minor, currency,
+		        reference_interest_rate_bps, start_date, status,
+		        delivered_at, market, commission_snapshot, idempotency_key,
+		        created_at, updated_at
+		 FROM cashback_schema.plans
+		 WHERE user_id = $1
+		   AND ($2 = 0 OR id < $2)
+		   AND ($3::text IS NULL OR status = $3)
+		 ORDER BY id DESC
+		 LIMIT $4`,
+		userID, beforeID, statusVal, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("cashback: ListPlansByUserID user=%d: %w", userID, err)
+	}
+	defer rows.Close()
+	var plans []Plan
+	for rows.Next() {
+		var p Plan
+		var statusStr string
+		var snapshot []byte
+		if err := rows.Scan(
+			&p.ID, &p.OrderID, &p.UserID, &p.MonthlyAmountMinor, &p.Currency,
+			&p.ReferenceInterestRateBps, &p.StartDate, &statusStr,
+			&p.DeliveredAt, &p.Market, &snapshot, &p.IdempotencyKey,
+			&p.CreatedAt, &p.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("cashback: ListPlansByUserID scan: %w", err)
+		}
+		p.Status = PlanStatus(statusStr)
+		p.CommissionSnapshot = snapshot
+		plans = append(plans, p)
+	}
+	return plans, rows.Err()
+}
+
+// GetPlanByIDAndUserID fetches a plan by primary key, scoped to userID for IDOR prevention.
+// Returns ErrPlanNotFound when no row matches — callers must return 404, NOT 403.
+func (r *pgxCashbackRepository) GetPlanByIDAndUserID(ctx context.Context, planID, userID int64) (Plan, error) {
+	const q = `
+		SELECT id, order_id, user_id, monthly_amount_minor, currency,
+		       reference_interest_rate_bps, start_date, status,
+		       delivered_at, market, commission_snapshot, idempotency_key,
+		       created_at, updated_at
+		FROM cashback_schema.plans
+		WHERE id = $1 AND user_id = $2`
+
+	var p Plan
+	var statusStr string
+	var snapshot []byte
+	err := r.pool.QueryRow(ctx, q, planID, userID).Scan(
+		&p.ID, &p.OrderID, &p.UserID, &p.MonthlyAmountMinor, &p.Currency,
+		&p.ReferenceInterestRateBps, &p.StartDate, &statusStr,
+		&p.DeliveredAt, &p.Market, &snapshot, &p.IdempotencyKey,
+		&p.CreatedAt, &p.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Plan{}, ErrPlanNotFound
+		}
+		return Plan{}, fmt.Errorf("cashback: GetPlanByIDAndUserID plan=%d user=%d: %w", planID, userID, err)
+	}
+	p.Status = PlanStatus(statusStr)
+	p.CommissionSnapshot = snapshot
+	return p, nil
+}
+
+// ListPaymentsByPlanID returns up to limit payments for planID, ordered by id DESC.
+// Pass beforeID > 0 to cursor-paginate.
+func (r *pgxCashbackRepository) ListPaymentsByPlanID(ctx context.Context, planID int64, limit int, beforeID int64) ([]Payment, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, plan_id, period_yyyymm, scheduled_date, paid_date,
+		        amount_minor, status, ledger_transaction_id, idempotency_key,
+		        attempt_count, last_attempt_at, last_error, created_at
+		 FROM cashback_schema.payments
+		 WHERE plan_id = $1
+		   AND ($2 = 0 OR id < $2)
+		 ORDER BY id DESC
+		 LIMIT $3`,
+		planID, beforeID, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("cashback: ListPaymentsByPlanID plan=%d: %w", planID, err)
+	}
+	defer rows.Close()
+	var payments []Payment
+	for rows.Next() {
+		var pay Payment
+		if err := rows.Scan(
+			&pay.ID, &pay.PlanID, &pay.PeriodYYYYMM, &pay.ScheduledDate, &pay.PaidDate,
+			&pay.AmountMinor, &pay.Status, &pay.LedgerTransactionID, &pay.IdempotencyKey,
+			&pay.AttemptCount, &pay.LastAttemptAt, &pay.LastError, &pay.CreatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("cashback: ListPaymentsByPlanID scan plan=%d: %w", planID, err)
+		}
+		payments = append(payments, pay)
+	}
+	return payments, rows.Err()
+}
+
 func isSerializationFailure(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "40001"

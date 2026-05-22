@@ -69,4 +69,10 @@ type Repository interface {
 	// Transaction control.
 	// level must be pgx.Serializable for cron per-plan tx; pgx.ReadCommitted for plan creation.
 	WithTx(ctx context.Context, level pgx.TxIsoLevel, fn func(pgx.Tx) error) error
+
+	// HTTP read path — safe for direct repository calls per R-2 (no business logic,
+	// no state mutation, no transaction coordination).
+	ListPlansByUserID(ctx context.Context, userID int64, limit int, beforeID int64, status *PlanStatus) ([]Plan, error)
+	GetPlanByIDAndUserID(ctx context.Context, planID, userID int64) (Plan, error)
+	ListPaymentsByPlanID(ctx context.Context, planID int64, limit int, beforeID int64) ([]Payment, error)
 }
