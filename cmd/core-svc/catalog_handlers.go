@@ -27,7 +27,7 @@ func handleListCategories(svc catalog.Service, defaultLocale string) http.Handle
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		jsonOK(w, http.StatusOK, map[string]any{"data": cats})
+		jsonOK(w, http.StatusOK, buildCategoryListResponse(cats))
 	}
 }
 
@@ -267,4 +267,26 @@ func parseIntQuery(s string, def int) int {
 		return def
 	}
 	return v
+}
+
+type categoryJSON struct {
+	ID               int64  `json:"id"`
+	Slug             string `json:"slug"`
+	Name             string `json:"name"`
+	ParentID         *int64 `json:"parent_id"`
+	CommissionPctBps int    `json:"commission_pct_bps"`
+}
+
+func buildCategoryListResponse(rows []catalog.CategoryRow) map[string]any {
+	out := make([]categoryJSON, len(rows))
+	for i, r := range rows {
+		out[i] = categoryJSON{
+			ID:               r.ID,
+			Slug:             r.Slug,
+			Name:             r.Name,
+			ParentID:         r.ParentID,
+			CommissionPctBps: r.CommissionPctBps,
+		}
+	}
+	return map[string]any{"data": out}
 }

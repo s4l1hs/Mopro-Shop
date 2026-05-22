@@ -249,7 +249,7 @@ func (r *pgxRepository) ListProductsByCategory(ctx context.Context, categoryID i
 		`SELECT p.id, p.seller_id, p.category_id, p.brand, p.status,
 		        COALESCE(t.title, '') AS title,
 		        v.price_minor, v.price_currency,
-		        COALESCE((v.image_keys->>0), '') AS cover_image_key,
+		        COALESCE(v.image_keys[1], '') AS cover_image_key,
 		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
 		        count(*) OVER() AS total_count
 		FROM catalog_schema.products p
@@ -301,7 +301,7 @@ func (r *pgxRepository) SearchProductsSummary(ctx context.Context, query, locale
 		`SELECT p.id, p.seller_id, p.category_id, p.brand, p.status,
 		        COALESCE(t.title, '') AS title,
 		        v.price_minor, v.price_currency,
-		        COALESCE((v.image_keys->>0), '') AS cover_image_key,
+		        COALESCE(v.image_keys[1], '') AS cover_image_key,
 		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
 		        count(*) OVER() AS total_count
 		FROM catalog_schema.products p
