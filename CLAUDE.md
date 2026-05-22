@@ -95,6 +95,8 @@ Adding a 4th binary requires explicit human approval and an ADR file under `/doc
 - Other modules import the interface, NEVER the struct or repository directly.
 - No HTTP, no gRPC inside core-svc. Plain Go function calls.
 
+EXCEPTION: Read-only HTTP API handlers in `internal/api` (fin-svc endpoints) may call a module's `Repository` interface directly — NOT the `Service` — when ALL three conditions hold: (a) no business logic or derived calculations, (b) no state mutation, (c) no transaction coordination with other modules. The fin HTTP read handlers (`ListPlansByUserID`, `GetPlanByIDAndUserID`, `ListPaymentsByPlanID`, `ListEntriesByAccount`) satisfy all three. Any write, compute, or cross-module coordination MUST still go through the `Service` interface.
+
 ### 3.2 core-svc → fin-svc
 - ONLY via Redis Streams events. No HTTP. No direct DB access.
 - Event topic format: `<domain>.<entity>.<action>.v<n>` (e.g., `ecom.order.delivered.v1`).
