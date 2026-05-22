@@ -11,13 +11,30 @@
   },
   "auth": {
     "login_title": "Sign In",
-    "phone_hint": "Phone number",
+    "phone_title": "Your Phone Number",
+    "phone_subtitle": "Enter your 10-digit number starting with +90",
+    "phone_hint": "5XX XXX XX XX",
     "send_otp": "Send Verification Code",
     "otp_title": "Verification Code",
+    "otp_subtitle": "Enter the 6-digit code sent to {}",
     "otp_hint": "6-digit code",
     "verify": "Verify",
+    "resend": "Resend Code",
+    "resend_countdown": "Resend in {} seconds",
     "otp_expired": "Verification code expired. Please try again.",
-    "step_up_required": "Additional verification required for this action."
+    "otp_invalid": "Incorrect code. Please try again.",
+    "rate_limit": "Too many attempts. Please try again in 1 minute.",
+    "phone_locked": "Your account is temporarily locked. Try again in 1 hour.",
+    "network_error": "Connection error. Check your internet connection.",
+    "unknown_error": "Something went wrong. Please try again.",
+    "step_up_required": "Additional verification required for this action.",
+    "session_revoked": "Your session was ended for security reasons. Please sign in again.",
+    "profile_title": "Complete Your Profile",
+    "profile_subtitle": "We need a few details before you start shopping.",
+    "name_first": "First Name",
+    "name_last": "Last Name",
+    "locale": "Language",
+    "complete_profile": "Continue"
   },
   "home": {
     "title": "Discover"

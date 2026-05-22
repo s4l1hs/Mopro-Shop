@@ -11,13 +11,30 @@
   },
   "auth": {
     "login_title": "Giriş Yap",
-    "phone_hint": "Telefon numarası",
+    "phone_title": "Telefon Numaranız",
+    "phone_subtitle": "+90 ile başlayan 10 haneli numara girin",
+    "phone_hint": "5XX XXX XX XX",
     "send_otp": "Doğrulama Kodu Gönder",
     "otp_title": "Doğrulama Kodu",
+    "otp_subtitle": "{} numarasına gönderilen 6 haneli kodu girin",
     "otp_hint": "6 haneli kod",
     "verify": "Doğrula",
+    "resend": "Tekrar Gönder",
+    "resend_countdown": "{} saniye sonra tekrar gönderebilirsiniz",
     "otp_expired": "Doğrulama kodunun süresi doldu. Lütfen tekrar deneyin.",
-    "step_up_required": "Bu işlem için ek doğrulama gerekli."
+    "otp_invalid": "Hatalı doğrulama kodu. Lütfen tekrar deneyin.",
+    "rate_limit": "Çok fazla deneme. Lütfen 1 dakika sonra tekrar deneyin.",
+    "phone_locked": "Hesabınız geçici olarak kilitlendi. 1 saat sonra tekrar deneyin.",
+    "network_error": "Bağlantı hatası. İnternet bağlantınızı kontrol edin.",
+    "unknown_error": "Bir hata oluştu. Lütfen tekrar deneyin.",
+    "step_up_required": "Bu işlem için ek doğrulama gerekli.",
+    "session_revoked": "Oturumunuz güvenlik nedeniyle sonlandırıldı. Lütfen tekrar giriş yapın.",
+    "profile_title": "Profilinizi Tamamlayın",
+    "profile_subtitle": "Alışverişe başlamadan önce birkaç bilgiye ihtiyacımız var.",
+    "name_first": "Ad",
+    "name_last": "Soyad",
+    "locale": "Dil",
+    "complete_profile": "Devam Et"
   },
   "home": {
     "title": "Keşfet"
