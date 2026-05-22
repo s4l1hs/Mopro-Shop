@@ -241,8 +241,11 @@ func main() {
 	mux.Handle("POST /v1/products",
 		httpx.TraceAndLog(http.HandlerFunc(handleCreateProduct(catalogSvc, defaultCurrency, defaultLocale))),
 	)
+	mux.Handle("GET /v1/products",
+		httpx.TraceAndLog(http.HandlerFunc(handleListProducts(catalogSvc, defaultLocale, market))),
+	)
 	mux.Handle("GET /v1/products/{id}",
-		httpx.TraceAndLog(http.HandlerFunc(handleGetProduct(catalogSvc))),
+		httpx.TraceAndLog(http.HandlerFunc(handleGetProductDetail(catalogSvc, market, cashbackCurrency))),
 	)
 	mux.Handle("POST /v1/products/{id}/variants",
 		httpx.TraceAndLog(http.HandlerFunc(handleAddVariant(catalogSvc, defaultCurrency))),
@@ -250,8 +253,37 @@ func main() {
 	mux.Handle("PUT /v1/products/{id}/translations/{locale}",
 		httpx.TraceAndLog(http.HandlerFunc(handleUpdateTranslation(catalogSvc))),
 	)
+	mux.Handle("GET /v1/categories",
+		httpx.TraceAndLog(http.HandlerFunc(handleListCategories(catalogSvc, defaultLocale))),
+	)
 	mux.Handle("GET /v1/categories/{id}/commission",
 		httpx.TraceAndLog(http.HandlerFunc(handleGetCommission(catalogSvc, market))),
+	)
+	mux.Handle("GET /v1/search",
+		httpx.TraceAndLog(http.HandlerFunc(handleSearch(catalogSvc, defaultLocale, market))),
+	)
+	mux.Handle("GET /v1/banners",
+		httpx.TraceAndLog(http.HandlerFunc(handleListBanners())),
+	)
+	mux.Handle("GET /v1/recommendations",
+		httpx.TraceAndLog(http.HandlerFunc(handleListRecommendations())),
+	)
+
+	// Address routes — require JWT authentication (IDOR-safe: user_id from JWT)
+	mux.Handle("GET /v1/addresses",
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleListAddresses(identitySvc)))),
+	)
+	mux.Handle("POST /v1/addresses",
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleCreateAddress(identitySvc)))),
+	)
+	mux.Handle("GET /v1/addresses/{id}",
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleGetAddress(identitySvc)))),
+	)
+	mux.Handle("PUT /v1/addresses/{id}",
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleUpdateAddress(identitySvc)))),
+	)
+	mux.Handle("DELETE /v1/addresses/{id}",
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleDeleteAddress(identitySvc)))),
 	)
 
 	// Cart routes — require JWT authentication

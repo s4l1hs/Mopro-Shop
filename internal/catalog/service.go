@@ -105,3 +105,38 @@ func (s *catalogService) GetCommissionForCategory(ctx context.Context, market st
 func (s *catalogService) GetVariantByID(ctx context.Context, variantID int64) (Variant, error) {
 	return s.repo.GetVariantByID(ctx, variantID)
 }
+
+func (s *catalogService) ListCategories(ctx context.Context, locale string) ([]CategoryRow, error) {
+	if locale == "" {
+		locale = s.defaultLocale
+	}
+	return s.repo.ListCategories(ctx, locale)
+}
+
+func (s *catalogService) ListProductsByCategory(ctx context.Context, categoryID int64, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error) {
+	if locale == "" {
+		locale = s.defaultLocale
+	}
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 || perPage > 50 {
+		perPage = 20
+	}
+	offset := (page - 1) * perPage
+	return s.repo.ListProductsByCategory(ctx, categoryID, locale, offset, perPage)
+}
+
+func (s *catalogService) SearchSummary(ctx context.Context, query, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error) {
+	if locale == "" {
+		locale = s.defaultLocale
+	}
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 || perPage > 50 {
+		perPage = 20
+	}
+	offset := (page - 1) * perPage
+	return s.repo.SearchProductsSummary(ctx, query, locale, offset, perPage)
+}

@@ -95,6 +95,52 @@ const (
 	StatusDeleted   = "deleted"
 )
 
+// Address is a user's saved delivery address.
+// PII fields (Name, Phone, FullAddress, Neighborhood) are stored AES-GCM encrypted;
+// District, City, PostalCode are stored plaintext for logistics routing.
+type Address struct {
+	ID           int64
+	UserID       int64
+	Label        string
+	Name         string // decrypted display name
+	Phone        string // decrypted E.164 phone
+	FullAddress  string // decrypted street address line
+	Neighborhood string // decrypted neighborhood; empty when absent
+	District     string
+	City         string
+	PostalCode   string
+	IsDefault    bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+// AddressInput carries mutable fields for create/update address.
+// Phone is optional; when present it must be a valid E.164 number.
+type AddressInput struct {
+	Label        string
+	Name         string
+	Phone        string // optional; validated when non-empty
+	FullAddress  string
+	Neighborhood string // optional
+	District     string
+	City         string
+	PostalCode   string // optional
+	IsDefault    bool
+}
+
+// AddressRow is the encrypted storage representation passed from service to repo.
+type AddressRow struct {
+	Label           string
+	NameEnc         string
+	PhoneEnc        string
+	FullAddressEnc  string
+	NeighborhoodEnc string // empty string when absent
+	District        string
+	City            string
+	PostalCode      string
+	IsDefault       bool
+}
+
 // MaskPhone masks an E.164 phone number for display.
 // "+905321234567" → "+90 5XX XXX XX 67"
 // For numbers shorter than expected, falls back to showing last 2 digits only.

@@ -177,15 +177,14 @@ func (r *pgxRepository) loadTranslations(ctx context.Context, productID int64) (
 }
 
 func (r *pgxRepository) SearchProducts(ctx context.Context, query, locale, market string) ([]Product, error) {
-	// Phase 1.1: SQL ILIKE search via product_translations.
-	// TODO(search-sprint): replace ILIKE with Meilisearch via /internal/search/ when launch volume warrants it.
 	rows, err := r.pool.Query(ctx,
 		`SELECT DISTINCT p.id, p.seller_id, p.category_id, p.brand,
 		        p.default_currency, p.default_locale, p.status, p.created_at, p.updated_at
 		FROM catalog_schema.products p
 		JOIN catalog_schema.product_translations t ON t.product_id = p.id AND t.locale = $1
 		WHERE p.status = 'active'
-		  AND t.title ILIKE '%' || $2 || '%'
+		  AND (t.search_vector @@ plainto_tsquery('simple', $2)
+		       OR t.title ILIKE '%' || $2 || '%')
 		ORDER BY p.id ASC
 		LIMIT 50`,
 		locale, query,
@@ -208,6 +207,146 @@ func (r *pgxRepository) SearchProducts(ctx context.Context, query, locale, marke
 		products = append(products, p)
 	}
 	return products, rows.Err()
+}
+
+func (r *pgxRepository) ListCategories(ctx context.Context, locale string) ([]CategoryRow, error) {
+	nameCol := "name_en"
+	if locale == "tr-TR" || locale == "tr" {
+		nameCol = "name_tr"
+	}
+	rows, err := r.pool.Query(ctx,
+		`SELECT c.id, c.slug, c.`+nameCol+`, c.parent_id,
+		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps
+		FROM ref_schema.categories c
+		LEFT JOIN ref_schema.commission_rules cr
+		       ON cr.category_id = c.id
+		      AND cr.active = TRUE
+		      AND (cr.effective_to IS NULL OR cr.effective_to > now())
+		WHERE c.active = TRUE
+		ORDER BY c.id ASC`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: ListCategories: %w", err)
+	}
+	defer rows.Close()
+
+	var cats []CategoryRow
+	for rows.Next() {
+		var c CategoryRow
+		if err := rows.Scan(&c.ID, &c.Slug, &c.Name, &c.ParentID, &c.CommissionPctBps); err != nil {
+			return nil, fmt.Errorf("catalog.repo: scan category: %w", err)
+		}
+		cats = append(cats, c)
+	}
+	if cats == nil {
+		cats = []CategoryRow{}
+	}
+	return cats, rows.Err()
+}
+
+func (r *pgxRepository) ListProductsByCategory(ctx context.Context, categoryID int64, locale string, offset, limit int) ([]ProductSummaryRow, int, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT p.id, p.seller_id, p.category_id, p.brand, p.status,
+		        COALESCE(t.title, '') AS title,
+		        v.price_minor, v.price_currency,
+		        COALESCE((v.image_keys->>0), '') AS cover_image_key,
+		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
+		        count(*) OVER() AS total_count
+		FROM catalog_schema.products p
+		JOIN catalog_schema.product_translations t
+		     ON t.product_id = p.id AND t.locale = $2
+		JOIN LATERAL (
+		    SELECT price_minor, price_currency, image_keys
+		    FROM catalog_schema.variants
+		    WHERE product_id = p.id
+		    ORDER BY price_minor ASC
+		    LIMIT 1
+		) v ON TRUE
+		LEFT JOIN ref_schema.commission_rules cr
+		       ON cr.category_id = p.category_id
+		      AND cr.active = TRUE
+		      AND (cr.effective_to IS NULL OR cr.effective_to > now())
+		WHERE p.category_id = $1
+		  AND p.status = 'active'
+		ORDER BY p.id DESC
+		LIMIT $3 OFFSET $4`,
+		categoryID, locale, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("catalog.repo: ListProductsByCategory: %w", err)
+	}
+	defer rows.Close()
+
+	var results []ProductSummaryRow
+	var total int
+	for rows.Next() {
+		var s ProductSummaryRow
+		if err := rows.Scan(
+			&s.ID, &s.SellerID, &s.CategoryID, &s.Brand, &s.Status,
+			&s.Title, &s.PriceMinor, &s.PriceCurrency,
+			&s.CoverImageKey, &s.CommissionPctBps, &total,
+		); err != nil {
+			return nil, 0, fmt.Errorf("catalog.repo: scan product summary: %w", err)
+		}
+		results = append(results, s)
+	}
+	if results == nil {
+		results = []ProductSummaryRow{}
+	}
+	return results, total, rows.Err()
+}
+
+func (r *pgxRepository) SearchProductsSummary(ctx context.Context, query, locale string, offset, limit int) ([]ProductSummaryRow, int, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT p.id, p.seller_id, p.category_id, p.brand, p.status,
+		        COALESCE(t.title, '') AS title,
+		        v.price_minor, v.price_currency,
+		        COALESCE((v.image_keys->>0), '') AS cover_image_key,
+		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
+		        count(*) OVER() AS total_count
+		FROM catalog_schema.products p
+		JOIN catalog_schema.product_translations t
+		     ON t.product_id = p.id AND t.locale = $2
+		JOIN LATERAL (
+		    SELECT price_minor, price_currency, image_keys
+		    FROM catalog_schema.variants
+		    WHERE product_id = p.id
+		    ORDER BY price_minor ASC
+		    LIMIT 1
+		) v ON TRUE
+		LEFT JOIN ref_schema.commission_rules cr
+		       ON cr.category_id = p.category_id
+		      AND cr.active = TRUE
+		      AND (cr.effective_to IS NULL OR cr.effective_to > now())
+		WHERE p.status = 'active'
+		  AND (t.search_vector @@ plainto_tsquery('simple', $1)
+		       OR t.title ILIKE '%' || $1 || '%')
+		ORDER BY p.id DESC
+		LIMIT $3 OFFSET $4`,
+		query, locale, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("catalog.repo: SearchProductsSummary: %w", err)
+	}
+	defer rows.Close()
+
+	var results []ProductSummaryRow
+	var total int
+	for rows.Next() {
+		var s ProductSummaryRow
+		if err := rows.Scan(
+			&s.ID, &s.SellerID, &s.CategoryID, &s.Brand, &s.Status,
+			&s.Title, &s.PriceMinor, &s.PriceCurrency,
+			&s.CoverImageKey, &s.CommissionPctBps, &total,
+		); err != nil {
+			return nil, 0, fmt.Errorf("catalog.repo: scan search summary: %w", err)
+		}
+		results = append(results, s)
+	}
+	if results == nil {
+		results = []ProductSummaryRow{}
+	}
+	return results, total, rows.Err()
 }
 
 func (r *pgxRepository) GetVariantByID(ctx context.Context, variantID int64) (Variant, error) {

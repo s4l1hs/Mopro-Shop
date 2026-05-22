@@ -38,6 +38,25 @@ type Service interface {
 
 	// RegisterDevice records an FCM token for push-notification delivery.
 	RegisterDevice(ctx context.Context, userID int64, info DeviceInfo) (Device, error)
+
+	// ListAddresses returns all saved addresses for the user (caller-owned only).
+	ListAddresses(ctx context.Context, userID int64) ([]Address, error)
+
+	// CreateAddress creates and returns a new delivery address for the user.
+	// If IsDefault is true, all other addresses for the user are unset as default.
+	CreateAddress(ctx context.Context, userID int64, in AddressInput) (Address, error)
+
+	// GetAddress returns a single address.
+	// Returns ErrAddressNotFound when the address doesn't exist or belongs to another user.
+	GetAddress(ctx context.Context, userID, addressID int64) (Address, error)
+
+	// UpdateAddress replaces all fields of the address.
+	// Returns ErrAddressNotFound when the address doesn't exist or belongs to another user.
+	UpdateAddress(ctx context.Context, userID, addressID int64, in AddressInput) (Address, error)
+
+	// DeleteAddress permanently removes the address.
+	// Returns ErrAddressNotFound when the address doesn't exist or belongs to another user.
+	DeleteAddress(ctx context.Context, userID, addressID int64) error
 }
 
 // Repository is the storage interface of the identity module.
@@ -100,4 +119,23 @@ type Repository interface {
 	// CreateDevice inserts a device record.
 	// If the same FCM token already exists and is active, the old record is revoked first.
 	CreateDevice(ctx context.Context, userID int64, info DeviceInfo) (Device, error)
+
+	// ListAddresses returns all addresses for the given user.
+	ListAddresses(ctx context.Context, userID int64) ([]Address, error)
+
+	// InsertAddress inserts a new address row and returns it with its generated ID.
+	// If isDefault is true, the caller must have already cleared other defaults in the same tx.
+	InsertAddress(ctx context.Context, userID int64, a AddressRow) (Address, error)
+
+	// ClearDefaultAddresses sets is_default=false for all addresses of the user.
+	ClearDefaultAddresses(ctx context.Context, userID int64) error
+
+	// GetAddress returns the address with the given id, only if it belongs to userID.
+	GetAddress(ctx context.Context, userID, addressID int64) (Address, error)
+
+	// UpdateAddress replaces all mutable address fields.
+	UpdateAddress(ctx context.Context, userID, addressID int64, a AddressRow) (Address, error)
+
+	// DeleteAddress hard-deletes the address.
+	DeleteAddress(ctx context.Context, userID, addressID int64) error
 }

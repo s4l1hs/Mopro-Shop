@@ -51,6 +51,15 @@ func (m *mockCatalogSvc) GetByID(_ context.Context, id int64) (catalog.Product, 
 func (m *mockCatalogSvc) Search(_ context.Context, _, _, _ string) ([]catalog.Product, error) {
 	return nil, nil
 }
+func (m *mockCatalogSvc) ListCategories(_ context.Context, _ string) ([]catalog.CategoryRow, error) {
+	return nil, nil
+}
+func (m *mockCatalogSvc) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return nil, 0, nil
+}
+func (m *mockCatalogSvc) SearchSummary(_ context.Context, _, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return nil, 0, nil
+}
 
 // ── cart mock ─────────────────────────────────────────────────────────────────
 

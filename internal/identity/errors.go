@@ -57,7 +57,14 @@ var (
 // ── Crypto / input errors ─────────────────────────────────────────────────────
 
 var (
-	ErrInvalidPhone = errors.New("identity: phone must be E.164 format (+XXXXXXXXXXX)")
-	ErrInvalidEmail = errors.New("identity: invalid email format")
+	ErrInvalidPhone  = errors.New("identity: phone must be E.164 format (+XXXXXXXXXXX)")
+	ErrInvalidEmail  = errors.New("identity: invalid email format")
 	ErrInvalidLocale = errors.New("identity: unsupported locale")
+)
+
+// ── Address errors ────────────────────────────────────────────────────────────
+
+var (
+	ErrAddressNotFound     = errors.New("identity: address not found")
+	ErrAddressInvalidPhone = errors.New("identity: address phone must be E.164 format")
 )

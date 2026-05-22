@@ -38,6 +38,31 @@ type ProductTranslation struct {
 	Description string `json:"description"`
 }
 
+// CategoryRow is a category with its locale-resolved name and commission rate.
+// Used by ListCategories for the buyer-facing GET /v1/categories endpoint.
+type CategoryRow struct {
+	ID               int64
+	Slug             string
+	Name             string // locale-resolved (name_tr or name_en)
+	ParentID         *int64
+	CommissionPctBps int
+}
+
+// ProductSummaryRow is a lightweight product record for list / search results.
+// Includes the lowest-priced variant's price, cover image key, and commission rate.
+type ProductSummaryRow struct {
+	ID               int64
+	SellerID         int64
+	CategoryID       int64
+	Brand            string
+	Status           string
+	Title            string // locale-resolved
+	PriceMinor       int64
+	PriceCurrency    string
+	CoverImageKey    string // raw storage key; handler calls mediaurl.CDNUrl()
+	CommissionPctBps int
+}
+
 // CategoryCommission holds the currently active commission + KDV rates for a
 // market/category pair, read from ref_schema.commission_rules.
 type CategoryCommission struct {

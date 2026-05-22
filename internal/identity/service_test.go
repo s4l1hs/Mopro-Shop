@@ -29,6 +29,7 @@ type mockRepo struct {
 	users         map[int64]*identity.User
 	otps          []*identity.OTP
 	tokens        map[string]*identity.RefreshToken
+	addrStore     []identity.Address // for address IDOR tests
 	createOTPErr  error
 	findOTPErr    error
 	verifyErr     error

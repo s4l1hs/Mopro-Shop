@@ -406,3 +406,137 @@ func mapRatelimitErr(err error) error {
 		return err
 	}
 }
+
+// ── Address methods ───────────────────────────────────────────────────────────
+
+var e164Regexp = regexp.MustCompile(`^\+[0-9]{7,15}$`)
+
+func (s *serviceImpl) ListAddresses(ctx context.Context, userID int64) ([]Address, error) {
+	addrs, err := s.repo.ListAddresses(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("identity: list addresses: %w", err)
+	}
+	result := make([]Address, 0, len(addrs))
+	for _, a := range addrs {
+		dec, dErr := decryptAddress(a)
+		if dErr != nil {
+			s.log.Error("identity: decrypt address", "address_id", a.ID, "err", dErr)
+			continue
+		}
+		result = append(result, dec)
+	}
+	return result, nil
+}
+
+func (s *serviceImpl) CreateAddress(ctx context.Context, userID int64, in AddressInput) (Address, error) {
+	if in.Phone != "" && !e164Regexp.MatchString(in.Phone) {
+		return Address{}, ErrAddressInvalidPhone
+	}
+	row, err := encryptAddressInput(in)
+	if err != nil {
+		return Address{}, fmt.Errorf("identity: encrypt address: %w", err)
+	}
+	if in.IsDefault {
+		if err := s.repo.ClearDefaultAddresses(ctx, userID); err != nil {
+			return Address{}, fmt.Errorf("identity: clear defaults: %w", err)
+		}
+	}
+	created, err := s.repo.InsertAddress(ctx, userID, row)
+	if err != nil {
+		return Address{}, fmt.Errorf("identity: insert address: %w", err)
+	}
+	return created, nil
+}
+
+func (s *serviceImpl) GetAddress(ctx context.Context, userID, addressID int64) (Address, error) {
+	a, err := s.repo.GetAddress(ctx, userID, addressID)
+	if err != nil {
+		return Address{}, err
+	}
+	return decryptAddress(a)
+}
+
+func (s *serviceImpl) UpdateAddress(ctx context.Context, userID, addressID int64, in AddressInput) (Address, error) {
+	if in.Phone != "" && !e164Regexp.MatchString(in.Phone) {
+		return Address{}, ErrAddressInvalidPhone
+	}
+	row, err := encryptAddressInput(in)
+	if err != nil {
+		return Address{}, fmt.Errorf("identity: encrypt address: %w", err)
+	}
+	if in.IsDefault {
+		if err := s.repo.ClearDefaultAddresses(ctx, userID); err != nil {
+			return Address{}, fmt.Errorf("identity: clear defaults: %w", err)
+		}
+	}
+	updated, err := s.repo.UpdateAddress(ctx, userID, addressID, row)
+	if err != nil {
+		return Address{}, err
+	}
+	return decryptAddress(updated)
+}
+
+func (s *serviceImpl) DeleteAddress(ctx context.Context, userID, addressID int64) error {
+	return s.repo.DeleteAddress(ctx, userID, addressID)
+}
+
+// encryptAddressInput encrypts PII fields from AddressInput into an AddressRow.
+func encryptAddressInput(in AddressInput) (AddressRow, error) {
+	nameEnc, err := pkgcrypto.EncryptPII(in.Name)
+	if err != nil {
+		return AddressRow{}, err
+	}
+	phoneEnc, err := pkgcrypto.EncryptPII(in.Phone)
+	if err != nil {
+		return AddressRow{}, err
+	}
+	fullAddrEnc, err := pkgcrypto.EncryptPII(in.FullAddress)
+	if err != nil {
+		return AddressRow{}, err
+	}
+	neighEnc, err := pkgcrypto.EncryptPII(in.Neighborhood)
+	if err != nil {
+		return AddressRow{}, err
+	}
+	return AddressRow{
+		Label:           in.Label,
+		NameEnc:         nameEnc,
+		PhoneEnc:        phoneEnc,
+		FullAddressEnc:  fullAddrEnc,
+		NeighborhoodEnc: neighEnc,
+		District:        in.District,
+		City:            in.City,
+		PostalCode:      in.PostalCode,
+		IsDefault:       in.IsDefault,
+	}, nil
+}
+
+// decryptAddress decrypts PII fields of a stored address back to plaintext.
+// The stored address has encrypted strings in the PII fields; after decryption
+// they are copied into the display fields.
+func decryptAddress(a Address) (Address, error) {
+	name, err := pkgcrypto.DecryptPII(a.Name)
+	if err != nil {
+		return Address{}, fmt.Errorf("identity: decrypt name: %w", err)
+	}
+	phone, err := pkgcrypto.DecryptPII(a.Phone)
+	if err != nil {
+		return Address{}, fmt.Errorf("identity: decrypt phone: %w", err)
+	}
+	fullAddr, err := pkgcrypto.DecryptPII(a.FullAddress)
+	if err != nil {
+		return Address{}, fmt.Errorf("identity: decrypt full_address: %w", err)
+	}
+	var neigh string
+	if a.Neighborhood != "" {
+		neigh, err = pkgcrypto.DecryptPII(a.Neighborhood)
+		if err != nil {
+			return Address{}, fmt.Errorf("identity: decrypt neighborhood: %w", err)
+		}
+	}
+	a.Name = name
+	a.Phone = phone
+	a.FullAddress = fullAddr
+	a.Neighborhood = neigh
+	return a, nil
+}

@@ -427,3 +427,144 @@ func (r *PgxRepository) CreateDevice(ctx context.Context, userID int64, info Dev
 	}
 	return d, nil
 }
+
+// ── Address repository methods ────────────────────────────────────────────────
+
+func (r *PgxRepository) ListAddresses(ctx context.Context, userID int64) ([]Address, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, user_id, label, name_enc, phone_enc, full_address_enc,
+		        COALESCE(neighborhood_enc, ''), district, city,
+		        COALESCE(postal_code, ''), is_default, created_at, updated_at
+		FROM identity_schema.addresses
+		WHERE user_id = $1
+		ORDER BY is_default DESC, id ASC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("identity repo: list addresses: %w", err)
+	}
+	defer rows.Close()
+
+	var addrs []Address
+	for rows.Next() {
+		var a Address
+		if err := rows.Scan(
+			&a.ID, &a.UserID, &a.Label, &a.Name, &a.Phone, &a.FullAddress,
+			&a.Neighborhood, &a.District, &a.City,
+			&a.PostalCode, &a.IsDefault, &a.CreatedAt, &a.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("identity repo: scan address: %w", err)
+		}
+		addrs = append(addrs, a)
+	}
+	if addrs == nil {
+		addrs = []Address{}
+	}
+	return addrs, rows.Err()
+}
+
+func (r *PgxRepository) ClearDefaultAddresses(ctx context.Context, userID int64) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE identity_schema.addresses SET is_default = FALSE WHERE user_id = $1`,
+		userID,
+	)
+	if err != nil {
+		return fmt.Errorf("identity repo: clear defaults: %w", err)
+	}
+	return nil
+}
+
+func (r *PgxRepository) InsertAddress(ctx context.Context, userID int64, a AddressRow) (Address, error) {
+	var result Address
+	err := r.pool.QueryRow(ctx,
+		`INSERT INTO identity_schema.addresses
+		    (user_id, label, name_enc, phone_enc, full_address_enc,
+		     neighborhood_enc, district, city, postal_code, is_default)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, ''), $10)
+		RETURNING id, user_id, label, name_enc, phone_enc, full_address_enc,
+		          COALESCE(neighborhood_enc, ''), district, city,
+		          COALESCE(postal_code, ''), is_default, created_at, updated_at`,
+		userID, a.Label, a.NameEnc, a.PhoneEnc, a.FullAddressEnc,
+		nullIfEmpty(a.NeighborhoodEnc), a.District, a.City, a.PostalCode, a.IsDefault,
+	).Scan(
+		&result.ID, &result.UserID, &result.Label, &result.Name, &result.Phone,
+		&result.FullAddress, &result.Neighborhood, &result.District, &result.City,
+		&result.PostalCode, &result.IsDefault, &result.CreatedAt, &result.UpdatedAt,
+	)
+	if err != nil {
+		return Address{}, fmt.Errorf("identity repo: insert address: %w", err)
+	}
+	return result, nil
+}
+
+func (r *PgxRepository) GetAddress(ctx context.Context, userID, addressID int64) (Address, error) {
+	var a Address
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, user_id, label, name_enc, phone_enc, full_address_enc,
+		        COALESCE(neighborhood_enc, ''), district, city,
+		        COALESCE(postal_code, ''), is_default, created_at, updated_at
+		FROM identity_schema.addresses
+		WHERE id = $1 AND user_id = $2`,
+		addressID, userID,
+	).Scan(
+		&a.ID, &a.UserID, &a.Label, &a.Name, &a.Phone, &a.FullAddress,
+		&a.Neighborhood, &a.District, &a.City,
+		&a.PostalCode, &a.IsDefault, &a.CreatedAt, &a.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Address{}, ErrAddressNotFound
+		}
+		return Address{}, fmt.Errorf("identity repo: get address: %w", err)
+	}
+	return a, nil
+}
+
+func (r *PgxRepository) UpdateAddress(ctx context.Context, userID, addressID int64, a AddressRow) (Address, error) {
+	var result Address
+	err := r.pool.QueryRow(ctx,
+		`UPDATE identity_schema.addresses
+		SET label = $3, name_enc = $4, phone_enc = $5, full_address_enc = $6,
+		    neighborhood_enc = $7, district = $8, city = $9,
+		    postal_code = NULLIF($10, ''), is_default = $11, updated_at = now()
+		WHERE id = $1 AND user_id = $2
+		RETURNING id, user_id, label, name_enc, phone_enc, full_address_enc,
+		          COALESCE(neighborhood_enc, ''), district, city,
+		          COALESCE(postal_code, ''), is_default, created_at, updated_at`,
+		addressID, userID,
+		a.Label, a.NameEnc, a.PhoneEnc, a.FullAddressEnc,
+		nullIfEmpty(a.NeighborhoodEnc), a.District, a.City, a.PostalCode, a.IsDefault,
+	).Scan(
+		&result.ID, &result.UserID, &result.Label, &result.Name, &result.Phone,
+		&result.FullAddress, &result.Neighborhood, &result.District, &result.City,
+		&result.PostalCode, &result.IsDefault, &result.CreatedAt, &result.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Address{}, ErrAddressNotFound
+		}
+		return Address{}, fmt.Errorf("identity repo: update address: %w", err)
+	}
+	return result, nil
+}
+
+func (r *PgxRepository) DeleteAddress(ctx context.Context, userID, addressID int64) error {
+	tag, err := r.pool.Exec(ctx,
+		`DELETE FROM identity_schema.addresses WHERE id = $1 AND user_id = $2`,
+		addressID, userID,
+	)
+	if err != nil {
+		return fmt.Errorf("identity repo: delete address: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrAddressNotFound
+	}
+	return nil
+}
+
+func nullIfEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}

@@ -16,6 +16,11 @@ type Service interface {
 	Search(ctx context.Context, query, locale, market string) ([]Product, error)
 	GetCommissionForCategory(ctx context.Context, market string, categoryID int64) (CategoryCommission, error)
 	GetVariantByID(ctx context.Context, variantID int64) (Variant, error)
+
+	// Discovery endpoints (Phase 4.4a).
+	ListCategories(ctx context.Context, locale string) ([]CategoryRow, error)
+	ListProductsByCategory(ctx context.Context, categoryID int64, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error)
+	SearchSummary(ctx context.Context, query, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error)
 }
 
 // Repository is the storage interface used only by service.go.
@@ -29,4 +34,9 @@ type Repository interface {
 	GetCommission(ctx context.Context, market string, categoryID int64) (CategoryCommission, error)
 	IsCurrencyActive(ctx context.Context, code string) (bool, error)
 	GetVariantByID(ctx context.Context, variantID int64) (Variant, error)
+
+	// Discovery queries (Phase 4.4a).
+	ListCategories(ctx context.Context, locale string) ([]CategoryRow, error)
+	ListProductsByCategory(ctx context.Context, categoryID int64, locale string, offset, limit int) ([]ProductSummaryRow, int, error)
+	SearchProductsSummary(ctx context.Context, query, locale string, offset, limit int) ([]ProductSummaryRow, int, error)
 }

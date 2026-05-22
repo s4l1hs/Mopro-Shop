@@ -285,10 +285,19 @@ func (s *FinServer) ListCashbackPayments(ctx context.Context, req genfin.ListCas
 // ── mapping helpers ────────────────────────────────────────────────────────────
 
 // planToAPI maps a cashback.Plan to the OpenAPI CashbackPlan model.
-// product_id=0, product_title="Sipariş #<orderID>", product_image_url=nil are
-// Phase 4.3a fallbacks; Phase 4.3b adds migration + event enrichment.
 func planToAPI(p cashback.Plan) genfin.CashbackPlan {
-	productTitle := fmt.Sprintf("Sipariş #%d", p.OrderID)
+	productTitle := p.ProductTitle
+	if productTitle == "" {
+		productTitle = fmt.Sprintf("Sipariş #%d", p.OrderID)
+	}
+	var productID int64
+	if p.ProductID != 0 {
+		productID = p.ProductID
+	}
+	var productImageURL *string
+	if p.ProductImageURL != "" {
+		productImageURL = &p.ProductImageURL
+	}
 	return genfin.CashbackPlan{
 		Id:                       p.ID,
 		OrderId:                  p.OrderID,
@@ -298,10 +307,9 @@ func planToAPI(p cashback.Plan) genfin.CashbackPlan {
 		StartDate:                openapi_types.Date{Time: p.StartDate},
 		Status:                   genfin.CashbackPlanStatus(string(p.Status)),
 		CreatedAt:                p.CreatedAt,
-		// Phase 4.3a fallbacks (product_id=0 means data unavailable; see DEVELOPMENT.md).
-		ProductId:       0,
-		ProductTitle:    productTitle,
-		ProductImageUrl: nil,
+		ProductId:                productID,
+		ProductTitle:             productTitle,
+		ProductImageUrl:          productImageURL,
 	}
 }
 
