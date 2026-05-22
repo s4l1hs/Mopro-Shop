@@ -84,6 +84,11 @@ func (m *mockRepo) SetSystemState(_ context.Context, _ pgx.Tx, _ bool, _ string)
 	return nil
 }
 
+// ListEntriesByAccount is not exercised by wallet unit tests.
+func (m *mockRepo) ListEntriesByAccount(_ context.Context, _ int64, _ int, _ int64) ([]LedgerEntryRow, error) {
+	return nil, nil
+}
+
 // ── mock outbox ───────────────────────────────────────────────────────────────
 
 type mockOutbox struct{ insertErr error }

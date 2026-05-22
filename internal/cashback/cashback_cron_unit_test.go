@@ -59,6 +59,17 @@ func (m *mockCashbackRepo) WithTx(_ context.Context, _ pgx.TxIsoLevel, fn func(p
 	return fn(nil)
 }
 
+// HTTP read-path stubs — not exercised by cron unit tests.
+func (m *mockCashbackRepo) ListPlansByUserID(_ context.Context, _ int64, _ int, _ int64, _ *PlanStatus) ([]Plan, error) {
+	return nil, nil
+}
+func (m *mockCashbackRepo) GetPlanByIDAndUserID(_ context.Context, _ int64, _ int64) (Plan, error) {
+	return Plan{}, ErrPlanNotFound
+}
+func (m *mockCashbackRepo) ListPaymentsByPlanID(_ context.Context, _ int64, _ int, _ int64) ([]Payment, error) {
+	return nil, nil
+}
+
 // ── mock WalletPoster ─────────────────────────────────────────────────────────
 
 type mockWalletPoster struct {
