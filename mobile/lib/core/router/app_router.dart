@@ -5,6 +5,7 @@ import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/core/router/auth_guard.dart';
 import 'package:mopro/features/auth/login_screen.dart';
 import 'package:mopro/features/auth/otp_screen.dart';
+import 'package:mopro/features/auth/splash_screen.dart';
 import 'package:mopro/features/home/home_screen.dart';
 
 /// Top-level navigator key — use for imperative navigation outside widget tree.
@@ -15,6 +16,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   // its redirect when auth state changes, without recreating the GoRouter.
   return GoRouter(
     navigatorKey: rootNavigatorKey,
+    initialLocation: '/splash',
     refreshListenable: _AuthStateListenable(ref),
     redirect: (context, state) {
       // Read (not watch) current auth state inside redirect callback.
@@ -35,6 +37,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       };
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(
         path: '/',
         builder: (context, state) => const HomeScreen(),
