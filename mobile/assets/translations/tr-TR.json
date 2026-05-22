@@ -56,10 +56,23 @@
     "cashback_preview": "Bu üründen aylık {monthly} Mopro Coin alacaksınız — SÜRESİZ.",
     "monthly_coin": "Aylık {amount} Coin",
     "perpetual_note": "Ödeme iptal edilene kadar her ay aktarılır.",
+    "perpetual_label": "Süresiz plan",
     "plans_title": "Cashback Planlarım",
     "active": "Aktif",
     "cancelled": "İptal Edildi",
-    "no_plans": "Henüz cashback planınız bulunmuyor."
+    "no_plans": "Henüz cashback planınız bulunmuyor.",
+    "plans_empty": "Henüz geri ödeme planınız yok",
+    "load_more_plans": "Daha fazla plan yükle",
+    "load_more_payments": "Daha fazla ödeme yükle",
+    "plan_detail_title": "Plan Detayı",
+    "payment_history_title": "Ödeme Geçmişi",
+    "payment_status_paid": "Ödendi",
+    "payment_status_scheduled": "Planlandı",
+    "payment_status_failed": "Başarısız",
+    "plan_status_active": "Aktif",
+    "plan_status_cancelled": "İptal",
+    "plan_status_suspended": "Askıya Alındı",
+    "no_payments": "Henüz ödeme yok"
   },
   "cart": {
     "title": "Sepetim",
@@ -81,7 +94,16 @@
     "title": "Cüzdanım",
     "balance": "Bakiye",
     "coin_balance": "Mopro Coin",
-    "transactions": "İşlem Geçmişi"
+    "transactions": "İşlem Geçmişi",
+    "load_more_transactions": "Daha fazla işlem yükle",
+    "no_transactions": "Henüz işlem yok",
+    "transaction_type_cashback": "Geri Ödeme",
+    "transaction_type_topup": "Yükleme",
+    "transaction_type_purchase": "Alışveriş",
+    "transaction_type_refund": "İade",
+    "transaction_type_other": "Diğer",
+    "direction_debit": "Giden",
+    "direction_credit": "Gelen"
   },
   "seller": {
     "breakdown_title": "Sipariş Özeti",

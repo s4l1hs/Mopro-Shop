@@ -56,10 +56,23 @@
     "cashback_preview": "You'll receive {monthly} Mopro Coin per month from this product — FOREVER.",
     "monthly_coin": "{amount} Coin / month",
     "perpetual_note": "Paid every month until cancelled.",
+    "perpetual_label": "Perpetual plan",
     "plans_title": "My Cashback Plans",
     "active": "Active",
     "cancelled": "Cancelled",
-    "no_plans": "You have no cashback plans yet."
+    "no_plans": "You have no cashback plans yet.",
+    "plans_empty": "No cashback plans yet",
+    "load_more_plans": "Load more plans",
+    "load_more_payments": "Load more payments",
+    "plan_detail_title": "Plan Detail",
+    "payment_history_title": "Payment History",
+    "payment_status_paid": "Paid",
+    "payment_status_scheduled": "Scheduled",
+    "payment_status_failed": "Failed",
+    "plan_status_active": "Active",
+    "plan_status_cancelled": "Cancelled",
+    "plan_status_suspended": "Suspended",
+    "no_payments": "No payments yet"
   },
   "cart": {
     "title": "My Cart",
@@ -81,7 +94,16 @@
     "title": "My Wallet",
     "balance": "Balance",
     "coin_balance": "Mopro Coin",
-    "transactions": "Transaction History"
+    "transactions": "Transaction History",
+    "load_more_transactions": "Load more transactions",
+    "no_transactions": "No transactions yet",
+    "transaction_type_cashback": "Cashback",
+    "transaction_type_topup": "Top Up",
+    "transaction_type_purchase": "Purchase",
+    "transaction_type_refund": "Refund",
+    "transaction_type_other": "Other",
+    "direction_debit": "Outgoing",
+    "direction_credit": "Incoming"
   },
   "seller": {
     "breakdown_title": "Order Summary",

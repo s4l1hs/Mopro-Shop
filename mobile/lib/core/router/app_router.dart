@@ -8,6 +8,8 @@ import 'package:mopro/features/auth/otp_screen.dart';
 import 'package:mopro/features/auth/profile_screen.dart';
 import 'package:mopro/features/auth/splash_screen.dart';
 import 'package:mopro/features/home/home_screen.dart';
+import 'package:mopro/features/wallet/plan_detail_screen.dart';
+import 'package:mopro/features/wallet/wallet_screen.dart';
 
 /// Top-level navigator key — use for imperative navigation outside widget tree.
 final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -63,6 +65,26 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/auth/profile',
         builder: (context, state) => const ProfileCompletionScreen(),
+      ),
+      GoRoute(
+        path: '/wallet',
+        builder: (context, state) => const WalletScreen(),
+        routes: [
+          GoRoute(
+            path: 'plans/:id',
+            builder: (context, state) {
+              final raw = state.pathParameters['id'];
+              final planId = raw != null ? int.tryParse(raw) : null;
+              if (planId == null || planId <= 0) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (context.mounted) context.go('/wallet');
+                });
+                return const WalletScreen();
+              }
+              return PlanDetailScreen(planId: planId);
+            },
+          ),
+        ],
       ),
     ],
   );
