@@ -113,5 +113,69 @@ void main() {
       );
       expect(handler.captured?.error, isA<NetworkError>());
     });
+
+    test('maps 401 with token_family_revoked to SessionRevokedError', () {
+      final handler = _TestErrHandler();
+      interceptor.onError(
+        makeErr(401, {
+          'error': {'code': 'token_family_revoked', 'message': 'revoked'},
+        }),
+        handler,
+      );
+      expect(handler.captured?.error, isA<SessionRevokedError>());
+    });
+
+    test('maps plain 401 to UnauthorizedError', () {
+      final handler = _TestErrHandler();
+      interceptor.onError(
+        makeErr(401, {
+          'error': {'code': 'other_code', 'message': 'unauthorized'},
+        }),
+        handler,
+      );
+      expect(handler.captured?.error, isA<UnauthorizedError>());
+    });
+
+    test('maps 422 with otp_invalid to OtpInvalidError', () {
+      final handler = _TestErrHandler();
+      interceptor.onError(
+        makeErr(422, {
+          'error': {'code': 'otp_invalid', 'message': 'invalid code'},
+        }),
+        handler,
+      );
+      expect(handler.captured?.error, isA<OtpInvalidError>());
+    });
+
+    test('maps 422 with otp_expired to OtpExpiredError', () {
+      final handler = _TestErrHandler();
+      interceptor.onError(
+        makeErr(422, {
+          'error': {'code': 'otp_expired', 'message': 'code expired'},
+        }),
+        handler,
+      );
+      expect(handler.captured?.error, isA<OtpExpiredError>());
+    });
+
+    test('maps 423 to PhoneLockedError', () {
+      final handler = _TestErrHandler();
+      interceptor.onError(makeErr(423), handler);
+      expect(handler.captured?.error, isA<PhoneLockedError>());
+    });
+
+    test('maps 429 with rate_limit_exceeded to OtpExhaustedError', () {
+      final handler = _TestErrHandler();
+      interceptor.onError(
+        makeErr(429, {
+          'error': {
+            'code': 'rate_limit_exceeded',
+            'message': 'too many requests',
+          },
+        }),
+        handler,
+      );
+      expect(handler.captured?.error, isA<OtpExhaustedError>());
+    });
   });
 }
