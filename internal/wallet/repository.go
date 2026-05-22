@@ -342,6 +342,39 @@ func (r *walletRepository) SetSystemState(ctx context.Context, tx pgx.Tx, readOn
 	return nil
 }
 
+// ListEntriesByAccount returns up to limit ledger entries for accountID, joined
+// with their parent transaction for type and reference. Ordered by entry id DESC.
+// Pass beforeID > 0 to cursor-paginate.
+func (r *walletRepository) ListEntriesByAccount(ctx context.Context, accountID int64, limit int, beforeID int64) ([]LedgerEntryRow, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT le.id, le.amount_minor, le.direction, le.created_at,
+		        t.type, COALESCE(t.reference, '')
+		 FROM wallet_schema.ledger_entries le
+		 JOIN wallet_schema.transactions t ON t.id = le.transaction_id
+		 WHERE le.account_id = $1
+		   AND ($2 = 0 OR le.id < $2)
+		 ORDER BY le.id DESC
+		 LIMIT $3`,
+		accountID, beforeID, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("wallet: ListEntriesByAccount account=%d: %w", accountID, err)
+	}
+	defer rows.Close()
+	var result []LedgerEntryRow
+	for rows.Next() {
+		var row LedgerEntryRow
+		if err := rows.Scan(
+			&row.ID, &row.AmountMinor, &row.Direction, &row.CreatedAt,
+			&row.TxnType, &row.TxnReference,
+		); err != nil {
+			return nil, fmt.Errorf("wallet: ListEntriesByAccount scan: %w", err)
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
 func isSerializationFailure(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "40001"

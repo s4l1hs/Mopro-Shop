@@ -337,6 +337,11 @@ func (s *walletService) InvalidateReadOnlyCache() {
 	s.sysRefreshedAt.Store(0)
 }
 
+// ListEntriesByAccount delegates to the repository read path.
+func (s *walletService) ListEntriesByAccount(ctx context.Context, accountID int64, limit int, beforeID int64) ([]LedgerEntryRow, error) {
+	return s.repo.ListEntriesByAccount(ctx, accountID, limit, beforeID)
+}
+
 // outboxAggregate maps a transaction type to the outbox aggregate name.
 func outboxAggregate(txType string) string {
 	switch txType {

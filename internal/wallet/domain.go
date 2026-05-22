@@ -12,3 +12,14 @@ type Account struct {
 	Status    string
 	CreatedAt time.Time
 }
+
+// LedgerEntryRow is a read projection of wallet_schema.ledger_entries
+// joined with wallet_schema.transactions. Used by the HTTP read path only.
+type LedgerEntryRow struct {
+	ID           int64
+	AmountMinor  int64
+	Direction    string // "D" (debit) or "C" (credit) from the account's perspective
+	TxnType      string // transaction type, e.g. "cashback_payment"
+	TxnReference string // transactions.reference; empty when not set
+	CreatedAt    time.Time
+}

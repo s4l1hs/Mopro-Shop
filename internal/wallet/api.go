@@ -81,6 +81,11 @@ type Service interface {
 	// every 5 seconds. Must be called once from fin-svc/main.go after service construction.
 	// No-op implementations satisfy test mocks.
 	StartRefresher(ctx context.Context)
+
+	// ListEntriesByAccount returns up to limit ledger entries for the given account,
+	// ordered by id DESC. Pass beforeID > 0 to cursor-paginate (entries with id < beforeID).
+	// Used by the HTTP wallet transaction list endpoint — read path only.
+	ListEntriesByAccount(ctx context.Context, accountID int64, limit int, beforeID int64) ([]LedgerEntryRow, error)
 }
 
 // Repository defines the storage interface of the wallet module.
@@ -144,4 +149,8 @@ type Repository interface {
 	// Accepts an optional pgx.Tx; if tx is nil, executes against the pool directly.
 	// The tx parameter is required when the call must be atomic with other writes (OQ4).
 	SetSystemState(ctx context.Context, tx pgx.Tx, readOnly bool, reason string) error
+
+	// ListEntriesByAccount returns up to limit ledger entries for accountID, ordered
+	// by id DESC. Pass beforeID > 0 to paginate (returns entries with id < beforeID).
+	ListEntriesByAccount(ctx context.Context, accountID int64, limit int, beforeID int64) ([]LedgerEntryRow, error)
 }
