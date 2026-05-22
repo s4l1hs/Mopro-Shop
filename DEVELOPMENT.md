@@ -843,10 +843,32 @@ intentionally want to reset.
 
 ---
 
-## 16. When in Doubt
+## 16. fin-svc HTTP API — Known Limitations (Phase 4.3a)
+
+### CashbackPlan.product_id = 0 means "data unavailable"
+
+`cashback_schema.plans` does not yet store product information (product_id, product_title, product_image_url). Phase 4.3a returns the following fallback values in the `GET /v1/cashback/plans` and `GET /v1/cashback/plans/{id}` responses:
+
+| Field | Phase 4.3a value | Production value (Phase 4.3b+) |
+|---|---|---|
+| `product_id` | `0` | Real product ID from order |
+| `product_title` | `"Sipariş #<orderID>"` | Actual product title |
+| `product_image_url` | `null` | CDN URL |
+
+Mobile clients MUST treat `product_id == 0` as "product data not yet available" and render the `product_title` fallback string as-is. Do NOT treat `product_id=0` as a real product lookup.
+
+Phase 4.3b will add a DB migration to `cashback_schema.plans` to store product fields, populated via the `ecom.order.delivered.v1` event enrichment path.
+
+### WalletTransaction.reference_id
+
+`transactions.reference` was not set for cashback payments created before Phase 4.3a (fix committed in commit 3 of this phase). Historic payments will have `reference_id=null` in the API response. New payments will have `reference_id=<plan_id>`.
+
+---
+
+## 17. When in Doubt
 
 Read in this order:
-1. `CLAUDE.md` — non-negotiable rules
+1. `CLAUDE.md` — non-negotiable rules (§16 above now lists the Repository-direct exception for HTTP read handlers)
 2. `ARCHITECTURE.md` — topology
 3. `DATA_DICTIONARY.md` — DB rules
 4. `LEDGER_GUIDE.md` — financial rules (if touching fin-svc, wallet, cashback, sellerpayout, treasury)
