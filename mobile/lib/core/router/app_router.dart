@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/core/auth/auth_state.dart';
@@ -7,16 +7,22 @@ import 'package:mopro/features/auth/login_screen.dart';
 import 'package:mopro/features/auth/otp_screen.dart';
 import 'package:mopro/features/home/home_screen.dart';
 
-final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authNotifierProvider);
+/// Top-level navigator key — use for imperative navigation outside widget tree.
+final rootNavigatorKey = GlobalKey<NavigatorState>();
 
+final routerProvider = Provider<GoRouter>((ref) {
+  // Use refreshListenable so the router is created ONCE and only re-runs
+  // its redirect when auth state changes, without recreating the GoRouter.
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     refreshListenable: _AuthStateListenable(ref),
     redirect: (context, state) {
-      // While loading, stay put; SplashScreen handles the wait.
-      if (authState.isLoading) return null;
+      // Read (not watch) current auth state inside redirect callback.
+      final authAsync = ref.read(authNotifierProvider);
 
-      final auth = authState.valueOrNull;
+      if (authAsync.isLoading) return null;
+
+      final auth = authAsync.valueOrNull;
       final loc = state.matchedLocation;
       final isAuthRoute = loc.startsWith('/auth');
 
@@ -25,8 +31,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           isAuthRoute ? null : '/auth/phone',
         AuthProfileIncomplete() =>
           loc == '/auth/profile' ? null : '/auth/profile',
-        AuthAuthenticated() =>
-          isAuthRoute ? '/' : null,
+        AuthAuthenticated() => isAuthRoute ? '/' : null,
       };
     },
     routes: [
