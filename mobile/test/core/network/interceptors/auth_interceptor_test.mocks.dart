@@ -121,6 +121,7 @@ class MockTokenStorage extends _i1.Mock implements _i8.TokenStorage {
   _i9.Future<void> save({
     required String? accessToken,
     required String? refreshToken,
+    required int? accessExpiresIn,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -129,6 +130,7 @@ class MockTokenStorage extends _i1.Mock implements _i8.TokenStorage {
           {
             #accessToken: accessToken,
             #refreshToken: refreshToken,
+            #accessExpiresIn: accessExpiresIn,
           },
         ),
         returnValue: _i9.Future<void>.value(),

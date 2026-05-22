@@ -89,6 +89,7 @@ class AuthInterceptor extends Interceptor {
       await tokenStorage.save(
         accessToken: body['access_token'] as String,
         refreshToken: body['refresh_token'] as String,
+        accessExpiresIn: (body['expires_in'] as int?) ?? 900,
       );
       return true;
     } on DioException {
