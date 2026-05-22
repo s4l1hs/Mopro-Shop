@@ -60,7 +60,9 @@ class AuthOtpNotifier extends AutoDisposeFamilyNotifier<OtpState, String> {
   @override
   OtpState build(String phone) {
     ref.onDispose(() => _resendTimer?.cancel());
-    _startResendCountdown();
+    // Defer until after build() returns — reading `state` inside
+    // _startResendCountdown() before build completes throws StateError.
+    unawaited(Future.microtask(_startResendCountdown));
     return OtpState(phone: phone, resendCountdown: 60);
   }
 
