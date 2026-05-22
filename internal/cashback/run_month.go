@@ -137,6 +137,7 @@ func (s *cashbackService) processPlanInTx(ctx context.Context, plan Plan, period
 		// 3. Post ledger entries: D equity:cashback_distribution → C liability:wallet:user.
 		postIn := ledger.PostInput{
 			Type:           "cashback_payment",
+			Reference:      strconv.FormatInt(plan.ID, 10),
 			IdempotencyKey: idemKey,
 			Market:         plan.Market,
 			Currency:       plan.Currency,
