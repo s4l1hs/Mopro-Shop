@@ -54,15 +54,30 @@ func (r *pgxCashbackRepository) InsertPlan(ctx context.Context, tx pgx.Tx, p Pla
 		INSERT INTO cashback_schema.plans
 			(order_id, user_id, monthly_amount_minor, currency,
 			 reference_interest_rate_bps, start_date, status,
-			 delivered_at, market, commission_snapshot, idempotency_key)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			 delivered_at, market, commission_snapshot, idempotency_key,
+			 product_id, product_title, product_image_url)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 		RETURNING id, created_at, updated_at`
+
+	var productID *int64
+	if p.ProductID != 0 {
+		productID = &p.ProductID
+	}
+	var productTitle *string
+	if p.ProductTitle != "" {
+		productTitle = &p.ProductTitle
+	}
+	var productImageURL *string
+	if p.ProductImageURL != "" {
+		productImageURL = &p.ProductImageURL
+	}
 
 	err := tx.QueryRow(ctx, q,
 		p.OrderID, p.UserID, p.MonthlyAmountMinor, p.Currency,
 		p.ReferenceInterestRateBps, p.StartDate,
 		string(p.Status), p.DeliveredAt.UTC(), p.Market,
 		[]byte(p.CommissionSnapshot), p.IdempotencyKey,
+		productID, productTitle, productImageURL,
 	).Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -79,6 +94,7 @@ func (r *pgxCashbackRepository) FindPlanByOrderID(ctx context.Context, orderID i
 		SELECT id, order_id, user_id, monthly_amount_minor, currency,
 		       reference_interest_rate_bps, start_date, status,
 		       delivered_at, market, commission_snapshot, idempotency_key,
+		       product_id, product_title, product_image_url,
 		       created_at, updated_at
 		FROM cashback_schema.plans
 		WHERE order_id = $1
@@ -87,11 +103,14 @@ func (r *pgxCashbackRepository) FindPlanByOrderID(ctx context.Context, orderID i
 	var p Plan
 	var statusStr string
 	var snapshot []byte
+	var productID *int64
+	var productTitle, productImageURL *string
 
 	err := r.pool.QueryRow(ctx, q, orderID).Scan(
 		&p.ID, &p.OrderID, &p.UserID, &p.MonthlyAmountMinor, &p.Currency,
 		&p.ReferenceInterestRateBps, &p.StartDate, &statusStr,
 		&p.DeliveredAt, &p.Market, &snapshot, &p.IdempotencyKey,
+		&productID, &productTitle, &productImageURL,
 		&p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
@@ -102,6 +121,15 @@ func (r *pgxCashbackRepository) FindPlanByOrderID(ctx context.Context, orderID i
 	}
 	p.Status = PlanStatus(statusStr)
 	p.CommissionSnapshot = snapshot
+	if productID != nil {
+		p.ProductID = *productID
+	}
+	if productTitle != nil {
+		p.ProductTitle = *productTitle
+	}
+	if productImageURL != nil {
+		p.ProductImageURL = *productImageURL
+	}
 	return p, nil
 }
 
@@ -114,6 +142,7 @@ func (r *pgxCashbackRepository) FetchPlansBatch(ctx context.Context, period int,
 		SELECT id, order_id, user_id, monthly_amount_minor, currency,
 		       reference_interest_rate_bps, start_date, status,
 		       delivered_at, market, commission_snapshot, idempotency_key,
+		       product_id, product_title, product_image_url,
 		       created_at, updated_at, last_distributed_period
 		FROM cashback_schema.plans
 		WHERE status = 'active'
@@ -135,17 +164,29 @@ func (r *pgxCashbackRepository) FetchPlansBatch(ctx context.Context, period int,
 		var p Plan
 		var statusStr string
 		var snapshot []byte
+		var productID *int64
+		var productTitle, productImageURL *string
 		var lastPeriod *int
 		if err := rows.Scan(
 			&p.ID, &p.OrderID, &p.UserID, &p.MonthlyAmountMinor, &p.Currency,
 			&p.ReferenceInterestRateBps, &p.StartDate, &statusStr,
 			&p.DeliveredAt, &p.Market, &snapshot, &p.IdempotencyKey,
+			&productID, &productTitle, &productImageURL,
 			&p.CreatedAt, &p.UpdatedAt, &lastPeriod,
 		); err != nil {
 			return nil, fmt.Errorf("cashback: FetchPlansBatch scan: %w", err)
 		}
 		p.Status = PlanStatus(statusStr)
 		p.CommissionSnapshot = snapshot
+		if productID != nil {
+			p.ProductID = *productID
+		}
+		if productTitle != nil {
+			p.ProductTitle = *productTitle
+		}
+		if productImageURL != nil {
+			p.ProductImageURL = *productImageURL
+		}
 		plans = append(plans, p)
 	}
 	return plans, rows.Err()
@@ -237,6 +278,7 @@ func (r *pgxCashbackRepository) ListPlansByUserID(ctx context.Context, userID in
 		`SELECT id, order_id, user_id, monthly_amount_minor, currency,
 		        reference_interest_rate_bps, start_date, status,
 		        delivered_at, market, commission_snapshot, idempotency_key,
+		        product_id, product_title, product_image_url,
 		        created_at, updated_at
 		 FROM cashback_schema.plans
 		 WHERE user_id = $1
@@ -255,16 +297,28 @@ func (r *pgxCashbackRepository) ListPlansByUserID(ctx context.Context, userID in
 		var p Plan
 		var statusStr string
 		var snapshot []byte
+		var productID *int64
+		var productTitle, productImageURL *string
 		if err := rows.Scan(
 			&p.ID, &p.OrderID, &p.UserID, &p.MonthlyAmountMinor, &p.Currency,
 			&p.ReferenceInterestRateBps, &p.StartDate, &statusStr,
 			&p.DeliveredAt, &p.Market, &snapshot, &p.IdempotencyKey,
+			&productID, &productTitle, &productImageURL,
 			&p.CreatedAt, &p.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("cashback: ListPlansByUserID scan: %w", err)
 		}
 		p.Status = PlanStatus(statusStr)
 		p.CommissionSnapshot = snapshot
+		if productID != nil {
+			p.ProductID = *productID
+		}
+		if productTitle != nil {
+			p.ProductTitle = *productTitle
+		}
+		if productImageURL != nil {
+			p.ProductImageURL = *productImageURL
+		}
 		plans = append(plans, p)
 	}
 	return plans, rows.Err()
@@ -277,6 +331,7 @@ func (r *pgxCashbackRepository) GetPlanByIDAndUserID(ctx context.Context, planID
 		SELECT id, order_id, user_id, monthly_amount_minor, currency,
 		       reference_interest_rate_bps, start_date, status,
 		       delivered_at, market, commission_snapshot, idempotency_key,
+		       product_id, product_title, product_image_url,
 		       created_at, updated_at
 		FROM cashback_schema.plans
 		WHERE id = $1 AND user_id = $2`
@@ -284,10 +339,13 @@ func (r *pgxCashbackRepository) GetPlanByIDAndUserID(ctx context.Context, planID
 	var p Plan
 	var statusStr string
 	var snapshot []byte
+	var productID *int64
+	var productTitle, productImageURL *string
 	err := r.pool.QueryRow(ctx, q, planID, userID).Scan(
 		&p.ID, &p.OrderID, &p.UserID, &p.MonthlyAmountMinor, &p.Currency,
 		&p.ReferenceInterestRateBps, &p.StartDate, &statusStr,
 		&p.DeliveredAt, &p.Market, &snapshot, &p.IdempotencyKey,
+		&productID, &productTitle, &productImageURL,
 		&p.CreatedAt, &p.UpdatedAt,
 	)
 	if err != nil {
@@ -298,6 +356,15 @@ func (r *pgxCashbackRepository) GetPlanByIDAndUserID(ctx context.Context, planID
 	}
 	p.Status = PlanStatus(statusStr)
 	p.CommissionSnapshot = snapshot
+	if productID != nil {
+		p.ProductID = *productID
+	}
+	if productTitle != nil {
+		p.ProductTitle = *productTitle
+	}
+	if productImageURL != nil {
+		p.ProductImageURL = *productImageURL
+	}
 	return p, nil
 }
 

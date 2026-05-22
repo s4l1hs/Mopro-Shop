@@ -71,6 +71,11 @@ type Plan struct {
 	Market                   string
 	CommissionSnapshot       json.RawMessage
 	IdempotencyKey           string
-	CreatedAt                time.Time
-	UpdatedAt                time.Time
+	// Product snapshot — populated from ecom.order.delivered.v1 (Phase 4.4a).
+	// Nil/empty for plans created before Phase 4.4a deploy.
+	ProductID       int64
+	ProductTitle    string
+	ProductImageURL string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }

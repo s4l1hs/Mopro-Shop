@@ -13,6 +13,7 @@ import (
 	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/outbox"
+	"github.com/mopro/platform/pkg/mediaurl"
 )
 
 type orderService struct {
@@ -208,7 +209,36 @@ func (s *orderService) MarkDelivered(ctx context.Context, orderID int64, deliver
 		return nil // idempotent
 	}
 
-	payload, err := json.Marshal(buildDeliveredPayload(o, items, deliveredAt))
+	// Resolve product snapshot from the first item for the cashback plan's display fields.
+	var productID int64
+	var productTitle, productImageURL string
+	if len(items) > 0 {
+		v, vErr := s.catalog.GetVariantByID(ctx, items[0].VariantID)
+		if vErr == nil {
+			productID = v.ProductID
+			_, _, translations, tErr := s.catalog.GetByID(ctx, v.ProductID)
+			if tErr == nil {
+				for _, t := range translations {
+					if productTitle == "" {
+						productTitle = t.Title
+					}
+					if t.Locale == "tr-TR" || t.Locale == o.Market {
+						productTitle = t.Title
+					}
+				}
+			}
+			if len(v.ImageKeys) > 0 {
+				productImageURL = mediaurl.CDNUrl(v.ImageKeys[0])
+			}
+		}
+		// Catalog lookup failure is non-fatal: plan still created, title shows as "Sipariş #N".
+		if vErr != nil {
+			slog.Warn("order: catalog lookup for product enrichment failed",
+				"order_id", orderID, "variant_id", items[0].VariantID, "err", vErr)
+		}
+	}
+
+	payload, err := json.Marshal(buildDeliveredPayload(o, items, deliveredAt, productID, productTitle, productImageURL))
 	if err != nil {
 		return fmt.Errorf("order: marshal delivered payload: %w", err)
 	}
@@ -239,6 +269,10 @@ type deliveredPayload struct {
 	Market      string                 `json:"market"`
 	Currency    string                 `json:"currency"`
 	Items       []deliveredItemPayload `json:"items"`
+	// Phase 4.4a: product snapshot from first item (omitempty for backward compat).
+	ProductID       int64  `json:"product_id,omitempty"`
+	ProductTitle    string `json:"product_title,omitempty"`
+	ProductImageURL string `json:"product_image_url,omitempty"`
 }
 
 type deliveredItemPayload struct {
@@ -254,7 +288,16 @@ type deliveredItemPayload struct {
 	SellerNetMinor        int64 `json:"seller_net_minor"`
 }
 
-func buildDeliveredPayload(o Order, items []OrderItem, deliveredAt time.Time) deliveredPayload {
+// buildDeliveredPayload serialises the order + items into the event payload.
+// productID/productTitle/productImageURL come from a pre-resolved catalog lookup.
+func buildDeliveredPayload(
+	o Order,
+	items []OrderItem,
+	deliveredAt time.Time,
+	productID int64,
+	productTitle string,
+	productImageURL string,
+) deliveredPayload {
 	its := make([]deliveredItemPayload, len(items))
 	for i, it := range items {
 		its[i] = deliveredItemPayload{
@@ -271,11 +314,14 @@ func buildDeliveredPayload(o Order, items []OrderItem, deliveredAt time.Time) de
 		}
 	}
 	return deliveredPayload{
-		OrderID:     o.ID,
-		UserID:      o.UserID,
-		DeliveredAt: deliveredAt.UTC(),
-		Market:      o.Market,
-		Currency:    o.Currency,
-		Items:       its,
+		OrderID:         o.ID,
+		UserID:          o.UserID,
+		DeliveredAt:     deliveredAt.UTC(),
+		Market:          o.Market,
+		Currency:        o.Currency,
+		Items:           its,
+		ProductID:       productID,
+		ProductTitle:    productTitle,
+		ProductImageURL: productImageURL,
 	}
 }

@@ -26,6 +26,10 @@ type orderDeliveredPayload struct {
 	Market      string                  `json:"market"`
 	Currency    string                  `json:"currency"`
 	Items       []deliveredItemSnapshot `json:"items"`
+	// Phase 4.4a additive fields — absent in pre-4.4a events (zero value is safe).
+	ProductID       int64  `json:"product_id,omitempty"`
+	ProductTitle    string `json:"product_title,omitempty"`
+	ProductImageURL string `json:"product_image_url,omitempty"`
 }
 
 type deliveredItemSnapshot struct {
@@ -77,12 +81,15 @@ func handleDelivered(ctx context.Context, svc Service, ev eventbus.Event) error 
 	}
 
 	ode := OrderDeliveredEvent{
-		OrderID:     raw.OrderID,
-		UserID:      raw.UserID,
-		DeliveredAt: raw.DeliveredAt,
-		Market:      ev.Market,
-		Currency:    ev.Currency,
-		Items:       items,
+		OrderID:         raw.OrderID,
+		UserID:          raw.UserID,
+		DeliveredAt:     raw.DeliveredAt,
+		Market:          ev.Market,
+		Currency:        ev.Currency,
+		Items:           items,
+		ProductID:       raw.ProductID,
+		ProductTitle:    raw.ProductTitle,
+		ProductImageURL: raw.ProductImageURL,
 	}
 
 	if err := svc.CreatePlanForOrder(ctx, ode); err != nil {

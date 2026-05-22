@@ -21,6 +21,10 @@ type OrderDeliveredEvent struct {
 	Market      string
 	Currency    string // fiat currency from the order event; service converts to coin currency
 	Items       []CommissionSnapshotItem
+	// Product snapshot fields (additive, Phase 4.4a). Empty for pre-4.4a events.
+	ProductID       int64
+	ProductTitle    string
+	ProductImageURL string
 }
 
 // Service is the public interface of the cashback engine (fin-svc only).

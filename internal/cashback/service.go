@@ -108,6 +108,9 @@ func (s *cashbackService) CreatePlanForOrder(ctx context.Context, ev OrderDelive
 		Market:                   ev.Market,
 		CommissionSnapshot:       json.RawMessage(snapshot),
 		IdempotencyKey:           fmt.Sprintf("cashback:plan:order_%d", ev.OrderID),
+		ProductID:                ev.ProductID,
+		ProductTitle:             ev.ProductTitle,
+		ProductImageURL:          ev.ProductImageURL,
 	}
 
 	outboxKey := fmt.Sprintf("fin:cashback:plan:created:order_%d", ev.OrderID)
