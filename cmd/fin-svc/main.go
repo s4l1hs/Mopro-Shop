@@ -15,8 +15,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	finapi "github.com/mopro/platform/internal/api"
+	genfin "github.com/mopro/platform/internal/api/gen/fin"
 	"github.com/mopro/platform/internal/cashback"
 	"github.com/mopro/platform/internal/eventbus"
+	identityjwt "github.com/mopro/platform/internal/identity/jwt"
+	identitymw "github.com/mopro/platform/internal/identity/middleware"
 	"github.com/mopro/platform/internal/outbox"
 	"github.com/mopro/platform/internal/reconcile"
 	"github.com/mopro/platform/internal/sellerpayout"
@@ -196,11 +200,31 @@ func main() {
 	weeklyCron.Start(ctx)
 	defer weeklyCron.Stop()
 
+	// ── JWT signer (shared key with core-svc; used to verify access tokens) ──
+	jwtKey := []byte(mustEnv("JWT_SIGNING_KEY"))
+	jwtSigner, err := identityjwt.NewHS256Signer(jwtKey)
+	if err != nil {
+		slog.Error("fin-svc: jwt signer init", "err", err)
+		os.Exit(1)
+	}
+
+	// ── FinServer — wallet + cashback HTTP endpoints ──────────────────────────
+	finServer := &finapi.FinServer{
+		WalletSvc:       walletSvc,
+		CashbackRepo:    cashbackRepo,
+		DefaultCurrency: cashbackCurrency,
+	}
+
 	// ── HTTP server ──────────────────────────────────────────────────────────
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+
+	// Register /v1/* routes behind JWT auth middleware.
+	finMux := http.NewServeMux()
+	genfin.HandlerFromMuxWithBaseURL(genfin.NewStrictHandler(finServer, nil), finMux, "")
+	mux.Handle("/v1/", identitymw.RequireAuth(jwtSigner)(finMux))
 	srv := &http.Server{
 		Addr:         ":8081",
 		Handler:      mux,
