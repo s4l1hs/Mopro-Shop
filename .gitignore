@@ -40,3 +40,5 @@ go.work.sum
 
 # Docker overrides
 docker-compose.override.yml
+bin/
+*.bak
