@@ -1,99 +1,92 @@
 #!/usr/bin/env bash
-# deploy/scripts/apply-migration.sh — Apply a SQL migration file to postgres-ecom or postgres-ledger.
-# Usage: ./deploy/scripts/apply-migration.sh --db ecom|ledger|config --file <path>
-# Tracks applied migrations in a _migrations table to prevent double-apply.
+# deploy/scripts/apply-migration.sh — Run golang-migrate managed migrations on VDS.
+#
+# Usage: ./deploy/scripts/apply-migration.sh --db <ecom|ledger> <up|down|status>
+#
+# Builds a linux/amd64 static migrate-tool binary locally, copies it + the
+# migrations/ directory to VDS, then runs the tool as a one-shot Docker container
+# on the appropriate Docker network so it can reach postgres directly (bypassing
+# PgBouncer — DDL requires a direct connection).
+#
+# Requirements on VDS: Docker, /opt/mopro/.env with DB passwords present.
 set -euo pipefail
 
 DB=""
-MIGRATION_FILE=""
+CMD=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --db)   DB="$2";             shift 2 ;;
-    --file) MIGRATION_FILE="$2"; shift 2 ;;
+    --db) DB="$2"; shift 2 ;;
+    up|down|status) CMD="$1"; shift ;;
     *) echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
 
-if [[ -z "${DB}" ]] || [[ -z "${MIGRATION_FILE}" ]]; then
-  echo "Usage: apply-migration.sh --db ecom|ledger|config --file <path>" >&2
-  exit 1
-fi
-
-if [[ ! -f "${MIGRATION_FILE}" ]]; then
-  echo "ERROR: Migration file not found: ${MIGRATION_FILE}" >&2
+if [[ -z "${DB}" ]] || [[ -z "${CMD}" ]]; then
+  echo "Usage: apply-migration.sh --db <ecom|ledger> <up|down|status>" >&2
   exit 1
 fi
 
 case "${DB}" in
-  ecom)
-    PGHOST="postgres-ecom"
-    PGUSER="ecom_admin"
-    PGDB="mopro_ecom"
-    PGPASS_VAR="ECOM_DB_PASSWORD"
-    ;;
-  ledger)
-    PGHOST="postgres-ledger"
-    PGUSER="ledger_admin"
-    PGDB="mopro_ledger"
-    PGPASS_VAR="LEDGER_DB_PASSWORD"
-    ;;
-  config)
-    PGHOST="postgres-config"
-    PGUSER="config_admin"
-    PGDB="mopro_config"
-    PGPASS_VAR="ECOM_DB_PASSWORD"
-    ;;
-  *)
-    echo "ERROR: --db must be one of: ecom, ledger, config" >&2
-    exit 1
-    ;;
+  ecom|ledger) ;;
+  *) echo "ERROR: --db must be ecom or ledger" >&2; exit 1 ;;
 esac
 
-MIGRATION_NAME="$(basename "${MIGRATION_FILE}")"
 SERVER="${SERVER:-mopro@195.85.207.92}"
 SSH_PORT="${SSH_PORT:-4625}"
+MOPRO_DIR="${MOPRO_DIR:-/opt/mopro}"
 
 _ssh() { ssh -p "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "${SERVER}" "$@"; }
-_scp() { scp -P "${SSH_PORT}" "$@"; }
+_scp() { scp -P "${SSH_PORT}" -o StrictHostKeyChecking=accept-new "$@"; }
 
-echo "Applying migration '${MIGRATION_NAME}' to ${DB} (${PGDB})..."
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+BIN_OUT="/tmp/mopro-migrate-tool-linux"
 
-# Upload migration file to VDS
-_scp "${MIGRATION_FILE}" "${SERVER}:/tmp/mopro_migration_$$.sql"
+echo "[1/4] Building migrate-tool (linux/amd64 static binary)..."
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+  -trimpath -ldflags="-s -w" \
+  -o "${BIN_OUT}" \
+  "${REPO_ROOT}/cmd/migrate-tool"
+echo "      → ${BIN_OUT}"
 
-# Apply via direct psql into the Postgres container (bypasses PgBouncer for DDL)
+echo "[2/4] Copying binary and migrations to VDS..."
+_scp "${BIN_OUT}" "${SERVER}:${MOPRO_DIR}/bin/migrate-tool"
+_ssh "chmod 755 ${MOPRO_DIR}/bin/migrate-tool"
+
+# Sync migrations directory (rsync-like via tar pipe to avoid rsync dependency)
+tar -C "${REPO_ROOT}" -czf - migrations | \
+  _ssh "tar -C ${MOPRO_DIR} -xzf -"
+echo "      → ${MOPRO_DIR}/migrations/ synced"
+
+echo "[3/4] Constructing DSN on VDS..."
 _ssh "
   set -euo pipefail
-  PGPASSWORD=\"\$(grep '^${PGPASS_VAR}=' /etc/mopro/.env | cut -d= -f2-)\"
-  export PGPASSWORD
+  source /etc/mopro/.env 2>/dev/null || true
 
-  # Create _migrations tracking table if absent
-  docker exec -i '${PGHOST}' psql -U '${PGUSER}' -d '${PGDB}' <<'SQL'
-CREATE TABLE IF NOT EXISTS _migrations (
-  name       TEXT PRIMARY KEY,
-  applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-SQL
+  case '${DB}' in
+    ecom)
+      PASS=\${ECOM_DB_PASSWORD:?ECOM_DB_PASSWORD not set in /etc/mopro/.env}
+      DSN=\"postgres://ecom_admin:\${PASS}@postgres-ecom:5432/mopro_ecom\"
+      NETWORK=\"mopro-net\"
+      ;;
+    ledger)
+      PASS=\${LEDGER_DB_PASSWORD:?LEDGER_DB_PASSWORD not set in /etc/mopro/.env}
+      DSN=\"postgres://ledger_admin:\${PASS}@postgres-ledger:5432/mopro_ledger\"
+      NETWORK=\"mopro-fin-net\"
+      ;;
+  esac
 
-  # Check if already applied
-  already=\$(docker exec -i '${PGHOST}' psql -U '${PGUSER}' -d '${PGDB}' -tAq \
-    -c \"SELECT 1 FROM _migrations WHERE name = '${MIGRATION_NAME}'\")
-  if [[ \"\${already}\" == '1' ]]; then
-    echo '  SKIP: ${MIGRATION_NAME} already applied.'
-    rm -f /tmp/mopro_migration_$$.sql
-    exit 0
-  fi
-
-  # Apply
-  echo '  Applying ${MIGRATION_NAME}...'
-  docker exec -i '${PGHOST}' psql -U '${PGUSER}' -d '${PGDB}' \
-    < /tmp/mopro_migration_$$.sql
-
-  # Record
-  docker exec -i '${PGHOST}' psql -U '${PGUSER}' -d '${PGDB}' \
-    -c \"INSERT INTO _migrations(name) VALUES ('${MIGRATION_NAME}')\"
-
-  rm -f /tmp/mopro_migration_$$.sql
-  echo '  OK: ${MIGRATION_NAME} applied and recorded.'
+  echo '[4/4] Running migrate-tool --db ${DB} ${CMD}...'
+  docker run --rm \
+    --network \"\${NETWORK}\" \
+    -v ${MOPRO_DIR}/bin/migrate-tool:/migrate-tool:ro \
+    -v ${MOPRO_DIR}/migrations:/migrations:ro \
+    -e ECOM_DATABASE_URL=\"\${DSN}\" \
+    -e LEDGER_DATABASE_URL=\"\${DSN}\" \
+    -e MIGRATIONS_DIR=/migrations \
+    alpine:3.19 \
+    /migrate-tool --db ${DB} ${CMD}
 "
+
+echo ""
+echo "apply-migration.sh complete: db=${DB} cmd=${CMD}"

@@ -925,17 +925,91 @@ Tool versions are pinned in the Makefile:
 - `oapi-codegen`: `OAPI_CODEGEN_VERSION = v2.4.1`
 - `openapi-generator-cli` (Docker): `OPENAPI_GEN_VERSION = v7.10.0`
 
-### Auth bypass for local development (Phase 4.2a removal)
+### Identity service — OTP and JWT (Phase 4.2a, live)
 
-In Phase 4.0 and earlier, `core-svc` accepts an `X-Mopro-User-Id` header as a
-dev-only auth bypass. The middleware reads this header and injects the user ID
-into the request context, skipping JWT validation.
+`X-Mopro-User-Id` header auth bypass has been **removed** in Phase 4.2a.
+All authenticated endpoints now require a Bearer JWT issued by the identity service.
 
-**This header is NOT part of the OpenAPI spec.** It is a temporary scaffolding
-mechanism and will be removed in Phase 4.2a when full JWT auth is implemented.
-The spec documents the target authentication flow (bearerAuth + stepUpAuth).
+#### OTP flow in development
 
-Do NOT document `X-Mopro-User-Id` in the spec or in any client code.
+Set `SMS_PROVIDER=mock` (default in `.env.local`). The mock provider logs the
+6-digit OTP to stdout at INFO level — no SMS is sent:
+
+```
+core-svc  | level=INFO msg="identity: sms mock" to=+905321234567 code=482915
+```
+
+To get the code during a local test:
+
+```bash
+docker compose logs core-svc 2>&1 | grep "sms mock"
+```
+
+#### DEV_OTP_ACCEPT_ANY backdoor
+
+For automated local testing where you cannot read logs mid-request, set:
+
+```bash
+DEV_OTP_ACCEPT_ANY=true  # .env.local only — NEVER production
+ENV=development           # must NOT be "production"
+```
+
+When `DEV_OTP_ACCEPT_ANY=true`, `POST /v1/auth/otp/verify` accepts **any** 6-digit
+code for any phone. The service panics at startup if this env is set together with
+`ENV=production`. This guard is tested in `TestDevOTPAcceptAny_PanicsOnProduction`.
+
+**Do NOT ship `DEV_OTP_ACCEPT_ANY=true` in any Docker image or compose file.**
+The CI pipeline enforces `ENV=production` for the build stage, which will cause
+a startup panic and fail the deployment.
+
+#### Running the full auth smoke test locally
+
+```bash
+# 1. Start the stack
+docker compose --env-file .env.local up -d
+
+# 2. Request OTP (mock SMS — code in logs)
+curl -s -X POST http://localhost/v1/auth/otp/request \
+  -H "Content-Type: application/json" \
+  -d '{"phone":"+905321234567","purpose":"login"}' | jq
+
+# 3. Grab code from logs
+CODE=$(docker compose logs core-svc 2>&1 | grep "sms mock" | tail -1 | grep -oP '"code":"\K[0-9]{6}')
+
+# 4. Verify OTP — get token pair
+TOKEN_PAIR=$(curl -s -X POST http://localhost/v1/auth/otp/verify \
+  -H "Content-Type: application/json" \
+  -d "{\"phone\":\"+905321234567\",\"purpose\":\"login\",\"code\":\"$CODE\"}")
+ACCESS=$(echo $TOKEN_PAIR | jq -r .access_token)
+
+# 5. GET /v1/me
+curl -s -H "Authorization: Bearer $ACCESS" http://localhost/v1/me | jq
+```
+
+#### Migration convention for identity
+
+Identity tables live in `identity_schema` on `postgres-ecom`. Apply with:
+
+```bash
+go run ./cmd/migrate-tool --db ecom up
+```
+
+The migration file `migrations/ecom/0055_identity_schema_up.sql` creates four tables:
+`users`, `otp_codes`, `refresh_tokens`, `devices`. The `touch_updated_at` trigger
+auto-updates `users.updated_at` on any row change.
+
+#### Testutil helpers for other packages
+
+When writing tests for handlers that require a Bearer token, use:
+
+```go
+import "github.com/mopro/platform/internal/identity/testutil"
+
+token := testutil.IssueTestAccessToken(t, 42, "TR")
+req.Header.Set("Authorization", "Bearer "+token)
+```
+
+Do NOT set `X-Mopro-User-Id` in new tests — that header is no longer accepted.
 
 ### CI: OpenAPI contract workflow
 

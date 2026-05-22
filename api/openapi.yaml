@@ -121,9 +121,20 @@ paths:
                   pattern: '^\+90[5][0-9]{9}$'
                   example: "+905321234567"
                   description: "Turkish mobile number in E.164 format. Must start with +905."
+                purpose:
+                  type: string
+                  enum: [login, step_up]
+                  default: login
+                  description: |
+                    OTP purpose. Use `login` for initial authentication (default).
+                    Use `step_up` only if you need a step-up OTP outside the authenticated
+                    step-up flow (`POST /v1/auth/step-up/request`). Most clients should omit
+                    this field and rely on the default.
       responses:
         '204':
           description: OTP dispatched
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
@@ -155,6 +166,11 @@ paths:
                   type: string
                   pattern: '^\d{6}$'
                   example: "123456"
+                purpose:
+                  type: string
+                  enum: [login, step_up]
+                  default: login
+                  description: "Must match the purpose used in the corresponding /otp/request call. Defaults to `login`."
       responses:
         '200':
           description: Token pair issued

@@ -5,21 +5,19 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/mopro/platform/internal/identity/middleware"
 	"github.com/mopro/platform/internal/payment"
 	"github.com/mopro/platform/internal/payment/sipay"
 )
 
 // handleInitiatePayment handles POST /v1/payments — starts a 3DS session.
-// Requires Idempotency-Key and X-Mopro-User-Id headers.
+// Requires Idempotency-Key header and Bearer JWT auth (via RequireAuth middleware).
 func handleInitiatePayment(svc payment.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireIdempotencyKey(w, r) {
 			return
 		}
-		_, ok := requireUserID(w, r)
-		if !ok {
-			return
-		}
+		_ = middleware.UserIDFromCtx(r.Context())
 		var body payment.InitiatePaymentRequest
 		if err := decodeJSON(w, r, &body); err != nil {
 			return

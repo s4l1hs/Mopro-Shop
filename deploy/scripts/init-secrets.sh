@@ -67,7 +67,7 @@ echo " You will be prompted for external credentials."
 echo ""
 
 # ── §1 Auto-generate DB passwords ─────────────────────────────────────────────
-echo "[1/8] Generating DB passwords..."
+echo "[1/9] Generating DB passwords..."
 for _key in \
   ECOM_DB_PASSWORD LEDGER_DB_PASSWORD \
   IDENTITY_DB_PASSWORD CATALOG_DB_PASSWORD CART_DB_PASSWORD \
@@ -85,7 +85,7 @@ for _key in \
 done
 
 # ── §2 Auto-generate Redis + Meili + JWT + PII ────────────────────────────────
-echo "[2/8] Generating Redis / Meili / JWT / PII secrets..."
+echo "[2/9] Generating Redis / Meili / JWT / PII secrets..."
 if ! _has_key REDIS_PASSWORD;   then _write REDIS_PASSWORD   "$(_gen_pass)"; echo "  REDIS_PASSWORD: generated";   fi
 if ! _has_key MEILI_MASTER_KEY; then _write MEILI_MASTER_KEY "$(_gen_pass)"; echo "  MEILI_MASTER_KEY: generated"; fi
 if ! _has_key JWT_SIGNING_KEY;  then _write JWT_SIGNING_KEY  "$(_gen_pass)"; echo "  JWT_SIGNING_KEY: generated";  fi
@@ -98,12 +98,13 @@ if ! _has_key PII_PEPPER; then _write PII_PEPPER "$(_gen_pass)"; echo "  PII_PEP
 if ! _has_key ADMIN_INTERNAL_TOKEN; then _write ADMIN_INTERNAL_TOKEN "$(_gen_pass)"; echo "  ADMIN_INTERNAL_TOKEN: generated"; fi
 
 # ── §3 Caddy / TLS ────────────────────────────────────────────────────────────
-echo "[3/8] Caddy..."
+echo "[3/9] Caddy..."
 _write CADDY_EMAIL "sefersalih017@gmail.com"
 echo "  CADDY_EMAIL: sefersalih017@gmail.com"
 
 # ── §4 Market + locale (TR launch defaults) ───────────────────────────────────
-echo "[4/8] Market defaults (TR launch)..."
+echo "[4/9] Market defaults (TR launch)..."
+_write ENV "production"
 _write MARKET "TR"
 _write DEFAULT_CURRENCY "TRY"
 _write DEFAULT_LOCALE "tr-TR"
@@ -113,7 +114,7 @@ _write COIN_LICENSE_JURISDICTION ""
 _write COIN_LICENSE_AUTHORITY ""
 
 # ── §5 PSP credentials ────────────────────────────────────────────────────────
-echo "[5/8] PSP credentials (Sipay TR launch)..."
+echo "[5/9] PSP credentials (Sipay TR launch)..."
 _write PSP_PROVIDER "sipay"
 _prompt PSP_API_KEY        "Sipay API key"
 _prompt_secret PSP_SECRET  "Sipay secret"
@@ -125,8 +126,19 @@ _write SIPAY_APP_SECRET    "REPLACE_ME"
 _write SIPAY_MERCHANT_KEY  "REPLACE_ME"
 _write SIPAY_MERCHANT_ID   "REPLACE_ME"
 
-# ── §6 Hetzner Storage Box backup ────────────────────────────────────────────
-echo "[6/8] Hetzner Storage Box backup..."
+# ── §6 SMS providers (optional — press Enter to skip each) ───────────────────
+echo "[6/9] SMS providers (press Enter to skip each)..."
+_prompt NETGSM_USERNAME    "Netgsm username" ""
+_prompt_secret NETGSM_PASSWORD    "Netgsm password"
+_prompt NETGSM_HEADER      "Netgsm sender header (approved alphanumeric)" ""
+_prompt NETGSM_API_URL     "Netgsm API URL" "https://api.netgsm.com.tr/sms/send/get"
+_prompt ILETIMERKEZI_USERNAME "İletimerkezi username" ""
+_prompt_secret ILETIMERKEZI_PASSWORD "İletimerkezi password"
+_prompt ILETIMERKEZI_SENDER "İletimerkezi sender name" ""
+_write SMS_PROVIDER "mock"
+
+# ── §7 Hetzner Storage Box backup ────────────────────────────────────────────
+echo "[7/9] Hetzner Storage Box backup..."
 _prompt HETZNER_STORAGEBOX_HOST "Hetzner Storage Box hostname (e.g. uXXXXXX.your-storagebox.de)"
 _prompt HETZNER_STORAGEBOX_USER "Hetzner Storage Box SSH username"
 _prompt HETZNER_STORAGEBOX_PORT "Hetzner Storage Box SSH port" "23"
@@ -135,7 +147,7 @@ _prompt_secret RESTIC_PASSWORD  "Restic repository passphrase (SAVE THIS — can
 _write HEALTHCHECK_BACKUP_UUID ""
 
 # ── §7 Grafana Cloud (optional) ───────────────────────────────────────────────
-echo "[7/8] Grafana Cloud (press Enter to skip each)..."
+echo "[8/9] Grafana Cloud (press Enter to skip each)..."
 _prompt GRAFANA_PROM_USER  "Grafana Prometheus user ID" ""
 _prompt_secret GRAFANA_PROM_PASS  "Grafana Prometheus API key"
 _prompt GRAFANA_LOKI_USER  "Grafana Loki user ID" ""
@@ -144,7 +156,7 @@ _prompt GRAFANA_TEMPO_USER "Grafana Tempo user ID" ""
 _prompt_secret GRAFANA_TEMPO_PASS "Grafana Tempo API key"
 
 # ── §8 Slack / PagerDuty (optional) ──────────────────────────────────────────
-echo "[8/8] Slack / PagerDuty (press Enter to skip each)..."
+echo "[9/9] Slack / PagerDuty (press Enter to skip each)..."
 _prompt SLACK_WEBHOOK            "Slack webhook URL" ""
 _prompt SLACK_PANIC_WEBHOOK      "Slack panic webhook URL" ""
 _prompt SLACK_DLQ_WEBHOOK_URL    "Slack DLQ webhook URL" ""

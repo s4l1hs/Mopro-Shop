@@ -173,4 +173,42 @@ var Registry = []EventEntry{
 		ConsumerGroups: []string{"notification-reconcile-drift"},
 		Status:         StatusActiveConsumed,
 	},
+
+	// ── ecom domain: identity ─────────────────────────────────────────────────
+	// All identity events are emitted; no consumers wired yet (Phase 4.2a).
+	{
+		EventType:      "ecom.user.created.v1",
+		ProducerModule: "internal/identity",
+		ConsumerGroups: []string{},
+		Status:         StatusActiveEmittedNoConsumer,
+		Notes:          "Emitted on first OTP verify (account creation). Future: welcome notification.",
+	},
+	{
+		EventType:      "ecom.user.updated.v1",
+		ProducerModule: "internal/identity",
+		ConsumerGroups: []string{},
+		Status:         StatusActiveEmittedNoConsumer,
+		Notes:          "Emitted on PATCH /v1/me. Future: analytics.",
+	},
+	{
+		EventType:      "ecom.user.soft_deleted.v1",
+		ProducerModule: "internal/identity",
+		ConsumerGroups: []string{},
+		Status:         StatusActiveEmittedNoConsumer,
+		Notes:          "Emitted on DELETE /v1/me. Future: data erasure pipeline.",
+	},
+	{
+		EventType:      "ecom.device.registered.v1",
+		ProducerModule: "internal/identity",
+		ConsumerGroups: []string{},
+		Status:         StatusActiveEmittedNoConsumer,
+		Notes:          "Emitted on POST /v1/me/devices. Future: notification-device-sync.",
+	},
+	{
+		EventType:      "ecom.device.revoked.v1",
+		ProducerModule: "internal/identity",
+		ConsumerGroups: []string{},
+		Status:         StatusActiveEmittedNoConsumer,
+		Notes:          "Emitted on device re-registration (old token revoked). Future: notification-device-sync.",
+	},
 }

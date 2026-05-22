@@ -21,6 +21,14 @@ import (
 	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/eventbus"
+	"github.com/mopro/platform/internal/identity"
+	"github.com/mopro/platform/internal/identity/cleanup"
+	identityjwt "github.com/mopro/platform/internal/identity/jwt"
+	"github.com/mopro/platform/internal/identity/middleware"
+	"github.com/mopro/platform/internal/identity/ratelimit"
+	"github.com/mopro/platform/internal/identity/sms"
+	"github.com/mopro/platform/internal/identity/sms/mock"
+	"github.com/mopro/platform/internal/identity/sms/netgsm"
 	"github.com/mopro/platform/internal/order"
 	"github.com/mopro/platform/internal/outbox"
 	"github.com/mopro/platform/internal/payment"
@@ -31,6 +39,7 @@ import (
 	"github.com/mopro/platform/internal/shipping/surat"
 	"github.com/mopro/platform/pkg/dbx"
 	"github.com/mopro/platform/pkg/httpx"
+	"github.com/mopro/platform/pkg/slack"
 )
 
 func main() {
@@ -189,12 +198,44 @@ func main() {
 		PTT     shipping.PTTConfig
 	}{Aras: arasCarrierCfg, Yurtici: yurticiCarrierCfg, PTT: pttCarrierCfg})
 
+	// ── Identity module wiring ────────────────────────────────────────────────
+	jwtSigningKey := []byte(mustEnv("JWT_SIGNING_KEY"))
+	jwtSigner, err := identityjwt.NewHS256Signer(jwtSigningKey)
+	if err != nil {
+		slog.Error("core-svc: jwt signer init", "err", err)
+		os.Exit(1)
+	}
+	identityRepo := identity.NewRepository(pool)
+	identityLimiter := ratelimit.New(rc)
+	var smsProv sms.Provider
+	switch os.Getenv("SMS_PROVIDER") {
+	case "netgsm":
+		slackForSMS := slack.New(os.Getenv("SLACK_PANIC_WEBHOOK"))
+		smsProv = netgsm.New(
+			mustEnv("NETGSM_USERNAME"), mustEnv("NETGSM_PASSWORD"),
+			mustEnv("NETGSM_HEADER"), os.Getenv("NETGSM_API_URL"),
+			slackForSMS,
+		)
+	default: // "mock" or empty
+		smsProv = mock.New(slog.Default())
+	}
+	identitySvc := identity.NewService(
+		identityRepo, smsProv, identityLimiter, jwtSigner,
+		market, defaultLocale, slog.Default(),
+	)
+	cleanup.StartCleanupWorker(ctx, pool, slog.Default())
+
 	// ── HTTP router (Go 1.22+ stdlib mux with method+path patterns) ─────────
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+
+	// Identity / auth routes
+	requireAuth := middleware.RequireAuth(jwtSigner)
+	auth := &authHandlers{svc: identitySvc, log: slog.Default()}
+	auth.registerRoutes(mux, requireAuth)
 
 	// Catalog routes
 	mux.Handle("POST /v1/products",
@@ -213,32 +254,32 @@ func main() {
 		httpx.TraceAndLog(http.HandlerFunc(handleGetCommission(catalogSvc, market))),
 	)
 
-	// Cart routes
+	// Cart routes — require JWT authentication
 	mux.Handle("POST /v1/cart/items",
-		httpx.TraceAndLog(http.HandlerFunc(handleCartAddItem(cartSvc))),
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleCartAddItem(cartSvc)))),
 	)
 	mux.Handle("DELETE /v1/cart/items/{variant_id}",
-		httpx.TraceAndLog(http.HandlerFunc(handleCartRemoveItem(cartSvc))),
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleCartRemoveItem(cartSvc)))),
 	)
 	mux.Handle("GET /v1/cart",
-		httpx.TraceAndLog(http.HandlerFunc(handleGetCart(cartSvc))),
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleGetCart(cartSvc)))),
 	)
 	mux.Handle("POST /v1/cart/reserve",
-		httpx.TraceAndLog(http.HandlerFunc(handleCartReserve(cartSvc))),
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleCartReserve(cartSvc)))),
 	)
 	mux.Handle("POST /v1/cart/release",
 		httpx.TraceAndLog(http.HandlerFunc(handleCartRelease(cartSvc))),
 	)
 
-	// Order routes
+	// Order routes — require JWT authentication where user ID is needed
 	mux.Handle("POST /v1/orders",
-		httpx.TraceAndLog(http.HandlerFunc(handleCreateOrder(orderSvc))),
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleCreateOrder(orderSvc)))),
 	)
 	mux.Handle("GET /v1/orders/{id}",
 		httpx.TraceAndLog(http.HandlerFunc(handleGetOrder(orderSvc))),
 	)
 	mux.Handle("GET /v1/orders",
-		httpx.TraceAndLog(http.HandlerFunc(handleListOrders(orderSvc))),
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleListOrders(orderSvc)))),
 	)
 	mux.Handle("POST /v1/orders/{id}/status",
 		httpx.TraceAndLog(http.HandlerFunc(handleUpdateOrderStatus(orderSvc))),
@@ -256,9 +297,9 @@ func main() {
 		httpx.TraceAndLog(http.HandlerFunc(handleSellerBreakdown(orderSvc))),
 	)
 
-	// Payment routes
+	// Payment routes — require JWT authentication
 	mux.Handle("POST /v1/payments",
-		httpx.TraceAndLog(http.HandlerFunc(handleInitiatePayment(paymentSvc))),
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleInitiatePayment(paymentSvc)))),
 	)
 	mux.Handle("GET /v1/payments/{provider_ref}/status",
 		httpx.TraceAndLog(http.HandlerFunc(handlePaymentStatus(paymentSvc))),
@@ -369,16 +410,6 @@ func requireIdempotencyKey(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-// requireUserID extracts the user ID from X-Mopro-User-Id (dev-only; Phase 1.3 uses JWT).
-func requireUserID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	s := r.Header.Get("X-Mopro-User-Id")
-	id, err := strconv.ParseInt(s, 10, 64)
-	if err != nil || id <= 0 {
-		jsonError(w, "X-Mopro-User-Id header required", http.StatusUnauthorized)
-		return 0, false
-	}
-	return id, true
-}
 
 // parseLocale extracts the best-match locale from Accept-Language, falling back to def.
 func parseLocale(r *http.Request, def string) string {
@@ -576,10 +607,7 @@ func handleGetCommission(svc catalog.Service, defaultMarket string) http.Handler
 
 func handleCartAddItem(svc cart.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := requireUserID(w, r)
-		if !ok {
-			return
-		}
+		userID := middleware.UserIDFromCtx(r.Context())
 		var body struct {
 			VariantID int64 `json:"variant_id"`
 			Qty       int   `json:"qty"`
@@ -606,10 +634,7 @@ func handleCartAddItem(svc cart.Service) http.HandlerFunc {
 
 func handleCartRemoveItem(svc cart.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := requireUserID(w, r)
-		if !ok {
-			return
-		}
+		userID := middleware.UserIDFromCtx(r.Context())
 		variantID, err := strconv.ParseInt(r.PathValue("variant_id"), 10, 64)
 		if err != nil {
 			jsonError(w, "invalid variant_id", http.StatusBadRequest)
@@ -626,10 +651,7 @@ func handleCartRemoveItem(svc cart.Service) http.HandlerFunc {
 
 func handleGetCart(svc cart.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := requireUserID(w, r)
-		if !ok {
-			return
-		}
+		userID := middleware.UserIDFromCtx(r.Context())
 		c, err := svc.GetCart(r.Context(), userID)
 		if err != nil {
 			slog.Error("cart: GetCart", "err", err)
@@ -642,10 +664,7 @@ func handleGetCart(svc cart.Service) http.HandlerFunc {
 
 func handleCartReserve(svc cart.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := requireUserID(w, r)
-		if !ok {
-			return
-		}
+		userID := middleware.UserIDFromCtx(r.Context())
 		reservationID, expiresAt, err := svc.Reserve(r.Context(), userID)
 		if err != nil {
 			switch {
@@ -694,10 +713,7 @@ func handleCartRelease(svc cart.Service) http.HandlerFunc {
 
 func handleCreateOrder(svc order.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := requireUserID(w, r)
-		if !ok {
-			return
-		}
+		userID := middleware.UserIDFromCtx(r.Context())
 		if !requireIdempotencyKey(w, r) {
 			return
 		}
@@ -756,10 +772,7 @@ func handleGetOrder(svc order.Service) http.HandlerFunc {
 
 func handleListOrders(svc order.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := requireUserID(w, r)
-		if !ok {
-			return
-		}
+		userID := middleware.UserIDFromCtx(r.Context())
 		orders, err := svc.ListOrders(r.Context(), userID)
 		if err != nil {
 			slog.Error("order: ListOrders", "err", err)
