@@ -9,6 +9,7 @@ class AuthInterceptor extends Interceptor {
     required this.tokenStorage,
     required this.refreshDio,
     required this.onLogout,
+    this.onSessionRevoked,
   });
 
   final TokenStorage tokenStorage;
@@ -17,6 +18,10 @@ class AuthInterceptor extends Interceptor {
   final Dio refreshDio;
 
   final Future<void> Function() onLogout;
+
+  /// Called when the server revokes the entire refresh-token family (theft
+  /// detection). The callback should notify the user and then call onLogout.
+  final Future<void> Function()? onSessionRevoked;
 
   Future<bool>? _refreshFuture;
 
@@ -70,6 +75,13 @@ class AuthInterceptor extends Interceptor {
     }
   }
 
+  static String _extractCode(dynamic body) {
+    if (body is Map<String, dynamic>) {
+      return (body['error'] as Map<String, dynamic>?)?['code'] as String? ?? '';
+    }
+    return '';
+  }
+
   Future<bool> _doRefresh() async {
     final refreshToken = await tokenStorage.readRefreshToken();
     if (refreshToken == null) {
@@ -92,8 +104,13 @@ class AuthInterceptor extends Interceptor {
         accessExpiresIn: (body['expires_in'] as int?) ?? 900,
       );
       return true;
-    } on DioException {
-      await onLogout();
+    } on DioException catch (e) {
+      final code = _extractCode(e.response?.data);
+      if (code == 'token_family_revoked' && onSessionRevoked != null) {
+        await onSessionRevoked!();
+      } else {
+        await onLogout();
+      }
       return false;
     }
   }

@@ -13,6 +13,7 @@ Dio buildDio({
   required TokenStorage tokenStorage,
   required Locale Function() localeGetter,
   required Future<void> Function() onLogout,
+  Future<void> Function()? onSessionRevoked,
 }) {
   final dio = Dio(BaseOptions(baseUrl: baseUrl));
 
@@ -23,6 +24,7 @@ Dio buildDio({
     tokenStorage: tokenStorage,
     refreshDio: refreshDio,
     onLogout: onLogout,
+    onSessionRevoked: onSessionRevoked,
   );
 
   // Add order: Idempotency → Trace → Locale → Auth → Retry → ErrorMapping

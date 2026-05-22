@@ -37,6 +37,10 @@ final authInterceptorProvider = Provider<AuthInterceptor>((ref) {
     tokenStorage: storage,
     refreshDio: refreshDio,
     onLogout: logoutFn,
+    onSessionRevoked: () async {
+      ref.read(sessionRevokedProvider.notifier).state = true;
+      await ref.read(authNotifierProvider.notifier).setLoggedOut();
+    },
   );
 });
 
@@ -50,8 +54,16 @@ final dioProvider = Provider<Dio>((ref) {
     tokenStorage: storage,
     localeGetter: () => locale,
     onLogout: ref.watch(_logoutFnProvider),
+    onSessionRevoked: () async {
+      ref.read(sessionRevokedProvider.notifier).state = true;
+      await ref.read(authNotifierProvider.notifier).setLoggedOut();
+    },
   );
 });
+
+/// True when the server revokes a refresh-token family (theft detection).
+/// Root widget shows the ErrorBanner once, then resets to false.
+final sessionRevokedProvider = StateProvider<bool>((_) => false);
 
 final authApiProvider = Provider<AuthApi>((ref) {
   return AuthApi(ref.watch(dioProvider));
