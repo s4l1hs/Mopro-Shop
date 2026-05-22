@@ -398,7 +398,7 @@ services:
       DEFAULT_CURRENCY: "${DEFAULT_CURRENCY:-TRY}"
       SLACK_DLQ_WEBHOOK_URL: "${SLACK_DLQ_WEBHOOK_URL:-}"
     ports:
-      - "127.0.0.1:8081:8080"
+      - "127.0.0.1:8081:8081"
     depends_on:
       pgbouncer-ledger:
         condition: service_healthy

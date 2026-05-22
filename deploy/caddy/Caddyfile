@@ -19,16 +19,16 @@
 # fin-svc listens on :8081 (core-svc and jobs-svc on :8080)
 (fin_routes) {
 	handle /v1/wallet/* {
-		reverse_proxy fin-svc:8080
+		reverse_proxy fin-svc:8081
 	}
 	handle /v1/cashback/* {
-		reverse_proxy fin-svc:8080
+		reverse_proxy fin-svc:8081
 	}
 	handle /v1/payouts/* {
-		reverse_proxy fin-svc:8080
+		reverse_proxy fin-svc:8081
 	}
 	handle /v1/admin/* {
-		reverse_proxy fin-svc:8080
+		reverse_proxy fin-svc:8081
 	}
 }
 
@@ -194,7 +194,7 @@ localhost:80 {
 
 	@fin path /v1/wallet/* /v1/cashback/* /v1/payouts/* /v1/admin/*
 	handle @fin {
-		reverse_proxy fin-svc:8080
+		reverse_proxy fin-svc:8081
 	}
 
 	@jobs path /v1/jobs/*
