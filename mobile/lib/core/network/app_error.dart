@@ -55,3 +55,19 @@ final class UnknownError extends AppError {
   final int statusCode;
   final String message;
 }
+
+final class OtpInvalidError extends AppError {
+  const OtpInvalidError();
+}
+
+final class OtpExhaustedError extends AppError {
+  const OtpExhaustedError();
+}
+
+final class PhoneLockedError extends AppError {
+  const PhoneLockedError();
+}
+
+final class SessionRevokedError extends AppError {
+  const SessionRevokedError();
+}

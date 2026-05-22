@@ -36,13 +36,18 @@ class ErrorMappingInterceptor extends Interceptor {
     final code = _extractCode(body);
 
     return switch (statusCode) {
+      401 when code == 'token_family_revoked' => const SessionRevokedError(),
       401 => const UnauthorizedError(),
       404 => NotFoundError(resource: message),
       409 => ConflictError(message: message),
+      422 when code == 'otp_invalid' => const OtpInvalidError(),
+      422 when code == 'otp_expired' => const OtpExpiredError(),
       422 => ValidationError(
           message: message,
           fields: _extractFields(body),
         ),
+      423 => const PhoneLockedError(),
+      429 when code == 'rate_limit_exceeded' => const OtpExhaustedError(),
       429 => RateLimitedError(
           retryAfterSeconds: _extractRetryAfter(response.headers),
         ),

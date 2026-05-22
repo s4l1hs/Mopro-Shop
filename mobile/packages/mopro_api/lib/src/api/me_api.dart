@@ -366,7 +366,7 @@ _responseData = rawData == null ? null : deserialize<Device, Device>(rawData, 'D
   }) async {
     final _path = r'/v1/me';
     final _options = Options(
-      method: r'PUT',
+      method: r'PATCH',
       headers: <String, dynamic>{
         if (xTraceId != null) r'X-Trace-Id': xTraceId,
         r'X-Idempotency-Key': xIdempotencyKey,
