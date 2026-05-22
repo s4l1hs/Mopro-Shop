@@ -82,3 +82,92 @@ Run `flutter test --no-pub` and `flutter analyze --no-pub` before each test sess
 **14. Re-launch with valid tokens**
 - Close and re-launch the app with a valid, non-expired access token in storage.
 - Expected: Splash screen appears briefly, then redirects directly to home (`/`) without passing through auth screens.
+
+---
+
+## Phase 4.3b — Wallet + Cashback Timeline Screens
+
+Run `flutter test --no-pub` and `flutter analyze --no-pub` before each test session.
+
+### Prerequisites
+
+- fin-svc running and reachable at `API_BASE_URL`
+- Migration 74 applied (`deploy/postgres-ledger/init/74-cashback-payments-cursor-idx.sql`)
+- Test data seeded (see below)
+
+### Seed Test Data
+
+```bash
+# Connect to postgres-ledger and run:
+./deploy/scripts/seed-test-wallet.sh
+# Or with custom DSN:
+LEDGER_DSN=postgres://ledger_admin:test123@localhost:6434/mopro_ledger \
+  ./deploy/scripts/seed-test-wallet.sh
+```
+
+This seeds for `user_id=3`:
+- Wallet account with 500,00 MC balance
+- 1 cashback plan (`Sipariş #90001`, 50,00 MC/month, 90 days old)
+- 3 paid payments + 3 scheduled payments
+
+### Steps
+
+**1. HomeScreen — CoinBalancePill appears**
+- Log in as user_id=3 (phone: +905001234567 or whichever test account maps to id=3).
+- Expected: CoinBalancePill appears at top of HomeScreen showing `"500,00 MC"` (or similar).
+- Verify: Pill tappable — tap navigates to `/wallet`.
+
+**2. WalletScreen — balance card**
+- Expected: Balance card shows `"500,00 Mopro Coin"` (full format).
+- Verify: Card background uses `colorScheme.primaryContainer`.
+
+**3. WalletScreen — empty states (before seeding)**
+- Before running the seed script, verify that "Henüz işlem yok" and "Henüz cashback planınız bulunmuyor." appear.
+
+**4. WalletScreen — after seeding**
+- Pull-to-refresh on WalletScreen.
+- Verify: Cashback plan card appears ("Sipariş #90001").
+- Verify: Product title in plan card shows fallback title (productId=0).
+
+**5. PlanDetailScreen — navigation**
+- Tap a plan card.
+- Expected: Navigates to `/wallet/plans/<id>`.
+- Expected: AppBar shows plan product title.
+- Verify: PlanHeader shows `50,00 Mopro Coin` full format.
+- Verify: "Süresiz plan" label visible.
+- Verify: "Ödeme iptal edilene kadar her ay aktarılır." perpetual note visible.
+
+**6. PlanDetailScreen — payment timeline**
+- Expected: 6 timeline rows total (3 "Ödendi" + 3 "Planlandı").
+- Verify: Paid rows have filled primary-colour dot.
+- Verify: Scheduled rows have outlined/muted dot.
+- Verify: Month labels are Turkish ("Ocak 2026", "Şubat 2026", etc.).
+
+**7. Pull-to-refresh on PlanDetailScreen**
+- Pull down.
+- Expected: RefreshIndicator spinner appears, data reloads.
+- Verify: No duplicate rows after refresh.
+
+**8. Back navigation**
+- From PlanDetailScreen, tap system back.
+- Expected: Returns to WalletScreen.
+- From WalletScreen, tap back.
+- Expected: Returns to HomeScreen.
+
+**9. Android back gesture (API 33+)**
+- Use predictive back gesture.
+- Expected: Correct screen transition without crash.
+
+**10. Turkish locale formatting**
+- With device locale set to tr-TR:
+  - Amounts use `,` as decimal separator ("500,00 MC").
+  - Month labels are Turkish ("Ocak", "Şubat", "Mart", etc.).
+
+### Cleanup
+
+```sql
+DELETE FROM cashback_schema.payments
+ WHERE idempotency_key LIKE 'test_visual_qa_%';
+DELETE FROM cashback_schema.plans
+ WHERE idempotency_key LIKE 'test_visual_qa_%';
+```
