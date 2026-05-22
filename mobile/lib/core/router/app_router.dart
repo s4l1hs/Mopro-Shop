@@ -55,7 +55,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/auth/otp',
-        builder: (context, state) => const OtpScreen(),
+        builder: (context, state) => OtpScreen(
+          phone: (state.extra as String?) ?? '',
+        ),
       ),
     ],
   );
