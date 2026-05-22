@@ -67,12 +67,12 @@ _ssh "
     ecom)
       PASS=\${ECOM_DB_PASSWORD:?ECOM_DB_PASSWORD not set in /etc/mopro/.env}
       DSN=\"postgres://ecom_admin:\${PASS}@postgres-ecom:5432/mopro_ecom\"
-      NETWORK=\"mopro-net\"
+      NETWORK=\"mopro_mopro-net\"
       ;;
     ledger)
       PASS=\${LEDGER_DB_PASSWORD:?LEDGER_DB_PASSWORD not set in /etc/mopro/.env}
       DSN=\"postgres://ledger_admin:\${PASS}@postgres-ledger:5432/mopro_ledger\"
-      NETWORK=\"mopro-fin-net\"
+      NETWORK=\"mopro_mopro-fin-net\"
       ;;
   esac
 
