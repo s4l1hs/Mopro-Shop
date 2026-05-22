@@ -5,6 +5,7 @@ import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/core/router/auth_guard.dart';
 import 'package:mopro/features/auth/login_screen.dart';
 import 'package:mopro/features/auth/otp_screen.dart';
+import 'package:mopro/features/auth/profile_screen.dart';
 import 'package:mopro/features/auth/splash_screen.dart';
 import 'package:mopro/features/home/home_screen.dart';
 
@@ -58,6 +59,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => OtpScreen(
           phone: (state.extra as String?) ?? '',
         ),
+      ),
+      GoRoute(
+        path: '/auth/profile',
+        builder: (context, state) => const ProfileCompletionScreen(),
       ),
     ],
   );
