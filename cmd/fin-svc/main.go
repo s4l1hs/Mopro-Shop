@@ -19,6 +19,7 @@ import (
 	genfin "github.com/mopro/platform/internal/api/gen/fin"
 	"github.com/mopro/platform/internal/cashback"
 	"github.com/mopro/platform/internal/eventbus"
+	"github.com/mopro/platform/internal/orderledger"
 	identityjwt "github.com/mopro/platform/internal/identity/jwt"
 	identitymw "github.com/mopro/platform/internal/identity/middleware"
 	"github.com/mopro/platform/internal/outbox"
@@ -124,6 +125,15 @@ func main() {
 	go func() {
 		if err := pub.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
 			slog.Error("fin-svc: outbox publisher exited unexpectedly", "err", err)
+		}
+	}()
+
+	// ── Order capture ledger consumer ─────────────────────────────��──────────
+	orderledgerRepo := orderledger.NewRepository(pool)
+	orderledgerSvc := orderledger.NewService(orderledgerRepo, walletSvc, slog.Default())
+	go func() {
+		if err := orderledger.StartConsumer(ctx, bus, orderledgerSvc); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("fin-svc: orderledger consumer exited unexpectedly", "err", err)
 		}
 	}()
 

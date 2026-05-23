@@ -316,8 +316,11 @@ type deliveredItemPayload struct {
 
 // MarkPaid transitions an order from pending_payment → paid and emits ecom.order.paid.v1.
 // Called by the Sipay webhook CaptureFinalizer. Idempotent: returns nil if already paid.
+// The payload includes seller_id, shipping_minor and per-item commission snapshots so
+// the fin-svc orderledger consumer can post the balanced ledger entry without querying
+// postgres-ecom (CLAUDE.md §3.2: fin-svc may only reach postgres-ledger).
 func (s *orderService) MarkPaid(ctx context.Context, orderID int64) error {
-	o, _, err := s.repo.GetOrder(ctx, orderID)
+	o, items, err := s.repo.GetOrder(ctx, orderID)
 	if err != nil {
 		return err
 	}
@@ -328,14 +331,7 @@ func (s *orderService) MarkPaid(ctx context.Context, orderID int64) error {
 		return err
 	}
 	now := time.Now().UTC()
-	payload, _ := json.Marshal(map[string]any{
-		"order_id":     orderID,
-		"user_id":      o.UserID,
-		"paid_at":      now.Format(time.RFC3339),
-		"amount_minor": o.TotalMinor,
-		"currency":     o.Currency,
-		"market":       o.Market,
-	})
+	payload, _ := json.Marshal(buildPaidPayload(o, items, now))
 	return s.repo.WithTx(ctx, func(tx pgx.Tx) error {
 		if err := s.repo.UpdateStatus(ctx, tx, orderID, StatusPaid, now); err != nil {
 			return err
@@ -349,6 +345,61 @@ func (s *orderService) MarkPaid(ctx context.Context, orderID int64) error {
 			Currency:       o.Currency,
 		})
 	})
+}
+
+// buildPaidPayload serialises the enriched ecom.order.paid.v1 payload.
+// Items carry frozen commission snapshots so fin-svc can post the capture ledger entry
+// without a cross-service call to postgres-ecom.
+func buildPaidPayload(o Order, items []OrderItem, paidAt time.Time) paidPayload {
+	its := make([]paidItemPayload, len(items))
+	for i, it := range items {
+		its[i] = paidItemPayload{
+			VariantID:             it.VariantID,
+			SellerID:              it.SellerID,
+			Qty:                   it.Qty,
+			UnitPriceMinor:        it.UnitPriceMinor,
+			CommissionPctBps:      it.CommissionPctBps,
+			KdvPctBps:             it.KdvPctBps,
+			CommissionAmountMinor: it.CommissionAmountMinor,
+			KdvAmountMinor:        it.KdvAmountMinor,
+			SellerNetMinor:        it.SellerNetMinor,
+		}
+	}
+	return paidPayload{
+		OrderID:       o.ID,
+		UserID:        o.UserID,
+		SellerID:      o.SellerID,
+		PaidAt:        paidAt,
+		AmountMinor:   o.TotalMinor,
+		ShippingMinor: o.ShippingMinor,
+		Currency:      o.Currency,
+		Market:        o.Market,
+		Items:         its,
+	}
+}
+
+type paidPayload struct {
+	OrderID       int64            `json:"order_id"`
+	UserID        int64            `json:"user_id"`
+	SellerID      int64            `json:"seller_id"`
+	PaidAt        time.Time        `json:"paid_at"`
+	AmountMinor   int64            `json:"amount_minor"`
+	ShippingMinor int64            `json:"shipping_minor"`
+	Currency      string           `json:"currency"`
+	Market        string           `json:"market"`
+	Items         []paidItemPayload `json:"items"`
+}
+
+type paidItemPayload struct {
+	VariantID             int64 `json:"variant_id"`
+	SellerID              int64 `json:"seller_id"`
+	Qty                   int   `json:"qty"`
+	UnitPriceMinor        int64 `json:"unit_price_minor"`
+	CommissionPctBps      int   `json:"commission_pct_bps"`
+	KdvPctBps             int   `json:"kdv_pct_bps"`
+	CommissionAmountMinor int64 `json:"commission_amount_minor"`
+	KdvAmountMinor        int64 `json:"kdv_amount_minor"`
+	SellerNetMinor        int64 `json:"seller_net_minor"`
 }
 
 // buildDeliveredPayload serialises the order + items into the event payload.

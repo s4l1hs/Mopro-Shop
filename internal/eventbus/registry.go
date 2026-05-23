@@ -41,10 +41,10 @@ var Registry = []EventEntry{
 	{
 		EventType:       "ecom.order.paid.v1",
 		ProducerModule:  "internal/order",
-		ConsumerGroups:  []string{},
-		Status:          StatusActiveEmittedNoConsumer,
+		ConsumerGroups:  []string{"order-ledger-poster"},
+		Status:          StatusActiveConsumed,
 		PlannedConsumer: "internal/notification (Phase 4.6)",
-		Notes:           "Emitted by MarkPaid on Sipay webhook capture. Triggers buyer payment notification.",
+		Notes:           "Emitted by MarkPaid on Sipay webhook capture. Payload enriched (Phase 4.5c) to include seller_id, shipping_minor, items[]. order-ledger-poster posts balanced capture ledger entry.",
 	},
 
 	// ── ecom domain: payment ─────────────────────────────────────────────────────
