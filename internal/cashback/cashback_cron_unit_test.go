@@ -15,43 +15,37 @@ import (
 // ── mock repository ───────────────────────────────────────────────────────────
 
 type mockCashbackRepo struct {
-	plans             []Plan
-	insertPaymentRet  Payment
-	insertPaymentErr  error
-	withTxErr         error
-	markPaidErr       error
-	markFailedErr     error
-	updatePeriodErr   error
-	lastDistribPeriod int
+	duePlans       []Plan
+	insertPlanRet  Plan
+	insertPlanIsNew bool
+	insertPlanErr  error
+	incrCountRet   int
+	incrCompleted  bool
+	incrErr        error
+	withTxErr      error
+	getPlans       []Plan
 }
 
-func (m *mockCashbackRepo) InsertPlan(_ context.Context, _ pgx.Tx, p Plan) (Plan, error) {
-	return p, nil
-}
-func (m *mockCashbackRepo) FindPlanByOrderID(_ context.Context, _ int64) (Plan, error) {
-	return Plan{}, ErrPlanNotFound
-}
-func (m *mockCashbackRepo) FetchPlansBatch(_ context.Context, _ int, _ time.Time, _ string, _ int) ([]Plan, error) {
-	defer func() { m.plans = nil }() // return once then empty
-	return m.plans, nil
-}
-func (m *mockCashbackRepo) InsertPayment(_ context.Context, _ pgx.Tx, pay Payment) (Payment, error) {
-	if m.insertPaymentErr != nil {
-		return Payment{}, m.insertPaymentErr
+func (m *mockCashbackRepo) InsertPlanIfAbsent(_ context.Context, _ pgx.Tx, p Plan) (Plan, bool, error) {
+	if m.insertPlanErr != nil {
+		return Plan{}, false, m.insertPlanErr
 	}
-	pay.ID = 1
-	return pay, nil
+	if m.insertPlanRet.ID != 0 {
+		return m.insertPlanRet, m.insertPlanIsNew, nil
+	}
+	p.ID = 1
+	return p, true, nil
 }
-func (m *mockCashbackRepo) MarkPaymentPaid(_ context.Context, _ pgx.Tx, _ int64, _ int64, _ time.Time) error {
-	return m.markPaidErr
+
+func (m *mockCashbackRepo) ListDuePlans(_ context.Context, _ time.Time, _ int) ([]Plan, error) {
+	defer func() { m.duePlans = nil }() // return once then empty
+	return m.duePlans, nil
 }
-func (m *mockCashbackRepo) MarkPaymentFailed(_ context.Context, _ pgx.Tx, _ int64, _ string) error {
-	return m.markFailedErr
+
+func (m *mockCashbackRepo) IncrPaymentsMade(_ context.Context, _ pgx.Tx, _ int64) (int, bool, error) {
+	return m.incrCountRet, m.incrCompleted, m.incrErr
 }
-func (m *mockCashbackRepo) UpdateLastDistributedPeriod(_ context.Context, _ pgx.Tx, _ int64, period int) error {
-	m.lastDistribPeriod = period
-	return m.updatePeriodErr
-}
+
 func (m *mockCashbackRepo) WithTx(_ context.Context, _ pgx.TxIsoLevel, fn func(pgx.Tx) error) error {
 	if m.withTxErr != nil {
 		return m.withTxErr
@@ -59,13 +53,19 @@ func (m *mockCashbackRepo) WithTx(_ context.Context, _ pgx.TxIsoLevel, fn func(p
 	return fn(nil)
 }
 
-// HTTP read-path stubs — not exercised by cron unit tests.
-func (m *mockCashbackRepo) ListPlansByUserID(_ context.Context, _ int64, _ int, _ int64, _ *PlanStatus) ([]Plan, error) {
+func (m *mockCashbackRepo) GetPlan(_ context.Context, _, _ int64) (Plan, error) {
+	if len(m.getPlans) == 0 {
+		return Plan{}, ErrPlanNotFound
+	}
+	p := m.getPlans[0]
+	m.getPlans = m.getPlans[1:]
+	return p, nil
+}
+
+func (m *mockCashbackRepo) ListPlansByUser(_ context.Context, _ int64, _ int, _ int64, _ *PlanStatus) ([]Plan, error) {
 	return nil, nil
 }
-func (m *mockCashbackRepo) GetPlanByIDAndUserID(_ context.Context, _ int64, _ int64) (Plan, error) {
-	return Plan{}, ErrPlanNotFound
-}
+
 func (m *mockCashbackRepo) ListPaymentsByPlanID(_ context.Context, _ int64, _ int, _ int64) ([]Payment, error) {
 	return nil, nil
 }
@@ -73,16 +73,16 @@ func (m *mockCashbackRepo) ListPaymentsByPlanID(_ context.Context, _ int64, _ in
 // ── mock WalletPoster ─────────────────────────────────────────────────────────
 
 type mockWalletPoster struct {
-	postTxnID             int64
-	postErr               error
-	findAccountID         int64
-	findAccountErr        error
-	openWalletID          int64
-	openWalletErr         error
-	findByOwnerAnyID      int64
-	findByOwnerAnyStat    string
-	findByOwnerAnyErr     error
-	postCalled            bool
+	postTxnID          int64
+	postErr            error
+	findAccountID      int64
+	findAccountErr     error
+	openWalletID       int64
+	openWalletErr      error
+	findByOwnerAnyID   int64
+	findByOwnerAnyStat string
+	findByOwnerAnyErr  error
+	postCalled         bool
 }
 
 func (m *mockWalletPoster) PostInTx(_ context.Context, _ pgx.Tx, _ ledger.PostInput) (int64, error) {
@@ -113,56 +113,85 @@ func (m *mockCronOutbox) FetchUnpublished(_ context.Context, _ pgx.Tx, _ int) ([
 }
 func (m *mockCronOutbox) MarkPublished(_ context.Context, _ pgx.Tx, _ int64) error { return nil }
 
+// activePlan builds a v8-compatible active Plan for unit tests.
 func activePlan(id, userID int64) Plan {
 	return Plan{
-		ID:                 id,
-		UserID:             userID,
-		MonthlyAmountMinor: 500,
-		Currency:           "TRY_COIN",
-		StartDate:          time.Now().AddDate(0, -1, 0),
-		Status:             PlanStatusActive,
-		Market:             "TR",
+		ID:                     id,
+		UserID:                 userID,
+		PriceMinor:             100000,
+		CommissionBps:          2000,
+		TotalMonths:            78,
+		MonthlyAmountMinor:     1282,
+		MonthlyAmountLastMinor: 1344, // 77*1282 + 1344 = 100000
+		PaymentsMade:           0,
+		Currency:               "TRY_COIN",
+		StartDate:              time.Now().AddDate(0, -1, 0),
+		Status:                 PlanStatusActive,
+		Market:                 "TR",
 	}
 }
 
 // ── unit tests ────────────────────────────────────────────────────────────────
 
-func TestRunMonth_NoPlansDue(t *testing.T) {
-	repo := &mockCashbackRepo{} // FetchPlansBatch returns nil
+func TestPayMonthlyInstallments_NoPlansDue(t *testing.T) {
+	repo := &mockCashbackRepo{} // ListDuePlans returns nil
 	wp := &mockWalletPoster{findAccountID: 1, openWalletID: 2, postTxnID: 99}
 	svc := newCronSvc(repo, wp)
 
-	res, err := svc.RunMonth(context.Background(), 202607, time.Now(), "TRY_COIN")
+	summary, err := svc.PayMonthlyInstallments(context.Background(), time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if res.Processed != 0 || res.Failed != 0 {
-		t.Fatalf("want zero processed/failed, got %+v", res)
+	if summary.Processed != 0 || summary.Failed != 0 {
+		t.Fatalf("want zero processed/failed, got %+v", summary)
 	}
 }
 
-func TestRunMonth_HappyPath(t *testing.T) {
+func TestPayMonthlyInstallments_HappyPath(t *testing.T) {
 	plan := activePlan(1, 100)
-	repo := &mockCashbackRepo{plans: []Plan{plan}}
+	repo := &mockCashbackRepo{
+		duePlans:      []Plan{plan},
+		incrCountRet:  1,
+		incrCompleted: false,
+	}
 	wp := &mockWalletPoster{findAccountID: 10, openWalletID: 20, postTxnID: 99}
 	svc := newCronSvc(repo, wp)
 
-	res, err := svc.RunMonth(context.Background(), 202607, time.Now(), "TRY_COIN")
+	summary, err := svc.PayMonthlyInstallments(context.Background(), time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if res.Processed != 1 {
-		t.Fatalf("want processed=1, got %d", res.Processed)
+	if summary.Processed != 1 {
+		t.Fatalf("want processed=1, got %d", summary.Processed)
 	}
-	if repo.lastDistribPeriod != 202607 {
-		t.Fatalf("want lastDistribPeriod=202607, got %d", repo.lastDistribPeriod)
+	if !wp.postCalled {
+		t.Fatal("PostInTx must be called for active plan")
 	}
 }
 
-func TestRunMonth_WalletFrozen_Skipped(t *testing.T) {
+func TestPayMonthlyInstallments_FinalInstallment_Completed(t *testing.T) {
 	plan := activePlan(1, 100)
-	repo := &mockCashbackRepo{plans: []Plan{plan}}
-	// FindAccountByOwnerAnyStatus returns frozen account → skip without PostInTx.
+	plan.PaymentsMade = plan.TotalMonths - 1 // next payment is the last one
+	repo := &mockCashbackRepo{
+		duePlans:      []Plan{plan},
+		incrCountRet:  plan.TotalMonths,
+		incrCompleted: true,
+	}
+	wp := &mockWalletPoster{findAccountID: 10, openWalletID: 20, postTxnID: 99}
+	svc := newCronSvc(repo, wp)
+
+	summary, err := svc.PayMonthlyInstallments(context.Background(), time.Now())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if summary.Processed != 1 {
+		t.Fatalf("want processed=1, got %d", summary.Processed)
+	}
+}
+
+func TestPayMonthlyInstallments_WalletFrozen_Skipped(t *testing.T) {
+	plan := activePlan(1, 100)
+	repo := &mockCashbackRepo{duePlans: []Plan{plan}}
 	wp := &mockWalletPoster{
 		findAccountID:      10,
 		openWalletID:       20,
@@ -171,23 +200,25 @@ func TestRunMonth_WalletFrozen_Skipped(t *testing.T) {
 	}
 	svc := newCronSvc(repo, wp)
 
-	res, err := svc.RunMonth(context.Background(), 202607, time.Now(), "TRY_COIN")
+	summary, err := svc.PayMonthlyInstallments(context.Background(), time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if res.Skipped != 1 || res.Processed != 0 {
-		t.Fatalf("want skipped=1 processed=0, got %+v", res)
+	if summary.Skipped != 1 || summary.Processed != 0 {
+		t.Fatalf("want skipped=1 processed=0, got %+v", summary)
 	}
 	if wp.postCalled {
 		t.Fatal("PostInTx must not be called for frozen wallet")
 	}
 }
 
-func TestRunMonth_WalletDoesNotExist_LazilyCreated(t *testing.T) {
+func TestPayMonthlyInstallments_WalletDoesNotExist_LazilyCreated(t *testing.T) {
 	plan := activePlan(1, 100)
-	repo := &mockCashbackRepo{plans: []Plan{plan}}
-	// FindAccountByOwnerAnyStatus returns (0,"",nil) → wallet not yet created →
-	// OpenOrFindUserWallet is called → wallet created lazily → payment processed.
+	repo := &mockCashbackRepo{
+		duePlans:      []Plan{plan},
+		incrCountRet:  1,
+		incrCompleted: false,
+	}
 	wp := &mockWalletPoster{
 		findAccountID:      10,
 		openWalletID:       20,
@@ -197,20 +228,18 @@ func TestRunMonth_WalletDoesNotExist_LazilyCreated(t *testing.T) {
 	}
 	svc := newCronSvc(repo, wp)
 
-	res, err := svc.RunMonth(context.Background(), 202607, time.Now(), "TRY_COIN")
+	summary, err := svc.PayMonthlyInstallments(context.Background(), time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if res.Processed != 1 {
-		t.Fatalf("want processed=1 (lazy create), got %+v", res)
+	if summary.Processed != 1 {
+		t.Fatalf("want processed=1 (lazy create), got %+v", summary)
 	}
 }
 
-func TestRunMonth_WalletFrozenViaGetAccount_Skipped(t *testing.T) {
+func TestPayMonthlyInstallments_WalletSuspended_Skipped(t *testing.T) {
 	plan := activePlan(1, 100)
-	repo := &mockCashbackRepo{plans: []Plan{plan}}
-	// Wallet exists but is suspended (non-active status other than "frozen") —
-	// confirms the status != "active" check covers all non-active states.
+	repo := &mockCashbackRepo{duePlans: []Plan{plan}}
 	wp := &mockWalletPoster{
 		findAccountID:      10,
 		openWalletID:       20,
@@ -219,39 +248,21 @@ func TestRunMonth_WalletFrozenViaGetAccount_Skipped(t *testing.T) {
 	}
 	svc := newCronSvc(repo, wp)
 
-	res, err := svc.RunMonth(context.Background(), 202607, time.Now(), "TRY_COIN")
+	summary, err := svc.PayMonthlyInstallments(context.Background(), time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if res.Skipped != 1 || res.Processed != 0 || res.Failed != 0 {
-		t.Fatalf("want skipped=1 processed=0 failed=0, got %+v", res)
+	if summary.Skipped != 1 || summary.Processed != 0 || summary.Failed != 0 {
+		t.Fatalf("want skipped=1 processed=0 failed=0, got %+v", summary)
 	}
 	if wp.postCalled {
 		t.Fatal("PostInTx must not be called for suspended wallet")
 	}
 }
 
-func TestRunMonth_DuplicatePayment_Skipped(t *testing.T) {
+func TestPayMonthlyInstallments_PostInTxError_Failed(t *testing.T) {
 	plan := activePlan(1, 100)
-	repo := &mockCashbackRepo{
-		plans:            []Plan{plan},
-		insertPaymentErr: ErrPaymentAlreadyExists,
-	}
-	wp := &mockWalletPoster{findAccountID: 10, openWalletID: 20}
-	svc := newCronSvc(repo, wp)
-
-	res, err := svc.RunMonth(context.Background(), 202607, time.Now(), "TRY_COIN")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if res.Skipped != 1 {
-		t.Fatalf("want skipped=1 (idempotent re-run), got %+v", res)
-	}
-}
-
-func TestRunMonth_PostInTxError_Failed(t *testing.T) {
-	plan := activePlan(1, 100)
-	repo := &mockCashbackRepo{plans: []Plan{plan}}
+	repo := &mockCashbackRepo{duePlans: []Plan{plan}}
 	wp := &mockWalletPoster{
 		findAccountID: 10,
 		openWalletID:  20,
@@ -259,38 +270,43 @@ func TestRunMonth_PostInTxError_Failed(t *testing.T) {
 	}
 	svc := newCronSvc(repo, wp)
 
-	res, err := svc.RunMonth(context.Background(), 202607, time.Now(), "TRY_COIN")
+	summary, err := svc.PayMonthlyInstallments(context.Background(), time.Now())
 	if err != nil {
 		t.Fatalf("unexpected top-level error: %v", err)
 	}
-	if res.Failed != 1 {
-		t.Fatalf("want failed=1, got %+v", res)
+	if summary.Failed != 1 {
+		t.Fatalf("want failed=1, got %+v", summary)
 	}
 }
 
-func TestRunMonth_FindEquityAccountError_ReturnsError(t *testing.T) {
-	repo := &mockCashbackRepo{}
+func TestPayMonthlyInstallments_FindEquityAccountError_ReturnsError(t *testing.T) {
+	plan := activePlan(1, 100)
+	repo := &mockCashbackRepo{duePlans: []Plan{plan}}
 	wp := &mockWalletPoster{findAccountErr: errors.New("equity account not found")}
 	svc := newCronSvc(repo, wp)
 
-	_, err := svc.RunMonth(context.Background(), 202607, time.Now(), "TRY_COIN")
+	_, err := svc.PayMonthlyInstallments(context.Background(), time.Now())
 	if err == nil {
 		t.Fatal("expected error when equity account lookup fails")
 	}
 }
 
-func TestRunMonth_MultiplePlans(t *testing.T) {
+func TestPayMonthlyInstallments_MultiplePlans(t *testing.T) {
 	plans := []Plan{activePlan(1, 101), activePlan(2, 102), activePlan(3, 103)}
-	repo := &mockCashbackRepo{plans: plans}
+	repo := &mockCashbackRepo{
+		duePlans:      plans,
+		incrCountRet:  1,
+		incrCompleted: false,
+	}
 	wp := &mockWalletPoster{findAccountID: 10, openWalletID: 20, postTxnID: 99}
 	svc := newCronSvc(repo, wp)
 
-	res, err := svc.RunMonth(context.Background(), 202607, time.Now(), "TRY_COIN")
+	summary, err := svc.PayMonthlyInstallments(context.Background(), time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if res.Processed != 3 {
-		t.Fatalf("want processed=3, got %d", res.Processed)
+	if summary.Processed != 3 {
+		t.Fatalf("want processed=3, got %d", summary.Processed)
 	}
 }
 

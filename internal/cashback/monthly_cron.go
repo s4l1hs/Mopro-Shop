@@ -13,6 +13,8 @@ import (
 )
 
 // MarketConfig binds a market code to its coin currency for cron scheduling.
+// Kept for backward compat with main.go wiring; PayMonthlyInstallments processes
+// all currencies in a single pass so the markets list is no longer iterated.
 type MarketConfig struct {
 	Market   string
 	Currency string
@@ -39,27 +41,27 @@ func ParseMarketConfigs(raw string) ([]MarketConfig, error) {
 	return configs, nil
 }
 
-// MonthlyCron schedules RunMonth for each configured market on the 1st of each month.
+// MonthlyCron schedules PayMonthlyInstallments on the 1st of each month at 03:00 Istanbul time.
 type MonthlyCron struct {
-	svc     Service
-	markets []MarketConfig
-	pinger  healthcheck.Pinger
-	log     *slog.Logger
-	c       *cron.Cron
+	svc    Service
+	pinger healthcheck.Pinger
+	log    *slog.Logger
+	loc    *time.Location
+	c      *cron.Cron
 }
 
 // NewMonthlyCron constructs a MonthlyCron.
 // loc must be the Istanbul timezone; pass time.LoadLocation("Europe/Istanbul").
-// pinger is called with Start/Success/Fail around each full run; noopPinger if nil URL.
-func NewMonthlyCron(svc Service, markets []MarketConfig, loc *time.Location, pinger healthcheck.Pinger, log *slog.Logger) *MonthlyCron {
+// markets is accepted for API compat with main.go but is not used (v8 processes all currencies).
+// pinger is called with Start/Success/Fail around each run.
+func NewMonthlyCron(svc Service, _ []MarketConfig, loc *time.Location, pinger healthcheck.Pinger, log *slog.Logger) *MonthlyCron {
 	if log == nil {
 		log = slog.Default()
 	}
-	c := cron.New(cron.WithLocation(loc), cron.WithSeconds())
-	mc := &MonthlyCron{svc: svc, markets: markets, pinger: pinger, log: log, c: c}
-	// "0 0 2 1 * *" = second 0, minute 0, hour 2, day-of-month 1, every month.
-	// cron.WithSeconds() enables the 6-field format.
-	_, _ = c.AddFunc("0 0 2 1 * *", mc.runAll)
+	c := cron.New(cron.WithLocation(loc))
+	mc := &MonthlyCron{svc: svc, pinger: pinger, log: log, loc: loc, c: c}
+	// "0 3 1 * *" = minute 0, hour 3, day-of-month 1, every month, every year.
+	_, _ = c.AddFunc("0 3 1 * *", mc.runAll)
 	return mc
 }
 
@@ -69,33 +71,29 @@ func (mc *MonthlyCron) Start() { mc.c.Start() }
 // Stop halts the scheduler and waits for any in-progress run to finish.
 func (mc *MonthlyCron) Stop() { mc.c.Stop() }
 
-// runAll is the cron callback — runs RunMonth for every configured market.
+// runAll is the cron callback — calls PayMonthlyInstallments for all due plans.
 func (mc *MonthlyCron) runAll() {
 	ctx := context.Background()
-	now := time.Now().UTC()
-	period := timeToPeriod(now)
+	now := time.Now().In(mc.loc)
 
 	mc.pinger.Start(ctx)
-	mc.log.InfoContext(ctx, "cashback: monthly cron start", "period", period, "markets", len(mc.markets))
+	mc.log.InfoContext(ctx, "cashback: monthly cron start", "run_date", now.Format("2006-01-02"))
 
-	var totalFailed int
-	for _, m := range mc.markets {
-		res, err := mc.svc.RunMonth(ctx, period, now, m.Currency)
-		if err != nil {
-			mc.log.ErrorContext(ctx, "cashback: RunMonth error",
-				"market", m.Market, "currency", m.Currency, "period", period, "err", err)
-			totalFailed++
-			continue
-		}
-		mc.log.InfoContext(ctx, "cashback: monthly cron market done",
-			"market", m.Market, "currency", m.Currency, "period", period,
-			"processed", res.Processed, "skipped", res.Skipped,
-			"failed", res.Failed, "retries", res.TotalRetries)
-		totalFailed += res.Failed
+	summary, err := mc.svc.PayMonthlyInstallments(ctx, now)
+	if err != nil {
+		mc.log.ErrorContext(ctx, "cashback: PayMonthlyInstallments error", "err", err)
+		mc.pinger.Fail(ctx, err.Error())
+		return
 	}
 
-	if totalFailed > 0 {
-		mc.pinger.Fail(ctx, fmt.Sprintf("cashback: %d plan(s) failed in period %d", totalFailed, period))
+	mc.log.InfoContext(ctx, "cashback: monthly cron done",
+		"processed", summary.Processed,
+		"skipped", summary.Skipped,
+		"failed", summary.Failed,
+		"retries", summary.Retries,
+	)
+	if summary.Failed > 0 {
+		mc.pinger.Fail(ctx, fmt.Sprintf("cashback: %d plan(s) failed", summary.Failed))
 	} else {
 		mc.pinger.Success(ctx)
 	}

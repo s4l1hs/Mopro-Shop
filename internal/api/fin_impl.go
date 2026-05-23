@@ -192,7 +192,7 @@ func (s *FinServer) ListCashbackPlans(ctx context.Context, req genfin.ListCashba
 		status = &s
 	}
 
-	plans, err := s.CashbackRepo.ListPlansByUserID(ctx, userID, limit+1, beforeID, status)
+	plans, err := s.CashbackRepo.ListPlansByUser(ctx, userID, limit+1, beforeID, status)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +222,7 @@ func (s *FinServer) ListCashbackPlans(ctx context.Context, req genfin.ListCashba
 // Returns 404 if the plan does not exist OR belongs to a different user (IDOR prevention).
 func (s *FinServer) GetCashbackPlan(ctx context.Context, req genfin.GetCashbackPlanRequestObject) (genfin.GetCashbackPlanResponseObject, error) {
 	userID := identitymw.UserIDFromCtx(ctx)
-	plan, err := s.CashbackRepo.GetPlanByIDAndUserID(ctx, req.Id, userID)
+	plan, err := s.CashbackRepo.GetPlan(ctx, userID, req.Id)
 	if err != nil {
 		if errors.Is(err, cashback.ErrPlanNotFound) {
 			return genfin.GetCashbackPlan404JSONResponse{}, nil
@@ -240,7 +240,7 @@ func (s *FinServer) ListCashbackPayments(ctx context.Context, req genfin.ListCas
 	limit := finResolveLimit(req.Params.Limit)
 
 	// IDOR check: verify plan ownership before listing payments.
-	plan, err := s.CashbackRepo.GetPlanByIDAndUserID(ctx, req.Id, userID)
+	plan, err := s.CashbackRepo.GetPlan(ctx, userID, req.Id)
 	if err != nil {
 		if errors.Is(err, cashback.ErrPlanNotFound) {
 			return genfin.ListCashbackPayments404JSONResponse{}, nil

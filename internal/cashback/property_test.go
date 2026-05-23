@@ -2,7 +2,7 @@
 
 package cashback_test
 
-// Property tests: v6 perpetual cashback formula invariants.
+// Property tests: v8 accelerated amortization formula invariants.
 // Pure math — no DB, no Redis.
 
 import (
@@ -15,82 +15,83 @@ import (
 	"github.com/mopro/platform/internal/cashback"
 )
 
-func TestProperty_CashbackFormulaDeterministic(t *testing.T) {
+// TestProperty_V8Formula_PrincipalCoverage verifies that the sum of all installments
+// equals priceMinor exactly for any valid input combination.
+func TestProperty_V8Formula_PrincipalCoverage(t *testing.T) {
 	params := gopter.DefaultTestParameters()
 	params.MinSuccessfulTests = 1000
 	properties := gopter.NewProperties(params)
 
 	properties.Property(
-		"same commission_minor always yields same monthly_coin_minor",
+		"(T-1)*M + M_last == priceMinor (principal exactly covered)",
 		prop.ForAll(
-			func(commissionMinor int64) bool {
-				if commissionMinor <= 0 {
-					return true
+			func(priceMinor int64, commissionBps int) bool {
+				terms, err := cashback.ComputePlanTerms(priceMinor, commissionBps)
+				if err != nil {
+					return true // invalid input — skip
 				}
-				yearly1 := commissionMinor * int64(cashback.ReferenceInterestRateBpsConst) / 10000
-				monthly1 := yearly1 / 12
-
-				yearly2 := commissionMinor * int64(cashback.ReferenceInterestRateBpsConst) / 10000
-				monthly2 := yearly2 / 12
-
-				return monthly1 == monthly2
+				sum := int64(terms.TotalMonths-1)*terms.MonthlyAmountMinor + terms.MonthlyAmountLastMinor
+				return sum == priceMinor
 			},
-			gen.Int64Range(1, 1_000_000_000),
+			gen.Int64Range(1, int64(1e14)),
+			gen.IntRange(100, 10000),
 		),
 	)
 
 	properties.TestingRun(t)
 }
 
-func TestProperty_CashbackMonthlyNonNegative(t *testing.T) {
+// TestProperty_V8Formula_MonthlyNonNegative verifies that all output fields
+// are positive when ComputePlanTerms succeeds.
+func TestProperty_V8Formula_MonthlyNonNegative(t *testing.T) {
 	params := gopter.DefaultTestParameters()
 	params.MinSuccessfulTests = 1000
 	properties := gopter.NewProperties(params)
 
 	properties.Property(
-		"monthly_coin_minor >= 0 for any non-negative commission",
+		"MonthlyAmountMinor >= 1 and MonthlyAmountLastMinor >= MonthlyAmountMinor",
 		prop.ForAll(
-			func(unitPriceMinor int64, qty uint8, commPctBps uint16) bool {
-				if unitPriceMinor <= 0 || qty == 0 {
+			func(priceMinor int64, commissionBps int) bool {
+				terms, err := cashback.ComputePlanTerms(priceMinor, commissionBps)
+				if err != nil {
 					return true
 				}
-				if commPctBps > 3000 {
-					commPctBps %= 3001
-				}
-
-				gross := unitPriceMinor * int64(qty)
-				commAmt := gross * int64(commPctBps) / 10000
-				yearly := commAmt * int64(cashback.ReferenceInterestRateBpsConst) / 10000
-				monthly := yearly / 12
-
-				return monthly >= 0 && yearly >= 0
+				return terms.MonthlyAmountMinor >= 1 &&
+					terms.MonthlyAmountLastMinor >= terms.MonthlyAmountMinor
 			},
-			gen.Int64Range(1, 100_000_000),
-			gen.UInt8Range(1, 50),
-			gen.UInt16Range(0, 3000),
+			gen.Int64Range(1, int64(1e14)),
+			gen.IntRange(100, 10000),
 		),
 	)
 
 	properties.TestingRun(t)
 }
 
-func TestProperty_CashbackYearlyDividesBy12(t *testing.T) {
+// TestProperty_V8Formula_TotalMonthsDeterministic verifies that
+// ComputePlanTerms returns the same result when called twice with the same inputs.
+func TestProperty_V8Formula_TotalMonthsDeterministic(t *testing.T) {
 	params := gopter.DefaultTestParameters()
 	params.MinSuccessfulTests = 500
 	properties := gopter.NewProperties(params)
 
 	properties.Property(
-		"monthly_coin_minor * 12 <= yearly_yield_minor (integer division truncates down)",
+		"same inputs always yield identical PlanTerms",
 		prop.ForAll(
-			func(commissionMinor int64) bool {
-				if commissionMinor <= 0 {
+			func(priceMinor int64, commissionBps int) bool {
+				t1, err1 := cashback.ComputePlanTerms(priceMinor, commissionBps)
+				t2, err2 := cashback.ComputePlanTerms(priceMinor, commissionBps)
+				if (err1 == nil) != (err2 == nil) {
+					return false
+				}
+				if err1 != nil {
 					return true
 				}
-				yearly := commissionMinor * int64(cashback.ReferenceInterestRateBpsConst) / 10000
-				monthly := yearly / 12
-				return monthly*12 <= yearly
+				return t1.TotalMonths == t2.TotalMonths &&
+					t1.MonthlyAmountMinor == t2.MonthlyAmountMinor &&
+					t1.MonthlyAmountLastMinor == t2.MonthlyAmountLastMinor
 			},
-			gen.Int64Range(1, 1_000_000_000),
+			gen.Int64Range(1, int64(1e14)),
+			gen.IntRange(100, 10000),
 		),
 	)
 

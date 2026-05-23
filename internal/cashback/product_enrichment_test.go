@@ -10,22 +10,22 @@ import (
 	"github.com/mopro/platform/pkg/timex"
 )
 
-// capturePlanInsertRepo embeds mockCashbackRepo and captures the Plan passed to InsertPlan.
+// capturePlanInsertRepo embeds mockCashbackRepo and captures the Plan passed to InsertPlanIfAbsent.
 type capturePlanInsertRepo struct {
 	mockCashbackRepo
 	inserted Plan
 }
 
-func (c *capturePlanInsertRepo) InsertPlan(_ context.Context, _ pgx.Tx, p Plan) (Plan, error) {
+func (c *capturePlanInsertRepo) InsertPlanIfAbsent(_ context.Context, _ pgx.Tx, p Plan) (Plan, bool, error) {
 	c.inserted = p
 	p.ID = 42
-	return p, nil
+	return p, true, nil
 }
 
-// TestCreatePlanForOrder_PopulatesProductFields verifies that product_id,
+// TestCreatePlanFromDelivery_PopulatesProductFields verifies that product_id,
 // product_title, and product_image_url are captured from OrderDeliveredEvent
 // and persisted on the cashback Plan.
-func TestCreatePlanForOrder_PopulatesProductFields(t *testing.T) {
+func TestCreatePlanFromDelivery_PopulatesProductFields(t *testing.T) {
 	repo := &capturePlanInsertRepo{}
 	calLoader := timex.NewStaticCalendarLoader(map[string]timex.Calendar{
 		"TR": {},
@@ -33,11 +33,13 @@ func TestCreatePlanForOrder_PopulatesProductFields(t *testing.T) {
 	svc := NewService(repo, &mockCronOutbox{}, calLoader, "TRY_COIN", &mockWalletPoster{}, nil)
 
 	ev := OrderDeliveredEvent{
-		OrderID:     99,
-		UserID:      1,
-		DeliveredAt: time.Now(),
-		Market:      "TR",
-		Currency:    "TRY",
+		OrderID:       99,
+		UserID:        1,
+		DeliveredAt:   time.Now(),
+		Market:        "TR",
+		Currency:      "TRY",
+		PriceMinor:    10000,
+		CommissionBps: 2000,
 		Items: []CommissionSnapshotItem{
 			{
 				VariantID:             10,
@@ -57,8 +59,8 @@ func TestCreatePlanForOrder_PopulatesProductFields(t *testing.T) {
 		ProductImageURL: "https://cdn.example.com/img/abc.jpg",
 	}
 
-	if err := svc.CreatePlanForOrder(context.Background(), ev); err != nil {
-		t.Fatalf("CreatePlanForOrder: %v", err)
+	if _, err := svc.CreatePlanFromDelivery(context.Background(), ev); err != nil {
+		t.Fatalf("CreatePlanFromDelivery: %v", err)
 	}
 
 	p := repo.inserted

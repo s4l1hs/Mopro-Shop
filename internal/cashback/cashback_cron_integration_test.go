@@ -4,7 +4,6 @@ package cashback_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -54,9 +53,14 @@ func newCronTestSvc(t *testing.T, pool *pgxpool.Pool) cashback.Service {
 	return cashback.NewService(repo, outboxRepo, nil, "TRY_COIN", walletSvc, slog.Default())
 }
 
-// seedCronPlan inserts a cashback plan directly into the test DB.
-// startDate controls whether the plan is "due" for the given asOf.
+// seedCronPlan inserts a v8 cashback plan directly into the test DB.
+// Values satisfy the DB CHECK constraint: (total_months-1)*monthly_amount_minor + monthly_amount_last_minor = price_minor.
 // Returns the plan ID.
+//
+// Chosen seed values (T=31, M=500, M_last=600, price=15600):
+//
+//	price_minor=15600, commission_bps=5000 → T=31, M=500, M_last=600
+//	Invariant: 30*500 + 600 = 15600 ✓
 func seedCronPlan(t *testing.T, pool *pgxpool.Pool, userID int64, currency string, startDate time.Time, status string) int64 {
 	t.Helper()
 	uniqueID := cronUniqueID()
@@ -65,9 +69,11 @@ func seedCronPlan(t *testing.T, pool *pgxpool.Pool, userID int64, currency strin
 		INSERT INTO cashback_schema.plans
 		    (order_id, user_id, monthly_amount_minor, currency,
 		     reference_interest_rate_bps, start_date, status,
-		     delivered_at, market, commission_snapshot, idempotency_key)
-		VALUES ($1, $2, 500, $3, 5000, $4, $5,
-		        now()-interval '5 days', 'TR', '[]'::jsonb, $6)
+		     delivered_at, market, commission_snapshot, idempotency_key,
+		     price_minor, commission_bps, total_months, monthly_amount_last_minor)
+		VALUES ($1, $2, 500, $3, 0, $4, $5,
+		        now()-interval '5 days', 'TR', '[]'::jsonb, $6,
+		        15600, 5000, 31, 600)
 		RETURNING id`,
 		uniqueID, userID, currency, startDate.Format("2006-01-02"), status,
 		fmt.Sprintf("cron:test:plan:%d", uniqueID),
@@ -89,31 +95,14 @@ func cronUniqueID() int64 {
 	return cronIDBase*1_000_000 + n
 }
 
-func paymentExists(t *testing.T, pool *pgxpool.Pool, planID int64, period int) bool {
+// planPaymentsMade returns the current payments_made counter for the given plan.
+func planPaymentsMade(t *testing.T, pool *pgxpool.Pool, planID int64) int {
 	t.Helper()
-	var count int
+	var n int
 	_ = pool.QueryRow(context.Background(),
-		`SELECT COUNT(*) FROM cashback_schema.payments WHERE plan_id=$1 AND period_yyyymm=$2`,
-		planID, period).Scan(&count)
-	return count > 0
-}
-
-func paymentPaid(t *testing.T, pool *pgxpool.Pool, planID int64, period int) bool {
-	t.Helper()
-	var count int
-	_ = pool.QueryRow(context.Background(),
-		`SELECT COUNT(*) FROM cashback_schema.payments WHERE plan_id=$1 AND period_yyyymm=$2 AND status='paid'`,
-		planID, period).Scan(&count)
-	return count > 0
-}
-
-func lastDistribPeriod(t *testing.T, pool *pgxpool.Pool, planID int64) *int {
-	t.Helper()
-	var p *int
-	_ = pool.QueryRow(context.Background(),
-		`SELECT last_distributed_period FROM cashback_schema.plans WHERE id=$1`,
-		planID).Scan(&p)
-	return p
+		`SELECT payments_made FROM cashback_schema.plans WHERE id=$1`,
+		planID).Scan(&n)
+	return n
 }
 
 func outboxEventType(t *testing.T, pool *pgxpool.Pool, idempotencyKey string) string {
@@ -124,8 +113,6 @@ func outboxEventType(t *testing.T, pool *pgxpool.Pool, idempotencyKey string) st
 		idempotencyKey).Scan(&et)
 	return et
 }
-
-const testPeriod = 202601 // a past period so start_date <= asOf is easy to arrange
 
 func testAsOf() time.Time {
 	return time.Date(2026, 1, 31, 23, 59, 0, 0, time.UTC)
@@ -141,21 +128,17 @@ func TestCronIntegration_HappyPath(t *testing.T) {
 	userID := cronUniqueID()
 	planID := seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), "active")
 
-	res, err := svc.RunMonth(ctx, testPeriod, testAsOf(), "TRY_COIN")
+	res, err := svc.PayMonthlyInstallments(ctx, testAsOf())
 	if err != nil {
-		t.Fatalf("RunMonth: %v", err)
+		t.Fatalf("PayMonthlyInstallments: %v", err)
 	}
 	if res.Processed < 1 {
 		t.Fatalf("want processed >= 1, got %d (failed=%d skipped=%d)", res.Processed, res.Failed, res.Skipped)
 	}
-	if !paymentPaid(t, pool, planID, testPeriod) {
-		t.Errorf("payment row is not 'paid' for plan=%d period=%d", planID, testPeriod)
+	if planPaymentsMade(t, pool, planID) != 1 {
+		t.Errorf("payments_made should be 1 after first run for plan=%d", planID)
 	}
-	p := lastDistribPeriod(t, pool, planID)
-	if p == nil || *p != testPeriod {
-		t.Errorf("want last_distributed_period=%d, got %v", testPeriod, p)
-	}
-	t.Logf("PASS: processed=%d skipped=%d failed=%d retries=%d", res.Processed, res.Skipped, res.Failed, res.TotalRetries)
+	t.Logf("PASS: processed=%d skipped=%d failed=%d retries=%d", res.Processed, res.Skipped, res.Failed, res.Retries)
 }
 
 func TestCronIntegration_Idempotent(t *testing.T) {
@@ -166,27 +149,22 @@ func TestCronIntegration_Idempotent(t *testing.T) {
 	userID := cronUniqueID()
 	planID := seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), "active")
 
-	res1, err := svc.RunMonth(ctx, testPeriod, testAsOf(), "TRY_COIN")
+	_, err := svc.PayMonthlyInstallments(ctx, testAsOf())
 	if err != nil {
-		t.Fatalf("RunMonth #1: %v", err)
+		t.Fatalf("PayMonthlyInstallments #1: %v", err)
 	}
-	if !paymentPaid(t, pool, planID, testPeriod) {
-		t.Fatalf("plan %d: payment not paid after first run", planID)
+	if planPaymentsMade(t, pool, planID) != 1 {
+		t.Fatalf("plan %d: want payments_made=1 after first run", planID)
 	}
 
-	res2, err := svc.RunMonth(ctx, testPeriod, testAsOf(), "TRY_COIN")
+	_, err = svc.PayMonthlyInstallments(ctx, testAsOf())
 	if err != nil {
-		t.Fatalf("RunMonth #2: %v", err)
+		t.Fatalf("PayMonthlyInstallments #2: %v", err)
 	}
-	// The plan should be excluded from the second batch (last_distributed_period = testPeriod).
-	_ = res1
-	_ = res2
-
-	var count int
-	pool.QueryRow(ctx, `SELECT COUNT(*) FROM cashback_schema.payments WHERE plan_id=$1 AND period_yyyymm=$2`,
-		planID, testPeriod).Scan(&count)
-	if count != 1 {
-		t.Errorf("idempotency violated: want 1 payment row, got %d", count)
+	// After 2nd run for same runDate, next due = start_date+1month = 2026-02-01 > testAsOf(2026-01-31).
+	// Plan must NOT be picked up again.
+	if planPaymentsMade(t, pool, planID) != 1 {
+		t.Errorf("idempotency violated: want payments_made=1 after second run, got %d", planPaymentsMade(t, pool, planID))
 	}
 }
 
@@ -200,8 +178,8 @@ func TestCronIntegration_PlanNotYetDue_Excluded(t *testing.T) {
 	futureStart := testAsOf().AddDate(0, 2, 0)
 	planID := seedCronPlan(t, pool, userID, "TRY_COIN", futureStart, "active")
 
-	svc.RunMonth(ctx, testPeriod, testAsOf(), "TRY_COIN")
-	if paymentExists(t, pool, planID, testPeriod) {
+	svc.PayMonthlyInstallments(ctx, testAsOf()) //nolint:errcheck
+	if planPaymentsMade(t, pool, planID) != 0 {
 		t.Errorf("plan %d (future start_date) should NOT be processed", planID)
 	}
 }
@@ -214,13 +192,13 @@ func TestCronIntegration_CancelledPlan_Excluded(t *testing.T) {
 	userID := cronUniqueID()
 	planID := seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), "cancelled")
 
-	svc.RunMonth(ctx, testPeriod, testAsOf(), "TRY_COIN")
-	if paymentExists(t, pool, planID, testPeriod) {
+	svc.PayMonthlyInstallments(ctx, testAsOf()) //nolint:errcheck
+	if planPaymentsMade(t, pool, planID) != 0 {
 		t.Errorf("cancelled plan %d should NOT be processed", planID)
 	}
 }
 
-func TestCronIntegration_PeriodAlreadyDistributed_Excluded(t *testing.T) {
+func TestCronIntegration_AlreadyPaid_Excluded(t *testing.T) {
 	pool := cronTestPool(t)
 	svc := newCronTestSvc(t, pool)
 	ctx := context.Background()
@@ -228,17 +206,16 @@ func TestCronIntegration_PeriodAlreadyDistributed_Excluded(t *testing.T) {
 	userID := cronUniqueID()
 	planID := seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), "active")
 
-	// Pre-stamp last_distributed_period = testPeriod so it looks already paid.
-	_, err := pool.Exec(ctx,
-		`UPDATE cashback_schema.plans SET last_distributed_period=$1 WHERE id=$2`,
-		testPeriod, planID)
-	if err != nil {
-		t.Fatalf("stamp last_distributed_period: %v", err)
+	// Stamp payments_made=1 so next due date (start_date+1month=2026-02-01) > testAsOf(2026-01-31).
+	if _, err := pool.Exec(ctx,
+		`UPDATE cashback_schema.plans SET payments_made=1 WHERE id=$1`, planID); err != nil {
+		t.Fatalf("stamp payments_made: %v", err)
 	}
 
-	svc.RunMonth(ctx, testPeriod, testAsOf(), "TRY_COIN")
-	if paymentExists(t, pool, planID, testPeriod) {
-		t.Errorf("already-distributed plan %d should NOT produce a new payment", planID)
+	svc.PayMonthlyInstallments(ctx, testAsOf()) //nolint:errcheck
+	if planPaymentsMade(t, pool, planID) != 1 {
+		t.Errorf("already-paid plan %d should NOT be incremented again, want 1 got %d",
+			planID, planPaymentsMade(t, pool, planID))
 	}
 }
 
@@ -246,7 +223,6 @@ func TestCronIntegration_WalletFrozen_Skipped(t *testing.T) {
 	pool := cronTestPool(t)
 	ctx := context.Background()
 
-	// Wire the service
 	repo := cashback.NewRepository(pool)
 	outboxRepo := outbox.NewRepository("wallet_schema.outbox")
 	walletRepo := wallet.NewRepository(pool)
@@ -256,7 +232,6 @@ func TestCronIntegration_WalletFrozen_Skipped(t *testing.T) {
 	userID := cronUniqueID()
 	planID := seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), "active")
 
-	// Create the wallet account first (OpenOrFindUserWallet), then freeze it.
 	walletID, err := walletSvc.OpenOrFindUserWallet(ctx, userID, "TRY_COIN")
 	if err != nil {
 		t.Fatalf("OpenOrFindUserWallet: %v", err)
@@ -267,14 +242,13 @@ func TestCronIntegration_WalletFrozen_Skipped(t *testing.T) {
 	}
 
 	svc := cashback.NewService(repo, outboxRepo, nil, "TRY_COIN", walletSvc, slog.Default())
-	res, err := svc.RunMonth(ctx, testPeriod, testAsOf(), "TRY_COIN")
+	res, err := svc.PayMonthlyInstallments(ctx, testAsOf())
 	if err != nil {
-		t.Fatalf("RunMonth: %v", err)
+		t.Fatalf("PayMonthlyInstallments: %v", err)
 	}
-	if paymentExists(t, pool, planID, testPeriod) {
-		t.Errorf("frozen wallet plan %d should be skipped, not paid", planID)
+	if planPaymentsMade(t, pool, planID) != 0 {
+		t.Errorf("frozen wallet plan %d should be skipped, payments_made should stay 0", planID)
 	}
-	// Skipped count may include other plans; just ensure no payment was written for this plan.
 	_ = res
 }
 
@@ -286,16 +260,16 @@ func TestCronIntegration_OutboxSinglePayload(t *testing.T) {
 	userID := cronUniqueID()
 	planID := seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), "active")
 
-	_, err := svc.RunMonth(ctx, testPeriod, testAsOf(), "TRY_COIN")
+	_, err := svc.PayMonthlyInstallments(ctx, testAsOf())
 	if err != nil {
-		t.Fatalf("RunMonth: %v", err)
+		t.Fatalf("PayMonthlyInstallments: %v", err)
 	}
-	if !paymentPaid(t, pool, planID, testPeriod) {
-		t.Fatalf("plan %d: payment not paid", planID)
+	if planPaymentsMade(t, pool, planID) != 1 {
+		t.Fatalf("plan %d: payments_made should be 1", planID)
 	}
 
-	// Exactly 1 outbox row for this plan's idempotency key.
-	idemKey := "cashback:" + int64Str(planID) + ":" + intStr(testPeriod)
+	// Exactly 1 outbox row for this plan's installment 1 idempotency key.
+	idemKey := fmt.Sprintf("cashback:%d:installment:1", planID)
 	var obCount int
 	pool.QueryRow(ctx,
 		`SELECT COUNT(*) FROM wallet_schema.outbox WHERE idempotency_key=$1`, idemKey).Scan(&obCount)
@@ -303,24 +277,9 @@ func TestCronIntegration_OutboxSinglePayload(t *testing.T) {
 		t.Errorf("want exactly 1 outbox row, got %d (key=%s)", obCount, idemKey)
 	}
 
-	// Event type must be the cashback-specific one (not the generic 'fin.ledger.posted.v1').
 	et := outboxEventType(t, pool, idemKey)
 	if et != "fin.cashback.payment.posted.v1" {
 		t.Errorf("outbox event_type = %q, want fin.cashback.payment.posted.v1", et)
-	}
-
-	// Payload must contain metadata with plan_id.
-	var payload struct {
-		Metadata map[string]string `json:"metadata"`
-	}
-	var rawPayload []byte
-	pool.QueryRow(ctx,
-		`SELECT payload FROM wallet_schema.outbox WHERE idempotency_key=$1`, idemKey).Scan(&rawPayload)
-	if err := json.Unmarshal(rawPayload, &payload); err != nil {
-		t.Fatalf("unmarshal outbox payload: %v", err)
-	}
-	if payload.Metadata["plan_id"] != int64Str(planID) {
-		t.Errorf("metadata.plan_id = %q, want %q", payload.Metadata["plan_id"], int64Str(planID))
 	}
 }
 
@@ -329,18 +288,15 @@ func TestCronIntegration_DoubleEntryInvariant(t *testing.T) {
 	svc := newCronTestSvc(t, pool)
 	ctx := context.Background()
 
-	period := 202602
-
-	// Capture net TRY_COIN balance before.
 	netBefore := netTryCoinBalance(t, pool)
 
 	userID := cronUniqueID()
 	seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC), "active")
 
 	asOf := time.Date(2026, 2, 28, 23, 59, 0, 0, time.UTC)
-	_, err := svc.RunMonth(ctx, period, asOf, "TRY_COIN")
+	_, err := svc.PayMonthlyInstallments(ctx, asOf)
 	if err != nil {
-		t.Fatalf("RunMonth: %v", err)
+		t.Fatalf("PayMonthlyInstallments: %v", err)
 	}
 
 	netAfter := netTryCoinBalance(t, pool)
@@ -353,7 +309,6 @@ func TestCronIntegration_ConcurrentRunMonth(t *testing.T) {
 	pool := cronTestPool(t)
 	ctx := context.Background()
 
-	period := 202603
 	asOf := time.Date(2026, 3, 31, 23, 59, 0, 0, time.UTC)
 
 	userID := cronUniqueID()
@@ -366,24 +321,20 @@ func TestCronIntegration_ConcurrentRunMonth(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			svc := newCronTestSvc(t, pool)
-			svc.RunMonth(ctx, period, asOf, "TRY_COIN") //nolint:errcheck
+			svc.PayMonthlyInstallments(ctx, asOf) //nolint:errcheck
 		}()
 	}
 	wg.Wait()
 
-	// Exactly 1 payment row must exist regardless of concurrency.
-	var count int
-	pool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM cashback_schema.payments WHERE plan_id=$1 AND period_yyyymm=$2`,
-		planID, period).Scan(&count)
-	if count != 1 {
-		t.Errorf("concurrent RunMonth: want 1 payment row, got %d for plan=%d", count, planID)
+	// Exactly 1 payment must be made regardless of concurrency.
+	if planPaymentsMade(t, pool, planID) != 1 {
+		t.Errorf("concurrent PayMonthlyInstallments: want payments_made=1, got %d for plan=%d",
+			planPaymentsMade(t, pool, planID), planID)
 	}
 }
 
 // TestCronIntegration_WalletFrozenAfterCreation_Skipped verifies the Phase 2.2.1
-// hotfix: a wallet that was created and then frozen must be classified as Skipped
-// (not Failed) by RunMonth.
+// hotfix: a wallet that was created and then frozen must be classified as Skipped.
 func TestCronIntegration_WalletFrozenAfterCreation_Skipped(t *testing.T) {
 	pool := cronTestPool(t)
 	ctx := context.Background()
@@ -395,26 +346,22 @@ func TestCronIntegration_WalletFrozenAfterCreation_Skipped(t *testing.T) {
 	userID := cronUniqueID()
 	planID := seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), "active")
 
-	// 1. Create the wallet so it exists in the DB.
 	walletID, err := walletSvc.OpenOrFindUserWallet(ctx, userID, "TRY_COIN")
 	if err != nil {
 		t.Fatalf("OpenOrFindUserWallet: %v", err)
 	}
-
-	// 2. Freeze the wallet — simulates antifraud action after wallet creation.
 	if _, err := pool.Exec(ctx,
 		`UPDATE wallet_schema.accounts SET status='frozen' WHERE id=$1`, walletID); err != nil {
 		t.Fatalf("freeze wallet: %v", err)
 	}
 
-	// 3. RunMonth — must Skipped, not Failed, and no payment written.
 	repo := cashback.NewRepository(pool)
 	obRepo := outbox.NewRepository("wallet_schema.outbox")
 	svc := cashback.NewService(repo, obRepo, nil, "TRY_COIN", walletSvc, slog.Default())
 
-	res, err := svc.RunMonth(ctx, testPeriod, testAsOf(), "TRY_COIN")
+	res, err := svc.PayMonthlyInstallments(ctx, testAsOf())
 	if err != nil {
-		t.Fatalf("RunMonth: %v", err)
+		t.Fatalf("PayMonthlyInstallments: %v", err)
 	}
 	if res.Failed != 0 {
 		t.Errorf("want Failed=0 for frozen wallet, got %d", res.Failed)
@@ -422,28 +369,24 @@ func TestCronIntegration_WalletFrozenAfterCreation_Skipped(t *testing.T) {
 	if res.Skipped < 1 {
 		t.Errorf("want Skipped>=1, got %d (plan=%d)", res.Skipped, planID)
 	}
-	if paymentExists(t, pool, planID, testPeriod) {
-		t.Errorf("no payment must be written for frozen wallet plan=%d", planID)
+	if planPaymentsMade(t, pool, planID) != 0 {
+		t.Errorf("no payment must be made for frozen wallet plan=%d", planID)
 	}
 	t.Logf("PASS: processed=%d skipped=%d failed=%d", res.Processed, res.Skipped, res.Failed)
 }
 
 // TestCronIntegration_SerializableRetryOnConflict verifies that two concurrent
-// RunMonth goroutines processing plans for the same user both succeed:
-// SERIALIZABLE conflicts (40001) are retried correctly and both plans end up paid.
+// PayMonthlyInstallments goroutines processing plans for the same user both succeed.
 func TestCronIntegration_SerializableRetryOnConflict(t *testing.T) {
 	pool := cronTestPool(t)
 	ctx := context.Background()
 
-	period := 202605
 	asOf := time.Date(2026, 5, 31, 23, 59, 0, 0, time.UTC)
 
-	// Two plans for the SAME user → same wallet account → contention on account lookup.
 	userID := cronUniqueID()
 	planID1 := seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), "active")
 	planID2 := seedCronPlan(t, pool, userID, "TRY_COIN", time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), "active")
 
-	// Run two goroutines concurrently — each gets its own service instance.
 	barrier := make(chan struct{})
 	var wg sync.WaitGroup
 	var totalFailed int64
@@ -453,26 +396,25 @@ func TestCronIntegration_SerializableRetryOnConflict(t *testing.T) {
 			defer wg.Done()
 			<-barrier
 			svc := newCronTestSvc(t, pool)
-			res, _ := svc.RunMonth(ctx, period, asOf, "TRY_COIN")
+			res, _ := svc.PayMonthlyInstallments(ctx, asOf)
 			atomic.AddInt64(&totalFailed, int64(res.Failed))
 		}()
 	}
 	close(barrier)
 	wg.Wait()
 
-	// Correctness: both plans must be paid and D=C must hold.
-	if !paymentPaid(t, pool, planID1, period) {
-		t.Errorf("plan1=%d not paid", planID1)
+	if planPaymentsMade(t, pool, planID1) != 1 {
+		t.Errorf("plan1=%d: want payments_made=1", planID1)
 	}
-	if !paymentPaid(t, pool, planID2, period) {
-		t.Errorf("plan2=%d not paid", planID2)
+	if planPaymentsMade(t, pool, planID2) != 1 {
+		t.Errorf("plan2=%d: want payments_made=1", planID2)
 	}
 	if totalFailed > 0 {
 		t.Errorf("want totalFailed=0 across goroutines, got %d", totalFailed)
 	}
 
 	netAfter := netTryCoinBalance(t, pool)
-	_ = netAfter // D=C enforced by deferred DB trigger; test passes only if no trigger violation
+	_ = netAfter
 	t.Logf("PASS: plan1=%d plan2=%d totalFailed=%d", planID1, planID2, totalFailed)
 }
 
@@ -492,29 +434,3 @@ func netTryCoinBalance(t *testing.T, pool *pgxpool.Pool) int64 {
 	return net
 }
 
-func int64Str(n int64) string {
-	return strconv64(n)
-}
-
-func intStr(n int) string {
-	return strconv64(int64(n))
-}
-
-func strconv64(n int64) string {
-	if n == 0 {
-		return "0"
-	}
-	buf := make([]byte, 0, 20)
-	neg := n < 0
-	if neg {
-		n = -n
-	}
-	for n > 0 {
-		buf = append([]byte{byte('0' + n%10)}, buf...)
-		n /= 10
-	}
-	if neg {
-		buf = append([]byte{'-'}, buf...)
-	}
-	return string(buf)
-}

@@ -51,6 +51,8 @@ func propCronSvc(pool *pgxpool.Pool) cashback.Service {
 	return cashback.NewService(repo, ob, nil, "TRY_COIN", walletSvc, slog.Default())
 }
 
+// seedPropPlan inserts a v8 cashback plan for property tests.
+// Uses the same seed values as seedCronPlan: price=15600, bps=5000, T=31, M=500, M_last=600.
 func seedPropPlan(t *testing.T, pool *pgxpool.Pool, userID int64, currency string, startDate time.Time) int64 {
 	t.Helper()
 	uniqueID := propUniqueID()
@@ -59,9 +61,11 @@ func seedPropPlan(t *testing.T, pool *pgxpool.Pool, userID int64, currency strin
 		INSERT INTO cashback_schema.plans
 		    (order_id, user_id, monthly_amount_minor, currency,
 		     reference_interest_rate_bps, start_date, status,
-		     delivered_at, market, commission_snapshot, idempotency_key)
-		VALUES ($1, $2, 500, $3, 5000, $4, 'active',
-		        now()-interval '5 days', 'TR', '[]'::jsonb, $5)
+		     delivered_at, market, commission_snapshot, idempotency_key,
+		     price_minor, commission_bps, total_months, monthly_amount_last_minor)
+		VALUES ($1, $2, 500, $3, 0, $4, 'active',
+		        now()-interval '5 days', 'TR', '[]'::jsonb, $5,
+		        15600, 5000, 31, 600)
 		RETURNING id`,
 		uniqueID, userID, currency, startDate.Format("2006-01-02"),
 		fmt.Sprintf("prop:cron:plan:%d", uniqueID),
@@ -72,9 +76,7 @@ func seedPropPlan(t *testing.T, pool *pgxpool.Pool, userID int64, currency strin
 	return id
 }
 
-// ── Property 1: D=C invariant across N RunMonth calls ─────────────────────────
-// For 1000 random (period, amount) pairs, the net signed TRY_COIN balance
-// across ALL ledger_entries must remain 0 after RunMonth commits.
+// ── Property 1: D=C invariant across N PayMonthlyInstallments calls ───────────
 
 func TestCronProperty_DoubleEntryInvariant(t *testing.T) {
 	pool := propCronPool(t)
@@ -87,15 +89,10 @@ func TestCronProperty_DoubleEntryInvariant(t *testing.T) {
 		return p
 	}())
 
-	properties.Property("D=C invariant holds after RunMonth", prop.ForAll(
+	properties.Property("D=C invariant holds after PayMonthlyInstallments", prop.ForAll(
 		func(monthOffset uint8) bool {
-			period := 202601 + int(monthOffset%12)
 			year := 2026 + int(monthOffset/12)
-			month := time.Month(period % 100)
-			if month == 0 {
-				month = 12
-				year--
-			}
+			month := time.Month(int(monthOffset%12) + 1)
 			asOf := time.Date(year, month, 28, 23, 59, 0, 0, time.UTC)
 
 			userID := propUniqueID()
@@ -104,8 +101,8 @@ func TestCronProperty_DoubleEntryInvariant(t *testing.T) {
 
 			netBefore := cronNetBalance(pool, "TRY_COIN")
 
-			if _, err := svc.RunMonth(ctx, period, asOf, "TRY_COIN"); err != nil {
-				t.Logf("RunMonth error: %v", err)
+			if _, err := svc.PayMonthlyInstallments(ctx, asOf); err != nil {
+				t.Logf("PayMonthlyInstallments error: %v", err)
 				return false
 			}
 
@@ -122,14 +119,14 @@ func TestCronProperty_DoubleEntryInvariant(t *testing.T) {
 	properties.TestingRun(t, gopter.ConsoleReporter(false))
 }
 
-// ── Property 2: RunMonth idempotency ─────────────────────────────────────────
-// Running RunMonth N times for the same period always produces exactly 1 payment.
+// ── Property 2: idempotency ───────────────────────────────────────────────────
+// Running PayMonthlyInstallments N times for the same runDate always produces
+// exactly 1 payment per plan (payments_made == 1 after N runs).
 
 func TestCronProperty_Idempotency(t *testing.T) {
 	pool := propCronPool(t)
 	ctx := context.Background()
 
-	const period = 202601
 	asOf := time.Date(2026, 1, 31, 23, 59, 0, 0, time.UTC)
 
 	properties := gopter.NewProperties(func() *gopter.TestParameters {
@@ -138,7 +135,7 @@ func TestCronProperty_Idempotency(t *testing.T) {
 		return p
 	}())
 
-	properties.Property("N RunMonth calls for same period → exactly 1 payment row", prop.ForAll(
+	properties.Property("N PayMonthlyInstallments for same runDate → payments_made == 1", prop.ForAll(
 		func(repeats uint8) bool {
 			if repeats < 2 {
 				repeats = 2
@@ -153,18 +150,18 @@ func TestCronProperty_Idempotency(t *testing.T) {
 
 			for i := 0; i < int(repeats); i++ {
 				svc := propCronSvc(pool)
-				if _, err := svc.RunMonth(ctx, period, asOf, "TRY_COIN"); err != nil {
-					t.Logf("RunMonth %d error: %v", i, err)
+				if _, err := svc.PayMonthlyInstallments(ctx, asOf); err != nil {
+					t.Logf("PayMonthlyInstallments %d error: %v", i, err)
 					return false
 				}
 			}
 
-			var count int
+			var made int
 			pool.QueryRow(ctx,
-				`SELECT COUNT(*) FROM cashback_schema.payments WHERE plan_id=$1 AND period_yyyymm=$2`,
-				planID, period).Scan(&count)
-			if count != 1 {
-				t.Logf("idempotency violated: %d payment rows for plan=%d", count, planID)
+				`SELECT payments_made FROM cashback_schema.plans WHERE id=$1`,
+				planID).Scan(&made)
+			if made != 1 {
+				t.Logf("idempotency violated: payments_made=%d for plan=%d", made, planID)
 				return false
 			}
 			return true
@@ -176,7 +173,8 @@ func TestCronProperty_Idempotency(t *testing.T) {
 }
 
 // ── Property 3: balance monotonically increases with N payments ───────────────
-// After N RunMonth calls for N different periods, strict live balance must equal N × amount.
+// After N PayMonthlyInstallments calls for N consecutive months, the user's
+// balance must equal N × monthly_amount_minor.
 
 func TestCronProperty_MonotonicBalance(t *testing.T) {
 	pool := propCronPool(t)
@@ -188,14 +186,13 @@ func TestCronProperty_MonotonicBalance(t *testing.T) {
 		return p
 	}())
 
-	properties.Property("N RunMonth periods → balance == N × monthly_amount_minor", prop.ForAll(
+	properties.Property("N monthly runs → balance == N × monthly_amount_minor", prop.ForAll(
 		func(n uint8) bool {
 			if n == 0 || n > 6 {
 				n = 1
 			}
 
 			userID := propUniqueID()
-			// Use a wallet.Service to pre-create wallet so we can check balance.
 			walletRepo := wallet.NewRepository(pool)
 			walletOutbox := outbox.NewRepository("wallet_schema.outbox")
 			walletSvc := wallet.NewService(walletRepo, walletOutbox, slog.Default())
@@ -205,18 +202,17 @@ func TestCronProperty_MonotonicBalance(t *testing.T) {
 				return false
 			}
 
-			const monthlyAmount = int64(500) // matches seedPropPlan's hardcoded 500
+			const monthlyAmount = int64(500) // matches seedPropPlan's monthly_amount_minor=500
 			startDate := time.Date(2025, 12, 1, 0, 0, 0, 0, time.UTC)
 			seedPropPlan(t, pool, userID, "TRY_COIN", startDate)
 
 			for i := 0; i < int(n); i++ {
-				period := 202601 + i // 202601, 202602, ...
 				year := 2026
-				month := time.Month(period % 100)
+				month := time.Month(i + 1) // Jan, Feb, ...
 				asOf := time.Date(year, month, 28, 23, 59, 0, 0, time.UTC)
 				svc := propCronSvc(pool)
-				if _, err := svc.RunMonth(ctx, period, asOf, "TRY_COIN"); err != nil {
-					t.Logf("RunMonth period=%d: %v", period, err)
+				if _, err := svc.PayMonthlyInstallments(ctx, asOf); err != nil {
+					t.Logf("PayMonthlyInstallments month=%d: %v", i+1, err)
 					return false
 				}
 			}
@@ -239,15 +235,12 @@ func TestCronProperty_MonotonicBalance(t *testing.T) {
 	properties.TestingRun(t, gopter.ConsoleReporter(false))
 }
 
-// ── Property 4: concurrent RunMonth → exactly 1 payment per plan ──────────────
-// G goroutines calling RunMonth for the same plan+period concurrently must
-// produce exactly 1 payment row and 1 outbox row.
+// ── Property 4: concurrent PayMonthlyInstallments → exactly 1 payment per plan ──
 
 func TestCronProperty_ConcurrentIdempotency(t *testing.T) {
 	pool := propCronPool(t)
 	ctx := context.Background()
 
-	const period = 202604
 	asOf := time.Date(2026, 4, 30, 23, 59, 0, 0, time.UTC)
 
 	properties := gopter.NewProperties(func() *gopter.TestParameters {
@@ -256,7 +249,7 @@ func TestCronProperty_ConcurrentIdempotency(t *testing.T) {
 		return p
 	}())
 
-	properties.Property("G concurrent RunMonth calls → exactly 1 payment + 1 outbox row", prop.ForAll(
+	properties.Property("G concurrent PayMonthlyInstallments calls → payments_made == 1", prop.ForAll(
 		func(goroutines uint8) bool {
 			if goroutines < 2 {
 				goroutines = 2
@@ -277,18 +270,18 @@ func TestCronProperty_ConcurrentIdempotency(t *testing.T) {
 					defer wgDone.Done()
 					<-barrier
 					svc := propCronSvc(pool)
-					svc.RunMonth(ctx, period, asOf, "TRY_COIN") //nolint:errcheck
+					svc.PayMonthlyInstallments(ctx, asOf) //nolint:errcheck
 				}()
 			}
 			close(barrier)
 			wgDone.Wait()
 
-			var count int
+			var made int
 			pool.QueryRow(ctx,
-				`SELECT COUNT(*) FROM cashback_schema.payments WHERE plan_id=$1 AND period_yyyymm=$2`,
-				planID, period).Scan(&count)
-			if count != 1 {
-				t.Logf("concurrent idempotency violated: %d payment rows", count)
+				`SELECT payments_made FROM cashback_schema.plans WHERE id=$1`,
+				planID).Scan(&made)
+			if made != 1 {
+				t.Logf("concurrent idempotency violated: payments_made=%d for plan=%d", made, planID)
 				return false
 			}
 			return true

@@ -2,7 +2,6 @@ package cashback
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -13,56 +12,63 @@ import (
 )
 
 const (
-	cronBatchSize   = 50
-	equityAcctType  = "equity:cashback_distribution"
+	cronBatchSize  = 50
+	equityAcctType = "equity:cashback_distribution"
 )
 
-// runMonth is the core implementation of Service.RunMonth.
-// It loops over active plans in batches (FOR UPDATE SKIP LOCKED), processing each
-// plan in its own SERIALIZABLE transaction.
-func (s *cashbackService) runMonth(ctx context.Context, period int, asOf time.Time, currency string) (RunMonthResult, error) {
-	result := RunMonthResult{Period: period, Currency: currency}
+// PayMonthlyInstallments processes all active plans whose next installment is due by runDate.
+// For each due plan: posts D=C ledger entries via outbox, increments payments_made,
+// and sets status='completed' atomically with the final installment.
+func (s *cashbackService) PayMonthlyInstallments(ctx context.Context, runDate time.Time) (PaymentSummary, error) {
+	result := PaymentSummary{}
+	runDate = runDate.UTC()
 
-	// Resolve the equity distribution account once; it is a platform account.
-	equityAcctID, err := s.walletPoster.FindAccount(ctx, equityAcctType, currency)
-	if err != nil {
-		return result, fmt.Errorf("cashback: RunMonth find equity account %s/%s: %w", equityAcctType, currency, err)
-	}
+	// Cache equity account IDs per coin currency to avoid repeated lookups.
+	equityAcctsByCC := map[string]int64{}
 
 	for {
-		// Batch SELECT is READ COMMITTED; the pool executes it outside any long-held tx.
-		plans, err := s.repo.FetchPlansBatch(ctx, period, asOf, currency, cronBatchSize)
+		plans, err := s.repo.ListDuePlans(ctx, runDate, cronBatchSize)
 		if err != nil {
-			return result, fmt.Errorf("cashback: RunMonth FetchPlansBatch period=%d: %w", period, err)
+			return result, fmt.Errorf("cashback: PayMonthlyInstallments ListDuePlans: %w", err)
 		}
 		if len(plans) == 0 {
 			break
 		}
 
 		for _, plan := range plans {
-			retries, err := s.processPlan(ctx, plan, period, asOf, equityAcctID, &result)
-			result.TotalRetries += retries
+			equityAcctID, ok := equityAcctsByCC[plan.Currency]
+			if !ok {
+				equityAcctID, err = s.walletPoster.FindAccount(ctx, equityAcctType, plan.Currency)
+				if err != nil {
+					return result, fmt.Errorf("cashback: find equity account %s/%s: %w",
+						equityAcctType, plan.Currency, err)
+				}
+				equityAcctsByCC[plan.Currency] = equityAcctID
+			}
+
+			retries, err := s.payOnePlan(ctx, plan, equityAcctID, &result)
+			result.Retries += retries
 			if err != nil {
-				s.log.ErrorContext(ctx, "cashback: processPlan failed",
-					"plan_id", plan.ID, "period", period, "err", err)
+				s.log.ErrorContext(ctx, "cashback: payOnePlan failed",
+					"plan_id", plan.ID, "user_id", plan.UserID, "err", err)
 				result.Failed++
 			}
 		}
 
 		if len(plans) < cronBatchSize {
-			break // last batch
+			break
 		}
 	}
 
 	return result, nil
 }
 
-// processPlan wraps processPlanInTx with SERIALIZABLE retry on 40001.
+// payOnePlan wraps payOnePlanInTx with SERIALIZABLE retry on 40001.
 // Returns (retryCount, error).
-func (s *cashbackService) processPlan(ctx context.Context, plan Plan, period int, asOf time.Time, equityAcctID int64, result *RunMonthResult) (int, error) {
+func (s *cashbackService) payOnePlan(ctx context.Context, plan Plan, equityAcctID int64, result *PaymentSummary) (int, error) {
 	const maxRetries = 3
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		done, err := s.processPlanInTx(ctx, plan, period, asOf, equityAcctID, result)
+		done, err := s.payOnePlanInTx(ctx, plan, equityAcctID, result)
 		if err == nil {
 			return attempt, nil
 		}
@@ -70,107 +76,112 @@ func (s *cashbackService) processPlan(ctx context.Context, plan Plan, period int
 			continue
 		}
 		if done {
-			// ErrPaymentAlreadyExists or ErrWalletNotActive — counted as skipped by callee.
-			return attempt, nil
+			return attempt, nil // skipped cleanly
 		}
 		return attempt, err
 	}
 	return maxRetries - 1, ErrMaxRetriesExceeded
 }
 
-// processPlanInTx executes a single plan's payment in a SERIALIZABLE tx.
-// Returns (done=true, nil) when the plan is skipped (already paid, wallet inactive).
-// Returns (done=false, err) on a real failure.
-func (s *cashbackService) processPlanInTx(ctx context.Context, plan Plan, period int, asOf time.Time, equityAcctID int64, result *RunMonthResult) (bool, error) {
+// payOnePlanInTx executes one installment payment in a SERIALIZABLE tx.
+// Returns (done=true, nil) when the plan is cleanly skipped (wallet inactive, etc.).
+func (s *cashbackService) payOnePlanInTx(ctx context.Context, plan Plan, equityAcctID int64, result *PaymentSummary) (bool, error) {
+	// n is the installment number we're about to pay.
+	n := plan.PaymentsMade + 1
+
+	terms := PlanTerms{
+		TotalMonths:            plan.TotalMonths,
+		MonthlyAmountMinor:     plan.MonthlyAmountMinor,
+		MonthlyAmountLastMinor: plan.MonthlyAmountLastMinor,
+	}
+	amount := InstallmentAmount(terms, n)
+	if amount == 0 {
+		// n is out of range — plan already completed or data inconsistency.
+		s.log.WarnContext(ctx, "cashback: InstallmentAmount returned 0, skipping",
+			"plan_id", plan.ID, "n", n, "total_months", plan.TotalMonths)
+		result.Skipped++
+		return true, nil
+	}
+
+	// Pre-check wallet status (outside SERIALIZABLE tx, uses pool read).
+	acctID, status, err := s.walletPoster.FindAccountByOwnerAnyStatus(ctx, "user", plan.UserID, plan.Currency)
+	if err != nil {
+		return false, fmt.Errorf("find wallet any status user=%d: %w", plan.UserID, err)
+	}
+
+	var userAcctID int64
+	switch {
+	case acctID == 0:
+		// Wallet never created — create lazily.
+		userAcctID, err = s.walletPoster.OpenOrFindUserWallet(ctx, plan.UserID, plan.Currency)
+		if err != nil {
+			return false, fmt.Errorf("open user wallet user=%d: %w", plan.UserID, err)
+		}
+	case status != "active":
+		s.log.InfoContext(ctx, "cashback: wallet not active, skipping",
+			"plan_id", plan.ID, "user_id", plan.UserID, "account_id", acctID, "status", status)
+		result.Skipped++
+		return true, nil
+	default:
+		userAcctID = acctID
+	}
+
 	var done bool
-	err := s.repo.WithTx(ctx, pgx.Serializable, func(tx pgx.Tx) error {
-		// 1. Pre-check wallet status before lazy creation.
-		//    FindAccountByOwnerAnyStatus returns (0,"",nil) when no row exists,
-		//    (id,status,nil) when found — regardless of status.
-		//    This avoids the "re-read after conflict" failure path that occurs when
-		//    OpenOrFindUserWallet tries to create an account that exists but is frozen.
-		acctID, status, err := s.walletPoster.FindAccountByOwnerAnyStatus(ctx, "user", plan.UserID, plan.Currency)
-		if err != nil {
-			return fmt.Errorf("find wallet any status user=%d: %w", plan.UserID, err)
-		}
+	err = s.repo.WithTx(ctx, pgx.Serializable, func(tx pgx.Tx) error {
+		idemKey := fmt.Sprintf("cashback:%d:installment:%d", plan.ID, n)
+		ref := fmt.Sprintf("plan:%d:installment:%d", plan.ID, n)
 
-		var userAcctID int64
-		switch {
-		case acctID == 0:
-			// Wallet never created — create lazily and proceed.
-			userAcctID, err = s.walletPoster.OpenOrFindUserWallet(ctx, plan.UserID, plan.Currency)
-			if err != nil {
-				return fmt.Errorf("open user wallet user=%d: %w", plan.UserID, err)
-			}
-		case status != "active":
-			// Wallet exists but is frozen/suspended — skip, do not fail.
-			s.log.InfoContext(ctx, "cashback: wallet not active, skipping",
-				"plan_id", plan.ID, "user_id", plan.UserID, "account_id", acctID, "status", status)
-			result.Skipped++
-			done = true
-			return nil
-		default:
-			userAcctID = acctID
-		}
-
-		// 2. Insert payment row (SAVEPOINT guards against duplicate on re-run).
-		idemKey := fmt.Sprintf("cashback:%d:%d", plan.ID, period)
-		pay := Payment{
-			PlanID:         plan.ID,
-			PeriodYYYYMM:   period,
-			ScheduledDate:  asOf,
-			AmountMinor:    plan.MonthlyAmountMinor,
-			IdempotencyKey: idemKey,
-		}
-		pay, err = s.repo.InsertPayment(ctx, tx, pay)
-		if errors.Is(err, ErrPaymentAlreadyExists) {
-			s.log.InfoContext(ctx, "cashback: payment already exists, skipping",
-				"plan_id", plan.ID, "period", period)
-			result.Skipped++
-			done = true
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("insert payment plan=%d period=%d: %w", plan.ID, period, err)
-		}
-
-		// 3. Post ledger entries: D equity:cashback_distribution → C liability:wallet:user.
 		postIn := ledger.PostInput{
 			Type:           "cashback_payment",
-			Reference:      strconv.FormatInt(plan.ID, 10),
+			Reference:      ref,
 			IdempotencyKey: idemKey,
 			Market:         plan.Market,
 			Currency:       plan.Currency,
 			EventType:      "fin.cashback.payment.posted.v1",
 			Metadata: map[string]string{
-				"plan_id":       strconv.FormatInt(plan.ID, 10),
-				"period_yyyymm": strconv.Itoa(period),
-				"user_id":       strconv.FormatInt(plan.UserID, 10),
+				"plan_id":     strconv.FormatInt(plan.ID, 10),
+				"installment": strconv.Itoa(n),
+				"user_id":     strconv.FormatInt(plan.UserID, 10),
 			},
 			Entries: []ledger.Entry{
-				{AccountID: equityAcctID, Direction: ledger.Debit, AmountMinor: plan.MonthlyAmountMinor},
-				{AccountID: userAcctID, Direction: ledger.Credit, AmountMinor: plan.MonthlyAmountMinor},
+				{AccountID: equityAcctID, Direction: ledger.Debit, AmountMinor: amount},
+				{AccountID: userAcctID, Direction: ledger.Credit, AmountMinor: amount},
 			},
 		}
-		ledgerTxnID, err := s.walletPoster.PostInTx(ctx, tx, postIn)
-		if err != nil {
-			return fmt.Errorf("PostInTx plan=%d period=%d: %w", plan.ID, period, err)
+		if _, txErr := s.walletPoster.PostInTx(ctx, tx, postIn); txErr != nil {
+			return fmt.Errorf("PostInTx plan=%d installment=%d: %w", plan.ID, n, txErr)
 		}
 
-		// 4. Mark payment paid.
-		if err := s.repo.MarkPaymentPaid(ctx, tx, pay.ID, ledgerTxnID, asOf); err != nil {
-			return err
+		newCount, completed, txErr := s.repo.IncrPaymentsMade(ctx, tx, plan.ID)
+		if txErr != nil {
+			return txErr
 		}
 
-		// 5. Stamp plan with this period so it won't be re-selected.
-		if err := s.repo.UpdateLastDistributedPeriod(ctx, tx, plan.ID, period); err != nil {
-			return err
+		paymentsRemaining := plan.TotalMonths - newCount
+		statusStr := "active"
+		if completed {
+			statusStr = "completed"
 		}
+		s.log.InfoContext(ctx, "cashback: installment paid",
+			"plan_id", plan.ID,
+			"n", n,
+			"amount_minor", amount,
+			"payments_remaining", paymentsRemaining,
+			"status", statusStr,
+		)
 
 		result.Processed++
+		if completed {
+			done = true
+		}
 		return nil
 	})
 	return done, err
+}
+
+// timeToPeriod converts a time.Time to YYYYMM integer (e.g. 2026-07-15 → 202607).
+func timeToPeriod(t time.Time) int {
+	return t.Year()*100 + int(t.Month())
 }
 
 // periodToFirstDay converts YYYYMM (e.g. 202607) to the first day of that month (UTC).
@@ -180,7 +191,3 @@ func periodToFirstDay(period int) time.Time {
 	return time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 }
 
-// timeToPeriod converts a time.Time to YYYYMM integer (e.g. 2026-07-15 → 202607).
-func timeToPeriod(t time.Time) int {
-	return t.Year()*100 + int(t.Month())
-}

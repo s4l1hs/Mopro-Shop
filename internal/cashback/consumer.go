@@ -14,18 +14,22 @@ const (
 	// TopicOrderDelivered is the Redis Streams topic produced by core-svc order.MarkDelivered.
 	TopicOrderDelivered = "ecom.order.delivered.v1"
 	// ConsumerGroup is the cashback engine's durable consumer group name.
-	// Renaming requires a group migration procedure (ADR-0003).
 	ConsumerGroup = "cashback-engine"
 )
 
 // orderDeliveredPayload matches the JSON written by order.buildDeliveredPayload.
 type orderDeliveredPayload struct {
-	OrderID     int64                   `json:"order_id"`
-	UserID      int64                   `json:"user_id"`
-	DeliveredAt time.Time               `json:"delivered_at"`
-	Market      string                  `json:"market"`
-	Currency    string                  `json:"currency"`
-	Items       []deliveredItemSnapshot `json:"items"`
+	OrderID     int64     `json:"order_id"`
+	UserID      int64     `json:"user_id"`
+	DeliveredAt time.Time `json:"delivered_at"`
+	Market      string    `json:"market"`
+	Currency    string    `json:"currency"`
+	// v8 direct fields — set by core-svc when publishing the event.
+	// Fall back to computing from items[] if absent (backward compat with pre-v8 events).
+	PriceMinor    int64 `json:"price_minor,omitempty"`
+	CommissionBps int   `json:"commission_bps,omitempty"`
+	// Items retains the per-line snapshot for the commission_snapshot audit column.
+	Items []deliveredItemSnapshot `json:"items"`
 	// Phase 4.4a additive fields — absent in pre-4.4a events (zero value is safe).
 	ProductID       int64  `json:"product_id,omitempty"`
 	ProductTitle    string `json:"product_title,omitempty"`
@@ -46,7 +50,7 @@ type deliveredItemSnapshot struct {
 }
 
 // StartConsumer blocks, reading ecom.order.delivered.v1 from Redis Streams
-// and calling svc.CreatePlanForOrder for each message.
+// and calling svc.CreatePlanFromDelivery for each message.
 // Returns nil when ctx is cancelled.
 func StartConsumer(ctx context.Context, bus eventbus.Consumer, svc Service) error {
 	slog.Info("cashback: consumer starting",
@@ -62,6 +66,19 @@ func handleDelivered(ctx context.Context, svc Service, ev eventbus.Event) error 
 	var raw orderDeliveredPayload
 	if err := json.Unmarshal(ev.Payload, &raw); err != nil {
 		return fmt.Errorf("cashback: unmarshal delivered payload id=%s: %w", ev.EventID, err)
+	}
+
+	// Resolve PriceMinor and CommissionBps.
+	// v8 events carry these directly; pre-v8 events carry them inside items[].
+	priceMinor := raw.PriceMinor
+	commissionBps := raw.CommissionBps
+	if priceMinor == 0 && len(raw.Items) > 0 {
+		// Compute from items for backward compat with pre-v8 core-svc events.
+		for _, it := range raw.Items {
+			priceMinor += it.UnitPriceMinor * int64(it.Qty)
+		}
+		// Use first item's commission bps (single-product-per-order assumption).
+		commissionBps = raw.Items[0].CommissionPctBps
 	}
 
 	items := make([]CommissionSnapshotItem, len(raw.Items))
@@ -86,14 +103,17 @@ func handleDelivered(ctx context.Context, svc Service, ev eventbus.Event) error 
 		DeliveredAt:     raw.DeliveredAt,
 		Market:          ev.Market,
 		Currency:        ev.Currency,
+		PriceMinor:      priceMinor,
+		CommissionBps:   commissionBps,
 		Items:           items,
 		ProductID:       raw.ProductID,
 		ProductTitle:    raw.ProductTitle,
 		ProductImageURL: raw.ProductImageURL,
 	}
 
-	if err := svc.CreatePlanForOrder(ctx, ode); err != nil {
-		slog.Error("cashback: CreatePlanForOrder failed",
+	plan, err := svc.CreatePlanFromDelivery(ctx, ode)
+	if err != nil {
+		slog.Error("cashback: CreatePlanFromDelivery failed",
 			"order_id", ode.OrderID,
 			"idempotency_key", ev.IdempotencyKey,
 			"err", err,
@@ -101,8 +121,9 @@ func handleDelivered(ctx context.Context, svc Service, ev eventbus.Event) error 
 		return err
 	}
 
-	slog.Info("cashback: plan created",
+	slog.Info("cashback: plan created or already exists",
 		"order_id", ode.OrderID,
+		"plan_id", plan.ID,
 		"idempotency_key", ev.IdempotencyKey,
 	)
 	return nil

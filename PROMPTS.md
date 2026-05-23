@@ -1016,88 +1016,304 @@ Report: file list, property test output.
 
 ---
 
-## Prompt 2.2 — Implement cashback-engine Module (THE CENTERPIECE) — v5 LOCKED MODEL
+## Prompt 2.2 — Implement cashback-engine Module (v8 ACCELERATED MODEL)
 
-**Phase & Goal:** Phase 2. cashback-engine consumes `ecom.order.delivered.v1`, creates a FROZEN plan + 24 scheduled payments + the equity↔obligation ledger move, all idempotently.
+**Phase & Goal:** Phase 2. Implement the cashback-engine module inside `fin-svc` that, on every `ecom.order.delivered.v1` event, opens a fixed-term Mopro Coin amortization plan that fully refunds the gross product price to the buyer over `T_months` months. **This is the financial centerpiece of the product.**
 
-**Copy-Paste Prompt:**
+**v8 MODEL OVERRIDES v6:** The "Perpetual" plan model from v6 is CANCELED. Plans are now fixed-term, dynamically sized by category commission. The higher the commission, the shorter the payback. Total payout equals exactly the gross price (no overpayment, no shortfall — enforced by a balloon last payment).
+
+### Mathematical Model (READ TWICE)
+
+All amounts in minor units (kuruş). All rates in basis points (bps). No floats, ever.
+
+**Constants:**
+- `CASHBACK_K = 156000` (the "accelerator constant" — controls global pace)
+- `C_bps` ∈ [100, 10000] (category commission rate, 1% to 100%)
+
+**Per-plan derived values (computed once at plan creation, then frozen):**
 
 ```
-READ FIRST: CLAUDE.md § 4.7, LEDGER_GUIDE.md § 7, DATA_DICTIONARY.md § 8.
+T_months    = CASHBACK_K / C_bps                                  // integer division (truncated)
+M_coin      = (P_minor × C_bps) / CASHBACK_K                      // integer division (truncated)
+M_coin_last = P_minor - (T_months - 1) × M_coin                   // balloon payment, makes sum exact
+```
 
-Implement /internal/cashback/ inside fin-svc (v6 PERPETUAL model).
+**Invariants (enforce in code, prove in tests):**
 
-const ReferenceInterestRateBpsConst = 5000  // v6 LOCKED = %50.00. Changing requires constitution update.
+```
+T_months    >= 1                                                 (reject if 0)
+M_coin      >= 1                                                 (reject if 0)
+M_coin_last >= M_coin                                            (balloon ≥ regular)
+(T_months - 1) × M_coin + M_coin_last == P_minor                 (exact principal coverage)
+C_bps must be in [100, 10000]                                    (reject otherwise)
+P_minor must be > 0                                              (reject otherwise)
+```
 
-Domain (v6):
-  Plan { ID, OrderID, UserID, MonthlyAmountMinor, Currency, ReferenceInterestRateBps,
-         StartDate, Status, DeliveredAt, Market, CommissionSnapshot, IdempotencyKey, ... }
-  Payment { ID, PlanID, PeriodYYYYMM, ScheduledDate, PaidDate, AmountMinor, Status,
-            LedgerTransactionID, IdempotencyKey, AttemptCount, ... }
+**Validation scenarios for `cashback_engine_test.go`:**
 
-Service interface:
-  CreatePlanForOrder(ctx, ev OrderDeliveredEvent) error      ← idempotent on (order_id)
-  RunMonthlyPayments(ctx, runDate time.Time) error           ← idempotent per (plan_id, period_yyyymm)
-  CancelPlan(ctx, planID, reason string) error               ← reverses paid + sets status='cancelled' (cron will skip)
-  PartialRefund(ctx, planID, refundFraction float64, reason string) error   ← reduces monthly_amount_minor (audit-logged)
-  GetPlanByOrderID(ctx, orderID) (*Plan, error)
+| Price | C_bps | T_months | M_coin (kuruş) | M_coin_last (kuruş) | sum |
+|---|---|---|---|---|---|
+| 10,000 TL (1,000,000) | 2000 (20%) | 78  | 12,820 | 12,820 + 40 = 12,860 | 1,000,000 ✓ |
+| 10,000 TL (1,000,000) | 1000 (10%) | 156 |  6,410 |  6,410 + 40 =  6,450 | 1,000,000 ✓ |
+| 10,000 TL (1,000,000) |  800  (8%) | 195 |  5,128 |  5,128 + 40 =  5,168 | 1,000,000 ✓ |
+| 250 TL    (25,000)    | 1500 (15%) | 104 |    240 |    240 + 40 =    280 |    25,000 ✓ |
+| 999.99 TL (99,999)    | 2000 (20%) | 78  |  1,282 |  1,282 +  3 =  1,285 |    99,999 ✓ |
 
-CreatePlanForOrder logic per LEDGER_GUIDE.md § 7.1 (v6):
-  1. Idempotency: if plan exists for order_id → no-op.
-  2. commissionMinor = sum(items[i].CommissionAmountMinor)  ← from event payload, NOT recomputed
-  3. yearlyYieldMinor = commissionMinor * ReferenceInterestRateBpsConst / 10000
-  4. monthlyMinor = yearlyYieldMinor / 12       ← v6: NO total amount, NO remainder, perpetual
-  5. unlockAt = pkg/timex.AddBusinessDays(ev.DeliveredAt, 3, ref_schema.business_calendars[market])
-  6. startDate = unlockAt   ← NO end_date; perpetual
-  7. Single SERIALIZABLE tx:
-     a. INSERT plans row (frozen by trigger; only status mutable)
-     b. NO payment rows pre-seeded — cron creates them month by month.
-     c. NO ledger move at plan creation (perpetual model accrues period-by-period).
-     d. INSERT outbox fin.cashback.plan.created.v1
+**Copy-Paste Prompt for Claude Code:**
 
-RunMonthlyPayments per LEDGER_GUIDE.md § 7.2 (v6):
-  period := yyyymm(runDate)  // e.g., 202607
-  SELECT active plans WHERE start_date <= runDate (batch up to 1000)
-  For each plan, in own tx:
-     1. INSERT cashback_schema.payments row for (plan_id, period, monthly_amount_minor, 'scheduled')
-        — UNIQUE constraint on (plan_id, period_yyyymm) makes this idempotent.
-     2. wallet.PostInTx (TRY_COIN-only):
-        D equity:cashback_distribution:TRY_COIN  amount=plan.MonthlyAmountMinor
-        C liability:wallet:user_<id>:TRY_COIN     amount=plan.MonthlyAmountMinor
-     3. Mark payment as 'paid', record ledger_transaction_id.
-     4. INSERT outbox fin.cashback.payment.posted.v1.
+```
+READ FIRST: LEDGER_GUIDE.md § 5 (cashback chart of accounts), § 6 (immutable plans rule), CLAUDE.md § 3 (Redis Streams only for inter-svc), § 4 (financial invariants), ARCHITECTURE.md § 4.2 (fin-svc layout). Read the v8 Mathematical Model block above THREE times. The integer-arithmetic invariants are not optional.
 
-CancelPlan per LEDGER_GUIDE.md § 7.4 (v6):
-  1. Sum paid coin so far for this plan.
-  2. Reversal: D liability:wallet:user / C equity:cashback_distribution for paid amount.
-  3. UPDATE plans SET status='cancelled' (allowed; only status mutable).
-  4. Future cron runs SKIP this plan (SELECT WHERE status='active').
-  5. Mopro's commission principal in equity:retained_commission:TRY is implicitly
-     released — no explicit ledger move needed (no upfront obligation in v6).
+PATHS:
+/internal/cashback/api.go
+/internal/cashback/domain.go
+/internal/cashback/service.go
+/internal/cashback/repository.go
+/internal/cashback/calculator.go              # pure math module (no DB, no I/O)
+/internal/cashback/consumer.go                # XREADGROUP ecom.order.delivered.v1
+/internal/cashback/payout_cron.go             # monthly cron — 1 installment per plan per month
+/internal/cashback/calculator_test.go         # unit tests for the math
+/internal/cashback/calculator_property_test.go # Gopter property tests
+/internal/cashback/consumer_test.go
+/internal/cashback/payout_cron_test.go
+/internal/cashback/service_test.go
+/migrations/ledger/00XX_cashback_accelerated_v8.up.sql
+/migrations/ledger/00XX_cashback_accelerated_v8.down.sql
 
-PartialRefund (v6):
-  1. Compute new_monthly = old_monthly * (1 - refundFraction)
-  2. INSERT plans_history audit row (BEFORE the UPDATE, because the trigger checks for it).
-  3. UPDATE plans SET monthly_amount_minor = new_monthly (allowed via the audit-trail exception).
-  4. Future cron runs use new monthly amount.
+DOMAIN (internal/cashback/domain.go):
+const CashbackK int64 = 156000  // accelerator constant — DO NOT CHANGE without ledger migration
 
-Property tests (gopter, v6):
-  - For random (price, commissionPctBps): monthlyMinor = round(price × pct × 5000 / 10000 / 10000 / 12)
-    matches CreatePlanForOrder output deterministically.
-  - After N cron runs (N arbitrary), user wallet credited exactly N × plan.MonthlyAmountMinor.
-  - UPDATE on plan.monthly_amount_minor without plans_history row raises (immutability).
-  - Replay of same delivery event → exactly one plan, exactly one payment per period.
+type PlanStatus string
+const (
+    PlanStatusActive    PlanStatus = "active"
+    PlanStatusCompleted PlanStatus = "completed"   // NEW in v8 — set after final installment paid
+    PlanStatusCanceled  PlanStatus = "canceled"    // refund / fraud cases (out of this prompt)
+)
 
-Wire the consumer: fin-svc.event-consumer subscribes to ecom.order.delivered.v1 and dispatches to CreatePlanForOrder.
+type Plan struct {
+    ID                       int64
+    OrderID                  int64
+    UserID                   int64
+    PriceMinor               int64
+    CommissionBps            int
+    Currency                 string       // "TRY_COIN"
+    TotalMonths              int          // frozen at creation
+    MonthlyAmountMinor       int64        // frozen at creation; paid in months 1..T-1
+    MonthlyAmountLastMinor   int64        // frozen at creation; paid in month T (balloon)
+    PaymentsMade             int          // monotonic counter, updated by payout_cron
+    Status                   PlanStatus
+    StartDate                time.Time
+    DeliveredAt              time.Time
+    ProductID                *int64       // from Phase 4.4a enrichment (nullable)
+    ProductTitle             *string
+    ProductImageURL          *string
+    CreatedAt                time.Time
+    UpdatedAt                time.Time
+}
 
-Report: file list, property test output, sample event consumption log.
+CALCULATOR (internal/cashback/calculator.go) — PURE FUNCTION, NO I/O:
+type PlanTerms struct {
+    TotalMonths            int
+    MonthlyAmountMinor     int64
+    MonthlyAmountLastMinor int64
+}
+
+var ErrInvalidPlanInput = errors.New("cashback: invalid plan input")
+
+// ComputePlanTerms computes the immutable schedule for a new plan.
+// On success: (TotalMonths-1)*MonthlyAmountMinor + MonthlyAmountLastMinor == priceMinor
+// Range constraints: priceMinor in (0, 1e14]; commissionBps in [100, 10000].
+func ComputePlanTerms(priceMinor int64, commissionBps int) (PlanTerms, error) {
+    if priceMinor <= 0 || priceMinor > 1e14 {
+        return PlanTerms{}, fmt.Errorf("%w: priceMinor out of range", ErrInvalidPlanInput)
+    }
+    if commissionBps < 100 || commissionBps > 10000 {
+        return PlanTerms{}, fmt.Errorf("%w: commissionBps out of range", ErrInvalidPlanInput)
+    }
+    totalMonths := int(CashbackK / int64(commissionBps))
+    monthly := (priceMinor * int64(commissionBps)) / CashbackK
+    if totalMonths < 1 || monthly < 1 {
+        return PlanTerms{}, fmt.Errorf("%w: degenerate schedule (T=%d, M=%d)",
+            ErrInvalidPlanInput, totalMonths, monthly)
+    }
+    lastMonth := priceMinor - int64(totalMonths-1)*monthly
+    if lastMonth < monthly {
+        return PlanTerms{}, fmt.Errorf("%w: balloon < regular (programming error)",
+            ErrInvalidPlanInput)
+    }
+    return PlanTerms{
+        TotalMonths:            totalMonths,
+        MonthlyAmountMinor:     monthly,
+        MonthlyAmountLastMinor: lastMonth,
+    }, nil
+}
+
+// InstallmentAmount returns payout for the Nth installment (1-indexed).
+func InstallmentAmount(terms PlanTerms, n int) int64 {
+    if n < 1 || n > terms.TotalMonths {
+        return 0
+    }
+    if n == terms.TotalMonths {
+        return terms.MonthlyAmountLastMinor
+    }
+    return terms.MonthlyAmountMinor
+}
+
+SERVICE (internal/cashback/service.go):
+type Service interface {
+    CreatePlanFromDelivery(ctx context.Context, evt OrderDeliveredEvent) (Plan, error)
+    PayMonthlyInstallments(ctx context.Context, runDate time.Time) (PaymentSummary, error)
+    GetPlan(ctx context.Context, userID, planID int64) (Plan, error)
+    ListPlans(ctx context.Context, userID int64, cursor int64, limit int) ([]Plan, error)
+}
+
+REPOSITORY (internal/cashback/repository.go):
+type Repository interface {
+    InsertPlanIfAbsent(ctx context.Context, p Plan) (Plan, bool, error)
+    ListDuePlans(ctx context.Context, runDate time.Time, limit int) ([]Plan, error)
+    PayInstallment(ctx context.Context, planID int64, installmentAmountMinor int64) error
+    GetPlan(ctx context.Context, userID, planID int64) (Plan, error)
+    ListPlansByUser(ctx context.Context, userID int64, cursor int64, limit int) ([]Plan, error)
+}
+
+PayInstallment is one SERIALIZABLE transaction that:
+  1. Posts the installment debit + credit to ledger_schema (D=C)
+  2. Increments plan.payments_made by 1
+  3. If payments_made == total_months, sets plan.status='completed'
+  The ledger post goes through the outbox (no direct XADD).
+
+CONSUMER (internal/cashback/consumer.go):
+  - XREADGROUP from "ecom.order.delivered.v1" with group "cashback-engine".
+  - Block 5s, batch 100.
+  - For each event: svc.CreatePlanFromDelivery; on success XACK.
+  - Non-idempotent error → XACK + DLQ (cashback-engine-dlq).
+  - Transient error → no XACK, retry on next batch.
+  - Idempotency enforced by UNIQUE INDEX on cashback_schema.plans(order_id).
+
+PAYOUT CRON (internal/cashback/payout_cron.go):
+  - robfig/cron/v3 schedule "0 3 1 * *" in time.LoadLocation("Europe/Istanbul")
+  - On tick: svc.PayMonthlyInstallments(ctx, runDate)
+  - Healthchecks.io pings via env HEALTHCHECK_CASHBACK_CRON_UUID (start/success/fail)
+  - Plan completion happens atomically inside PayInstallment; NO separate sweep.
+
+MIGRATION (migrations/ledger/00XX_cashback_accelerated_v8.up.sql):
+
+ALTER TABLE cashback_schema.plans
+    ADD COLUMN total_months                INTEGER NOT NULL,
+    ADD COLUMN monthly_amount_minor        BIGINT  NOT NULL,
+    ADD COLUMN monthly_amount_last_minor   BIGINT  NOT NULL,
+    ADD COLUMN payments_made               INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE cashback_schema.plans
+    ADD CONSTRAINT plans_total_months_positive CHECK (total_months >= 1),
+    ADD CONSTRAINT plans_monthly_positive      CHECK (monthly_amount_minor >= 1),
+    ADD CONSTRAINT plans_last_gte_monthly      CHECK (monthly_amount_last_minor >= monthly_amount_minor),
+    ADD CONSTRAINT plans_payments_within_total CHECK (payments_made >= 0 AND payments_made <= total_months),
+    ADD CONSTRAINT plans_principal_exact       CHECK (
+        (total_months - 1) * monthly_amount_minor + monthly_amount_last_minor = price_minor
+    );
+
+CREATE OR REPLACE FUNCTION cashback_schema.plans_immutable_fn()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF (
+        OLD.order_id                    IS DISTINCT FROM NEW.order_id OR
+        OLD.user_id                     IS DISTINCT FROM NEW.user_id OR
+        OLD.price_minor                 IS DISTINCT FROM NEW.price_minor OR
+        OLD.commission_bps              IS DISTINCT FROM NEW.commission_bps OR
+        OLD.currency                    IS DISTINCT FROM NEW.currency OR
+        OLD.total_months                IS DISTINCT FROM NEW.total_months OR
+        OLD.monthly_amount_minor        IS DISTINCT FROM NEW.monthly_amount_minor OR
+        OLD.monthly_amount_last_minor   IS DISTINCT FROM NEW.monthly_amount_last_minor OR
+        OLD.start_date                  IS DISTINCT FROM NEW.start_date OR
+        OLD.delivered_at                IS DISTINCT FROM NEW.delivered_at OR
+        (OLD.product_id        IS NOT NULL AND OLD.product_id        IS DISTINCT FROM NEW.product_id) OR
+        (OLD.product_title     IS NOT NULL AND OLD.product_title     IS DISTINCT FROM NEW.product_title) OR
+        (OLD.product_image_url IS NOT NULL AND OLD.product_image_url IS DISTINCT FROM NEW.product_image_url)
+    ) THEN
+        RAISE EXCEPTION 'cashback_schema.plans: immutable column update attempted';
+    END IF;
+    -- payments_made and status remain mutable (monotonic counter / status transitions).
+    RETURN NEW;
+END;
+$$;
+
+If production cashback_schema.plans is empty, NO data backfill needed. If any
+pre-v8 rows exist, write a SEPARATE migration to compute terms retroactively.
+
+REQUIREMENTS:
+1. Implement ComputePlanTerms exactly as specified. NO float64. NO math/big. Plain int64.
+2. Hard overflow ceiling: priceMinor <= 1e14. Document it.
+3. consumer.go receives event → svc.CreatePlanFromDelivery → service calls
+   ComputePlanTerms → constructs Plan → repository.InsertPlanIfAbsent.
+4. UNIQUE INDEX on cashback_schema.plans(order_id) must exist; if missing from
+   prior migrations, add it in 00XX_cashback_accelerated_v8.up.sql.
+5. PayMonthlyInstallments:
+   - Select active plans where payments_made < total_months and next-due-date <= runDate
+   - For each: installmentAmount = InstallmentAmount(terms, payments_made+1)
+   - PayInstallment atomic transaction
+   - Final installment → status='completed' inside same TX
+6. Ledger posting (via outbox):
+   DR cashback_pool_account (currency=TRY_COIN)
+   CR user_wallet_account[user_id] (currency=TRY_COIN)
+   Reference: "plan:<id>:installment:<n>"
+7. IDOR: GetPlan returns 404 for cross-user access (match internal/identity address handler pattern).
+8. Logging:
+   INFO cashback: plan created plan_id=X order_id=Y user_id=Z price_minor=P commission_bps=C T_months=T monthly=M last=L
+   INFO cashback: installment paid plan_id=X n=K amount_minor=A payments_remaining=R status=<active|completed>
+
+PROPERTY TESTS (Gopter — internal/cashback/calculator_property_test.go):
+Use github.com/leanovate/gopter. Generate 1000 random scenarios:
+  priceMinor    ∈ gen.Int64Range(1, 1e14)
+  commissionBps ∈ gen.IntRange(100, 10000)
+Assert for each:
+  (a) terms.TotalMonths >= 1
+  (b) terms.MonthlyAmountMinor >= 1
+  (c) terms.MonthlyAmountLastMinor >= terms.MonthlyAmountMinor
+  (d) (terms.TotalMonths-1) * terms.MonthlyAmountMinor + terms.MonthlyAmountLastMinor == priceMinor
+  (e) sum(InstallmentAmount(terms,n) for n in 1..TotalMonths) == priceMinor
+Seed via env GOPTER_SEED (default 42).
+
+ALSO embed the 5 validation table rows as fixed table-driven tests with exact-equality asserts.
+
+Unit tests (calculator_test.go) include boundary cases:
+  - priceMinor=1, commissionBps=10000   → expect ErrInvalidPlanInput (M=0 case)
+  - priceMinor=1e14, commissionBps=100  → T=1560, valid
+  - commissionBps=99 → reject; commissionBps=10001 → reject
+  - priceMinor=0 → reject; priceMinor=-1 → reject
+
+Service tests (service_test.go) with mocked Repository:
+  - Happy path; idempotent re-delivery returns existing plan no insert; ComputePlanTerms error propagates.
+
+Cron tests (payout_cron_test.go):
+  - Mix of due/not-due plans → only due are paid.
+  - Last installment triggers status='completed'.
+  - Completed plans not selected by ListDuePlans.
+
+DO NOT:
+  - DO NOT use float64 for any monetary or rate calc. EVER.
+  - DO NOT call ComputePlanTerms inside the payout cron loop. Terms are frozen — load from row.
+  - DO NOT spread the truncation remainder across early months. Balloon-last-payment IS the spec.
+  - DO NOT bypass the outbox for ledger writes. Direct XADD is forbidden.
+  - DO NOT use server local time. Use time.LoadLocation("Europe/Istanbul").
+
+VERIFICATION CRITERIA:
+[ ] make verify — all green (fmt, vet, test, lint, boundaries, property tests)
+[ ] go test -race -run TestProperty ./internal/cashback/... — passes with seed=42 and with 5 other seeds
+[ ] migration applies on a fresh DB AND down.sql rolls back cleanly
+[ ] All 5 validation-table rows pass exact-equality assertions
+[ ] grep -rn 'float' internal/cashback/ | grep -v _test.go → empty
+[ ] Implementation report leads with git log --oneline -N proving the commits exist
 ```
 
 **Verification / Done Criteria:**
-- [ ] Property tests pass 500+ iterations.
-- [ ] Re-emitting the same delivered event creates exactly one plan.
-- [ ] Cancellation reverses correctly per LEDGER_GUIDE § 7.4.
-- [ ] Mutating plan core fields is rejected by trigger.
+- [ ] `make verify` passes including property tests with 1000 cases.
+- [ ] All 5 validation scenarios pass exact-equality assertions.
+- [ ] Migration applies cleanly forward and rolls back cleanly.
+- [ ] Immutability trigger blocks updates to all 9 frozen columns; permits `payments_made` and `status` only.
+- [ ] Payout cron transitions plan to `status='completed'` atomically with final installment post.
+- [ ] Consumer idempotent on `order_id` (same event twice → one plan).
+- [ ] No `float64` in package; balloon last payment design honored.
 
 ---
 

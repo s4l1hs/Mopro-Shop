@@ -5,35 +5,74 @@ import (
 	"time"
 )
 
-// Payment is the in-memory representation of cashback_schema.payments.
+// PlanStatus enumerates valid cashback_schema.plans.status values.
+type PlanStatus string
+
+const (
+	PlanStatusActive    PlanStatus = "active"
+	PlanStatusCompleted PlanStatus = "completed" // set atomically with the final installment
+	PlanStatusCancelled PlanStatus = "cancelled" // refund / fraud — no new payments
+)
+
+// Plan is the in-memory representation of cashback_schema.plans.
+// IMMUTABLE after creation except Status and PaymentsMade (CLAUDE.md § 4.7).
+type Plan struct {
+	ID                     int64
+	OrderID                int64
+	UserID                 int64
+	PriceMinor             int64  // gross order price; drives ComputePlanTerms
+	CommissionBps          int    // category commission in basis points; frozen at sale
+	Currency               string // coin currency code, e.g. "TRY_COIN"
+	TotalMonths            int    // frozen at creation via ComputePlanTerms
+	MonthlyAmountMinor     int64  // regular installment; paid in months 1..TotalMonths-1
+	MonthlyAmountLastMinor int64  // balloon payment in month TotalMonths; >= MonthlyAmountMinor
+	PaymentsMade           int    // monotonic counter; incremented per paid installment
+	// ReferenceInterestRateBps is a v6 legacy field kept for backward compat with the HTTP API;
+	// always 0 for v8 plans. Do not use in business logic.
+	ReferenceInterestRateBps int
+	Status                   PlanStatus
+	StartDate                time.Time
+	DeliveredAt              time.Time
+	Market                   string
+	CommissionSnapshot       json.RawMessage // audit JSONB from the order event
+	IdempotencyKey           string
+	// Product snapshot from Phase 4.4a; nil/empty for pre-4.4a plans.
+	ProductID       int64
+	ProductTitle    string
+	ProductImageURL string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+// PlanTerms is defined in calculator.go — referenced here for documentation only.
+
+// Payment is the in-memory representation of cashback_schema.payments (v6 legacy; read-only in v8).
 type Payment struct {
-	ID                   int64
-	PlanID               int64
-	PeriodYYYYMM         int
-	ScheduledDate        time.Time
-	PaidDate             *time.Time
-	AmountMinor          int64
-	Status               string
-	LedgerTransactionID  *int64
-	IdempotencyKey       string
-	AttemptCount         int
-	LastAttemptAt        *time.Time
-	LastError            *string
-	CreatedAt            time.Time
+	ID                  int64
+	PlanID              int64
+	PeriodYYYYMM        int
+	ScheduledDate       time.Time
+	PaidDate            *time.Time
+	AmountMinor         int64
+	Status              string
+	LedgerTransactionID *int64
+	IdempotencyKey      string
+	AttemptCount        int
+	LastAttemptAt       *time.Time
+	LastError           *string
+	CreatedAt           time.Time
 }
 
-// RunMonthResult summarises the outcome of a RunMonth call.
-type RunMonthResult struct {
-	Period       int // YYYYMM
-	Currency     string
-	Processed    int // plans for which a payment was written this run
-	Skipped      int // plans skipped (already paid, wallet frozen, etc.)
-	Failed       int // plans that errored and logged
-	TotalRetries int // total serialization retries across all plans
+// PaymentSummary summarises a PayMonthlyInstallments run.
+type PaymentSummary struct {
+	Processed int // plans for which an installment was paid this run
+	Skipped   int // plans skipped (wallet frozen, not yet due, etc.)
+	Failed    int // plans that errored after retries
+	Retries   int // total SERIALIZABLE retry count across all plans
 }
 
-// CommissionSnapshotItem records the per-item commission breakdown frozen at order time.
-// Stored as JSONB in cashback_schema.plans.commission_snapshot for audit purposes.
+// CommissionSnapshotItem records per-item commission details frozen at order time.
+// Stored as JSONB in cashback_schema.plans.commission_snapshot for audit.
 type CommissionSnapshotItem struct {
 	VariantID             int64 `json:"variant_id"`
 	SellerID              int64 `json:"seller_id"`
@@ -45,37 +84,4 @@ type CommissionSnapshotItem struct {
 	CommissionAmountMinor int64 `json:"commission_amount_minor"`
 	KdvAmountMinor        int64 `json:"kdv_amount_minor"`
 	SellerNetMinor        int64 `json:"seller_net_minor"`
-}
-
-// PlanStatus enumerates valid cashback_schema.plans.status values.
-type PlanStatus string
-
-const (
-	PlanStatusActive    PlanStatus = "active"
-	PlanStatusCancelled PlanStatus = "cancelled"
-	PlanStatusSuspended PlanStatus = "suspended"
-)
-
-// Plan is the in-memory representation of cashback_schema.plans.
-// IMMUTABLE after creation except Status (CLAUDE.md § 4.7).
-type Plan struct {
-	ID                       int64
-	OrderID                  int64
-	UserID                   int64
-	MonthlyAmountMinor       int64
-	Currency                 string
-	ReferenceInterestRateBps int
-	StartDate                time.Time
-	Status                   PlanStatus
-	DeliveredAt              time.Time
-	Market                   string
-	CommissionSnapshot       json.RawMessage
-	IdempotencyKey           string
-	// Product snapshot — populated from ecom.order.delivered.v1 (Phase 4.4a).
-	// Nil/empty for plans created before Phase 4.4a deploy.
-	ProductID       int64
-	ProductTitle    string
-	ProductImageURL string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
 }

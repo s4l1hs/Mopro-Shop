@@ -73,43 +73,31 @@ func (s *stubWalletSvc) ListEntriesByAccount(ctx context.Context, accountID int6
 
 type stubCashbackRepo struct {
 	listPlansFn    func(ctx context.Context, userID int64, limit int, beforeID int64, status *cashback.PlanStatus) ([]cashback.Plan, error)
-	getPlanFn      func(ctx context.Context, planID, userID int64) (cashback.Plan, error)
+	getPlanFn      func(ctx context.Context, userID, planID int64) (cashback.Plan, error)
 	listPaymentsFn func(ctx context.Context, planID int64, limit int, beforeID int64) ([]cashback.Payment, error)
 }
 
-func (r *stubCashbackRepo) InsertPlan(_ context.Context, _ pgx.Tx, p cashback.Plan) (cashback.Plan, error) {
+func (r *stubCashbackRepo) InsertPlanIfAbsent(_ context.Context, _ pgx.Tx, _ cashback.Plan) (cashback.Plan, bool, error) {
 	panic("not expected in unit test")
 }
-func (r *stubCashbackRepo) FindPlanByOrderID(_ context.Context, _ int64) (cashback.Plan, error) {
+func (r *stubCashbackRepo) ListDuePlans(_ context.Context, _ time.Time, _ int) ([]cashback.Plan, error) {
 	panic("not expected in unit test")
 }
-func (r *stubCashbackRepo) FetchPlansBatch(_ context.Context, _ int, _ time.Time, _ string, _ int) ([]cashback.Plan, error) {
-	panic("not expected in unit test")
-}
-func (r *stubCashbackRepo) InsertPayment(_ context.Context, _ pgx.Tx, _ cashback.Payment) (cashback.Payment, error) {
-	panic("not expected in unit test")
-}
-func (r *stubCashbackRepo) MarkPaymentPaid(_ context.Context, _ pgx.Tx, _ int64, _ int64, _ time.Time) error {
-	panic("not expected in unit test")
-}
-func (r *stubCashbackRepo) MarkPaymentFailed(_ context.Context, _ pgx.Tx, _ int64, _ string) error {
-	panic("not expected in unit test")
-}
-func (r *stubCashbackRepo) UpdateLastDistributedPeriod(_ context.Context, _ pgx.Tx, _ int64, _ int) error {
+func (r *stubCashbackRepo) IncrPaymentsMade(_ context.Context, _ pgx.Tx, _ int64) (int, bool, error) {
 	panic("not expected in unit test")
 }
 func (r *stubCashbackRepo) WithTx(_ context.Context, _ pgx.TxIsoLevel, _ func(pgx.Tx) error) error {
 	panic("not expected in unit test")
 }
-func (r *stubCashbackRepo) ListPlansByUserID(ctx context.Context, userID int64, limit int, beforeID int64, status *cashback.PlanStatus) ([]cashback.Plan, error) {
+func (r *stubCashbackRepo) ListPlansByUser(ctx context.Context, userID int64, limit int, beforeID int64, status *cashback.PlanStatus) ([]cashback.Plan, error) {
 	if r.listPlansFn != nil {
 		return r.listPlansFn(ctx, userID, limit, beforeID, status)
 	}
 	return nil, nil
 }
-func (r *stubCashbackRepo) GetPlanByIDAndUserID(ctx context.Context, planID, userID int64) (cashback.Plan, error) {
+func (r *stubCashbackRepo) GetPlan(ctx context.Context, userID, planID int64) (cashback.Plan, error) {
 	if r.getPlanFn != nil {
-		return r.getPlanFn(ctx, planID, userID)
+		return r.getPlanFn(ctx, userID, planID)
 	}
 	return cashback.Plan{}, cashback.ErrPlanNotFound
 }
@@ -155,9 +143,9 @@ func TestGetCashbackPlan_OtherUserPlan_Returns404(t *testing.T) {
 	const planID int64 = 99
 
 	repo := &stubCashbackRepo{
-		getPlanFn: func(_ context.Context, pid, uid int64) (cashback.Plan, error) {
+		getPlanFn: func(_ context.Context, userID, pid int64) (cashback.Plan, error) {
 			// Plan exists for owner but NOT for attacker — DB-level IDOR prevention.
-			if pid == planID && uid == planOwner {
+			if userID == planOwner && pid == planID {
 				return cashback.Plan{ID: planID, UserID: planOwner, Status: cashback.PlanStatusActive}, nil
 			}
 			return cashback.Plan{}, cashback.ErrPlanNotFound
@@ -181,8 +169,8 @@ func TestListCashbackPayments_OtherUserPlan_Returns404(t *testing.T) {
 	const planID int64 = 99
 
 	repo := &stubCashbackRepo{
-		getPlanFn: func(_ context.Context, pid, uid int64) (cashback.Plan, error) {
-			if pid == planID && uid == planOwner {
+		getPlanFn: func(_ context.Context, userID, pid int64) (cashback.Plan, error) {
+			if userID == planOwner && pid == planID {
 				return cashback.Plan{ID: planID, UserID: planOwner}, nil
 			}
 			return cashback.Plan{}, cashback.ErrPlanNotFound
@@ -336,8 +324,8 @@ func TestGetCashbackPlan_OwnPlan_Returns200(t *testing.T) {
 	const userID int64 = 3
 	const planID int64 = 7
 	repo := &stubCashbackRepo{
-		getPlanFn: func(_ context.Context, pid, uid int64) (cashback.Plan, error) {
-			if pid == planID && uid == userID {
+		getPlanFn: func(_ context.Context, uid, pid int64) (cashback.Plan, error) {
+			if uid == userID && pid == planID {
 				return cashback.Plan{
 					ID:                       planID,
 					OrderID:                  100,

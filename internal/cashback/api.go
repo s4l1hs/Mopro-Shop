@@ -1,6 +1,7 @@
-// Package cashback owns the perpetual cashback engine: plan creation and monthly payments (fin-svc).
-// v6 LOCKED PERPETUAL MODEL: monthly_coin = (commission_minor × ref_rate_bps) / 10000 / 12
-// Reference interest rate is frozen at 5000 bps (50%) per plan at creation; NEVER changed for existing plans.
+// Package cashback owns the v8 accelerated amortization cashback engine (fin-svc).
+// v8 MODEL: fixed-term plans where T = CashbackK/commission_bps months, monthly payout
+// = (price × commission_bps)/CashbackK, with a balloon last payment so the sum equals
+// exactly the gross order price. See calculator.go for the formula and PROMPTS.md §2.2.
 package cashback
 
 import (
@@ -13,15 +14,18 @@ import (
 )
 
 // OrderDeliveredEvent is the decoded payload from ecom.order.delivered.v1.
-// Consumed by CreatePlanForOrder to create a v6 perpetual cashback plan.
 type OrderDeliveredEvent struct {
 	OrderID     int64
 	UserID      int64
 	DeliveredAt time.Time
 	Market      string
-	Currency    string // fiat currency from the order event; service converts to coin currency
-	Items       []CommissionSnapshotItem
-	// Product snapshot fields (additive, Phase 4.4a). Empty for pre-4.4a events.
+	Currency    string // fiat currency; service converts to coin currency
+	// v8 direct fields — populated by the consumer from the event payload.
+	PriceMinor    int64
+	CommissionBps int
+	// Items retains the per-line snapshot for the commission_snapshot audit column.
+	Items []CommissionSnapshotItem
+	// Product snapshot (Phase 4.4a additive). Zero for pre-4.4a events.
 	ProductID       int64
 	ProductTitle    string
 	ProductImageURL string
@@ -29,54 +33,53 @@ type OrderDeliveredEvent struct {
 
 // Service is the public interface of the cashback engine (fin-svc only).
 type Service interface {
-	// CreatePlanForOrder creates a v6 perpetual cashback plan for the delivered order.
-	// Idempotent: returns nil if a plan already exists for ev.OrderID.
-	CreatePlanForOrder(ctx context.Context, ev OrderDeliveredEvent) error
+	// CreatePlanFromDelivery creates a v8 fixed-term cashback plan for the delivered order.
+	// Idempotent: returns the existing plan if one already exists for ev.OrderID.
+	CreatePlanFromDelivery(ctx context.Context, ev OrderDeliveredEvent) (Plan, error)
 
-	// RunMonth processes all active plans due for period (YYYYMM) as of asOf for the
-	// given currency. Designed to be called by the monthly cron on the 1st of each month.
-	// The currency parameter selects which coin currency to process (e.g. "TRY_COIN").
+	// PayMonthlyInstallments processes all active plans whose next installment is due by runDate.
+	// Designed to be called by the monthly cron on the 1st of each month.
 	// Idempotent: re-running for an already-processed period is safe.
-	RunMonth(ctx context.Context, period int, asOf time.Time, currency string) (RunMonthResult, error)
+	PayMonthlyInstallments(ctx context.Context, runDate time.Time) (PaymentSummary, error)
+
+	// GetPlan returns a single plan scoped to userID (IDOR-safe: 404 on cross-user access).
+	GetPlan(ctx context.Context, userID, planID int64) (Plan, error)
+
+	// ListPlans returns cursor-paginated plans for userID, ordered by id DESC.
+	ListPlans(ctx context.Context, userID int64, cursor int64, limit int, status *PlanStatus) ([]Plan, error)
 }
 
 // WalletPoster is the subset of wallet.Service that cashback needs.
-// Using an interface instead of importing the wallet package keeps the packages
-// independently testable. Go structural typing means wallet.Service satisfies
-// this interface without any code change in the wallet package.
+// Defined as an interface to keep the packages independently testable.
 type WalletPoster interface {
 	PostInTx(ctx context.Context, tx pgx.Tx, in ledger.PostInput) (int64, error)
 	FindAccount(ctx context.Context, accountType, currency string) (int64, error)
 	OpenOrFindUserWallet(ctx context.Context, userID int64, currency string) (int64, error)
-	// FindAccountByOwnerAnyStatus returns (id, status, nil) if the account exists
-	// regardless of status, or (0, "", nil) if it does not exist.
 	FindAccountByOwnerAnyStatus(ctx context.Context, ownerType string, ownerID int64, currency string) (int64, string, error)
 }
 
 // Repository is the storage interface of the cashback engine (fin-svc only).
 type Repository interface {
-	// Plan creation path.
-	InsertPlan(ctx context.Context, tx pgx.Tx, p Plan) (Plan, error)
-	FindPlanByOrderID(ctx context.Context, orderID int64) (Plan, error)
+	// Plan creation — idempotent via UNIQUE INDEX on order_id.
+	// Returns (plan, true, nil) when newly inserted; (plan, false, nil) when already existed.
+	InsertPlanIfAbsent(ctx context.Context, tx pgx.Tx, p Plan) (Plan, bool, error)
 
-	// Cron path: batch cursor SELECT.
-	FetchPlansBatch(ctx context.Context, period int, asOf time.Time, currency string, batchSize int) ([]Plan, error)
+	// Payout cron: select active plans whose next installment is due by runDate.
+	// Uses start_date + payments_made*interval'1 month' <= runDate to determine due date.
+	// Caller holds the result for the duration of per-plan processing.
+	ListDuePlans(ctx context.Context, runDate time.Time, limit int) ([]Plan, error)
 
-	// Cron path: payment write.
-	InsertPayment(ctx context.Context, tx pgx.Tx, pay Payment) (Payment, error)
-	MarkPaymentPaid(ctx context.Context, tx pgx.Tx, paymentID int64, ledgerTxnID int64, paidDate time.Time) error
-	MarkPaymentFailed(ctx context.Context, tx pgx.Tx, paymentID int64, errMsg string) error
+	// Payout cron: within a SERIALIZABLE tx, increment payments_made by 1.
+	// Returns the new payments_made counter and whether the plan is now completed.
+	IncrPaymentsMade(ctx context.Context, tx pgx.Tx, planID int64) (newCount int, completed bool, err error)
 
-	// Cron path: post-payment plan stamp.
-	UpdateLastDistributedPeriod(ctx context.Context, tx pgx.Tx, planID int64, period int) error
+	// HTTP read path — safe for direct repository calls per CLAUDE.md §3.1 exception.
+	GetPlan(ctx context.Context, userID, planID int64) (Plan, error)
+	ListPlansByUser(ctx context.Context, userID int64, limit int, beforeID int64, status *PlanStatus) ([]Plan, error)
+	// ListPaymentsByPlanID is kept for backward compat with the fin HTTP API (v6 plans only).
+	ListPaymentsByPlanID(ctx context.Context, planID int64, limit int, beforeID int64) ([]Payment, error)
 
 	// Transaction control.
 	// level must be pgx.Serializable for cron per-plan tx; pgx.ReadCommitted for plan creation.
 	WithTx(ctx context.Context, level pgx.TxIsoLevel, fn func(pgx.Tx) error) error
-
-	// HTTP read path — safe for direct repository calls per R-2 (no business logic,
-	// no state mutation, no transaction coordination).
-	ListPlansByUserID(ctx context.Context, userID int64, limit int, beforeID int64, status *PlanStatus) ([]Plan, error)
-	GetPlanByIDAndUserID(ctx context.Context, planID, userID int64) (Plan, error)
-	ListPaymentsByPlanID(ctx context.Context, planID int64, limit int, beforeID int64) ([]Payment, error)
 }
