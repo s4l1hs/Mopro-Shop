@@ -13,19 +13,22 @@ import (
 	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/outbox"
+	"github.com/mopro/platform/internal/payment"
 	"github.com/mopro/platform/pkg/mediaurl"
 )
 
 type orderService struct {
 	repo             Repository
+	sessionRepo      CheckoutSessionRepository // nil for legacy NewService
 	cart             cart.Service
 	catalog          catalog.Service
 	outbox           outbox.Repository
 	defaultMarket    string
 	cashbackCurrency string // e.g. "TRY_COIN" for TR; read from env at startup
+	psp              payment.Service // nil for legacy NewService (no PSP call in Checkout)
 }
 
-// NewService constructs an order Service.
+// NewService constructs an order Service for the legacy single-order checkout flow.
 // cashbackCurrency should come from env DEFAULT_CASHBACK_CURRENCY (e.g. "TRY_COIN").
 func NewService(
 	repo Repository,
@@ -42,6 +45,29 @@ func NewService(
 		outbox:           outboxRepo,
 		defaultMarket:    defaultMarket,
 		cashbackCurrency: cashbackCurrency,
+	}
+}
+
+// NewServiceFull constructs an order Service with PSP integration for InitiateCheckout.
+func NewServiceFull(
+	repo Repository,
+	sessionRepo CheckoutSessionRepository,
+	cartSvc cart.Service,
+	catalogSvc catalog.Service,
+	outboxRepo outbox.Repository,
+	defaultMarket string,
+	cashbackCurrency string,
+	psp payment.Service,
+) Service {
+	return &orderService{
+		repo:             repo,
+		sessionRepo:      sessionRepo,
+		cart:             cartSvc,
+		catalog:          catalogSvc,
+		outbox:           outboxRepo,
+		defaultMarket:    defaultMarket,
+		cashbackCurrency: cashbackCurrency,
+		psp:              psp,
 	}
 }
 
@@ -286,6 +312,43 @@ type deliveredItemPayload struct {
 	CommissionAmountMinor int64 `json:"commission_amount_minor"`
 	KdvAmountMinor        int64 `json:"kdv_amount_minor"`
 	SellerNetMinor        int64 `json:"seller_net_minor"`
+}
+
+// MarkPaid transitions an order from pending_payment → paid and emits ecom.order.paid.v1.
+// Called by the Sipay webhook CaptureFinalizer. Idempotent: returns nil if already paid.
+func (s *orderService) MarkPaid(ctx context.Context, orderID int64) error {
+	o, _, err := s.repo.GetOrder(ctx, orderID)
+	if err != nil {
+		return err
+	}
+	if o.Status == StatusPaid {
+		return nil // idempotent
+	}
+	if err := ValidTransition(o.Status, StatusPaid); err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	payload, _ := json.Marshal(map[string]any{
+		"order_id":     orderID,
+		"user_id":      o.UserID,
+		"paid_at":      now.Format(time.RFC3339),
+		"amount_minor": o.TotalMinor,
+		"currency":     o.Currency,
+		"market":       o.Market,
+	})
+	return s.repo.WithTx(ctx, func(tx pgx.Tx) error {
+		if err := s.repo.UpdateStatus(ctx, tx, orderID, StatusPaid, now); err != nil {
+			return err
+		}
+		return s.outbox.Insert(ctx, tx, outbox.Row{
+			Aggregate:      "order",
+			EventType:      "ecom.order.paid.v1",
+			Payload:        json.RawMessage(payload),
+			IdempotencyKey: fmt.Sprintf("order:paid:order_%d", orderID),
+			Market:         o.Market,
+			Currency:       o.Currency,
+		})
+	})
 }
 
 // buildDeliveredPayload serialises the order + items into the event payload.

@@ -17,21 +17,23 @@ const (
 
 // Order is the aggregate root for a customer purchase.
 type Order struct {
-	ID               int64       `json:"id"`
-	UserID           int64       `json:"user_id"`
-	Status           OrderStatus `json:"status"`
-	SubtotalMinor    int64       `json:"subtotal_minor"`
-	ShippingMinor    int64       `json:"shipping_minor"`
-	ShippingPayer    string      `json:"shipping_payer"`
-	TotalMinor       int64       `json:"total_minor"`
-	Currency         string      `json:"currency"`
-	Market           string      `json:"market"`
-	DeliveredAt      *time.Time  `json:"delivered_at,omitempty"`
-	CashbackEligible bool        `json:"cashback_eligible"`
-	CashbackCurrency string      `json:"cashback_currency"`
-	IdempotencyKey   string      `json:"idempotency_key"`
-	CreatedAt        time.Time   `json:"created_at"`
-	UpdatedAt        time.Time   `json:"updated_at"`
+	ID                int64       `json:"id"`
+	UserID            int64       `json:"user_id"`
+	SellerID          int64       `json:"seller_id,omitempty"`           // 0 = legacy single-order
+	CheckoutSessionID string      `json:"checkout_session_id,omitempty"` // "" = legacy single-order
+	Status            OrderStatus `json:"status"`
+	SubtotalMinor     int64       `json:"subtotal_minor"`
+	ShippingMinor     int64       `json:"shipping_minor"`
+	ShippingPayer     string      `json:"shipping_payer"`
+	TotalMinor        int64       `json:"total_minor"`
+	Currency          string      `json:"currency"`
+	Market            string      `json:"market"`
+	DeliveredAt       *time.Time  `json:"delivered_at,omitempty"`
+	CashbackEligible  bool        `json:"cashback_eligible"`
+	CashbackCurrency  string      `json:"cashback_currency"`
+	IdempotencyKey    string      `json:"idempotency_key"`
+	CreatedAt         time.Time   `json:"created_at"`
+	UpdatedAt         time.Time   `json:"updated_at"`
 }
 
 // OrderItem is a single line in the order with frozen commission snapshots.
@@ -52,11 +54,59 @@ type OrderItem struct {
 	SellerNetMinor        int64  `json:"seller_net_minor"`
 }
 
-// CheckoutRequest is the input for Service.Checkout.
+// CheckoutRequest is the input for Service.Checkout (legacy single-order flow).
 type CheckoutRequest struct {
 	UserID         int64
 	ReservationID  string // from cart.Reserve; empty tolerated on idempotent retries
 	Market         string // overrides service default when non-empty
 	Currency       string // overrides first-item currency when non-empty
 	IdempotencyKey string
+}
+
+// ── checkout-session types ────────────────────────────────────────────────────
+
+// CheckoutSessionStatus is the lifecycle state of a multi-seller checkout session.
+type CheckoutSessionStatus string
+
+const (
+	CheckoutSessionPending      CheckoutSessionStatus = "pending"
+	CheckoutSessionPSPInitiated CheckoutSessionStatus = "psp_initiated"
+	CheckoutSessionCompleted    CheckoutSessionStatus = "completed"
+	CheckoutSessionFailed       CheckoutSessionStatus = "failed"
+	CheckoutSessionExpired      CheckoutSessionStatus = "expired"
+)
+
+// CheckoutSession tracks a single PSP payment that covers N per-seller orders.
+// id == PSP invoice_id so the webhook can resolve all order IDs on capture.
+type CheckoutSession struct {
+	ID            string                `json:"id"`
+	UserID        int64                 `json:"user_id"`
+	ReservationID string                `json:"reservation_id"`
+	Status        CheckoutSessionStatus `json:"status"`
+	OrderIDs      []int64               `json:"order_ids"`
+	AmountMinor   int64                 `json:"amount_minor"`
+	Currency      string                `json:"currency"`
+	ProviderRef   string                `json:"provider_ref,omitempty"`
+	ExpiresAt     time.Time             `json:"expires_at"`
+	CreatedAt     time.Time             `json:"created_at"`
+	UpdatedAt     time.Time             `json:"updated_at"`
+}
+
+// InitiateCheckoutRequest is the input for Service.InitiateCheckout.
+type InitiateCheckoutRequest struct {
+	UserID        int64
+	ReservationID string // from cart.Reserve
+	Market        string
+	Currency      string
+	SessionID     string // from Idempotency-Key header; becomes checkout_session.id and PSP invoice_id
+	BuyerName     string
+	BuyerSurname  string
+	BuyerEmail    string
+}
+
+// InitiateCheckoutResponse is returned by Service.InitiateCheckout.
+type InitiateCheckoutResponse struct {
+	SessionID   string  // checkout_session.id
+	ThreeDSHTML string  // rendered by mobile WebView
+	Orders      []Order // per-seller orders created
 }

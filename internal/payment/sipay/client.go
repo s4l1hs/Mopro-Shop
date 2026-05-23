@@ -5,8 +5,6 @@ package sipay
 import (
 	"bytes"
 	"context"
-	"crypto/sha512"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -217,14 +215,4 @@ func (a *Adapter) doJSON(ctx context.Context, path string, payload, dst any) err
 	return fmt.Errorf("sipay: %s: exhausted retries", path)
 }
 
-// --- HMAC signature helper used by webhook handler ---
-
-// ComputeHashKey produces the Sipay webhook hash_key for signature verification.
-// Algorithm: base64( SHA512( merchant_key + status_code + invoice_id + total_amount + currency_code ) )
-// This is raw SHA-512 string concatenation — NOT an HMAC (no separate signing key).
-// TODO(sipay-sandbox-verify): confirm field order against live sandbox webhook payload.
-func ComputeHashKey(merchantKey, statusCode, invoiceID, totalAmount, currencyCode string) string {
-	raw := merchantKey + statusCode + invoiceID + totalAmount + currencyCode
-	sum := sha512.Sum512([]byte(raw))
-	return base64.StdEncoding.EncodeToString(sum[:])
-}
+// ComputeHashKey is defined in hmac.go.

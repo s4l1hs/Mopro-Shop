@@ -85,7 +85,28 @@ func main() {
 	cashbackCurrency := mustEnv("DEFAULT_CASHBACK_CURRENCY")
 	orderOutbox := outbox.NewRepository("order_schema.outbox")
 	orderRepo := order.NewRepository(pool)
-	orderSvc := order.NewService(orderRepo, cartSvc, catalogSvc, orderOutbox, market, cashbackCurrency)
+	checkoutSessionRepo := order.NewCheckoutSessionRepository(pool)
+
+	// Payment module wired before order so orderSvc can receive the PSP reference.
+	paymentRepo := payment.NewRepository(pool)
+	paymentOutbox := outbox.NewRepository("order_schema.outbox")
+	sipaycfg := payment.SipayConfig{
+		BaseURL:     mustEnv("SIPAY_BASE_URL"),
+		MerchantKey: mustEnv("SIPAY_MERCHANT_KEY"),
+		AppID:       mustEnv("SIPAY_APP_ID"),
+		AppSecret:   mustEnv("SIPAY_APP_SECRET"),
+		MerchantID:  mustEnv("SIPAY_MERCHANT_ID"),
+		ReturnURL:   os.Getenv("SIPAY_RETURN_URL"),
+		CancelURL:   os.Getenv("SIPAY_CANCEL_URL"),
+	}
+	paymentSvc := payment.NewService(sipaycfg, paymentRepo)
+
+	orderSvc := order.NewServiceFull(
+		orderRepo, checkoutSessionRepo,
+		cartSvc, catalogSvc, orderOutbox,
+		market, cashbackCurrency,
+		paymentSvc,
+	)
 
 	// ── Outbox publisher — drains order_schema.outbox → Redis Streams ───────
 	bus := eventbus.NewRedisBus(rc, slog.Default())
@@ -103,28 +124,39 @@ func main() {
 		}
 	}()
 
-	// ── Payment module wiring ────────────────────────────────────────────────
-	paymentRepo := payment.NewRepository(pool)
-	paymentOutbox := outbox.NewRepository("order_schema.outbox")
-	sipaycfg := payment.SipayConfig{
-		BaseURL:     mustEnv("SIPAY_BASE_URL"),
-		MerchantKey: mustEnv("SIPAY_MERCHANT_KEY"),
-		AppID:       mustEnv("SIPAY_APP_ID"),
-		AppSecret:   mustEnv("SIPAY_APP_SECRET"),
-		MerchantID:  mustEnv("SIPAY_MERCHANT_ID"),
-		ReturnURL:   os.Getenv("SIPAY_RETURN_URL"),
-		CancelURL:   os.Getenv("SIPAY_CANCEL_URL"),
-	}
-	paymentSvc := payment.NewService(sipaycfg, paymentRepo)
-
+	// ── Sipay adapter + webhook handler ──────────────────────────────────────
 	sipayAdapter, err := sipay.NewAdapter(sipaycfg, paymentRepo, slog.Default())
 	if err != nil {
 		slog.Error("sipay: adapter init failed", "err", err)
 		os.Exit(1)
 	}
+
+	// captureFinalizer: called after every successful Sipay payment capture.
+	// Looks up the checkout session (providerRef == session_id) and marks all
+	// linked orders as paid, then commits the cart reservation.
+	captureFinalizer := sipay.CaptureFinalizer(func(ctx context.Context, providerRef string) error {
+		session, err := checkoutSessionRepo.FindCheckoutSessionByID(ctx, providerRef)
+		if err != nil {
+			// providerRef might be a legacy single-order invoice_id — not fatal.
+			slog.Warn("captureFinalizer: checkout session not found (may be legacy)", "provider_ref", providerRef)
+			return nil
+		}
+		for _, oid := range session.OrderIDs {
+			if mErr := orderSvc.MarkPaid(ctx, oid); mErr != nil {
+				slog.Error("captureFinalizer: MarkPaid failed", "order_id", oid, "err", mErr)
+			}
+		}
+		if session.ReservationID != "" {
+			if rErr := cartSvc.CommitReservation(ctx, session.ReservationID); rErr != nil {
+				slog.Warn("captureFinalizer: CommitReservation failed (non-fatal)", "err", rErr)
+			}
+		}
+		return nil
+	})
+
 	webhookHandler := sipay.NewWebhookHandler(
 		sipayAdapter, paymentRepo, paymentOutbox, rc, market, cashbackCurrency, slog.Default(),
-	)
+	).WithCaptureFinalizer(captureFinalizer)
 
 	// ── Shipping module wiring ───────────────────────────────────────────────
 	shippingRepo := shipping.NewRepository(pool)
@@ -301,6 +333,16 @@ func main() {
 	)
 	mux.Handle("POST /v1/cart/release",
 		httpx.TraceAndLog(http.HandlerFunc(handleCartRelease(cartSvc))),
+	)
+
+	// Checkout route — initiates the v8 multi-seller saga (cart → PSP → 3DS)
+	mux.Handle("POST /v1/checkout/initiate",
+		httpx.TraceAndLog(requireAuth(http.HandlerFunc(
+			order.HandleInitiateCheckout(orderSvc, func(r *http.Request) (int64, bool) {
+				id := middleware.UserIDFromCtx(r.Context())
+				return id, id != 0
+			}),
+		))),
 	)
 
 	// Order routes — require JWT authentication where user ID is needed

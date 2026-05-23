@@ -36,6 +36,10 @@ func (s *stubOrderSvc) UpdateStatus(_ context.Context, _ int64, _ order.OrderSta
 	return nil
 }
 func (s *stubOrderSvc) CancelOrder(_ context.Context, _ int64, _ string) error { return nil }
+func (s *stubOrderSvc) InitiateCheckout(_ context.Context, _ order.InitiateCheckoutRequest) (order.InitiateCheckoutResponse, error) {
+	return order.InitiateCheckoutResponse{}, nil
+}
+func (s *stubOrderSvc) MarkPaid(_ context.Context, _ int64) error { return nil }
 
 // stubShippingRepo is an in-memory shipping.Repository for testing.
 type stubShippingRepo struct {

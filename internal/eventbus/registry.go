@@ -38,6 +38,14 @@ var Registry = []EventEntry{
 		ConsumerGroups:  []string{"fin-cashback-consumer", "fin-sellerpayout-consumer"},
 		Status:          StatusActiveConsumed,
 	},
+	{
+		EventType:       "ecom.order.paid.v1",
+		ProducerModule:  "internal/order",
+		ConsumerGroups:  []string{},
+		Status:          StatusActiveEmittedNoConsumer,
+		PlannedConsumer: "internal/notification (Phase 4.6)",
+		Notes:           "Emitted by MarkPaid on Sipay webhook capture. Triggers buyer payment notification.",
+	},
 
 	// ── ecom domain: payment ─────────────────────────────────────────────────────
 	{

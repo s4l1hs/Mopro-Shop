@@ -35,16 +35,27 @@ func (r *pgxOrderRepository) WithTx(ctx context.Context, fn func(pgx.Tx) error) 
 }
 
 func (r *pgxOrderRepository) InsertOrder(ctx context.Context, tx pgx.Tx, o Order) (Order, error) {
+	// seller_id and checkout_session_id use NULLIF so zero-value → SQL NULL.
+	var checkoutSessionID *string
+	if o.CheckoutSessionID != "" {
+		checkoutSessionID = &o.CheckoutSessionID
+	}
+	var sellerID *int64
+	if o.SellerID != 0 {
+		sellerID = &o.SellerID
+	}
 	err := tx.QueryRow(ctx,
 		`INSERT INTO order_schema.orders
 			(user_id, status, subtotal_minor, shipping_minor, shipping_payer,
 			 total_minor, currency, market,
-			 cashback_eligible, cashback_currency, idempotency_key)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			 cashback_eligible, cashback_currency, idempotency_key,
+			 seller_id, checkout_session_id)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 		RETURNING id, created_at, updated_at`,
 		o.UserID, string(o.Status), o.SubtotalMinor, o.ShippingMinor, o.ShippingPayer,
 		o.TotalMinor, o.Currency, o.Market,
 		o.CashbackEligible, o.CashbackCurrency, o.IdempotencyKey,
+		sellerID, checkoutSessionID,
 	).Scan(&o.ID, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -81,7 +92,8 @@ func (r *pgxOrderRepository) GetOrder(ctx context.Context, orderID int64) (Order
 		`SELECT id, user_id, status, subtotal_minor, shipping_minor, shipping_payer,
 		        total_minor, currency, market, delivered_at,
 		        cashback_eligible, cashback_currency, idempotency_key,
-		        created_at, updated_at
+		        created_at, updated_at,
+		        COALESCE(seller_id, 0), COALESCE(checkout_session_id, '')
 		FROM order_schema.orders WHERE id = $1`, orderID))
 	if err != nil {
 		return Order{}, nil, err
@@ -109,7 +121,8 @@ func (r *pgxOrderRepository) FindByIdempotencyKey(ctx context.Context, key strin
 		`SELECT id, user_id, status, subtotal_minor, shipping_minor, shipping_payer,
 		        total_minor, currency, market, delivered_at,
 		        cashback_eligible, cashback_currency, idempotency_key,
-		        created_at, updated_at
+		        created_at, updated_at,
+		        COALESCE(seller_id, 0), COALESCE(checkout_session_id, '')
 		FROM order_schema.orders WHERE idempotency_key = $1`, key))
 }
 
@@ -118,7 +131,8 @@ func (r *pgxOrderRepository) ListOrders(ctx context.Context, userID int64) ([]Or
 		`SELECT id, user_id, status, subtotal_minor, shipping_minor, shipping_payer,
 		        total_minor, currency, market, delivered_at,
 		        cashback_eligible, cashback_currency, idempotency_key,
-		        created_at, updated_at
+		        created_at, updated_at,
+		        COALESCE(seller_id, 0), COALESCE(checkout_session_id, '')
 		FROM order_schema.orders
 		WHERE user_id = $1
 		ORDER BY created_at DESC`, userID)
@@ -180,6 +194,7 @@ func (r *pgxOrderRepository) scanOrder(ctx context.Context, row pgx.Row) (Order,
 		&o.TotalMinor, &o.Currency, &o.Market, &o.DeliveredAt,
 		&o.CashbackEligible, &o.CashbackCurrency, &o.IdempotencyKey,
 		&o.CreatedAt, &o.UpdatedAt,
+		&o.SellerID, &o.CheckoutSessionID,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Order{}, ErrOrderNotFound
@@ -197,6 +212,7 @@ func (r *pgxOrderRepository) scanOrderRow(rows pgx.Rows) (Order, error) {
 		&o.TotalMinor, &o.Currency, &o.Market, &o.DeliveredAt,
 		&o.CashbackEligible, &o.CashbackCurrency, &o.IdempotencyKey,
 		&o.CreatedAt, &o.UpdatedAt,
+		&o.SellerID, &o.CheckoutSessionID,
 	); err != nil {
 		return Order{}, fmt.Errorf("order.repo: scan order row: %w", err)
 	}

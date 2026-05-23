@@ -29,6 +29,13 @@ type webhookConfirmer interface {
 	ConfirmWebhook(ctx context.Context, rawBody []byte, sig string) (payment.PaymentEvent, error)
 }
 
+// CaptureFinalizer is called synchronously after a successful payment capture is
+// committed to the DB. It is responsible for transitioning all orders linked to
+// the checkout session to 'paid' and committing the cart reservation.
+// When nil, those side effects are skipped (legacy single-order flow or tests).
+// providerRef == checkout_session_id / PSP invoice_id.
+type CaptureFinalizer func(ctx context.Context, providerRef string) error
+
 // WebhookHandler handles Sipay webhook POST calls with 3-layer deduplication:
 //
 //  1. Sipay HMAC-SHA512 signature verification.
@@ -40,13 +47,21 @@ type webhookConfirmer interface {
 // The Redis key is written AFTER the DB commit (not before) to avoid cache poisoning
 // on a failed transaction.
 type WebhookHandler struct {
-	adapter    webhookConfirmer
-	repo       payment.Repository
-	outboxRepo outbox.Repository
-	rdb        *redis.Client
-	market     string
-	currency   string
-	log        *slog.Logger
+	adapter          webhookConfirmer
+	repo             payment.Repository
+	outboxRepo       outbox.Repository
+	captureFinalizer CaptureFinalizer // optional; nil = no order-status side effects
+	rdb              *redis.Client
+	market           string
+	currency         string
+	log              *slog.Logger
+}
+
+// WithCaptureFinalizer attaches a CaptureFinalizer to the handler.
+// Called once during startup wiring in cmd/core-svc/main.go.
+func (h *WebhookHandler) WithCaptureFinalizer(fn CaptureFinalizer) *WebhookHandler {
+	h.captureFinalizer = fn
+	return h
 }
 
 // NewWebhookHandler constructs a WebhookHandler.
@@ -139,11 +154,13 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Layer 2 fast-path: check Redis before hitting the DB.
 	redisKey := webhookRedisKeyPrefix + ev.ProviderRef
-	exists, err := h.rdb.Exists(ctx, redisKey).Result()
-	if err == nil && exists > 0 {
-		// Already processed; return 200 to prevent Sipay from retrying.
-		w.WriteHeader(http.StatusOK)
-		return
+	if h.rdb != nil {
+		exists, redisErr := h.rdb.Exists(ctx, redisKey).Result()
+		if redisErr == nil && exists > 0 {
+			// Already processed; return 200 to prevent Sipay from retrying.
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 	}
 
 	// Layer 2 (DB) + Layer 3 (outbox UNIQUE):
@@ -204,15 +221,28 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if alreadyDone {
 		// Already in DB — still write Redis to short-circuit future duplicates.
-		_ = h.rdb.Set(ctx, redisKey, "1", webhookRedisExpiry).Err()
+		if h.rdb != nil {
+			_ = h.rdb.Set(ctx, redisKey, "1", webhookRedisExpiry).Err()
+		}
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 
 	// Layer 3 post-commit: write Redis key so future duplicates bypass the DB.
-	if err := h.rdb.Set(ctx, redisKey, "1", webhookRedisExpiry).Err(); err != nil {
-		// Non-fatal: DB is the source of truth; Redis is best-effort fast path.
-		h.log.Warn("sipay webhook: redis set failed (non-fatal)", "err", err, "key", redisKey)
+	if h.rdb != nil {
+		if err := h.rdb.Set(ctx, redisKey, "1", webhookRedisExpiry).Err(); err != nil {
+			// Non-fatal: DB is the source of truth; Redis is best-effort fast path.
+			h.log.Warn("sipay webhook: redis set failed (non-fatal)", "err", err, "key", redisKey)
+		}
+	}
+
+	// Post-commit side effects: mark orders paid and commit cart reservation.
+	if ev.Type == payment.PaymentEventCaptured && h.captureFinalizer != nil {
+		if err := h.captureFinalizer(ctx, ev.ProviderRef); err != nil {
+			// Non-fatal: the payment IS captured (in DB + outbox). Log and alert.
+			h.log.Error("sipay webhook: CaptureFinalizer failed (non-fatal, payment recorded)",
+				"err", err, "provider_ref", ev.ProviderRef)
+		}
 	}
 
 	h.log.Info("sipay webhook: processed",

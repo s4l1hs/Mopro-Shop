@@ -48,6 +48,10 @@ func (s *stubOrderSvc) CancelOrder(ctx context.Context, id int64, reason string)
 	}
 	return nil
 }
+func (s *stubOrderSvc) InitiateCheckout(_ context.Context, _ order.InitiateCheckoutRequest) (order.InitiateCheckoutResponse, error) {
+	return order.InitiateCheckoutResponse{}, nil
+}
+func (s *stubOrderSvc) MarkPaid(_ context.Context, _ int64) error { return nil }
 
 // ── payment.Service mock ──────────────────────────────────────────────────────
 
