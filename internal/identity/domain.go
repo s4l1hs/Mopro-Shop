@@ -99,33 +99,33 @@ const (
 // PII fields (Name, Phone, FullAddress, Neighborhood) are stored AES-GCM encrypted;
 // District, City, PostalCode are stored plaintext for logistics routing.
 type Address struct {
-	ID           int64
-	UserID       int64
-	Label        string
-	Name         string // decrypted display name
-	Phone        string // decrypted E.164 phone
-	FullAddress  string // decrypted street address line
-	Neighborhood string // decrypted neighborhood; empty when absent
-	District     string
-	City         string
-	PostalCode   string
-	IsDefault    bool
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID           int64 `json:"id"`
+	UserID       int64 `json:"user_id"`
+	Label        string `json:"label"`
+	Name         string `json:"name"` // decrypted display name
+	Phone        string `json:"phone"` // decrypted E.164 phone
+	FullAddress  string `json:"full_address"` // decrypted street address line
+	Neighborhood string `json:"neighborhood"` // decrypted neighborhood; empty when absent
+	District     string `json:"district"`
+	City         string `json:"city"`
+	PostalCode   string `json:"postal_code"`
+	IsDefault    bool `json:"is_default"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // AddressInput carries mutable fields for create/update address.
 // Phone is optional; when present it must be a valid E.164 number.
 type AddressInput struct {
-	Label        string
-	Name         string
-	Phone        string // optional; validated when non-empty
-	FullAddress  string
-	Neighborhood string // optional
-	District     string
-	City         string
-	PostalCode   string // optional
-	IsDefault    bool
+	Label        string `json:"label"`
+	Name         string `json:"name"`
+	Phone        string `json:"phone"` // optional; validated when non-empty
+	FullAddress  string `json:"full_address"`
+	Neighborhood string `json:"neighborhood"` // optional
+	District     string `json:"district"`
+	City         string `json:"city"`
+	PostalCode   string `json:"postal_code"` // optional
+	IsDefault    bool `json:"is_default"`
 }
 
 // AddressRow is the encrypted storage representation passed from service to repo.
