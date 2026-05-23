@@ -229,3 +229,15 @@ func TestIntegration_CommitReservation(t *testing.T) {
 		t.Fatalf("second CommitReservation must be no-op: %v", err)
 	}
 }
+
+func (alwaysValidCatalog) ListCategories(_ context.Context, _ string) ([]catalog.CategoryRow, error) {
+	return nil, nil
+}
+
+func (alwaysValidCatalog) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return nil, 0, nil
+}
+
+func (alwaysValidCatalog) SearchSummary(_ context.Context, _, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return nil, 0, nil
+}
