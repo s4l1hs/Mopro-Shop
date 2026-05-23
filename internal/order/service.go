@@ -25,7 +25,8 @@ type orderService struct {
 	outbox           outbox.Repository
 	defaultMarket    string
 	cashbackCurrency string // e.g. "TRY_COIN" for TR; read from env at startup
-	psp              payment.Service // nil for legacy NewService (no PSP call in Checkout)
+	psp              payment.Service  // nil for legacy NewService (no PSP call in Checkout)
+	diskChecker      DiskPressureChecker // nil disables disk panic check
 }
 
 // NewService constructs an order Service for the legacy single-order checkout flow.
@@ -49,6 +50,7 @@ func NewService(
 }
 
 // NewServiceFull constructs an order Service with PSP integration for InitiateCheckout.
+// diskChecker is optional (nil disables the disk panic guard in InitiateCheckout).
 func NewServiceFull(
 	repo Repository,
 	sessionRepo CheckoutSessionRepository,
@@ -58,6 +60,7 @@ func NewServiceFull(
 	defaultMarket string,
 	cashbackCurrency string,
 	psp payment.Service,
+	diskChecker DiskPressureChecker,
 ) Service {
 	return &orderService{
 		repo:             repo,
@@ -68,6 +71,7 @@ func NewServiceFull(
 		defaultMarket:    defaultMarket,
 		cashbackCurrency: cashbackCurrency,
 		psp:              psp,
+		diskChecker:      diskChecker,
 	}
 }
 

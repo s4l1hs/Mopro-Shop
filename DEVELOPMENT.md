@@ -1049,4 +1049,43 @@ All four jobs must be green before merging to `main`.
 
 ---
 
+### Disk-watch monitor (Phase 5.2)
+
+`deploy/scripts/disk-watch.sh` runs every 60 s via `disk-watch.timer` on the
+production VDS. It monitors root filesystem usage and escalates through five
+threshold levels:
+
+| Threshold | Action |
+|---|---|
+| ≥ 70 % | INFO log to `/var/log/disk-watch.log` |
+| ≥ 80 % | WARN log + Slack ping |
+| ≥ 85 % | WARN log + Slack + PagerDuty warning |
+| ≥ 90 % | ERROR log + Slack + PD error + `docker image prune -f` |
+| ≥ 92 % | PANIC log + `docker container prune` + log truncation + Redis `SET panic:disk_full 1` |
+| Recovery < 80 % | Redis `DEL panic:disk_full` + PD resolve (automatic) |
+
+**Checkout impact:** `POST /v1/checkout/initiate` returns HTTP 503 while
+`panic:disk_full = 1` in Redis. All other endpoints and financial crons are
+unaffected. The check uses a 100 ms timeout and fails open (Redis unavailable
+→ checkout proceeds normally).
+
+**NEVER** use `docker volume prune` — it destroys postgres data volumes.
+
+```bash
+# Install on the VDS (run as root, once after first deploy)
+sudo bash /opt/mopro/deploy/scripts/install-disk-watch.sh
+
+# Run tests locally (mocks all external calls)
+bash deploy/scripts/disk-watch-test.sh
+
+# View timer status
+systemctl status disk-watch.timer
+journalctl -u mopro-disk-watch -n 50 --no-pager
+
+# Check current panic flag
+redis-cli -h redis -p 6379 GET panic:disk_full
+```
+
+---
+
 **End of DEVELOPMENT.md.**

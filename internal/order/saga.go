@@ -27,6 +27,15 @@ var ErrCheckoutSessionRequired = errors.New("order: SessionID (Idempotency-Key) 
 //  5. On success: update session to psp_initiated with provider_ref.
 //  6. On failure: cancel all orders + update session to failed, return error.
 func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckoutRequest) (InitiateCheckoutResponse, error) {
+	// Disk panic guard: fail-open so a Redis outage never blocks checkout.
+	if s.diskChecker != nil {
+		checkCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+		defer cancel()
+		if s.diskChecker.IsDiskPanic(checkCtx) {
+			return InitiateCheckoutResponse{}, ErrDiskPanic
+		}
+	}
+
 	if s.psp == nil {
 		return InitiateCheckoutResponse{}, ErrPSPNotConfigured
 	}

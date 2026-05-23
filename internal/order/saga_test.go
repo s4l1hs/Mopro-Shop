@@ -87,7 +87,7 @@ func newSagaService(
 	ob outbox.Repository,
 	psp payment.Service,
 ) order.Service {
-	return order.NewServiceFull(repo, sessionRepo, cartSvc, catSvc, ob, "TR", "TRY_COIN", psp)
+	return order.NewServiceFull(repo, sessionRepo, cartSvc, catSvc, ob, "TR", "TRY_COIN", psp, nil)
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────

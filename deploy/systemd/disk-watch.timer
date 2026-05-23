@@ -1,0 +1,14 @@
+[Unit]
+Description=Mopro disk pressure monitor — runs every 60 s
+Requires=disk-watch.service
+
+[Timer]
+# Fire 60 s after the last activation (not wall-clock aligned, so bursts don't pile up).
+OnUnitActiveSec=60s
+# Randomised jitter avoids all VDS monitors firing simultaneously on multi-host setups.
+RandomizedDelaySec=10s
+# Start the first run shortly after boot rather than waiting a full minute.
+OnBootSec=30s
+
+[Install]
+WantedBy=timers.target

@@ -20,81 +20,82 @@ Every SEV1 and SEV2 needs a blameless post-mortem within 5 business days.
 
 ## 2. Disk Pressure Runbook
 
+> Full operator runbook: `docs/runbooks/disk-pressure.md`
+
 ### 2.1 Thresholds
 
-`/opt/mopro/scripts/disk-watch.sh`, cron every 5 minutes.
+`/opt/mopro/deploy/scripts/disk-watch.sh`, systemd timer every 60 s.
 
-| Disk usage | Action |
-|---|---|
-| ≥ 65% | INFO log only |
-| ≥ 75% | Slack alert: "consider cleanup" |
-| ≥ 85% | Better Stack incident, page on-call |
-| ≥ 92% | **PANIC MODE:** `ALTER SYSTEM SET default_transaction_read_only = on;` on postgres-ecom AND postgres-ledger |
+| Disk usage | Level | Automation |
+|---|---|---|
+| ≥ 70 % | INFO | Log only |
+| ≥ 80 % | WARN | Slack ping |
+| ≥ 85 % | WARN | Slack + PagerDuty warning |
+| ≥ 90 % | ERROR | Slack + PagerDuty error + `docker image prune -f` |
+| ≥ 92 % | **PANIC** | All above + `docker container prune -f --filter until=1h` + log truncation + Redis `SET panic:disk_full 1` |
+| < 80 % | RECOVERY | Redis `DEL panic:disk_full` + PD resolve (auto) |
 
 ### 2.2 Panic mode behavior
 
-When the script triggers panic:
+At 92 % the script sets `panic:disk_full = 1` in Redis. The checkout endpoint
+(`POST /v1/checkout/initiate`) reads this key with a 100 ms timeout; if set, it
+returns **HTTP 503** immediately. All other endpoints and background jobs are
+unaffected — the DB remains fully writable.
 
-1. Postgres reload picks up `default_transaction_read_only = on` for both clusters.
-2. Writes return `ERROR: cannot execute in a read-only transaction` to apps.
-3. Apps surface "system maintenance" UI.
-4. **Cashback monthly cron will FAIL gracefully** (it runs as a transaction; rollback is safe). Failed payments stay `scheduled` and the cron picks them up on next scheduled run.
-5. **Seller payout daily cron will also FAIL gracefully** (same transactional design). Affected payouts stay `scheduled`; sellers wait an extra day at most before next cron run.
-6. Slack panic webhook fires.
-7. The script does NOT auto-undo. Operator must verify cleanup is safe BEFORE switching back.
+**Cashback monthly cron** and **seller payout daily cron** continue running
+during disk panic. Only new checkout is blocked; in-flight payments and
+post-delivery financial operations proceed normally.
 
-### 2.3 disk-watch.sh
+The script does **NOT** auto-recover above 80 %. An operator must free space;
+once `df /` drops below 80 % the next timer run clears the Redis key automatically.
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-USE=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
+**NEVER** run `docker volume prune` — it destroys postgres-ecom and
+postgres-ledger data volumes. Only image prune and container prune are safe.
 
-if [ "$USE" -ge 92 ]; then
-    docker exec postgres-ecom psql -U ecom_admin -d mopro_ecom -c \
-      "ALTER SYSTEM SET default_transaction_read_only = on;" || true
-    docker exec postgres-ecom psql -U ecom_admin -c "SELECT pg_reload_conf();" || true
-    docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger -c \
-      "ALTER SYSTEM SET default_transaction_read_only = on;" || true
-    docker exec postgres-ledger psql -U ledger_admin -c "SELECT pg_reload_conf();" || true
-    curl -X POST "$SLACK_PANIC_WEBHOOK" -d "{\"text\":\"PANIC: Disk %${USE} - Postgres read-only\"}"
-elif [ "$USE" -ge 85 ]; then
-    curl -X POST "$BETTERSTACK_INCIDENT_API" -d "Disk %${USE}"
-elif [ "$USE" -ge 75 ]; then
-    curl -X POST "$SLACK_WEBHOOK" -d "{\"text\":\"Warning: Disk %${USE} - cleanup\"}"
-fi
-```
-
-### 2.4 Recovery (operator action)
+### 2.3 Recovery (operator action)
 
 ```bash
+# Check disk
 df -h /
-sudo du -h --max-depth=1 /var/lib/docker /opt/mopro 2>/dev/null | sort -h
-sudo /opt/mopro/scripts/disk-hygiene.sh
+du -sh /var/lib/docker/* /opt/mopro/logs/* 2>/dev/null | sort -h | tail -20
 
-# WAL backlog?
-docker exec postgres-ecom psql -U ecom_admin -d mopro_ecom -c \
-  "SELECT count(*) FROM pg_ls_dir('pg_wal/archive_status') WHERE name LIKE '%.ready'"
-# Fix archive_command first; DO NOT delete .ready files.
+# Safe space-recovery commands
+docker image prune -a --filter "until=168h" -f     # images unused > 7 days
+docker container prune -f                           # stopped containers
+# DO NOT: docker volume prune
 
-# Cashback table growth check
-docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger -c \
-  "SELECT pg_size_pretty(pg_total_relation_size('cashback_schema.payments'))"
-# Seller payout table growth check
-docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger -c \
-  "SELECT pg_size_pretty(pg_total_relation_size('commission_schema.seller_payouts'))"
+# Truncate large logs manually
+find /var/log -name "*.log" -size +500M -exec truncate -s 50M {} \;
 
-# When < 75%, lift read-only:
-docker exec postgres-ecom psql -U ecom_admin -d mopro_ecom -c \
-  "ALTER SYSTEM SET default_transaction_read_only = off;"
-docker exec postgres-ecom psql -U ecom_admin -d mopro_ecom -c "SELECT pg_reload_conf();"
-docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger -c \
-  "ALTER SYSTEM SET default_transaction_read_only = off;"
-docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger -c "SELECT pg_reload_conf();"
+# Confirm disk is below 80% before continuing
+df -h /
+
+# Verify panic flag is cleared (auto-clears on next timer run)
+redis-cli -h redis -p 6379 GET panic:disk_full    # should be (nil)
 
 # If cashback or seller payout cron failed during the panic window, run them manually:
 docker exec fin-svc /app/app cashback-cron --month $(date -u +%Y-%m)
 docker exec fin-svc /app/app seller-payout-cron --date $(date -u +%Y-%m-%d)
+```
+
+### 2.4 Last-resort: Postgres read-only (SEV1 only)
+
+If disk is critically low and the automated cleanup is insufficient, you can
+make both Postgres clusters read-only to prevent further data growth while
+the issue is resolved. **Do not do this routinely** — it blocks all writes
+including the financial crons.
+
+```bash
+docker exec postgres-ecom psql -U ecom_admin -d mopro_ecom -c \
+  "ALTER SYSTEM SET default_transaction_read_only = on; SELECT pg_reload_conf();"
+docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger -c \
+  "ALTER SYSTEM SET default_transaction_read_only = on; SELECT pg_reload_conf();"
+
+# Lift read-only when safe:
+docker exec postgres-ecom psql -U ecom_admin -d mopro_ecom -c \
+  "ALTER SYSTEM SET default_transaction_read_only = off; SELECT pg_reload_conf();"
+docker exec postgres-ledger psql -U ledger_admin -d mopro_ledger -c \
+  "ALTER SYSTEM SET default_transaction_read_only = off; SELECT pg_reload_conf();"
 ```
 
 ### 2.5 disk-hygiene.sh (weekly cron)
@@ -102,13 +103,15 @@ docker exec fin-svc /app/app seller-payout-cron --date $(date -u +%Y-%m-%d)
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-docker system prune -af --volumes
-find /var/lib/docker/containers/ -name "*.log" -size +100M -delete
+docker image prune -a --filter "until=168h" -f
+docker container prune -f
+# DO NOT docker volume prune
+find /var/lib/docker/containers/ -name "*.log" -size +100M -exec truncate -s 50M {} \;
 apt-get clean
 find /opt/mopro/data/postgres-ecom/pg_wal/archive_status -name "*.done" -mtime +2 -delete
 find /opt/mopro/data/postgres-ledger/pg_wal/archive_status -name "*.done" -mtime +2 -delete
 find /tmp -type f -atime +7 -delete
-echo "Disk: $(df / | awk 'NR==2 {print $5}')"
+echo "Disk: $(df -P / | awk 'NR==2 {print $5}')"
 curl -sf "https://hc-ping.com/$HEALTHCHECK_DISK_HYGIENE_UUID" || true
 ```
 

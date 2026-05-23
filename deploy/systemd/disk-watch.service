@@ -1,0 +1,32 @@
+[Unit]
+Description=Mopro disk pressure monitor
+Documentation=file:///opt/mopro/docs/runbooks/disk-pressure.md
+After=docker.service redis.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+User=mopro
+Group=mopro
+# Picks up REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, SLACK_PANIC_WEBHOOK,
+# PAGERDUTY_ROUTING_KEY from the shared secrets file (chmod 600).
+EnvironmentFile=/opt/mopro/.env
+ExecStart=/opt/mopro/deploy/scripts/disk-watch.sh
+
+# Keep the log file writable by the mopro user.
+LogsDirectory=disk-watch
+LogsDirectoryMode=0750
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mopro-disk-watch
+
+# Resource guards — this is a lightweight monitor, not a production workload.
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUQuota=20%
+
+# Restart the oneshot on failure so a transient error (e.g. df unavailable)
+# does not permanently silence the monitor until the timer fires next.
+Restart=on-failure
+RestartSec=10

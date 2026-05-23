@@ -71,6 +71,8 @@ func HandleInitiateCheckout(svc Service, userIDFromContext func(*http.Request) (
 
 func checkoutError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, ErrDiskPanic):
+		http.Error(w, `{"error":"service temporarily unavailable"}`, http.StatusServiceUnavailable)
 	case errors.Is(err, ErrEmptyCart):
 		http.Error(w, `{"error":"cart is empty"}`, http.StatusUnprocessableEntity)
 	case errors.Is(err, ErrPSPNotConfigured):

@@ -121,6 +121,7 @@ func main() {
 		cartSvc, catalogSvc, orderOutbox,
 		market, cashbackCurrency,
 		paymentSvc,
+		&redisDiskPanicChecker{rc: rc},
 	)
 
 	// ── Outbox publisher — drains order_schema.outbox → Redis Streams ───────
@@ -541,6 +542,22 @@ func jsonOK(w http.ResponseWriter, status int, v any) {
 	if err := json.NewEncoder(w).Encode(v); err != nil {
 		slog.Error("json encode error", "err", err)
 	}
+}
+
+// redisDiskPanicChecker satisfies order.DiskPressureChecker using the Redis key
+// written by disk-watch.sh when root filesystem usage reaches the panic threshold.
+// Fails open: any Redis error returns false so checkout is never blocked by a
+// Redis outage rather than actual disk pressure.
+type redisDiskPanicChecker struct {
+	rc *redis.Client
+}
+
+func (c *redisDiskPanicChecker) IsDiskPanic(ctx context.Context) bool {
+	val, err := c.rc.Get(ctx, "panic:disk_full").Result()
+	if err != nil {
+		return false // fail-open: Redis unavailable → proceed with checkout
+	}
+	return val == "1"
 }
 
 // ── Catalog handlers ──────────────────────────────────────────────────────────
