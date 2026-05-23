@@ -49,7 +49,10 @@ func (s *captureService) PostCapture(ctx context.Context, ev OrderPaidEvent) err
 	}
 
 	in := Aggregate(ev)
-	entries := Compute(in)
+	entries, err := Compute(in)
+	if err != nil {
+		return fmt.Errorf("orderledger: compute entries order=%d: %w", ev.OrderID, err)
+	}
 
 	// Resolve account IDs (reads from pool, no tx needed).
 	pspReceivableID, err := s.wallet.FindAccount(ctx, "asset:psp_receivable", ev.Currency)

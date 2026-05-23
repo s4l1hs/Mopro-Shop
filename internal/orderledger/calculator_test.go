@@ -1,10 +1,11 @@
 package orderledger
 
 import (
+	"errors"
 	"testing"
 )
 
-// helper to sum amounts for a given direction in CaptureEntries.
+// sumDir sums AmountMinor for all lines with the given direction.
 func sumDir(c CaptureEntries, dir string) int64 {
 	var total int64
 	for _, l := range c.Lines {
@@ -26,7 +27,10 @@ func TestCompute_Balanced_WithShipping(t *testing.T) {
 		ShippingMinor:   0,
 		Currency:        "TRY",
 	}
-	got := Compute(in)
+	got, err := Compute(in)
+	if err != nil {
+		t.Fatalf("Compute returned error: %v", err)
+	}
 	if sumDir(got, "D") != sumDir(got, "C") {
 		t.Fatalf("unbalanced: D=%d C=%d", sumDir(got, "D"), sumDir(got, "C"))
 	}
@@ -46,10 +50,14 @@ func TestCompute_Balanced_NoShipping(t *testing.T) {
 		ShippingMinor:   0,
 		Currency:        "TRY",
 	}
-	got := Compute(in)
+	got, err := Compute(in)
+	if err != nil {
+		t.Fatalf("Compute returned error: %v", err)
+	}
 	if sumDir(got, "D") != sumDir(got, "C") {
 		t.Fatalf("unbalanced: D=%d C=%d", sumDir(got, "D"), sumDir(got, "C"))
 	}
+	// DR psp + CR seller + CR commission + CR kdv = 4 lines (no shipping, no zero lines)
 	if len(got.Lines) != 4 {
 		t.Fatalf("expected 4 lines when shipping=0, got %d", len(got.Lines))
 	}
@@ -66,7 +74,10 @@ func TestCompute_ShippingLine_PresentWhenNonZero(t *testing.T) {
 		ShippingMinor:   1000,
 		Currency:        "TRY",
 	}
-	got := Compute(in)
+	got, err := Compute(in)
+	if err != nil {
+		t.Fatalf("Compute returned error: %v", err)
+	}
 	if sumDir(got, "D") != sumDir(got, "C") {
 		t.Fatalf("unbalanced: D=%d C=%d", sumDir(got, "D"), sumDir(got, "C"))
 	}
@@ -87,24 +98,59 @@ func TestCompute_ShippingLine_PresentWhenNonZero(t *testing.T) {
 	}
 }
 
+func TestCompute_ZeroKdv_ExcludesKdvLine(t *testing.T) {
+	// When kdv is 0, the kdv_payable line must be excluded.
+	in := CaptureInputs{
+		OrderID:         6,
+		SellerID:        60,
+		GrossMinor:      10000,
+		SellerNetMinor:  8333,
+		CommissionMinor: 1667,
+		KdvMinor:        0,
+		ShippingMinor:   0,
+		Currency:        "TRY",
+	}
+	got, err := Compute(in)
+	if err != nil {
+		t.Fatalf("Compute returned error: %v", err)
+	}
+	if sumDir(got, "D") != sumDir(got, "C") {
+		t.Fatalf("unbalanced: D=%d C=%d", sumDir(got, "D"), sumDir(got, "C"))
+	}
+	for _, l := range got.Lines {
+		if l.AmountMinor <= 0 {
+			t.Fatalf("zero-amount line emitted: %+v", l)
+		}
+		if l.AccountType == "liability:kdv_payable" {
+			t.Fatal("kdv_payable line must not be emitted when kdv=0")
+		}
+	}
+	// DR psp + CR seller + CR commission = 3 lines
+	if len(got.Lines) != 3 {
+		t.Fatalf("expected 3 lines when kdv=0 and shipping=0, got %d", len(got.Lines))
+	}
+}
+
 func TestCompute_CommissionAbsorbsTruncation(t *testing.T) {
-	// Items compute: gross=10001, seller_net=7999, kdv=400, shipping=0.
-	// By formula: commission_revenue = 10001 - 7999 - 400 - 0 = 1602
+	// gross=10001, sellerNet=7999, kdv=400, shipping=0 →
+	// commissionRevenue = 10001 - 7999 - 400 = 1602 (absorbs the +1 residual)
 	in := CaptureInputs{
 		OrderID:         4,
 		SellerID:        40,
 		GrossMinor:      10001,
 		SellerNetMinor:  7999,
-		CommissionMinor: 1601, // pre-computed audit value (may differ by 1)
+		CommissionMinor: 1601, // pre-computed audit value (differs by 1)
 		KdvMinor:        400,
 		ShippingMinor:   0,
 		Currency:        "TRY",
 	}
-	got := Compute(in)
+	got, err := Compute(in)
+	if err != nil {
+		t.Fatalf("Compute returned error: %v", err)
+	}
 	if sumDir(got, "D") != sumDir(got, "C") {
 		t.Fatalf("unbalanced: D=%d C=%d", sumDir(got, "D"), sumDir(got, "C"))
 	}
-	// commission_revenue (by formula) should absorb the +1
 	for _, l := range got.Lines {
 		if l.AccountType == "equity:retained_commission" {
 			if l.AmountMinor != 1602 {
@@ -125,13 +171,52 @@ func TestCompute_SellerPayableHasSellerID(t *testing.T) {
 		ShippingMinor:   0,
 		Currency:        "TRY",
 	}
-	got := Compute(in)
+	got, err := Compute(in)
+	if err != nil {
+		t.Fatalf("Compute returned error: %v", err)
+	}
 	for _, l := range got.Lines {
 		if l.AccountType == "liability:seller_payable" {
 			if l.SellerID != in.SellerID {
 				t.Fatalf("seller_payable SellerID=%d, want %d", l.SellerID, in.SellerID)
 			}
 		}
+	}
+}
+
+func TestCompute_BelowMinGross_ReturnsError(t *testing.T) {
+	for _, gross := range []int64{0, 1, 50, 99} {
+		in := CaptureInputs{
+			OrderID:        7,
+			SellerID:       1,
+			GrossMinor:     gross,
+			SellerNetMinor: gross,
+			Currency:       "TRY",
+		}
+		_, err := Compute(in)
+		if !errors.Is(err, ErrInvalidCaptureInput) {
+			t.Fatalf("gross=%d: expected ErrInvalidCaptureInput, got %v", gross, err)
+		}
+	}
+}
+
+func TestCompute_AtMinGross_NoError(t *testing.T) {
+	in := CaptureInputs{
+		OrderID:         8,
+		SellerID:        1,
+		GrossMinor:      100,
+		SellerNetMinor:  80,
+		CommissionMinor: 16,
+		KdvMinor:        4,
+		ShippingMinor:   0,
+		Currency:        "TRY",
+	}
+	got, err := Compute(in)
+	if err != nil {
+		t.Fatalf("gross=100 should be valid, got error: %v", err)
+	}
+	if sumDir(got, "D") != sumDir(got, "C") {
+		t.Fatalf("unbalanced at min gross: D=%d C=%d", sumDir(got, "D"), sumDir(got, "C"))
 	}
 }
 
