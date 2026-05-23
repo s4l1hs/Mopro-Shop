@@ -24,7 +24,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/mopro/platform/internal/eventbus"
 )
@@ -187,6 +189,9 @@ func (p *Publisher) drainGraceful() error {
 	return nil
 }
 
+// outboxTracer is used for batch-level spans in RunBatch.
+var outboxTracer = otel.GetTracerProvider().Tracer("github.com/mopro/platform/internal/outbox")
+
 // RunBatch executes one drain cycle: claims up to p.batchSize rows from the outbox
 // table (SELECT FOR UPDATE SKIP LOCKED), publishes each to Redis Streams, then marks
 // them published. Returns the number of rows successfully published.
@@ -204,8 +209,15 @@ func (p *Publisher) drainGraceful() error {
 func (p *Publisher) RunBatch(ctx context.Context) (int, error) {
 	p.redisErrCount = 0
 
+	ctx, span := outboxTracer.Start(ctx, "outbox.run_batch",
+		trace.WithSpanKind(trace.SpanKindProducer),
+	)
+	defer span.End()
+
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return 0, fmt.Errorf("outbox: begin batch tx: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }() // no-op after Commit; cleans up on all error paths
@@ -266,8 +278,11 @@ func (p *Publisher) RunBatch(ctx context.Context) (int, error) {
 
 	if err := tx.Commit(ctx); err != nil {
 		// Rare: PG network error at commit time. All XADDed rows will be re-delivered.
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
 		return 0, fmt.Errorf("outbox: commit batch tx: %w", err)
 	}
+	span.SetAttributes(attribute.Int("outbox.published", published))
 	return published, nil
 }
 

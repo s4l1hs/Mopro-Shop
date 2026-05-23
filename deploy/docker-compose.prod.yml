@@ -375,6 +375,9 @@ services:
       SIPAY_APP_ID: "${SIPAY_APP_ID}"
       SIPAY_APP_SECRET: "${SIPAY_APP_SECRET}"
       SIPAY_MERCHANT_ID: "${SIPAY_MERCHANT_ID:-}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "grafana-agent:4317"
+      OTEL_SERVICE_NAME: "core-svc"
+      OTEL_RESOURCE_ATTRIBUTES: "market=${MARKET:-TR},deployment.environment=${ENV:-prod}"
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -397,6 +400,9 @@ services:
       MARKET: "${MARKET:-TR}"
       DEFAULT_CURRENCY: "${DEFAULT_CURRENCY:-TRY}"
       SLACK_DLQ_WEBHOOK_URL: "${SLACK_DLQ_WEBHOOK_URL:-}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "grafana-agent:4317"
+      OTEL_SERVICE_NAME: "fin-svc"
+      OTEL_RESOURCE_ATTRIBUTES: "market=${MARKET:-TR},deployment.environment=${ENV:-prod}"
     ports:
       - "127.0.0.1:8081:8081"
     depends_on:
@@ -419,6 +425,9 @@ services:
     environment:
       SVC_NAME: jobs-svc
       MARKET: "${MARKET:-TR}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "grafana-agent:4317"
+      OTEL_SERVICE_NAME: "jobs-svc"
+      OTEL_RESOURCE_ATTRIBUTES: "market=${MARKET:-TR},deployment.environment=${ENV:-prod}"
     ports:
       - "127.0.0.1:8082:8080"
     depends_on:
@@ -434,7 +443,7 @@ services:
     container_name: grafana-agent
     image: grafana/agent:latest
     restart: unless-stopped
-    networks: [mopro-net]
+    networks: [mopro-net, mopro-fin-net]
     mem_limit: 300m
     cpus: '0.3'
     cap_drop: [ALL]

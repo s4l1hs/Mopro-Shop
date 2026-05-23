@@ -20,10 +20,12 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/mopro/platform/pkg/logx"
 	"github.com/mopro/platform/pkg/slack"
 )
 
@@ -196,11 +198,22 @@ func (b *RedisBus) consumeBatch(
 		args.Block = xreadBlockMS
 	}
 
-	streams, err := b.client.XReadGroup(ctx, args).Result()
+	batchCtx, batchSpan := b.tracer.Start(ctx, "eventbus.xreadgroup:"+topic,
+		trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "redis"),
+			attribute.String("messaging.destination", topic),
+			attribute.String("messaging.consumer_group", group),
+		),
+	)
+	defer batchSpan.End()
+
+	streams, err := b.client.XReadGroup(batchCtx, args).Result()
 	if err != nil {
 		if err == redis.Nil || ctx.Err() != nil {
 			return // BLOCK timeout or context cancellation — both normal
 		}
+		batchSpan.RecordError(err)
 		b.log.Error("eventbus.xreadgroup_failed",
 			slog.String("stream", topic),
 			slog.String("group", group),
@@ -212,6 +225,7 @@ func (b *RedisBus) consumeBatch(
 	}
 
 	for _, stream := range streams {
+		batchSpan.SetAttributes(attribute.Int("messaging.batch.message_count", len(stream.Messages)))
 		b.log.Info("eventbus.batch_received",
 			slog.String("stream", topic),
 			slog.String("group", group),
@@ -295,6 +309,12 @@ func (b *RedisBus) dispatchMessage(
 
 	// Inject remote span context: links consumer span to producer span in Grafana Tempo.
 	handlerCtx := injectRemoteSpan(ctx, ev)
+	handlerCtx = logx.With(handlerCtx,
+		slog.String("event_type", ev.EventType),
+		slog.String("idempotency_key", ev.IdempotencyKey),
+		slog.String("market", ev.Market),
+		slog.String("trace_id", ev.TraceID),
+	)
 	handlerCtx, span := b.tracer.Start(handlerCtx,
 		"eventbus.handle:"+ev.EventType,
 		trace.WithSpanKind(trace.SpanKindConsumer),

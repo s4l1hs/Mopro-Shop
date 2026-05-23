@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -39,6 +38,8 @@ import (
 	"github.com/mopro/platform/internal/shipping/surat"
 	"github.com/mopro/platform/pkg/dbx"
 	"github.com/mopro/platform/pkg/httpx"
+	"github.com/mopro/platform/pkg/logx"
+	"github.com/mopro/platform/pkg/otelx"
 	"github.com/mopro/platform/pkg/slack"
 )
 
@@ -49,7 +50,21 @@ func main() {
 	market := os.Getenv("MARKET")
 	defaultCurrency := os.Getenv("DEFAULT_CURRENCY")
 	defaultLocale := os.Getenv("DEFAULT_LOCALE")
-	log.Printf("starting core-svc market=%s", market)
+	logx.Setup("core-svc", market)
+
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	otelShutdown, err := otelx.Init(initCtx, otelx.Config{
+		ServiceName:  "core-svc",
+		Market:       market,
+		OTLPEndpoint: otelEndpoint,
+	})
+	if err != nil {
+		slog.Warn("core-svc: OTel init failed, traces disabled", "err", err)
+		otelShutdown = func(_ context.Context) error { return nil }
+	}
+	defer func() { _ = otelShutdown(context.Background()) }()
+
+	slog.Info("core-svc: starting", "market", market)
 
 	// ── Database pool for catalog (connects through pgbouncer-ecom) ──────────
 	catalogDSN := buildCatalogDSN()
@@ -413,20 +428,21 @@ func main() {
 	}()
 	slog.Info("core-svc: starting", "market", market, "addr", srv.Addr)
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		log.Fatal(err)
+		slog.Error("core-svc: http server exited unexpectedly", "err", err)
 	}
 }
 
 func mustEnv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
-		log.Fatalf("core-svc: required env %s is not set", key)
+		slog.Error("core-svc: required env not set", "key", key)
+		os.Exit(1)
 	}
 	return v
 }
 
 // mustParseDuration reads key from env; if absent or empty returns def.
-// If the value is present but not parseable, log.Fatal (bad config = startup abort).
+// If the value is present but not parseable, it exits (bad config = startup abort).
 func mustParseDuration(key, def string) time.Duration {
 	v := os.Getenv(key)
 	if v == "" {
@@ -435,7 +451,8 @@ func mustParseDuration(key, def string) time.Duration {
 	}
 	d, err := time.ParseDuration(v)
 	if err != nil {
-		log.Fatalf("core-svc: env %s=%q is not a valid duration: %v", key, v, err)
+		slog.Error("core-svc: invalid duration env", "key", key, "value", v, "err", err)
+		os.Exit(1)
 	}
 	return d
 }

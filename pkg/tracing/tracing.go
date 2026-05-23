@@ -1,17 +1,22 @@
-// Package tracing initialises OpenTelemetry distributed tracing for Grafana Tempo.
+// Package tracing is retained for import-path compatibility.
+// New code should use pkg/otelx directly.
 package tracing
 
 import (
-	"go.opentelemetry.io/otel"
+	"context"
+	"os"
+
 	"go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/mopro/platform/pkg/otelx"
 )
 
-// Init configures a global TracerProvider for the named service.
-// TODO(mopro:placeholder): configure OTLP exporter pointing at Grafana Agent
-// Unblocked by: Phase 1 (GRAFANA_TEMPO_* env vars and deploy/grafana-agent/agent.yaml)
+// Init configures a global TracerProvider with an OTLP gRPC exporter.
+// Deprecated: call otelx.Init directly for full configuration control.
 func Init(serviceName string) (*trace.TracerProvider, error) {
-	tp := trace.NewTracerProvider()
-	otel.SetTracerProvider(tp)
-	_ = serviceName
-	return tp, nil
+	_, err := otelx.Init(context.Background(), otelx.Config{
+		ServiceName: serviceName,
+		Market:      os.Getenv("MARKET"),
+	})
+	return nil, err
 }

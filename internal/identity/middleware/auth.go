@@ -3,10 +3,15 @@ package middleware
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"strings"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/mopro/platform/internal/identity/jwt"
+	"github.com/mopro/platform/pkg/logx"
 )
 
 type contextKey string
@@ -38,6 +43,10 @@ func RequireAuth(signer jwt.Signer) func(http.Handler) http.Handler {
 			}
 			ctx := context.WithValue(r.Context(), ctxKeyUserID, claims.UserID)
 			ctx = context.WithValue(ctx, ctxKeyClaims, claims)
+			// Attach user_id to the active OTel span and inject it into the ctx logger.
+			span := trace.SpanFromContext(ctx)
+			span.SetAttributes(attribute.Int64("user_id", claims.UserID))
+			ctx = logx.With(ctx, slog.Int64("user_id", claims.UserID))
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

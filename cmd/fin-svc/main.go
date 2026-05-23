@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -28,6 +27,8 @@ import (
 	"github.com/mopro/platform/internal/sellerpayout/sipay"
 	"github.com/mopro/platform/internal/wallet"
 	"github.com/mopro/platform/pkg/healthcheck"
+	"github.com/mopro/platform/pkg/logx"
+	"github.com/mopro/platform/pkg/otelx"
 	"github.com/mopro/platform/pkg/pagerduty"
 	"github.com/mopro/platform/pkg/slack"
 	"github.com/mopro/platform/pkg/timex"
@@ -40,6 +41,19 @@ func main() {
 	market := mustEnv("MARKET")
 	defaultCurrency := mustEnv("DEFAULT_CURRENCY")
 	cashbackCurrency := mustEnv("DEFAULT_CASHBACK_CURRENCY")
+	logx.Setup("fin-svc", market)
+
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	otelShutdown, err := otelx.Init(initCtx, otelx.Config{
+		ServiceName:  "fin-svc",
+		Market:       market,
+		OTLPEndpoint: otelEndpoint,
+	})
+	if err != nil {
+		slog.Warn("fin-svc: OTel init failed, traces disabled", "err", err)
+		otelShutdown = func(_ context.Context) error { return nil }
+	}
+	defer func() { _ = otelShutdown(context.Background()) }()
 
 	// ── postgres-ledger pool ─────────────────────────────────────────────────
 	ledgerDSN := mustEnv("LEDGER_DATABASE_URL")
@@ -311,7 +325,8 @@ func extraMarkets() []string {
 func mustEnv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
-		log.Fatalf("fin-svc: required env %s is not set", key)
+		slog.Error("fin-svc: required env not set", "key", key)
+		os.Exit(1)
 	}
 	return v
 }

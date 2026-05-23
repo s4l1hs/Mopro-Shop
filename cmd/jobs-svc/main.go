@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -16,6 +15,8 @@ import (
 
 	"github.com/mopro/platform/internal/eventbus"
 	"github.com/mopro/platform/internal/notification"
+	"github.com/mopro/platform/pkg/logx"
+	"github.com/mopro/platform/pkg/otelx"
 	pkg_slack "github.com/mopro/platform/pkg/slack"
 )
 
@@ -23,6 +24,19 @@ func main() {
 	initCtx := context.Background()
 
 	market := mustEnv("MARKET")
+	logx.Setup("jobs-svc", market)
+
+	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	otelShutdown, err := otelx.Init(initCtx, otelx.Config{
+		ServiceName:  "jobs-svc",
+		Market:       market,
+		OTLPEndpoint: otelEndpoint,
+	})
+	if err != nil {
+		slog.Warn("jobs-svc: OTel init failed, traces disabled", "err", err)
+		otelShutdown = func(_ context.Context) error { return nil }
+	}
+	defer func() { _ = otelShutdown(context.Background()) }()
 
 	// ── postgres-ecom pool (for notification dedup store) ────────────────────────
 	ecomDSN := mustEnv("NOTIFICATION_DATABASE_URL")
@@ -101,7 +115,8 @@ func main() {
 func mustEnv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
-		log.Fatalf("jobs-svc: required env %s is not set", key)
+		slog.Error("jobs-svc: required env not set", "key", key)
+		os.Exit(1)
 	}
 	return v
 }
