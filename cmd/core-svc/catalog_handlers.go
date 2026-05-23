@@ -32,7 +32,7 @@ func handleListCategories(svc catalog.Service, defaultLocale string) http.Handle
 }
 
 // handleListProducts handles GET /v1/products?category_id=X&page=1&per_page=20
-func handleListProducts(svc catalog.Service, defaultLocale, defaultMarket string) http.HandlerFunc {
+func handleListProducts(svc catalog.Service, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		categoryIDStr := q.Get("category_id")
@@ -65,12 +65,12 @@ func handleListProducts(svc catalog.Service, defaultLocale, defaultMarket string
 			return
 		}
 
-		jsonOK(w, http.StatusOK, buildProductListResponse(rows, total, page, perPage))
+		jsonOK(w, http.StatusOK, buildProductListResponse(rows, total, page, perPage, cashbackCurrency))
 	}
 }
 
 // handleSearch handles GET /v1/search?q=...&page=1&per_page=20
-func handleSearch(svc catalog.Service, defaultLocale, defaultMarket string) http.HandlerFunc {
+func handleSearch(svc catalog.Service, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		query := q.Get("q")
@@ -98,7 +98,7 @@ func handleSearch(svc catalog.Service, defaultLocale, defaultMarket string) http
 			return
 		}
 
-		jsonOK(w, http.StatusOK, buildProductListResponse(rows, total, page, perPage))
+		jsonOK(w, http.StatusOK, buildProductListResponse(rows, total, page, perPage, cashbackCurrency))
 	}
 }
 
@@ -138,10 +138,10 @@ func handleGetProductDetail(svc catalog.Service, defaultMarket, cashbackCurrency
 				yearlyYield := commMinor * referenceInterestRateBps / 10000
 				monthlyMinor := yearlyYield / 12
 				cashbackPreview = &cashbackPreviewJSON{
-					MonthlyAmountMinor:    monthlyMinor,
-					Currency:              cashbackCurrency,
-					ReferenceRateBps:      referenceInterestRateBps,
-					CommissionPctBps:      comm.CommissionPctBps,
+					MonthlyAmountMinor: monthlyMinor,
+					Currency:           cashbackCurrency,
+					ReferenceRateBps:   referenceInterestRateBps,
+					CommissionPctBps:   comm.CommissionPctBps,
 				}
 			}
 		}
@@ -212,11 +212,16 @@ type productSummaryJSON struct {
 	PriceCurrency    string `json:"price_currency"`
 	CoverImageURL    string `json:"cover_image_url,omitempty"`
 	CommissionPctBps int    `json:"commission_pct_bps"`
+
+	CashbackPreview cashbackPreviewJSON `json:"cashback_preview"`
 }
 
-func buildProductListResponse(rows []catalog.ProductSummaryRow, total, page, perPage int) map[string]any {
+func buildProductListResponse(rows []catalog.ProductSummaryRow, total, page, perPage int, cashbackCurrency string) map[string]any {
 	out := make([]productSummaryJSON, len(rows))
 	for i, r := range rows {
+		commMinor := r.PriceMinor * int64(r.CommissionPctBps) / 10000
+		yearlyYield := commMinor * referenceInterestRateBps / 10000
+		monthlyMinor := yearlyYield / 12
 		out[i] = productSummaryJSON{
 			ID:               r.ID,
 			SellerID:         r.SellerID,
@@ -228,6 +233,17 @@ func buildProductListResponse(rows []catalog.ProductSummaryRow, total, page, per
 			PriceCurrency:    r.PriceCurrency,
 			CoverImageURL:    mediaurl.CDNUrl(r.CoverImageKey),
 			CommissionPctBps: r.CommissionPctBps,
+
+			CashbackPreview: cashbackPreviewJSON{
+
+				MonthlyAmountMinor: monthlyMinor,
+
+				Currency: cashbackCurrency,
+
+				ReferenceRateBps: referenceInterestRateBps,
+
+				CommissionPctBps: r.CommissionPctBps,
+			},
 		}
 	}
 	totalPages := 0

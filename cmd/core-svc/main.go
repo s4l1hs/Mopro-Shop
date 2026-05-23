@@ -242,7 +242,7 @@ func main() {
 		httpx.TraceAndLog(http.HandlerFunc(handleCreateProduct(catalogSvc, defaultCurrency, defaultLocale))),
 	)
 	mux.Handle("GET /v1/products",
-		httpx.TraceAndLog(http.HandlerFunc(handleListProducts(catalogSvc, defaultLocale, market))),
+		httpx.TraceAndLog(http.HandlerFunc(handleListProducts(catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)
 	mux.Handle("GET /v1/products/{id}",
 		httpx.TraceAndLog(http.HandlerFunc(handleGetProductDetail(catalogSvc, market, cashbackCurrency))),
@@ -260,7 +260,7 @@ func main() {
 		httpx.TraceAndLog(http.HandlerFunc(handleGetCommission(catalogSvc, market))),
 	)
 	mux.Handle("GET /v1/search",
-		httpx.TraceAndLog(http.HandlerFunc(handleSearch(catalogSvc, defaultLocale, market))),
+		httpx.TraceAndLog(http.HandlerFunc(handleSearch(catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)
 	mux.Handle("GET /v1/banners",
 		httpx.TraceAndLog(http.HandlerFunc(handleListBanners())),
@@ -441,7 +441,6 @@ func requireIdempotencyKey(w http.ResponseWriter, r *http.Request) bool {
 	}
 	return true
 }
-
 
 // parseLocale extracts the best-match locale from Accept-Language, falling back to def.
 func parseLocale(r *http.Request, def string) string {
@@ -1052,10 +1051,10 @@ func handleSellerBreakdown(svc order.Service) http.HandlerFunc {
 		}
 
 		jsonOK(w, http.StatusOK, map[string]any{
-			"order_id":      o.ID,
-			"order_status":  o.Status,
-			"seller_id":     sellerID,
-			"items":         breakdown,
+			"order_id":     o.ID,
+			"order_status": o.Status,
+			"seller_id":    sellerID,
+			"items":        breakdown,
 		})
 	}
 }
