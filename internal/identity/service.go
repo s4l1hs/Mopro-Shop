@@ -17,6 +17,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	pkgcrypto "github.com/mopro/platform/pkg/crypto"
+	"github.com/mopro/platform/pkg/metrics"
 
 	"github.com/mopro/platform/internal/identity/jwt"
 	"github.com/mopro/platform/internal/identity/ratelimit"
@@ -38,10 +39,12 @@ type serviceImpl struct {
 	market        string
 	defaultLocale string
 	log           *slog.Logger
+	biz           *metrics.BusinessMetrics // nil disables business KPI counters
 }
 
 // NewService constructs a Service.
 // Panics at startup if DEV_OTP_ACCEPT_ANY=true is combined with ENV=production.
+// biz is optional (nil disables business KPI metrics).
 func NewService(
 	repo Repository,
 	smsProv sms.Provider,
@@ -50,6 +53,7 @@ func NewService(
 	market string,
 	defaultLocale string,
 	log *slog.Logger,
+	biz *metrics.BusinessMetrics,
 ) Service {
 	if os.Getenv("DEV_OTP_ACCEPT_ANY") == "true" && os.Getenv("ENV") == "production" {
 		panic("identity: DEV_OTP_ACCEPT_ANY=true is forbidden on ENV=production")
@@ -65,12 +69,14 @@ func NewService(
 		market:        market,
 		defaultLocale: defaultLocale,
 		log:           log,
+		biz:           biz,
 	}
 }
 
 // ── RequestOTP ────────────────────────────────────────────────────────────────
 
 func (s *serviceImpl) RequestOTP(ctx context.Context, phoneE164 string, purpose string, clientIP string) error {
+	s.biz.IncOTPRequest("core-svc", purpose)
 	if err := validatePhone(phoneE164); err != nil {
 		return err
 	}
@@ -123,18 +129,22 @@ func (s *serviceImpl) VerifyOTP(ctx context.Context, phoneE164 string, purpose s
 
 	otp, err := s.repo.FindLatestOTP(ctx, phoneHash, purpose)
 	if errors.Is(err, ErrOTPNotFound) {
+		s.biz.IncOTPVerifyOutcome("core-svc", "not_found")
 		return TokenPair{}, ErrOTPNotFound
 	}
 	if err != nil {
 		return TokenPair{}, fmt.Errorf("identity: find otp: %w", err)
 	}
 	if time.Now().After(otp.ExpiresAt) {
+		s.biz.IncOTPVerifyOutcome("core-svc", "expired")
 		return TokenPair{}, ErrOTPExpired
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(otp.CodeHash), []byte(code)); err != nil {
 		if ferr := s.limiter.RecordVerifyFailure(ctx, phoneHash); ferr != nil {
+			s.biz.IncOTPVerifyOutcome("core-svc", "rate_limited")
 			return TokenPair{}, mapRatelimitErr(ferr)
 		}
+		s.biz.IncOTPVerifyOutcome("core-svc", "invalid")
 		return TokenPair{}, ErrOTPInvalid
 	}
 	if err := s.limiter.ResetVerifyFailures(ctx, phoneHash); err != nil {
@@ -153,15 +163,18 @@ func (s *serviceImpl) VerifyOTP(ctx context.Context, phoneE164 string, purpose s
 		return TokenPair{}, fmt.Errorf("identity: create session: %w", err)
 	}
 	if user.Status == StatusDeleted {
+		s.biz.IncOTPVerifyOutcome("core-svc", "deleted")
 		return TokenPair{}, ErrUserDeleted
 	}
 	if user.Status == StatusSuspended {
+		s.biz.IncOTPVerifyOutcome("core-svc", "suspended")
 		return TokenPair{}, ErrUserSuspended
 	}
 	accessToken, _, err := s.signer.IssueAccess(user.ID, s.market)
 	if err != nil {
 		return TokenPair{}, fmt.Errorf("identity: issue access token: %w", err)
 	}
+	s.biz.IncOTPVerifyOutcome("core-svc", "success")
 	return TokenPair{
 		AccessToken:      accessToken,
 		RefreshToken:     rtc.raw,

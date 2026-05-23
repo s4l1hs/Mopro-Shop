@@ -9,21 +9,24 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mopro/platform/internal/ledger"
+	"github.com/mopro/platform/pkg/metrics"
 )
 
 type captureService struct {
 	repo   Repository
 	wallet WalletPoster
 	log    *slog.Logger
+	biz    *metrics.BusinessMetrics // nil disables business KPI counters
 }
 
 // NewService constructs a Service.
 // wallet is satisfied by wallet.Service (injected from fin-svc/main.go).
-func NewService(repo Repository, wallet WalletPoster, log *slog.Logger) Service {
+// biz is optional (nil disables business KPI metrics).
+func NewService(repo Repository, wallet WalletPoster, log *slog.Logger, biz *metrics.BusinessMetrics) Service {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &captureService{repo: repo, wallet: wallet, log: log}
+	return &captureService{repo: repo, wallet: wallet, log: log, biz: biz}
 }
 
 // PostCapture posts the 4-or-5-entry balanced ledger transaction for a PSP
@@ -166,5 +169,6 @@ func (s *captureService) PostCapture(ctx context.Context, ev OrderPaidEvent) err
 		"gross_minor", in.GrossMinor,
 		"transaction_id", txnID,
 	)
+	s.biz.IncOrderLedgerPosting("fin-svc", ev.Market)
 	return nil
 }

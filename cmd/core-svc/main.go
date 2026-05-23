@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/mopro/platform/internal/cart"
@@ -36,9 +37,8 @@ import (
 	"github.com/mopro/platform/internal/shipping/hepsijet"
 	"github.com/mopro/platform/internal/shipping/mng"
 	"github.com/mopro/platform/internal/shipping/surat"
-	"github.com/mopro/platform/pkg/dbx"
-	"github.com/mopro/platform/pkg/httpx"
 	"github.com/mopro/platform/pkg/logx"
+	"github.com/mopro/platform/pkg/metrics"
 	"github.com/mopro/platform/pkg/otelx"
 	"github.com/mopro/platform/pkg/slack"
 )
@@ -64,11 +64,27 @@ func main() {
 	}
 	defer func() { _ = otelShutdown(context.Background()) }()
 
+	// ── Prometheus metrics (registry + all metrics pre-instantiated at startup) ─
+	metricsReg := metrics.New("core-svc")
+	httpM := metrics.NewHTTPMetrics(metricsReg)
+	dbM := metrics.NewDBMetrics(metricsReg)
+	redisM := metrics.NewRedisMetrics(metricsReg)
+	metrics.NewEventBusMetrics(metricsReg)
+	outboxM := metrics.NewOutboxMetrics(metricsReg)
+	bizM := metrics.NewBusinessMetrics(metricsReg)
+	// /metrics server starts after signal ctx is created below.
+
 	slog.Info("core-svc: starting", "market", market)
 
 	// ── Database pool for catalog (connects through pgbouncer-ecom) ──────────
 	catalogDSN := buildCatalogDSN()
-	pool, err := dbx.Connect(initCtx, catalogDSN)
+	poolCfg, err := pgxpool.ParseConfig(catalogDSN)
+	if err != nil {
+		slog.Error("catalog: failed to parse DB DSN", "err", err)
+		os.Exit(1)
+	}
+	dbM.WirePool(poolCfg, "core-svc")
+	pool, err := pgxpool.NewWithConfig(initCtx, poolCfg)
 	if err != nil {
 		slog.Error("catalog: failed to create DB pool", "err", err)
 		os.Exit(1)
@@ -84,6 +100,7 @@ func main() {
 		slog.Error("cart: failed to connect to Redis", "err", err)
 		os.Exit(1)
 	}
+	rc.AddHook(redisM.Hook("core-svc"))
 
 	// ── Cart module wiring (loads Lua EVALSHA at startup) ───────────────────
 	cartRepo, err := cart.NewRepository(initCtx, rc)
@@ -95,6 +112,12 @@ func main() {
 
 	// ── Signal-aware context for goroutines + HTTP shutdown ─────────────────
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
+
+	go metrics.StartServer(ctx, metricsReg, "0.0.0.0:9100", slog.Default())
+	metricsReg.AssertCardinalityUnder(10_000)
+	httpTrace = func(h http.Handler) http.Handler {
+		return otelx.TraceLogAndMetrics(httpM, "core-svc", h)
+	}
 
 	// ── Order module wiring ──────────────────────────────────────────────────
 	cashbackCurrency := mustEnv("DEFAULT_CASHBACK_CURRENCY")
@@ -122,6 +145,7 @@ func main() {
 		market, cashbackCurrency,
 		paymentSvc,
 		&redisDiskPanicChecker{rc: rc},
+		bizM,
 	)
 
 	// ── Outbox publisher — drains order_schema.outbox → Redis Streams ───────
@@ -129,6 +153,7 @@ func main() {
 	pub, err := outbox.NewPublisher(pool, orderOutbox, bus, slog.Default(),
 		outbox.WithServiceName("core"),
 		outbox.WithLagTable("order_schema.outbox"),
+		outbox.WithOutboxMetrics(outboxM),
 	)
 	if err != nil {
 		slog.Error("core-svc: outbox publisher init", "err", err)
@@ -270,6 +295,7 @@ func main() {
 	identitySvc := identity.NewService(
 		identityRepo, smsProv, identityLimiter, jwtSigner,
 		market, defaultLocale, slog.Default(),
+		bizM,
 	)
 	cleanup.StartCleanupWorker(ctx, pool, slog.Default())
 
@@ -287,73 +313,73 @@ func main() {
 
 	// Catalog routes
 	mux.Handle("POST /v1/products",
-		httpx.TraceAndLog(http.HandlerFunc(handleCreateProduct(catalogSvc, defaultCurrency, defaultLocale))),
+		httpTrace(http.HandlerFunc(handleCreateProduct(catalogSvc, defaultCurrency, defaultLocale))),
 	)
 	mux.Handle("GET /v1/products",
-		httpx.TraceAndLog(http.HandlerFunc(handleListProducts(catalogSvc, defaultLocale, market, cashbackCurrency))),
+		httpTrace(http.HandlerFunc(handleListProducts(catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)
 	mux.Handle("GET /v1/products/{id}",
-		httpx.TraceAndLog(http.HandlerFunc(handleGetProductDetail(catalogSvc, market, cashbackCurrency))),
+		httpTrace(http.HandlerFunc(handleGetProductDetail(catalogSvc, market, cashbackCurrency))),
 	)
 	mux.Handle("POST /v1/products/{id}/variants",
-		httpx.TraceAndLog(http.HandlerFunc(handleAddVariant(catalogSvc, defaultCurrency))),
+		httpTrace(http.HandlerFunc(handleAddVariant(catalogSvc, defaultCurrency))),
 	)
 	mux.Handle("PUT /v1/products/{id}/translations/{locale}",
-		httpx.TraceAndLog(http.HandlerFunc(handleUpdateTranslation(catalogSvc))),
+		httpTrace(http.HandlerFunc(handleUpdateTranslation(catalogSvc))),
 	)
 	mux.Handle("GET /v1/categories",
-		httpx.TraceAndLog(http.HandlerFunc(handleListCategories(catalogSvc, defaultLocale))),
+		httpTrace(http.HandlerFunc(handleListCategories(catalogSvc, defaultLocale))),
 	)
 	mux.Handle("GET /v1/categories/{id}/commission",
-		httpx.TraceAndLog(http.HandlerFunc(handleGetCommission(catalogSvc, market))),
+		httpTrace(http.HandlerFunc(handleGetCommission(catalogSvc, market))),
 	)
 	mux.Handle("GET /v1/search",
-		httpx.TraceAndLog(http.HandlerFunc(handleSearch(catalogSvc, defaultLocale, market, cashbackCurrency))),
+		httpTrace(http.HandlerFunc(handleSearch(catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)
 	mux.Handle("GET /v1/banners",
-		httpx.TraceAndLog(http.HandlerFunc(handleListBanners())),
+		httpTrace(http.HandlerFunc(handleListBanners())),
 	)
 	mux.Handle("GET /v1/recommendations",
-		httpx.TraceAndLog(http.HandlerFunc(handleListRecommendations())),
+		httpTrace(http.HandlerFunc(handleListRecommendations())),
 	)
 
 	// Address routes — require JWT authentication (IDOR-safe: user_id from JWT)
 	mux.Handle("GET /v1/addresses",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleListAddresses(identitySvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleListAddresses(identitySvc)))),
 	)
 	mux.Handle("POST /v1/addresses",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleCreateAddress(identitySvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleCreateAddress(identitySvc)))),
 	)
 	mux.Handle("GET /v1/addresses/{id}",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleGetAddress(identitySvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleGetAddress(identitySvc)))),
 	)
 	mux.Handle("PUT /v1/addresses/{id}",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleUpdateAddress(identitySvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleUpdateAddress(identitySvc)))),
 	)
 	mux.Handle("DELETE /v1/addresses/{id}",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleDeleteAddress(identitySvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleDeleteAddress(identitySvc)))),
 	)
 
 	// Cart routes — require JWT authentication
 	mux.Handle("POST /v1/cart/items",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleCartAddItem(cartSvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleCartAddItem(cartSvc)))),
 	)
 	mux.Handle("DELETE /v1/cart/items/{variant_id}",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleCartRemoveItem(cartSvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleCartRemoveItem(cartSvc)))),
 	)
 	mux.Handle("GET /v1/cart",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleGetCart(cartSvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleGetCart(cartSvc)))),
 	)
 	mux.Handle("POST /v1/cart/reserve",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleCartReserve(cartSvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleCartReserve(cartSvc)))),
 	)
 	mux.Handle("POST /v1/cart/release",
-		httpx.TraceAndLog(http.HandlerFunc(handleCartRelease(cartSvc))),
+		httpTrace(http.HandlerFunc(handleCartRelease(cartSvc))),
 	)
 
 	// Checkout route — initiates the v8 multi-seller saga (cart → PSP → 3DS)
 	mux.Handle("POST /v1/checkout/initiate",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(
+		httpTrace(requireAuth(http.HandlerFunc(
 			order.HandleInitiateCheckout(orderSvc, func(r *http.Request) (int64, bool) {
 				id := middleware.UserIDFromCtx(r.Context())
 				return id, id != 0
@@ -363,52 +389,52 @@ func main() {
 
 	// Order routes — require JWT authentication where user ID is needed
 	mux.Handle("POST /v1/orders",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleCreateOrder(orderSvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleCreateOrder(orderSvc)))),
 	)
 	mux.Handle("GET /v1/orders/{id}",
-		httpx.TraceAndLog(http.HandlerFunc(handleGetOrder(orderSvc))),
+		httpTrace(http.HandlerFunc(handleGetOrder(orderSvc))),
 	)
 	mux.Handle("GET /v1/orders",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleListOrders(orderSvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleListOrders(orderSvc)))),
 	)
 	mux.Handle("POST /v1/orders/{id}/status",
-		httpx.TraceAndLog(http.HandlerFunc(handleUpdateOrderStatus(orderSvc))),
+		httpTrace(http.HandlerFunc(handleUpdateOrderStatus(orderSvc))),
 	)
 	mux.Handle("POST /v1/orders/{id}/deliver",
-		httpx.TraceAndLog(http.HandlerFunc(handleMarkDelivered(orderSvc))),
+		httpTrace(http.HandlerFunc(handleMarkDelivered(orderSvc))),
 	)
 	mux.Handle("POST /v1/orders/{id}/cancel",
-		httpx.TraceAndLog(http.HandlerFunc(handleCancelOrder(orderSvc))),
+		httpTrace(http.HandlerFunc(handleCancelOrder(orderSvc))),
 	)
 	mux.Handle("POST /v1/orders/{id}/refund",
-		httpx.TraceAndLog(http.HandlerFunc(handleRefundOrder(orderSvc, paymentSvc, paymentRepo, paymentOutbox, market, defaultCurrency))),
+		httpTrace(http.HandlerFunc(handleRefundOrder(orderSvc, paymentSvc, paymentRepo, paymentOutbox, market, defaultCurrency))),
 	)
 	mux.Handle("GET /v1/seller/orders/{id}/breakdown",
-		httpx.TraceAndLog(http.HandlerFunc(handleSellerBreakdown(orderSvc))),
+		httpTrace(http.HandlerFunc(handleSellerBreakdown(orderSvc))),
 	)
 
 	// Payment routes — require JWT authentication
 	mux.Handle("POST /v1/payments",
-		httpx.TraceAndLog(requireAuth(http.HandlerFunc(handleInitiatePayment(paymentSvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleInitiatePayment(paymentSvc)))),
 	)
 	mux.Handle("GET /v1/payments/{provider_ref}/status",
-		httpx.TraceAndLog(http.HandlerFunc(handlePaymentStatus(paymentSvc))),
+		httpTrace(http.HandlerFunc(handlePaymentStatus(paymentSvc))),
 	)
 	// Webhook route — must match Caddyfile @psp_webhook path /v1/payments/webhook/*
 	// so the explicit no-middleware handle block applies (CLAUDE.md § 9).
 	mux.Handle("POST /v1/payments/webhook/sipay",
-		httpx.TraceAndLog(http.HandlerFunc(handleSipayWebhook(webhookHandler))),
+		httpTrace(http.HandlerFunc(handleSipayWebhook(webhookHandler))),
 	)
 
 	// Shipping webhook routes — Caddyfile @shipping_webhook path /v1/shipping/webhook/*
 	mux.Handle("POST /v1/shipping/webhook/surat",
-		httpx.TraceAndLog(http.HandlerFunc(handleShippingWebhook(shippingSvc, "surat"))),
+		httpTrace(http.HandlerFunc(handleShippingWebhook(shippingSvc, "surat"))),
 	)
 	mux.Handle("POST /v1/shipping/webhook/mng",
-		httpx.TraceAndLog(http.HandlerFunc(handleShippingWebhook(shippingSvc, "mng"))),
+		httpTrace(http.HandlerFunc(handleShippingWebhook(shippingSvc, "mng"))),
 	)
 	mux.Handle("POST /v1/shipping/webhook/hepsijet",
-		httpx.TraceAndLog(http.HandlerFunc(handleShippingWebhook(shippingSvc, "hepsijet"))),
+		httpTrace(http.HandlerFunc(handleShippingWebhook(shippingSvc, "hepsijet"))),
 	)
 
 	srv := &http.Server{

@@ -13,19 +13,19 @@ metrics:
       scrape_configs:
         - job_name: core-svc
           static_configs:
-            - targets: ["core-svc:9090"]
+            - targets: ["core-svc:9100"]
               labels:
                 service: core-svc
                 market: "${MARKET:-TR}"
         - job_name: fin-svc
           static_configs:
-            - targets: ["fin-svc:9090"]
+            - targets: ["fin-svc:9101"]
               labels:
                 service: fin-svc
                 market: "${MARKET:-TR}"
         - job_name: jobs-svc
           static_configs:
-            - targets: ["jobs-svc:9090"]
+            - targets: ["jobs-svc:9102"]
               labels:
                 service: jobs-svc
                 market: "${MARKET:-TR}"

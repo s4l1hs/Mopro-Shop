@@ -30,7 +30,7 @@ func TestCreatePlanFromDelivery_PopulatesProductFields(t *testing.T) {
 	calLoader := timex.NewStaticCalendarLoader(map[string]timex.Calendar{
 		"TR": {},
 	})
-	svc := NewService(repo, &mockCronOutbox{}, calLoader, "TRY_COIN", &mockWalletPoster{}, nil)
+	svc := NewService(repo, &mockCronOutbox{}, calLoader, "TRY_COIN", &mockWalletPoster{}, nil, nil)
 
 	ev := OrderDeliveredEvent{
 		OrderID:       99,

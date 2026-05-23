@@ -12,7 +12,6 @@ import (
 	"github.com/mopro/platform/internal/identity"
 	"github.com/mopro/platform/internal/identity/middleware"
 	pkgcrypto "github.com/mopro/platform/pkg/crypto"
-	"github.com/mopro/platform/pkg/httpx"
 )
 
 // authHandlers holds the identity.Service and registers all auth + me + device routes.
@@ -59,10 +58,9 @@ func (a *authHandlers) registerRoutes(mux *http.ServeMux, requireAuth func(http.
 	)
 }
 
-// httpTrace wraps a handler with the TraceAndLog middleware used by all routes.
-func httpTrace(h http.Handler) http.Handler {
-	return httpx.TraceAndLog(h)
-}
+// httpTrace wraps a handler with trace+log+metrics middleware.
+// Assigned in main() after HTTPMetrics are initialised; all route registrations call this.
+var httpTrace func(http.Handler) http.Handler
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
 

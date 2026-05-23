@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/mopro/platform/internal/outbox"
+	"github.com/mopro/platform/pkg/metrics"
 	"github.com/mopro/platform/pkg/timex"
 )
 
@@ -20,11 +21,13 @@ type cashbackService struct {
 	walletPoster     WalletPoster
 	log              *slog.Logger
 	cashbackCurrency string // coin currency code, read from env DEFAULT_CASHBACK_CURRENCY
+	biz              *metrics.BusinessMetrics // nil disables business KPI counters
 }
 
 // NewService constructs a cashback Service.
 // cashbackCurrency should come from env DEFAULT_CASHBACK_CURRENCY (e.g. "TRY_COIN").
 // calLoader is used to compute start_date = deliveredAt + 3 business days.
+// biz is optional (nil disables business KPI metrics).
 func NewService(
 	repo Repository,
 	outboxRepo outbox.Repository,
@@ -32,6 +35,7 @@ func NewService(
 	cashbackCurrency string,
 	walletPoster WalletPoster,
 	log *slog.Logger,
+	biz *metrics.BusinessMetrics,
 ) Service {
 	if log == nil {
 		log = slog.Default()
@@ -43,6 +47,7 @@ func NewService(
 		cashbackCurrency: cashbackCurrency,
 		walletPoster:     walletPoster,
 		log:              log,
+		biz:              biz,
 	}
 }
 
@@ -152,6 +157,7 @@ func (s *cashbackService) CreatePlanFromDelivery(ctx context.Context, ev OrderDe
 			"monthly", created.MonthlyAmountMinor,
 			"last", created.MonthlyAmountLastMinor,
 		)
+		s.biz.IncCashbackPlanCreated("fin-svc", created.Market)
 	}
 	return created, nil
 }

@@ -171,6 +171,7 @@ func (s *cashbackService) payOnePlanInTx(ctx context.Context, plan Plan, equityA
 		)
 
 		result.Processed++
+		s.biz.IncCashbackInstallmentPaid("fin-svc", plan.Market)
 		if completed {
 			done = true
 		}

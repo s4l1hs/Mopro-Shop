@@ -79,7 +79,7 @@ func newTestEvent() OrderPaidEvent {
 func TestPostCapture_HappyPath(t *testing.T) {
 	repo := &mockRepository{}
 	wallet := &mockWalletPoster{findAccountID: 1, sellerPayableID: 2, postTxnID: 99}
-	svc := NewService(repo, wallet, nil)
+	svc := NewService(repo, wallet, nil, nil)
 
 	if err := svc.PostCapture(context.Background(), newTestEvent()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -97,7 +97,7 @@ func TestPostCapture_Idempotent_AlreadyPosted(t *testing.T) {
 		existing: &CapturePosting{OrderID: 101, TransactionID: 50},
 	}
 	wallet := &mockWalletPoster{}
-	svc := NewService(repo, wallet, nil)
+	svc := NewService(repo, wallet, nil, nil)
 
 	if err := svc.PostCapture(context.Background(), newTestEvent()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -113,7 +113,7 @@ func TestPostCapture_InsertPosting_AlreadyPosted_Concurrent(t *testing.T) {
 	// The service must treat this as success (nil error).
 	repo := &mockRepository{insertErr: ErrAlreadyPosted}
 	wallet := &mockWalletPoster{findAccountID: 1, sellerPayableID: 2, postTxnID: 99}
-	svc := NewService(repo, wallet, nil)
+	svc := NewService(repo, wallet, nil, nil)
 
 	if err := svc.PostCapture(context.Background(), newTestEvent()); err != nil {
 		t.Fatalf("expected nil for concurrent ErrAlreadyPosted, got: %v", err)
@@ -123,7 +123,7 @@ func TestPostCapture_InsertPosting_AlreadyPosted_Concurrent(t *testing.T) {
 func TestPostCapture_FindAccountError_ReturnsError(t *testing.T) {
 	repo := &mockRepository{}
 	wallet := &mockWalletPoster{findAccountErr: errors.New("account not found")}
-	svc := NewService(repo, wallet, nil)
+	svc := NewService(repo, wallet, nil, nil)
 
 	err := svc.PostCapture(context.Background(), newTestEvent())
 	if err == nil {
@@ -134,7 +134,7 @@ func TestPostCapture_FindAccountError_ReturnsError(t *testing.T) {
 func TestPostCapture_SellerPayableError_ReturnsError(t *testing.T) {
 	repo := &mockRepository{}
 	wallet := &mockWalletPoster{findAccountID: 1, sellerPayableErr: errors.New("seller not found")}
-	svc := NewService(repo, wallet, nil)
+	svc := NewService(repo, wallet, nil, nil)
 
 	err := svc.PostCapture(context.Background(), newTestEvent())
 	if err == nil {
@@ -145,7 +145,7 @@ func TestPostCapture_SellerPayableError_ReturnsError(t *testing.T) {
 func TestPostCapture_PostInTxError_ReturnsError(t *testing.T) {
 	repo := &mockRepository{}
 	wallet := &mockWalletPoster{findAccountID: 1, sellerPayableID: 2, postErr: errors.New("ledger write failed")}
-	svc := NewService(repo, wallet, nil)
+	svc := NewService(repo, wallet, nil, nil)
 
 	err := svc.PostCapture(context.Background(), newTestEvent())
 	if err == nil {
@@ -163,7 +163,7 @@ func TestPostCapture_WithShipping_FiveLines(t *testing.T) {
 
 	repo := &mockRepository{}
 	wallet := &mockWalletPoster{findAccountID: 1, sellerPayableID: 2, postTxnID: 99}
-	svc := NewService(repo, wallet, nil)
+	svc := NewService(repo, wallet, nil, nil)
 
 	if err := svc.PostCapture(context.Background(), ev); err != nil {
 		t.Fatalf("unexpected error: %v", err)

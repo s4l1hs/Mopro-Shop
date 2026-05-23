@@ -15,6 +15,7 @@ import (
 	"github.com/mopro/platform/internal/outbox"
 	"github.com/mopro/platform/internal/payment"
 	"github.com/mopro/platform/pkg/mediaurl"
+	"github.com/mopro/platform/pkg/metrics"
 )
 
 type orderService struct {
@@ -25,8 +26,9 @@ type orderService struct {
 	outbox           outbox.Repository
 	defaultMarket    string
 	cashbackCurrency string // e.g. "TRY_COIN" for TR; read from env at startup
-	psp              payment.Service  // nil for legacy NewService (no PSP call in Checkout)
+	psp              payment.Service     // nil for legacy NewService (no PSP call in Checkout)
 	diskChecker      DiskPressureChecker // nil disables disk panic check
+	biz              *metrics.BusinessMetrics // nil disables business KPI counters
 }
 
 // NewService constructs an order Service for the legacy single-order checkout flow.
@@ -51,6 +53,7 @@ func NewService(
 
 // NewServiceFull constructs an order Service with PSP integration for InitiateCheckout.
 // diskChecker is optional (nil disables the disk panic guard in InitiateCheckout).
+// biz is optional (nil disables business KPI metrics).
 func NewServiceFull(
 	repo Repository,
 	sessionRepo CheckoutSessionRepository,
@@ -61,6 +64,7 @@ func NewServiceFull(
 	cashbackCurrency string,
 	psp payment.Service,
 	diskChecker DiskPressureChecker,
+	biz *metrics.BusinessMetrics,
 ) Service {
 	return &orderService{
 		repo:             repo,
@@ -72,6 +76,7 @@ func NewServiceFull(
 		cashbackCurrency: cashbackCurrency,
 		psp:              psp,
 		diskChecker:      diskChecker,
+		biz:              biz,
 	}
 }
 
@@ -204,10 +209,22 @@ func (s *orderService) ListOrders(ctx context.Context, userID int64) ([]Order, e
 }
 
 func (s *orderService) UpdateStatus(ctx context.Context, orderID int64, status OrderStatus) error {
+	// Pre-fetch current status for from→to metrics label. Best-effort: uses
+	// "unknown" when the fetch fails. No transaction needed for a metric label.
+	fromStatus := OrderStatus("unknown")
+	if s.biz != nil {
+		if o, _, err := s.repo.GetOrder(ctx, orderID); err == nil {
+			fromStatus = o.Status
+		}
+	}
 	now := time.Now().UTC()
-	return s.repo.WithTx(ctx, func(tx pgx.Tx) error {
+	if err := s.repo.WithTx(ctx, func(tx pgx.Tx) error {
 		return s.repo.UpdateStatus(ctx, tx, orderID, status, now)
-	})
+	}); err != nil {
+		return err
+	}
+	s.biz.IncOrderStatusTransition("core-svc", string(fromStatus), string(status))
+	return nil
 }
 
 // CancelOrder transitions an order to cancelled. Only valid from pending_payment or paid.

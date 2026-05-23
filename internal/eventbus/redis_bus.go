@@ -26,6 +26,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/mopro/platform/pkg/logx"
+	"github.com/mopro/platform/pkg/metrics"
 	"github.com/mopro/platform/pkg/slack"
 )
 
@@ -47,6 +48,8 @@ type busOptions struct {
 	attemptRepo AttemptRepository
 	dlqRepo     DLQRepository
 	slackPoster SlackPoster
+	ebMetrics   *metrics.EventBusMetrics
+	svcName     string
 }
 
 // WithAttemptRepo wires an AttemptRepository into the bus for dispatch attempt logging.
@@ -68,6 +71,15 @@ func WithSlackPoster(p SlackPoster) Option {
 	return func(o *busOptions) { o.slackPoster = p }
 }
 
+// WithMetrics wires a *metrics.EventBusMetrics for consumer throughput tracking.
+// svcName is the service label on all emitted metrics (e.g. "fin-svc").
+func WithMetrics(m *metrics.EventBusMetrics, svcName string) Option {
+	return func(o *busOptions) {
+		o.ebMetrics = m
+		o.svcName = svcName
+	}
+}
+
 // xackClient wraps the Redis XAck call so it can be replaced in unit tests.
 // *redis.Client satisfies this interface.
 type xackClient interface {
@@ -84,6 +96,8 @@ type RedisBus struct {
 	dlqRepo     DLQRepository
 	slackPoster SlackPoster
 	sev2Sent    sync.Map // key: string (topic) → time.Time of last SEV2 alert
+	ebMetrics   *metrics.EventBusMetrics // nil when metrics not wired
+	svcName     string                   // for metric labels; empty when metrics not wired
 
 	// Attempt-log worker pool: buffered channel drained by attemptWorkers goroutines.
 	// Started lazily (once) on the first Subscribe call.
@@ -106,6 +120,8 @@ func NewRedisBus(client *redis.Client, log *slog.Logger, opts ...Option) *RedisB
 		attemptRepo: o.attemptRepo,
 		dlqRepo:     o.dlqRepo,
 		slackPoster: o.slackPoster,
+		ebMetrics:   o.ebMetrics,
+		svcName:     o.svcName,
 	}
 	if o.attemptRepo != nil {
 		b.attemptCh = make(chan AttemptRow, attemptChanBuf)
@@ -264,6 +280,7 @@ func (b *RedisBus) dispatchMessage(
 	var ev Event
 
 	defer func() {
+		dur := time.Since(start)
 		// Recover from handler panics — convert to error, keep message in PEL.
 		if r := recover(); r != nil {
 			outcome = "panic"
@@ -274,6 +291,9 @@ func (b *RedisBus) dispatchMessage(
 				slog.Any("panic", r),
 			)
 		}
+		if b.ebMetrics != nil {
+			b.ebMetrics.RecordDispatch(b.svcName, group, ev.EventType, outcome, dur)
+		}
 		row := AttemptRow{
 			Stream:        topic,
 			MessageID:     msg.ID,
@@ -281,7 +301,7 @@ func (b *RedisBus) dispatchMessage(
 			ConsumerName:  consumerName,
 			Outcome:       outcome,
 			ErrorMessage:  errString(handlerErr),
-			DurationMs:    int(time.Since(start).Milliseconds()),
+			DurationMs:    int(dur.Milliseconds()),
 		}
 		if b.attemptRepo != nil {
 			b.sendAttempt(row) // async, buffered
@@ -434,6 +454,9 @@ func (b *RedisBus) insertDLQIfThreshold(
 			slog.Int64("dlq_id", dlqID),
 			slog.String("idempotency_key", idemKey),
 		)
+		if b.ebMetrics != nil {
+			b.ebMetrics.RecordDLQ(b.svcName, group, topic)
+		}
 		b.sendDLQAlert(ctx, topic, group, idemKey, current, dlqID)
 	}
 }

@@ -10,12 +10,12 @@ import (
 )
 
 func newTestSvc(repo Repository) Service {
-	return NewService(repo, &mockCronOutbox{}, nil, "TRY_COIN", &mockWalletPoster{}, nil)
+	return NewService(repo, &mockCronOutbox{}, nil, "TRY_COIN", &mockWalletPoster{}, nil, nil)
 }
 
 func newTestSvcWithCal(repo Repository) Service {
 	cal := timex.NewStaticCalendarLoader(map[string]timex.Calendar{"TR": {}})
-	return NewService(repo, &mockCronOutbox{}, cal, "TRY_COIN", &mockWalletPoster{}, nil)
+	return NewService(repo, &mockCronOutbox{}, cal, "TRY_COIN", &mockWalletPoster{}, nil, nil)
 }
 
 // ── CreatePlanFromDelivery ────────────────────────────────────────────────────

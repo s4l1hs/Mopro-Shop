@@ -13,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/mopro/platform/pkg/logx"
+	"github.com/mopro/platform/pkg/metrics"
 )
 
 const tracerName = "github.com/mopro/platform/pkg/otelx"
@@ -24,6 +25,20 @@ const tracerName = "github.com/mopro/platform/pkg/otelx"
 // This is the drop-in replacement for pkg/httpx.TraceAndLog.
 func TraceAndLog(next http.Handler) http.Handler {
 	return RecoverPanic(InjectTraceContext(spanAndLog(next)))
+}
+
+// TraceLogAndMetrics wraps next with the full observability chain including
+// Prometheus HTTP metrics:
+//
+//	RecoverPanic → InjectTraceContext → StartSpan+InjectLogger → MetricsHTTP → Handler
+//
+// Use this instead of TraceAndLog when a *metrics.HTTPMetrics is available
+// (all production main.go wiring). Falls back to TraceAndLog when m is nil.
+func TraceLogAndMetrics(m *metrics.HTTPMetrics, svc string, next http.Handler) http.Handler {
+	if m == nil {
+		return TraceAndLog(next)
+	}
+	return RecoverPanic(InjectTraceContext(spanAndLog(m.Middleware(svc, next))))
 }
 
 // InjectTraceContext extracts a W3C traceparent header and injects the remote

@@ -28,6 +28,7 @@ import (
 	"github.com/mopro/platform/internal/wallet"
 	"github.com/mopro/platform/pkg/healthcheck"
 	"github.com/mopro/platform/pkg/logx"
+	"github.com/mopro/platform/pkg/metrics"
 	"github.com/mopro/platform/pkg/otelx"
 	"github.com/mopro/platform/pkg/pagerduty"
 	"github.com/mopro/platform/pkg/slack"
@@ -55,9 +56,24 @@ func main() {
 	}
 	defer func() { _ = otelShutdown(context.Background()) }()
 
+	// ── Prometheus metrics (registry + all metrics pre-instantiated at startup) ─
+	metricsReg := metrics.New("fin-svc")
+	dbM := metrics.NewDBMetrics(metricsReg)
+	redisM := metrics.NewRedisMetrics(metricsReg)
+	ebM := metrics.NewEventBusMetrics(metricsReg)
+	outboxM := metrics.NewOutboxMetrics(metricsReg)
+	bizM := metrics.NewBusinessMetrics(metricsReg)
+	_ = metrics.NewHTTPMetrics(metricsReg) // registered; fin-svc routes are minimal
+
 	// ── postgres-ledger pool ─────────────────────────────────────────────────
 	ledgerDSN := mustEnv("LEDGER_DATABASE_URL")
-	pool, err := pgxpool.New(initCtx, ledgerDSN)
+	ledgerCfg, err := pgxpool.ParseConfig(ledgerDSN)
+	if err != nil {
+		slog.Error("fin-svc: parse ledger DSN", "err", err)
+		os.Exit(1)
+	}
+	dbM.WirePool(ledgerCfg, "fin-svc")
+	pool, err := pgxpool.NewWithConfig(initCtx, ledgerCfg)
 	if err != nil {
 		slog.Error("fin-svc: postgres-ledger pool", "err", err)
 		os.Exit(1)
@@ -77,9 +93,13 @@ func main() {
 		slog.Error("fin-svc: redis ping", "err", err)
 		os.Exit(1)
 	}
+	redisClient.AddHook(redisM.Hook("fin-svc"))
 
 	// ── Signal-aware context for goroutines + HTTP shutdown ─────────────────
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
+
+	go metrics.StartServer(ctx, metricsReg, "0.0.0.0:9101", slog.Default())
+	metricsReg.AssertCardinalityUnder(10_000)
 
 	// ── Business calendar (static — fin-svc cannot reach postgres-ecom) ──────
 	// Holidays loaded from env BUSINESS_CALENDAR_<MARKET>=YYYY-MM-DD,YYYY-MM-DD,...
@@ -98,7 +118,7 @@ func main() {
 	cashbackOutbox := outbox.NewRepository("wallet_schema.outbox")
 	cashbackRepo := cashback.NewRepository(pool)
 	calLoader := timex.NewStaticCalendarLoader(calendarMap)
-	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutbox, calLoader, cashbackCurrency, walletSvc, slog.Default())
+	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutbox, calLoader, cashbackCurrency, walletSvc, slog.Default(), bizM)
 
 	// Slack client for DLQ alerts (EXCEPTION: fin-svc → Slack direct; see CLAUDE.md §5).
 	// SLACK_DLQ_WEBHOOK_URL is optional; no-op when absent.
@@ -112,6 +132,7 @@ func main() {
 		eventbus.WithAttemptRepo(attemptRepo),
 		eventbus.WithDLQRepo(dlqRepo),
 		eventbus.WithSlackPoster(eventbus.NewSlackPosterAdapter(slackDLQClient)),
+		eventbus.WithMetrics(ebM, "fin-svc"),
 	)
 
 	// ── Seller payout engine ─────────────────────────────────────────────────
@@ -131,6 +152,7 @@ func main() {
 	pub, err := outbox.NewPublisher(pool, cashbackOutbox, bus, slog.Default(),
 		outbox.WithServiceName("fin"),
 		outbox.WithLagTable("wallet_schema.outbox"),
+		outbox.WithOutboxMetrics(outboxM),
 	)
 	if err != nil {
 		slog.Error("fin-svc: outbox publisher init", "err", err)
@@ -144,7 +166,7 @@ func main() {
 
 	// ── Order capture ledger consumer ─────────────────────────────��──────────
 	orderledgerRepo := orderledger.NewRepository(pool)
-	orderledgerSvc := orderledger.NewService(orderledgerRepo, walletSvc, slog.Default())
+	orderledgerSvc := orderledger.NewService(orderledgerRepo, walletSvc, slog.Default(), bizM)
 	go func() {
 		if err := orderledger.StartConsumer(ctx, bus, orderledgerSvc); err != nil && !errors.Is(err, context.Canceled) {
 			slog.Error("fin-svc: orderledger consumer exited unexpectedly", "err", err)
@@ -187,7 +209,13 @@ func main() {
 	if reconcileDSN == "" {
 		reconcileDSN = ledgerDSN // fallback to wallet_user pool in dev (limited grants)
 	}
-	reconcilePool, err := pgxpool.New(initCtx, reconcileDSN)
+	reconcileCfg, err := pgxpool.ParseConfig(reconcileDSN)
+	if err != nil {
+		slog.Error("fin-svc: parse reconcile DSN", "err", err)
+		os.Exit(1)
+	}
+	dbM.WirePool(reconcileCfg, "fin-svc")
+	reconcilePool, err := pgxpool.NewWithConfig(initCtx, reconcileCfg)
 	if err != nil {
 		slog.Error("fin-svc: reconcile pool", "err", err)
 		os.Exit(1)

@@ -380,6 +380,8 @@ services:
       OTEL_RESOURCE_ATTRIBUTES: "market=${MARKET:-TR},deployment.environment=${ENV:-prod}"
     ports:
       - "127.0.0.1:8080:8080"
+    expose:
+      - "9100"  # Prometheus /metrics — scraped by grafana-agent on mopro-net
     depends_on:
       pgbouncer-ecom:
         condition: service_healthy
@@ -405,6 +407,8 @@ services:
       OTEL_RESOURCE_ATTRIBUTES: "market=${MARKET:-TR},deployment.environment=${ENV:-prod}"
     ports:
       - "127.0.0.1:8081:8081"
+    expose:
+      - "9101"  # Prometheus /metrics — scraped by grafana-agent on mopro-fin-net
     depends_on:
       pgbouncer-ledger:
         condition: service_healthy
@@ -430,6 +434,8 @@ services:
       OTEL_RESOURCE_ATTRIBUTES: "market=${MARKET:-TR},deployment.environment=${ENV:-prod}"
     ports:
       - "127.0.0.1:8082:8080"
+    expose:
+      - "9102"  # Prometheus /metrics — scraped by grafana-agent on mopro-net
     depends_on:
       pgbouncer-ecom:
         condition: service_healthy

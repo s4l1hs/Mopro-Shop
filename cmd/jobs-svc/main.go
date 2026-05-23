@@ -16,6 +16,7 @@ import (
 	"github.com/mopro/platform/internal/eventbus"
 	"github.com/mopro/platform/internal/notification"
 	"github.com/mopro/platform/pkg/logx"
+	"github.com/mopro/platform/pkg/metrics"
 	"github.com/mopro/platform/pkg/otelx"
 	pkg_slack "github.com/mopro/platform/pkg/slack"
 )
@@ -38,9 +39,21 @@ func main() {
 	}
 	defer func() { _ = otelShutdown(context.Background()) }()
 
+	// ── Prometheus metrics ───────────────────────────────────────────────────────
+	metricsReg := metrics.New("jobs-svc")
+	dbM := metrics.NewDBMetrics(metricsReg)
+	redisM := metrics.NewRedisMetrics(metricsReg)
+	ebM := metrics.NewEventBusMetrics(metricsReg)
+
 	// ── postgres-ecom pool (for notification dedup store) ────────────────────────
 	ecomDSN := mustEnv("NOTIFICATION_DATABASE_URL")
-	pool, err := pgxpool.New(initCtx, ecomDSN)
+	ecomCfg, err := pgxpool.ParseConfig(ecomDSN)
+	if err != nil {
+		slog.Error("jobs-svc: parse ecom DSN", "err", err)
+		os.Exit(1)
+	}
+	dbM.WirePool(ecomCfg, "jobs-svc")
+	pool, err := pgxpool.NewWithConfig(initCtx, ecomCfg)
 	if err != nil {
 		slog.Error("jobs-svc: postgres-ecom pool", "err", err)
 		os.Exit(1)
@@ -60,9 +73,13 @@ func main() {
 		slog.Error("jobs-svc: redis ping", "err", err)
 		os.Exit(1)
 	}
+	redisClient.AddHook(redisM.Hook("jobs-svc"))
 
 	// ── Signal-aware context ─────────────────────────────────────────────────────
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
+
+	go metrics.StartServer(ctx, metricsReg, "0.0.0.0:9102", slog.Default())
+	metricsReg.AssertCardinalityUnder(10_000)
 
 	// ── Slack client (reconcile-drift alerts) ─────────────────────────────────────
 	var slackClient *pkg_slack.Client
@@ -76,7 +93,7 @@ func main() {
 	dedupStore := notification.NewPgxDedupStore(pool)
 
 	// ── Event bus ────────────────────────────────────────────────────────────────
-	bus := eventbus.NewRedisBus(redisClient, slog.Default())
+	bus := eventbus.NewRedisBus(redisClient, slog.Default(), eventbus.WithMetrics(ebM, "jobs-svc"))
 
 	// ── Start reconcile-drift consumer ───────────────────────────────────────────
 	go func() {

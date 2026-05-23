@@ -247,7 +247,7 @@ func newTestService(repo identity.Repository, sms *mockSMS, limiter *mockLimiter
 	t.Helper()
 	return identity.NewService(
 		repo, sms, limiter, newTestSigner(t),
-		"TR", "tr-TR", nil,
+		"TR", "tr-TR", nil, nil,
 	)
 }
 
@@ -419,7 +419,7 @@ func TestDevOTPAcceptAny_PanicsOnProduction(t *testing.T) {
 	}()
 	identity.NewService(
 		newMockRepo(), &mockSMS{}, &mockLimiter{}, newTestSigner(t),
-		"TR", "tr-TR", nil,
+		"TR", "tr-TR", nil, nil,
 	)
 }
 

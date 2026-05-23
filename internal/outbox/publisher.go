@@ -25,10 +25,10 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/mopro/platform/internal/eventbus"
+	"github.com/mopro/platform/pkg/metrics"
 )
 
 const (
@@ -44,8 +44,8 @@ const (
 // Option configures a Publisher.
 type Option func(*Publisher)
 
-// WithServiceName sets the service identifier used in metric names.
-// Example: WithServiceName("fin") → metric "mopro.fin.outbox.lag.seconds".
+// WithServiceName sets the service identifier used in metric labels.
+// Example: WithServiceName("fin") → service label on all emitted metrics.
 // Default is "mopro" when not set.
 func WithServiceName(name string) Option {
 	return func(p *Publisher) { p.svcName = name }
@@ -55,6 +55,11 @@ func WithServiceName(name string) Option {
 // When not set, the lag metric is not emitted.
 func WithLagTable(table string) Option {
 	return func(p *Publisher) { p.lagTable = table }
+}
+
+// WithOutboxMetrics wires Prometheus metrics for outbox publish throughput and lag.
+func WithOutboxMetrics(m *metrics.OutboxMetrics) Option {
+	return func(p *Publisher) { p.outboxM = m }
 }
 
 // Publisher is the outbox relay worker. It drains unpublished rows from the outbox
@@ -77,14 +82,12 @@ type Publisher struct {
 	// backoff state — managed exclusively by Run loop
 	backoff time.Duration
 
-	lagEnabled     bool
-	lagGauge       metric.Float64Gauge
-	publishCounter metric.Int64Counter
+	lagEnabled bool
+	outboxM    *metrics.OutboxMetrics // nil when metrics not wired; all calls are nil-safe
 }
 
 // NewPublisher constructs a Publisher.
-// Uses the global OTel MeterProvider for metrics — safe in tests
-// (global no-op meter when OTel is uninitialised).
+// Use WithOutboxMetrics to wire Prometheus metrics (optional; nil-safe if absent).
 func NewPublisher(pool *pgxpool.Pool, repo Repository, bus eventbus.Publisher, log *slog.Logger, opts ...Option) (*Publisher, error) {
 	p := &Publisher{
 		pool:      pool,
@@ -97,32 +100,9 @@ func NewPublisher(pool *pgxpool.Pool, repo Repository, bus eventbus.Publisher, l
 	for _, o := range opts {
 		o(p)
 	}
-
-	meter := otel.GetMeterProvider().Meter("github.com/mopro/platform/internal/outbox")
-
-	var err error
-	p.publishCounter, err = meter.Int64Counter(
-		"mopro.outbox.publish.total",
-		metric.WithDescription("Total outbox events published to Redis Streams"),
-		metric.WithUnit("{events}"),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("outbox: create publish counter: %w", err)
-	}
-
 	if p.lagTable != "" {
-		lagName := fmt.Sprintf("mopro.%s.outbox.lag.seconds", p.svcName)
-		p.lagGauge, err = meter.Float64Gauge(
-			lagName,
-			metric.WithDescription("Age in seconds of the oldest unpublished outbox row"),
-			metric.WithUnit("s"),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("outbox: create lag gauge: %w", err)
-		}
 		p.lagEnabled = true
 	}
-
 	return p, nil
 }
 
@@ -208,11 +188,17 @@ var outboxTracer = otel.GetTracerProvider().Tracer("github.com/mopro/platform/in
 // idempotency checks.
 func (p *Publisher) RunBatch(ctx context.Context) (int, error) {
 	p.redisErrCount = 0
+	batchStart := time.Now()
 
 	ctx, span := outboxTracer.Start(ctx, "outbox.run_batch",
 		trace.WithSpanKind(trace.SpanKindProducer),
 	)
-	defer span.End()
+	defer func() {
+		span.End()
+		if p.outboxM != nil {
+			p.outboxM.RecordBatch(p.svcName, time.Since(batchStart))
+		}
+	}()
 
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
@@ -330,14 +316,18 @@ func (p *Publisher) recordLag(ctx context.Context) {
 		WHERE published_at IS NULL ORDER BY id ASC LIMIT 1
 	`).Scan(&createdAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		p.lagGauge.Record(ctx, 0)
+		if p.outboxM != nil {
+			p.outboxM.SetLag(p.svcName, 0)
+		}
 		return
 	}
 	if err != nil {
 		return // transient DB error: skip this cycle's metric update
 	}
 	lag := time.Since(createdAt).Seconds()
-	p.lagGauge.Record(ctx, lag)
+	if p.outboxM != nil {
+		p.outboxM.SetLag(p.svcName, lag)
+	}
 	if lag > lagAlertThreshold.Seconds() {
 		p.log.Warn("outbox.lag_alert",
 			slog.Float64("lag_seconds", lag),
@@ -364,13 +354,8 @@ func rowToEvent(row Row) eventbus.Event {
 	}
 }
 
-func (p *Publisher) emitMetric(ctx context.Context, row Row, result string) {
-	p.publishCounter.Add(ctx, 1,
-		metric.WithAttributes(
-			attribute.String("market", row.Market),
-			attribute.String("currency", row.Currency),
-			attribute.String("event_type", row.EventType),
-			attribute.String("result", result),
-		),
-	)
+func (p *Publisher) emitMetric(_ context.Context, row Row, result string) {
+	if p.outboxM != nil {
+		p.outboxM.RecordPublish(p.svcName, row.EventType, result)
+	}
 }

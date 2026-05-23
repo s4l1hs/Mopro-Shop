@@ -102,7 +102,7 @@ func (m *mockWalletPoster) FindAccountByOwnerAnyStatus(_ context.Context, _ stri
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 func newCronSvc(repo Repository, wp WalletPoster) Service {
-	return NewService(repo, &mockCronOutbox{}, nil, "TRY_COIN", wp, nil)
+	return NewService(repo, &mockCronOutbox{}, nil, "TRY_COIN", wp, nil, nil)
 }
 
 type mockCronOutbox struct{}
