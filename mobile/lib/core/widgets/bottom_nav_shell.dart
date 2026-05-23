@@ -1,8 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/features/cart/application/cart_count_provider.dart';
+import 'package:mopro/shared/molecules/badge_icon.dart';
 
-class BottomNavShell extends StatelessWidget {
+class BottomNavShell extends ConsumerWidget {
   const BottomNavShell({
     required this.navigationShell,
     super.key,
@@ -11,7 +14,9 @@ class BottomNavShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cartCount = ref.watch(cartCountProvider);
+
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: NavigationBar(
@@ -32,6 +37,17 @@ class BottomNavShell extends StatelessWidget {
             icon: const Icon(Icons.grid_view_outlined),
             selectedIcon: const Icon(Icons.grid_view),
             label: 'nav.categories'.tr(),
+          ),
+          NavigationDestination(
+            icon: BadgeIcon(
+              icon: const Icon(Icons.shopping_cart_outlined),
+              count: cartCount,
+            ),
+            selectedIcon: BadgeIcon(
+              icon: const Icon(Icons.shopping_cart),
+              count: cartCount,
+            ),
+            label: 'nav.cart'.tr(),
           ),
           NavigationDestination(
             icon: const Icon(Icons.account_balance_wallet_outlined),

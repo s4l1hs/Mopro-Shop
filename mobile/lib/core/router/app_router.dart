@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/core/widgets/bottom_nav_shell.dart';
 import 'package:mopro/features/address/screens/address_form_screen.dart';
@@ -9,11 +10,18 @@ import 'package:mopro/features/auth/login_screen.dart';
 import 'package:mopro/features/auth/otp_screen.dart';
 import 'package:mopro/features/auth/profile_screen.dart';
 import 'package:mopro/features/auth/splash_screen.dart';
+import 'package:mopro/features/cart/presentation/cart_screen.dart';
 import 'package:mopro/features/catalog/screens/category_products_screen.dart';
 import 'package:mopro/features/catalog/screens/category_screen.dart';
 import 'package:mopro/features/catalog/screens/home_screen.dart';
 import 'package:mopro/features/catalog/screens/product_detail_screen.dart';
 import 'package:mopro/features/catalog/screens/search_screen.dart';
+import 'package:mopro/features/checkout/presentation/checkout_3ds_webview_screen.dart';
+import 'package:mopro/features/checkout/presentation/checkout_address_screen.dart';
+import 'package:mopro/features/checkout/presentation/checkout_payment_screen.dart';
+import 'package:mopro/features/checkout/presentation/checkout_result_screen.dart';
+import 'package:mopro/features/order/presentation/order_detail_screen.dart';
+import 'package:mopro/features/order/presentation/order_history_screen.dart';
 import 'package:mopro/features/profile/profile_tab_screen.dart';
 import 'package:mopro/features/wallet/plan_detail_screen.dart';
 import 'package:mopro_api/mopro_api.dart';
@@ -23,6 +31,7 @@ final rootNavigatorKey = GlobalKey<NavigatorState>();
 final _homeNavKey = GlobalKey<NavigatorState>(debugLabel: 'homeNav');
 final _categoriesNavKey =
     GlobalKey<NavigatorState>(debugLabel: 'categoriesNav');
+final _cartNavKey = GlobalKey<NavigatorState>(debugLabel: 'cartNav');
 final _walletNavKey = GlobalKey<NavigatorState>(debugLabel: 'walletNav');
 final _profileNavKey = GlobalKey<NavigatorState>(debugLabel: 'profileNav');
 
@@ -126,6 +135,52 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      // ── Checkout overlay (full-screen above nav shell) ──────────────────────
+      GoRoute(
+        path: '/checkout',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, __) => const CheckoutAddressScreen(),
+        routes: [
+          GoRoute(
+            path: 'payment',
+            builder: (_, __) => const CheckoutPaymentScreen(),
+          ),
+          GoRoute(
+            path: '3ds',
+            builder: (_, __) => const Checkout3dsWebviewScreen(),
+          ),
+          GoRoute(
+            path: 'result',
+            builder: (_, state) {
+              final failed =
+                  state.uri.queryParameters['failed'] == '1';
+              return CheckoutResultScreen(failed: failed);
+            },
+          ),
+        ],
+      ),
+      // ── Orders (root-level for deep links) ─────────────────────────────────
+      GoRoute(
+        path: '/orders',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, __) => const OrderHistoryScreen(),
+        routes: [
+          GoRoute(
+            path: ':id',
+            builder: (_, state) {
+              final raw = state.pathParameters['id'];
+              final id = raw != null ? int.tryParse(raw) : null;
+              if (id == null || id <= 0) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => rootNavigatorKey.currentContext?.go('/orders'),
+                );
+                return const SizedBox.shrink();
+              }
+              return OrderDetailScreen(orderId: id);
+            },
+          ),
+        ],
+      ),
       StatefulShellRoute.indexedStack(
         builder: (_, __, shell) => BottomNavShell(navigationShell: shell),
         branches: [
@@ -148,6 +203,15 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: _cartNavKey,
+            routes: [
+              GoRoute(
+                path: '/cart',
+                builder: (_, __) => const CartScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
             navigatorKey: _walletNavKey,
             routes: [
               GoRoute(
@@ -162,7 +226,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                           raw != null ? int.tryParse(raw) : null;
                       if (planId == null || planId <= 0) {
                         WidgetsBinding.instance.addPostFrameCallback(
-                          (_) => _walletNavKey.currentContext?.go('/wallet'),
+                          (_) =>
+                              _walletNavKey.currentContext?.go('/wallet'),
                         );
                         return const WalletScreen();
                       }
