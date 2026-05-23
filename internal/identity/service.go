@@ -445,7 +445,7 @@ func (s *serviceImpl) CreateAddress(ctx context.Context, userID int64, in Addres
 	if err != nil {
 		return Address{}, fmt.Errorf("identity: insert address: %w", err)
 	}
-	return created, nil
+	return decryptAddress(created)
 }
 
 func (s *serviceImpl) GetAddress(ctx context.Context, userID, addressID int64) (Address, error) {
