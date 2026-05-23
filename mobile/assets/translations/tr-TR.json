@@ -3,6 +3,7 @@
   "common": {
     "ok": "Tamam",
     "cancel": "İptal",
+    "delete": "Sil",
     "retry": "Tekrar Dene",
     "loading": "Yükleniyor...",
     "error": "Bir hata oluştu",
@@ -36,6 +37,12 @@
     "locale": "Dil",
     "complete_profile": "Devam Et"
   },
+  "nav": {
+    "home": "Ana Sayfa",
+    "categories": "Kategoriler",
+    "wallet": "Cüzdan",
+    "profile": "Profil"
+  },
   "home": {
     "title": "Keşfet"
   },
@@ -43,13 +50,38 @@
     "categories": "Kategoriler",
     "search_hint": "Ürün ara...",
     "filter": "Filtrele",
-    "sort": "Sırala"
+    "sort": "Sırala",
+    "load_more": "Daha fazla yükle"
+  },
+  "empty_state": {
+    "empty_message": "Henüz içerik yok",
+    "error_message": "Bir hata oluştu. Lütfen tekrar deneyin.",
+    "not_found_message": "Aradığınız ürün bulunamadı."
+  },
+  "address": {
+    "list_title": "Adreslerim",
+    "new_title": "Yeni Adres",
+    "edit_title": "Adresi Düzenle",
+    "save": "Kaydet",
+    "default": "Varsayılan",
+    "label": "Adres Başlığı",
+    "name": "Ad Soyad",
+    "phone": "Telefon",
+    "city": "İl",
+    "district": "İlçe",
+    "neighborhood": "Mahalle",
+    "full_address": "Açık Adres",
+    "postal_code": "Posta Kodu",
+    "set_as_default": "Varsayılan adres olarak ayarla",
+    "delete_title": "Adresi Sil",
+    "delete_confirm": "Bu adresi silmek istediğinizden emin misiniz?"
   },
   "product": {
     "add_to_cart": "Sepete Ekle",
     "buy_now": "Hemen Al",
     "sold_by": "{seller} tarafından satılmaktadır",
-    "stock_left": "Son {count} ürün"
+    "stock_left": "Son {count} ürün",
+    "select_variant": "Seçenek"
   },
   "cashback": {
     "preview_title": "Mopro Cashback",

@@ -3,11 +3,41 @@
   "common": {
     "ok": "OK",
     "cancel": "Cancel",
+    "delete": "Delete",
     "retry": "Retry",
     "loading": "Loading...",
     "error": "Something went wrong",
     "network_error": "Check your internet connection",
     "unknown_error": "An unexpected error occurred"
+  },
+  "nav": {
+    "home": "Home",
+    "categories": "Categories",
+    "wallet": "Wallet",
+    "profile": "Profile"
+  },
+  "empty_state": {
+    "empty_message": "Nothing here yet",
+    "error_message": "Something went wrong. Please try again.",
+    "not_found_message": "No products found."
+  },
+  "address": {
+    "list_title": "My Addresses",
+    "new_title": "New Address",
+    "edit_title": "Edit Address",
+    "save": "Save",
+    "default": "Default",
+    "label": "Address Title",
+    "name": "Full Name",
+    "phone": "Phone",
+    "city": "City",
+    "district": "District",
+    "neighborhood": "Neighborhood",
+    "full_address": "Full Address",
+    "postal_code": "Postal Code",
+    "set_as_default": "Set as default address",
+    "delete_title": "Delete Address",
+    "delete_confirm": "Are you sure you want to delete this address?"
   },
   "auth": {
     "login_title": "Sign In",
@@ -43,13 +73,15 @@
     "categories": "Categories",
     "search_hint": "Search products...",
     "filter": "Filter",
-    "sort": "Sort"
+    "sort": "Sort",
+    "load_more": "Load more"
   },
   "product": {
     "add_to_cart": "Add to Cart",
     "buy_now": "Buy Now",
     "sold_by": "Sold by {seller}",
-    "stock_left": "{count} left in stock"
+    "stock_left": "{count} left in stock",
+    "select_variant": "Option"
   },
   "cashback": {
     "preview_title": "Mopro Cashback",

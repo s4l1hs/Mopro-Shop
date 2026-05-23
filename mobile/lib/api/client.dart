@@ -44,3 +44,7 @@ final sellerApiProvider = Provider<SellerApi>((ref) {
 final meApiProvider = Provider<MeApi>((ref) {
   return ref.watch(apiClientProvider).getMeApi();
 });
+
+final addressApiProvider = Provider<AddressApi>((ref) {
+  return ref.watch(apiClientProvider).getAddressApi();
+});
