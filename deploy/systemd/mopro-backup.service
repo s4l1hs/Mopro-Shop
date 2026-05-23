@@ -1,5 +1,6 @@
 [Unit]
-Description=Mopro daily Postgres backup to Hetzner Storage Box
+Description=Mopro nightly Postgres backup to B2 + Hetzner via restic
+Documentation=file:///opt/mopro/docs/runbooks/backup-failure.md
 After=docker.service
 Requires=docker.service
 
@@ -7,13 +8,24 @@ Requires=docker.service
 Type=oneshot
 User=mopro
 Group=mopro
-EnvironmentFile=/etc/mopro/.env
+# All secrets (RESTIC_PASSWORD, B2_*, HETZNER_*, HEALTHCHECK_*, SLACK_*) live here.
+EnvironmentFile=/opt/mopro/.env
+
 ExecStart=/opt/mopro/deploy/scripts/backup-postgres.sh
+
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=mopro-backup
 
-# Resource guards
+# Resource guards — backup is a background job, not latency-sensitive.
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
+CPUQuota=50%
+
+# Retry once on failure (systemd triggers Restart; Healthchecks.io grace timer
+# provides the final alert if both attempts fail).
+Restart=on-failure
+RestartSec=60
+StartLimitIntervalSec=300
+StartLimitBurst=2

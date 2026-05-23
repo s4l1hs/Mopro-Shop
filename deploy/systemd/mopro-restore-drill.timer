@@ -1,0 +1,14 @@
+[Unit]
+Description=Mopro weekly backup restore drill timer — fires every Sunday at 04:00 Istanbul
+Requires=mopro-restore-drill.service
+
+[Timer]
+# Every Sunday at 04:00 Istanbul (after the nightly backup at 02:00 + buffer).
+OnCalendar=Sun *-*-* 04:00:00 Europe/Istanbul
+# Small jitter so the drill doesn't race against backup completion.
+RandomizedDelaySec=120
+# If Sunday 04:00 was missed (system off), run at next boot — do NOT skip.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

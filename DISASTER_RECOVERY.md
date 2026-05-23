@@ -4,6 +4,21 @@ This file is action-oriented. When a runbook fires, follow it step-by-step. Do n
 
 Reflects PRD v6.0 (perpetual cashback) + v7 detail packs (PSP & kargo API'ları, mobil 30+ ekran, anti-fraud ML, TR e-fatura/e-arşiv/GİB).
 
+> **Full DR procedure:** `docs/runbooks/disaster-recovery.md`  
+> **Restore from backup:** `docs/runbooks/restore-from-backup.md`  
+> **Backup failure:** `docs/runbooks/backup-failure.md`
+
+---
+
+## RTO / RPO (Phase 5.3)
+
+| Metric | Target | Notes |
+|---|---|---|
+| **RTO** | **30 min** | From "decision to restore" to "service back online". Solo operator. |
+| **RPO** | **24 hours** | Nightly backups 02:00 Istanbul. Phase 6 target: ≤ 1 hour (WAL streaming). |
+
+**Backup pipeline:** restic to B2 (primary) + Hetzner (secondary). Daily 02:00 Istanbul. Retention: daily=7, weekly=4, monthly=12. Weekly restore drill Sundays 04:00 Istanbul verifies restorability.
+
 ---
 
 ## 1. Severity Levels

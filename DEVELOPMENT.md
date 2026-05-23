@@ -1049,6 +1049,55 @@ All four jobs must be green before merging to `main`.
 
 ---
 
+### Backup pipeline (Phase 5.3)
+
+Nightly restic backups to B2 (primary) + Hetzner (secondary). Weekly restore drill every Sunday.
+
+**Local test (no VDS needed):**
+```bash
+# Requires restic (brew install restic / apt install restic)
+bash deploy/scripts/backup-test.sh
+
+# Fast mode (skips multi-snapshot retention test):
+bash deploy/scripts/backup-test.sh --fast
+```
+
+Expected output: `Results: N passed, 0 failed`
+
+**Production install (one-shot, run as root on VDS):**
+```bash
+# Ensure RESTIC_PASSWORD, B2_KEY_ID, B2_APP_KEY, B2_BUCKET are in /opt/mopro/.env
+sudo bash /opt/mopro/deploy/scripts/install-backup.sh
+```
+
+**Manual backup run:**
+```bash
+sudo -u mopro bash /opt/mopro/deploy/scripts/backup-postgres.sh
+```
+
+**Check snapshots:**
+```bash
+RESTIC_PASSWORD=$(grep RESTIC_PASSWORD /opt/mopro/.env | cut -d= -f2) \
+B2_ACCOUNT_ID=$(grep B2_KEY_ID /opt/mopro/.env | cut -d= -f2) \
+B2_ACCOUNT_KEY=$(grep B2_APP_KEY /opt/mopro/.env | cut -d= -f2) \
+    restic -r "b2:$(grep B2_BUCKET /opt/mopro/.env | cut -d= -f2):mopro-backups" snapshots
+```
+
+**Manual restore:**
+```bash
+sudo -u mopro bash /opt/mopro/deploy/scripts/restore-postgres.sh \
+    --db ecom --snapshot latest --confirm YES
+```
+
+**Run restore drill manually:**
+```bash
+sudo -u mopro bash /opt/mopro/deploy/scripts/restore-drill.sh
+```
+
+See `docs/runbooks/restore-from-backup.md` for the full DR procedure.
+
+---
+
 ### Disk-watch monitor (Phase 5.2)
 
 `deploy/scripts/disk-watch.sh` runs every 60 s via `disk-watch.timer` on the

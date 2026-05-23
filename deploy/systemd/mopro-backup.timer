@@ -1,10 +1,13 @@
 [Unit]
-Description=Mopro daily Postgres backup timer
+Description=Mopro nightly Postgres backup timer — fires daily at 02:00 Istanbul
 Requires=mopro-backup.service
 
 [Timer]
-OnCalendar=*-*-* 04:00:00 Europe/Istanbul
+# Fire at 02:00 Istanbul time (UTC+3 in winter, UTC+3 year-round — Turkey uses a fixed offset).
+OnCalendar=*-*-* 02:00:00 Europe/Istanbul
+# ±5 min random jitter prevents calendar-aligned thundering herd on multi-instance setups.
 RandomizedDelaySec=300
+# If the system was off at 02:00, run on next boot (catches missed nightly backups).
 Persistent=true
 
 [Install]

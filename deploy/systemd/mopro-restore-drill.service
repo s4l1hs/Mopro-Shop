@@ -1,0 +1,30 @@
+[Unit]
+Description=Mopro weekly backup restore drill — verifies backups are actually restorable
+Documentation=file:///opt/mopro/docs/runbooks/restore-from-backup.md
+After=docker.service mopro-backup.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=mopro
+Group=mopro
+EnvironmentFile=/opt/mopro/.env
+
+ExecStart=/opt/mopro/deploy/scripts/restore-drill.sh
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mopro-restore-drill
+
+# Drill may run longer than backup: allocate 20 min timeout.
+TimeoutStartSec=1200
+
+# Resource guards.
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUQuota=50%
+
+# No restart on failure — if the drill fails, we want to alert, not retry silently.
+# The script sends PagerDuty + Slack on failure; operator investigates.
+Restart=no
