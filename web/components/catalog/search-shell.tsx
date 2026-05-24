@@ -1,9 +1,9 @@
 "use client";
 
-import { SearchX } from "lucide-react";
+import { Clock, SearchX } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useCategories } from "@/lib/catalog/categories-cache";
 import { CatalogShell } from "./catalog-shell";
 
@@ -22,13 +22,31 @@ function saveSearch(q: string) {
   }
 }
 
+function loadRecent(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
+    return Array.isArray(raw) ? (raw as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export function SearchShell() {
   const searchParams = useSearchParams();
   const q = searchParams.get("q")?.trim() ?? "";
   const { data: categories } = useCategories();
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
   useEffect(() => {
-    if (q) saveSearch(q);
+    setRecentSearches(loadRecent());
+  }, []);
+
+  useEffect(() => {
+    if (q) {
+      saveSearch(q);
+      setRecentSearches(loadRecent());
+    }
   }, [q]);
 
   const topCategories = (categories ?? [])
@@ -37,8 +55,29 @@ export function SearchShell() {
 
   if (!q) {
     return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 text-center">
-        <p className="text-muted-foreground">Aramak istediğiniz ürünü girin.</p>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+        {recentSearches.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5" />
+              Son aramalar
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {recentSearches.map((s) => (
+                <Link
+                  key={s}
+                  href={`/search?q=${encodeURIComponent(s)}`}
+                  className="text-sm px-3 py-1.5 rounded-full border border-border hover:bg-accent transition-colors text-foreground"
+                >
+                  {s}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+        <p className="text-muted-foreground text-sm">
+          Aramak istediğiniz ürünü girin.
+        </p>
       </div>
     );
   }

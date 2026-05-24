@@ -16,6 +16,7 @@ import {
 import { StarRating } from "@/components/ui/star-rating";
 import { cashbackMonthlyMinor, formatPrice } from "@/lib/money";
 import type { ProductDetail } from "@/lib/types/product";
+import { useCartStore } from "@/store/cart";
 import { MobileBuyBar } from "./mobile-buy-bar";
 
 const TRUST_ITEMS = [
@@ -30,6 +31,8 @@ interface BuyBoxProps {
 
 export function BuyBox({ product }: BuyBoxProps) {
   const [quantity, setQuantity] = useState(1);
+  const addItem = useCartStore((s) => s.addItem);
+  const openDrawer = useCartStore((s) => s.openDrawer);
 
   const maxQty = Math.min(10, product.stock ?? 10);
   const isOutOfStock = (product.stock ?? 1) === 0;
@@ -47,8 +50,21 @@ export function BuyBox({ product }: BuyBoxProps) {
   const previewTotalMinor = monthlyMinor * 12;
 
   const handleAddToCart = () => {
-    // TODO(U6): wire real addToCart API
+    addItem({
+      productId: product.id,
+      title: product.title,
+      priceMinor: displayPriceMinor,
+      currency: product.currency ?? "TRY",
+      coverImageUrl: product.cover_image_url,
+      quantity,
+      ...(product.slug !== undefined && { slug: product.slug }),
+      ...(product.brand !== undefined && { brand: product.brand }),
+      ...(product.commission_pct_bps !== undefined && {
+        commissionPctBps: product.commission_pct_bps,
+      }),
+    });
     toast.success(`${product.title} sepete eklendi`);
+    openDrawer();
   };
 
   return (

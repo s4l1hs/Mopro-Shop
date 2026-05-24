@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { useCartStore } from "@/store/cart";
+import { CartDrawer } from "@/components/cart/cart-drawer";
+import { useCartStore, useCartCount } from "@/store/cart";
 import { cn } from "@/lib/utils";
 import { CategoryMegaMenu } from "./category-mega-menu";
 import { HeaderSearch } from "./header-search";
@@ -14,7 +15,10 @@ import { MobileNavSheet } from "./mobile-nav-sheet";
 
 export function Header() {
   const [scrolled, setScrolled] = useState(false);
-  const cartCount = useCartStore((s) => s.itemCount);
+  const cartCount = useCartCount();
+  const drawerOpen = useCartStore((s) => s.drawerOpen);
+  const openDrawer = useCartStore((s) => s.openDrawer);
+  const closeDrawer = useCartStore((s) => s.closeDrawer);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 0);
@@ -81,16 +85,20 @@ export function Header() {
               </Link>
             </Button>
 
-            {/* Cart with badge */}
-            <Button variant="ghost" size="icon" aria-label="Sepet" asChild>
-              <Link href="/cart" className="relative">
-                <ShoppingCart className="h-5 w-5" />
-                {cartCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
-                    {cartCount > 99 ? "99+" : cartCount}
-                  </span>
-                )}
-              </Link>
+            {/* Cart with badge — opens drawer */}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Sepet"
+              onClick={openDrawer}
+              className="relative"
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {cartCount > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                  {cartCount > 99 ? "99+" : cartCount}
+                </span>
+              )}
             </Button>
 
             {/* Desktop: user menu (login or account dropdown) */}
@@ -98,6 +106,8 @@ export function Header() {
           </div>
         </div>
       </div>
+
+      <CartDrawer open={drawerOpen} onOpenChange={(v) => (v ? openDrawer() : closeDrawer())} />
 
       {/* ===== CATEGORY STRIP (desktop only) ===== */}
       <div className="hidden lg:block border-t border-border/40">
