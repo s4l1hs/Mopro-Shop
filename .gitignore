@@ -42,3 +42,12 @@ go.work.sum
 docker-compose.override.yml
 bin/
 *.bak
+
+# Load test secrets and generated outputs
+load-tests/.tokens.json
+load-tests/.refresh.json
+load-tests/.otps.json
+load-tests/reports/*.json
+load-tests/reports/*.md
+!load-tests/reports/README.md
+!load-tests/reports/.gitkeep
