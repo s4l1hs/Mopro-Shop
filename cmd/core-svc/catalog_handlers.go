@@ -17,7 +17,7 @@ const (
 )
 
 // handleListCategories returns all active categories with locale-resolved name.
-// GET /v1/categories
+// GET /categories
 func handleListCategories(svc catalog.Service, defaultLocale string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		locale := parseLocale(r, defaultLocale)
@@ -31,7 +31,7 @@ func handleListCategories(svc catalog.Service, defaultLocale string) http.Handle
 	}
 }
 
-// handleListProducts handles GET /v1/products?category_id=X&page=1&per_page=20
+// handleListProducts handles GET /products?category_id=X&page=1&per_page=20
 func handleListProducts(svc catalog.Service, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
@@ -69,7 +69,7 @@ func handleListProducts(svc catalog.Service, defaultLocale, defaultMarket, cashb
 	}
 }
 
-// handleSearch handles GET /v1/search?q=...&page=1&per_page=20
+// handleSearch handles GET /search?q=...&page=1&per_page=20
 func handleSearch(svc catalog.Service, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
@@ -102,7 +102,7 @@ func handleSearch(svc catalog.Service, defaultLocale, defaultMarket, cashbackCur
 	}
 }
 
-// handleGetProductDetail handles GET /v1/products/{id} with cashback_preview.
+// handleGetProductDetail handles GET /products/{id} with cashback_preview.
 // Replaces the original stub in main.go (wired separately).
 func handleGetProductDetail(svc catalog.Service, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -169,7 +169,7 @@ func handleGetProductDetail(svc catalog.Service, defaultMarket, cashbackCurrency
 	}
 }
 
-// handleListBanners is a 200-empty stub. GET /v1/banners
+// handleListBanners is a 200-empty stub. GET /banners
 func handleListBanners() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slog.Debug("banners: stub called")
@@ -177,7 +177,7 @@ func handleListBanners() http.HandlerFunc {
 	}
 }
 
-// handleListRecommendations is a 200-empty stub. GET /v1/recommendations
+// handleListRecommendations is a 200-empty stub. GET /recommendations
 func handleListRecommendations() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		slog.Debug("recommendations: stub called")

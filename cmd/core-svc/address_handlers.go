@@ -11,7 +11,7 @@ import (
 	"github.com/mopro/platform/internal/identity/middleware"
 )
 
-// handleListAddresses GET /v1/addresses
+// handleListAddresses GET /addresses
 func handleListAddresses(svc identity.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := middleware.UserIDFromCtx(r.Context())
@@ -25,7 +25,7 @@ func handleListAddresses(svc identity.Service) http.HandlerFunc {
 	}
 }
 
-// handleCreateAddress POST /v1/addresses
+// handleCreateAddress POST /addresses
 func handleCreateAddress(svc identity.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := middleware.UserIDFromCtx(r.Context())
@@ -52,7 +52,7 @@ func handleCreateAddress(svc identity.Service) http.HandlerFunc {
 	}
 }
 
-// handleGetAddress GET /v1/addresses/{id}
+// handleGetAddress GET /addresses/{id}
 func handleGetAddress(svc identity.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := middleware.UserIDFromCtx(r.Context())
@@ -75,7 +75,7 @@ func handleGetAddress(svc identity.Service) http.HandlerFunc {
 	}
 }
 
-// handleUpdateAddress PUT /v1/addresses/{id}
+// handleUpdateAddress PUT /addresses/{id}
 func handleUpdateAddress(svc identity.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := middleware.UserIDFromCtx(r.Context())
@@ -110,7 +110,7 @@ func handleUpdateAddress(svc identity.Service) http.HandlerFunc {
 	}
 }
 
-// handleDeleteAddress DELETE /v1/addresses/{id}
+// handleDeleteAddress DELETE /addresses/{id}
 func handleDeleteAddress(svc identity.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := middleware.UserIDFromCtx(r.Context())

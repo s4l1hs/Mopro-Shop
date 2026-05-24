@@ -10,7 +10,7 @@ import (
 	"github.com/mopro/platform/internal/payment/sipay"
 )
 
-// handleInitiatePayment handles POST /v1/payments — starts a 3DS session.
+// handleInitiatePayment handles POST /payments — starts a 3DS session.
 // Requires Idempotency-Key header and Bearer JWT auth (via RequireAuth middleware).
 func handleInitiatePayment(svc payment.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +43,7 @@ func handleInitiatePayment(svc payment.Service) http.HandlerFunc {
 	}
 }
 
-// handlePaymentStatus handles GET /v1/payments/{provider_ref}/status — polls PSP.
+// handlePaymentStatus handles GET /payments/{provider_ref}/status — polls PSP.
 func handlePaymentStatus(svc payment.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ref := r.PathValue("provider_ref")

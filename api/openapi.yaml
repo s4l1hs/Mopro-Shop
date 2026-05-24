@@ -29,7 +29,7 @@ info:
     Client flow:
     1. Receive `403 step_up_required`.
     2. Present OTP entry screen.
-    3. `POST /v1/auth/step-up` with access token + fresh OTP code → `step_up_token`.
+    3. `POST /auth/step-up` with access token + fresh OTP code → `step_up_token`.
     4. Retry the original request with `Authorization: Bearer <step_up_token>`.
 
     ## X-Trace-Id
@@ -44,9 +44,9 @@ info:
 
     ## Binary routing
     Caddy routes by path prefix:
-    - `/v1/wallet/*` → fin-svc
-    - `/v1/cashback/*` → fin-svc
-    - All other `/v1/*` → core-svc
+    - `/wallet/*` → fin-svc
+    - `/cashback/*` → fin-svc
+    - All other `/*` → core-svc
     See `deploy/CADDY-ROUTING.md` for the authoritative mapping.
   contact:
     name: Mopro Platform Team
@@ -95,7 +95,7 @@ paths:
 
   # ── Auth ──────────────────────────────────────────────────────────────────────
 
-  /v1/auth/otp/request:
+  /auth/otp/request:
     post:
       operationId: RequestOtp
       tags: [auth]
@@ -128,7 +128,7 @@ paths:
                   description: |
                     OTP purpose. Use `login` for initial authentication (default).
                     Use `step_up` only if you need a step-up OTP outside the authenticated
-                    step-up flow (`POST /v1/auth/step-up/request`). Most clients should omit
+                    step-up flow (`POST /auth/step-up/request`). Most clients should omit
                     this field and rely on the default.
       responses:
         '204':
@@ -142,7 +142,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/auth/otp/verify:
+  /auth/otp/verify:
     post:
       operationId: VerifyOtp
       tags: [auth]
@@ -191,7 +191,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/auth/token/refresh:
+  /auth/token/refresh:
     post:
       operationId: RefreshToken
       tags: [auth]
@@ -226,7 +226,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/auth/logout:
+  /auth/logout:
     post:
       operationId: Logout
       tags: [auth]
@@ -252,14 +252,14 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/auth/step-up:
+  /auth/step-up:
     post:
       operationId: StepUp
       tags: [auth]
       summary: Exchange access token + fresh OTP for a step-up token (TTL 5 min)
       description: |
         Call this after receiving `403 step_up_required`. The caller must have
-        already called `/v1/auth/otp/request` to obtain a fresh OTP for the
+        already called `/auth/otp/request` to obtain a fresh OTP for the
         currently authenticated phone number.
       parameters:
         - $ref: '#/components/parameters/TraceId'
@@ -295,7 +295,7 @@ paths:
 
   # ── Me ────────────────────────────────────────────────────────────────────────
 
-  /v1/me:
+  /me:
     get:
       operationId: GetMe
       tags: [me]
@@ -390,7 +390,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/me/devices:
+  /me/devices:
     post:
       operationId: RegisterDevice
       tags: [me]
@@ -428,7 +428,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/me/devices/{id}:
+  /me/devices/{id}:
     delete:
       operationId: UnregisterDevice
       tags: [me]
@@ -456,7 +456,7 @@ paths:
 
   # ── Addresses ─────────────────────────────────────────────────────────────────
 
-  /v1/addresses:
+  /addresses:
     get:
       operationId: ListAddresses
       tags: [address]
@@ -510,7 +510,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/addresses/{id}:
+  /addresses/{id}:
     put:
       operationId: UpdateAddress
       tags: [address]
@@ -575,7 +575,7 @@ paths:
 
   # ── Catalog ───────────────────────────────────────────────────────────────────
 
-  /v1/categories:
+  /categories:
     get:
       operationId: ListCategories
       tags: [catalog]
@@ -600,7 +600,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/categories/{id}/commission:
+  /categories/{id}/commission:
     get:
       operationId: GetCategoryCommission
       tags: [catalog, admin]
@@ -636,7 +636,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/products:
+  /products:
     get:
       operationId: ListProducts
       tags: [catalog]
@@ -738,7 +738,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/products/{id}:
+  /products/{id}:
     get:
       operationId: GetProduct
       tags: [catalog]
@@ -774,7 +774,7 @@ paths:
 
   # ── Search ────────────────────────────────────────────────────────────────────
 
-  /v1/search/suggest:
+  /search/suggest:
     get:
       operationId: SearchSuggest
       tags: [search]
@@ -805,7 +805,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/search/trending:
+  /search/trending:
     get:
       operationId: SearchTrending
       tags: [search]
@@ -830,7 +830,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/search:
+  /search:
     get:
       operationId: Search
       tags: [search]
@@ -907,7 +907,7 @@ paths:
 
   # ── Discovery ─────────────────────────────────────────────────────────────────
 
-  /v1/banners:
+  /banners:
     get:
       operationId: ListBanners
       tags: [discovery]
@@ -939,7 +939,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/recommendations:
+  /recommendations:
     get:
       operationId: ListRecommendations
       tags: [discovery]
@@ -966,7 +966,7 @@ paths:
 
   # ── Cart ──────────────────────────────────────────────────────────────────────
 
-  /v1/cart:
+  /cart:
     get:
       operationId: GetCart
       tags: [cart]
@@ -989,13 +989,13 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/cart/items:
+  /cart/items:
     post:
       operationId: AddCartItem
       tags: [cart]
       summary: Add a variant to the cart; returns the updated enriched cart
       description: |
-        Returns the full enriched cart (same schema as GET /v1/cart) in the
+        Returns the full enriched cart (same schema as GET /cart) in the
         response, eliminating the need for a follow-up GET round-trip.
       parameters:
         - $ref: '#/components/parameters/TraceId'
@@ -1032,7 +1032,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/cart/items/{variant_id}:
+  /cart/items/{variant_id}:
     delete:
       operationId: RemoveCartItem
       tags: [cart]
@@ -1058,7 +1058,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/cart/reserve:
+  /cart/reserve:
     post:
       operationId: ReserveCart
       tags: [cart]
@@ -1092,7 +1092,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/cart/release:
+  /cart/release:
     post:
       operationId: ReleaseCart
       tags: [cart]
@@ -1122,7 +1122,7 @@ paths:
 
   # ── Orders ────────────────────────────────────────────────────────────────────
 
-  /v1/orders/checkout:
+  /orders/checkout:
     post:
       operationId: Checkout
       tags: [orders]
@@ -1163,7 +1163,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/orders:
+  /orders:
     post:
       operationId: CreateOrder
       tags: [orders, admin]
@@ -1251,7 +1251,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/orders/{id}:
+  /orders/{id}:
     get:
       operationId: GetOrder
       tags: [orders]
@@ -1278,7 +1278,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/orders/{id}/cancel:
+  /orders/{id}/cancel:
     post:
       operationId: CancelOrder
       tags: [orders]
@@ -1308,7 +1308,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/orders/{id}/refund:
+  /orders/{id}/refund:
     post:
       operationId: RefundOrder
       tags: [orders, admin]
@@ -1350,7 +1350,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/orders/{id}/returns:
+  /orders/{id}/returns:
     post:
       operationId: CreateReturn
       tags: [orders]
@@ -1428,7 +1428,7 @@ paths:
 
   # ── Seller ────────────────────────────────────────────────────────────────────
 
-  /v1/seller/orders/{id}/breakdown:
+  /seller/orders/{id}/breakdown:
     get:
       operationId: GetSellerOrderBreakdown
       tags: [seller]
@@ -1470,7 +1470,7 @@ paths:
 
   # ── Wallet ────────────────────────────────────────────────────────────────────
 
-  /v1/wallet/balance:
+  /wallet/balance:
     get:
       operationId: GetWalletBalance
       tags: [wallet]
@@ -1495,7 +1495,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/wallet/transactions:
+  /wallet/transactions:
     get:
       operationId: ListWalletTransactions
       tags: [wallet]
@@ -1538,7 +1538,7 @@ paths:
 
   # ── Cashback ──────────────────────────────────────────────────────────────────
 
-  /v1/cashback/plans:
+  /cashback/plans:
     get:
       operationId: ListCashbackPlans
       tags: [cashback]
@@ -1584,7 +1584,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/cashback/plans/{id}:
+  /cashback/plans/{id}:
     get:
       operationId: GetCashbackPlan
       tags: [cashback]
@@ -1611,7 +1611,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /v1/cashback/plans/{id}/payments:
+  /cashback/plans/{id}/payments:
     get:
       operationId: ListCashbackPayments
       tags: [cashback]
@@ -1690,15 +1690,15 @@ components:
       description: |
         HS256 access token. TTL 15 min.
         Claims: sub (user_id as string), iat, exp.
-        Issued by POST /v1/auth/otp/verify or POST /v1/auth/token/refresh.
+        Issued by POST /auth/otp/verify or POST /auth/token/refresh.
     stepUpAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
       description: |
         Short-lived JWT with claim `scope=high_sensitivity`. TTL 5 min.
-        Issued by POST /v1/auth/step-up after re-verifying OTP.
-        Required for: DELETE /v1/me (account deletion).
+        Issued by POST /auth/step-up after re-verifying OTP.
+        Required for: DELETE /me (account deletion).
         If a regular bearerAuth token is sent instead, the server returns
         403 with code=step_up_required.
     adminAuth:
@@ -1706,8 +1706,8 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: |
-        Admin / internal token. Only for POST /v1/products, POST /v1/orders,
-        POST /v1/orders/{id}/refund, and GET /v1/categories/{id}/commission.
+        Admin / internal token. Only for POST /products, POST /orders,
+        POST /orders/{id}/refund, and GET /categories/{id}/commission.
         Not exposed to mobile clients.
 
   parameters:
@@ -1737,6 +1737,13 @@ components:
         example: "4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e"
 
   responses:
+    BadRequest:
+      description: Request is malformed or missing required fields
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+
     Unauthorized:
       description: Missing, invalid, or expired access token
       content:
@@ -1747,7 +1754,7 @@ components:
     StepUpRequired:
       description: |
         Regular access token provided but step-up token required.
-        Client must call POST /v1/auth/step-up to obtain a step-up token.
+        Client must call POST /auth/step-up to obtain a step-up token.
       content:
         application/json:
           schema:
@@ -2276,7 +2283,7 @@ components:
       properties:
         id:
           type: string
-          description: Reservation ID; pass to POST /v1/orders or POST /v1/orders/checkout
+          description: Reservation ID; pass to POST /orders or POST /orders/checkout
         expires_at:
           type: string
           format: date-time

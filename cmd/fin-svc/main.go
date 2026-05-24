@@ -273,10 +273,10 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	// Register /v1/* routes behind JWT auth middleware.
+	// Register /* routes behind JWT auth middleware.
 	finMux := http.NewServeMux()
 	genfin.HandlerFromMuxWithBaseURL(genfin.NewStrictHandler(finServer, nil), finMux, "")
-	mux.Handle("/v1/", identitymw.RequireAuth(jwtSigner)(finMux))
+	mux.Handle("/", identitymw.RequireAuth(jwtSigner)(finMux))
 	srv := &http.Server{
 		Addr:         ":8081",
 		Handler:      mux,

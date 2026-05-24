@@ -39,7 +39,7 @@ type ProductTranslation struct {
 }
 
 // CategoryRow is a category with its locale-resolved name and commission rate.
-// Used by ListCategories for the buyer-facing GET /v1/categories endpoint.
+// Used by ListCategories for the buyer-facing GET /categories endpoint.
 type CategoryRow struct {
 	ID               int64
 	Slug             string

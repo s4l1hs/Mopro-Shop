@@ -154,7 +154,7 @@ func TestGetCashbackPlan_OtherUserPlan_Returns404(t *testing.T) {
 	h := buildHandler(t, &stubWalletSvc{}, repo)
 
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/v1/cashback/plans/99", attacker))
+	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/cashback/plans/99", attacker))
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d (body: %s)", w.Code, w.Body.String())
@@ -183,7 +183,7 @@ func TestListCashbackPayments_OtherUserPlan_Returns404(t *testing.T) {
 	h := buildHandler(t, &stubWalletSvc{}, repo)
 
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/v1/cashback/plans/99/payments", attacker))
+	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/cashback/plans/99/payments", attacker))
 
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d", w.Code)
@@ -208,7 +208,7 @@ func TestListWalletTransactions_OnlyShowsCurrentUserWallet(t *testing.T) {
 	h := buildHandler(t, walletSvc, &stubCashbackRepo{})
 
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/v1/wallet/transactions", ctxUser))
+	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/wallet/transactions", ctxUser))
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
@@ -233,7 +233,7 @@ func TestListCashbackPlans_OtherUserPlans_NotVisible(t *testing.T) {
 	h := buildHandler(t, &stubWalletSvc{}, repo)
 
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/v1/cashback/plans", ctxUser))
+	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/cashback/plans", ctxUser))
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
@@ -261,7 +261,7 @@ func TestGetWalletBalance_AlwaysScopedToContextUserID(t *testing.T) {
 	h := buildHandler(t, walletSvc, &stubCashbackRepo{})
 
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/v1/wallet/balance", ctxUser))
+	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/wallet/balance", ctxUser))
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -290,7 +290,7 @@ func TestGetWalletBalance_NoWallet_ReturnsZeroBalance(t *testing.T) {
 	h := buildHandler(t, walletSvc, &stubCashbackRepo{})
 
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/v1/wallet/balance", 1))
+	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/wallet/balance", 1))
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -313,7 +313,7 @@ func TestListCashbackPlans_EmptyList_Returns200(t *testing.T) {
 	h := buildHandler(t, &stubWalletSvc{}, repo)
 
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/v1/cashback/plans", 1))
+	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/cashback/plans", 1))
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -344,7 +344,7 @@ func TestGetCashbackPlan_OwnPlan_Returns200(t *testing.T) {
 	h := buildHandler(t, &stubWalletSvc{}, repo)
 
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/v1/cashback/plans/7", userID))
+	h.ServeHTTP(w, authedReq(t, http.MethodGet, "/cashback/plans/7", userID))
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d (body: %s)", w.Code, w.Body.String())
@@ -354,7 +354,7 @@ func TestGetCashbackPlan_OwnPlan_Returns200(t *testing.T) {
 func TestMissingAuth_Returns401(t *testing.T) {
 	h := buildHandler(t, &stubWalletSvc{}, &stubCashbackRepo{})
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/wallet/balance", nil))
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/wallet/balance", nil))
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("expected 401 without auth, got %d", w.Code)
 	}

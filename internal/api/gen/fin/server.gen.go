@@ -225,19 +225,19 @@ type ListWalletTransactionsParams struct {
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 	// List the authenticated user's perpetual cashback plans
-	// (GET /v1/cashback/plans)
+	// (GET /cashback/plans)
 	ListCashbackPlans(w http.ResponseWriter, r *http.Request, params ListCashbackPlansParams)
 	// Get a single cashback plan
-	// (GET /v1/cashback/plans/{id})
+	// (GET /cashback/plans/{id})
 	GetCashbackPlan(w http.ResponseWriter, r *http.Request, id int64, params GetCashbackPlanParams)
 	// List monthly payment history for a cashback plan (cursor-paginated)
-	// (GET /v1/cashback/plans/{id}/payments)
+	// (GET /cashback/plans/{id}/payments)
 	ListCashbackPayments(w http.ResponseWriter, r *http.Request, id int64, params ListCashbackPaymentsParams)
 	// Get the authenticated user's coin wallet balance
-	// (GET /v1/wallet/balance)
+	// (GET /wallet/balance)
 	GetWalletBalance(w http.ResponseWriter, r *http.Request, params GetWalletBalanceParams)
 	// List wallet transaction history (cursor-paginated)
-	// (GET /v1/wallet/transactions)
+	// (GET /wallet/transactions)
 	ListWalletTransactions(w http.ResponseWriter, r *http.Request, params ListWalletTransactionsParams)
 }
 
@@ -682,11 +682,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
-	m.HandleFunc("GET "+options.BaseURL+"/v1/cashback/plans", wrapper.ListCashbackPlans)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/cashback/plans/{id}", wrapper.GetCashbackPlan)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/cashback/plans/{id}/payments", wrapper.ListCashbackPayments)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/wallet/balance", wrapper.GetWalletBalance)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/wallet/transactions", wrapper.ListWalletTransactions)
+	m.HandleFunc("GET "+options.BaseURL+"/cashback/plans", wrapper.ListCashbackPlans)
+	m.HandleFunc("GET "+options.BaseURL+"/cashback/plans/{id}", wrapper.GetCashbackPlan)
+	m.HandleFunc("GET "+options.BaseURL+"/cashback/plans/{id}/payments", wrapper.ListCashbackPayments)
+	m.HandleFunc("GET "+options.BaseURL+"/wallet/balance", wrapper.GetWalletBalance)
+	m.HandleFunc("GET "+options.BaseURL+"/wallet/transactions", wrapper.ListWalletTransactions)
 
 	return m
 }
@@ -910,19 +910,19 @@ func (response ListWalletTransactions500JSONResponse) VisitListWalletTransaction
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// List the authenticated user's perpetual cashback plans
-	// (GET /v1/cashback/plans)
+	// (GET /cashback/plans)
 	ListCashbackPlans(ctx context.Context, request ListCashbackPlansRequestObject) (ListCashbackPlansResponseObject, error)
 	// Get a single cashback plan
-	// (GET /v1/cashback/plans/{id})
+	// (GET /cashback/plans/{id})
 	GetCashbackPlan(ctx context.Context, request GetCashbackPlanRequestObject) (GetCashbackPlanResponseObject, error)
 	// List monthly payment history for a cashback plan (cursor-paginated)
-	// (GET /v1/cashback/plans/{id}/payments)
+	// (GET /cashback/plans/{id}/payments)
 	ListCashbackPayments(ctx context.Context, request ListCashbackPaymentsRequestObject) (ListCashbackPaymentsResponseObject, error)
 	// Get the authenticated user's coin wallet balance
-	// (GET /v1/wallet/balance)
+	// (GET /wallet/balance)
 	GetWalletBalance(ctx context.Context, request GetWalletBalanceRequestObject) (GetWalletBalanceResponseObject, error)
 	// List wallet transaction history (cursor-paginated)
-	// (GET /v1/wallet/transactions)
+	// (GET /wallet/transactions)
 	ListWalletTransactions(ctx context.Context, request ListWalletTransactionsRequestObject) (ListWalletTransactionsResponseObject, error)
 }
 

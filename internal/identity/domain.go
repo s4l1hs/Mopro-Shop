@@ -74,7 +74,7 @@ type StepUpToken struct {
 	ExpiresAt time.Time
 }
 
-// UserUpdates carries mutable fields for PATCH /v1/me.
+// UserUpdates carries mutable fields for PATCH /me.
 // Only non-nil fields are applied.
 type UserUpdates struct {
 	Name   *string

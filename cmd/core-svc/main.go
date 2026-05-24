@@ -313,73 +313,73 @@ func main() {
 	auth.registerRoutes(mux, requireAuth)
 
 	// Catalog routes
-	mux.Handle("POST /v1/products",
+	mux.Handle("POST /products",
 		httpTrace(http.HandlerFunc(handleCreateProduct(catalogSvc, defaultCurrency, defaultLocale))),
 	)
-	mux.Handle("GET /v1/products",
+	mux.Handle("GET /products",
 		httpTrace(http.HandlerFunc(handleListProducts(catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)
-	mux.Handle("GET /v1/products/{id}",
+	mux.Handle("GET /products/{id}",
 		httpTrace(http.HandlerFunc(handleGetProductDetail(catalogSvc, market, cashbackCurrency))),
 	)
-	mux.Handle("POST /v1/products/{id}/variants",
+	mux.Handle("POST /products/{id}/variants",
 		httpTrace(http.HandlerFunc(handleAddVariant(catalogSvc, defaultCurrency))),
 	)
-	mux.Handle("PUT /v1/products/{id}/translations/{locale}",
+	mux.Handle("PUT /products/{id}/translations/{locale}",
 		httpTrace(http.HandlerFunc(handleUpdateTranslation(catalogSvc))),
 	)
-	mux.Handle("GET /v1/categories",
+	mux.Handle("GET /categories",
 		httpTrace(http.HandlerFunc(handleListCategories(catalogSvc, defaultLocale))),
 	)
-	mux.Handle("GET /v1/categories/{id}/commission",
+	mux.Handle("GET /categories/{id}/commission",
 		httpTrace(http.HandlerFunc(handleGetCommission(catalogSvc, market))),
 	)
-	mux.Handle("GET /v1/search",
+	mux.Handle("GET /search",
 		httpTrace(http.HandlerFunc(handleSearch(catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)
-	mux.Handle("GET /v1/banners",
+	mux.Handle("GET /banners",
 		httpTrace(http.HandlerFunc(handleListBanners())),
 	)
-	mux.Handle("GET /v1/recommendations",
+	mux.Handle("GET /recommendations",
 		httpTrace(http.HandlerFunc(handleListRecommendations())),
 	)
 
 	// Address routes — require JWT authentication (IDOR-safe: user_id from JWT)
-	mux.Handle("GET /v1/addresses",
+	mux.Handle("GET /addresses",
 		httpTrace(requireAuth(http.HandlerFunc(handleListAddresses(identitySvc)))),
 	)
-	mux.Handle("POST /v1/addresses",
+	mux.Handle("POST /addresses",
 		httpTrace(requireAuth(http.HandlerFunc(handleCreateAddress(identitySvc)))),
 	)
-	mux.Handle("GET /v1/addresses/{id}",
+	mux.Handle("GET /addresses/{id}",
 		httpTrace(requireAuth(http.HandlerFunc(handleGetAddress(identitySvc)))),
 	)
-	mux.Handle("PUT /v1/addresses/{id}",
+	mux.Handle("PUT /addresses/{id}",
 		httpTrace(requireAuth(http.HandlerFunc(handleUpdateAddress(identitySvc)))),
 	)
-	mux.Handle("DELETE /v1/addresses/{id}",
+	mux.Handle("DELETE /addresses/{id}",
 		httpTrace(requireAuth(http.HandlerFunc(handleDeleteAddress(identitySvc)))),
 	)
 
 	// Cart routes — require JWT authentication
-	mux.Handle("POST /v1/cart/items",
+	mux.Handle("POST /cart/items",
 		httpTrace(requireAuth(http.HandlerFunc(handleCartAddItem(cartSvc)))),
 	)
-	mux.Handle("DELETE /v1/cart/items/{variant_id}",
+	mux.Handle("DELETE /cart/items/{variant_id}",
 		httpTrace(requireAuth(http.HandlerFunc(handleCartRemoveItem(cartSvc)))),
 	)
-	mux.Handle("GET /v1/cart",
+	mux.Handle("GET /cart",
 		httpTrace(requireAuth(http.HandlerFunc(handleGetCart(cartSvc)))),
 	)
-	mux.Handle("POST /v1/cart/reserve",
+	mux.Handle("POST /cart/reserve",
 		httpTrace(requireAuth(http.HandlerFunc(handleCartReserve(cartSvc)))),
 	)
-	mux.Handle("POST /v1/cart/release",
+	mux.Handle("POST /cart/release",
 		httpTrace(http.HandlerFunc(handleCartRelease(cartSvc))),
 	)
 
 	// Checkout route — initiates the v8 multi-seller saga (cart → PSP → 3DS)
-	mux.Handle("POST /v1/checkout/initiate",
+	mux.Handle("POST /checkout/initiate",
 		httpTrace(requireAuth(http.HandlerFunc(
 			order.HandleInitiateCheckout(orderSvc, func(r *http.Request) (int64, bool) {
 				id := middleware.UserIDFromCtx(r.Context())
@@ -389,52 +389,52 @@ func main() {
 	)
 
 	// Order routes — require JWT authentication where user ID is needed
-	mux.Handle("POST /v1/orders",
+	mux.Handle("POST /orders",
 		httpTrace(requireAuth(http.HandlerFunc(handleCreateOrder(orderSvc)))),
 	)
-	mux.Handle("GET /v1/orders/{id}",
+	mux.Handle("GET /orders/{id}",
 		httpTrace(http.HandlerFunc(handleGetOrder(orderSvc))),
 	)
-	mux.Handle("GET /v1/orders",
+	mux.Handle("GET /orders",
 		httpTrace(requireAuth(http.HandlerFunc(handleListOrders(orderSvc)))),
 	)
-	mux.Handle("POST /v1/orders/{id}/status",
+	mux.Handle("POST /orders/{id}/status",
 		httpTrace(http.HandlerFunc(handleUpdateOrderStatus(orderSvc))),
 	)
-	mux.Handle("POST /v1/orders/{id}/deliver",
+	mux.Handle("POST /orders/{id}/deliver",
 		httpTrace(http.HandlerFunc(handleMarkDelivered(orderSvc))),
 	)
-	mux.Handle("POST /v1/orders/{id}/cancel",
+	mux.Handle("POST /orders/{id}/cancel",
 		httpTrace(http.HandlerFunc(handleCancelOrder(orderSvc))),
 	)
-	mux.Handle("POST /v1/orders/{id}/refund",
+	mux.Handle("POST /orders/{id}/refund",
 		httpTrace(http.HandlerFunc(handleRefundOrder(orderSvc, paymentSvc, paymentRepo, paymentOutbox, market, defaultCurrency))),
 	)
-	mux.Handle("GET /v1/seller/orders/{id}/breakdown",
+	mux.Handle("GET /seller/orders/{id}/breakdown",
 		httpTrace(http.HandlerFunc(handleSellerBreakdown(orderSvc))),
 	)
 
 	// Payment routes — require JWT authentication
-	mux.Handle("POST /v1/payments",
+	mux.Handle("POST /payments",
 		httpTrace(requireAuth(http.HandlerFunc(handleInitiatePayment(paymentSvc)))),
 	)
-	mux.Handle("GET /v1/payments/{provider_ref}/status",
+	mux.Handle("GET /payments/{provider_ref}/status",
 		httpTrace(http.HandlerFunc(handlePaymentStatus(paymentSvc))),
 	)
-	// Webhook route — must match Caddyfile @psp_webhook path /v1/payments/webhook/*
+	// Webhook route — must match Caddyfile @psp_webhook path /payments/webhook/*
 	// so the explicit no-middleware handle block applies (CLAUDE.md § 9).
-	mux.Handle("POST /v1/payments/webhook/sipay",
+	mux.Handle("POST /payments/webhook/sipay",
 		httpTrace(http.HandlerFunc(handleSipayWebhook(webhookHandler))),
 	)
 
-	// Shipping webhook routes — Caddyfile @shipping_webhook path /v1/shipping/webhook/*
-	mux.Handle("POST /v1/shipping/webhook/surat",
+	// Shipping webhook routes — Caddyfile @shipping_webhook path /shipping/webhook/*
+	mux.Handle("POST /shipping/webhook/surat",
 		httpTrace(http.HandlerFunc(handleShippingWebhook(shippingSvc, "surat"))),
 	)
-	mux.Handle("POST /v1/shipping/webhook/mng",
+	mux.Handle("POST /shipping/webhook/mng",
 		httpTrace(http.HandlerFunc(handleShippingWebhook(shippingSvc, "mng"))),
 	)
-	mux.Handle("POST /v1/shipping/webhook/hepsijet",
+	mux.Handle("POST /shipping/webhook/hepsijet",
 		httpTrace(http.HandlerFunc(handleShippingWebhook(shippingSvc, "hepsijet"))),
 	)
 

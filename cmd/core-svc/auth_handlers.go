@@ -24,36 +24,36 @@ type authHandlers struct {
 // Routes that require JWT auth are wrapped with the RequireAuth middleware.
 func (a *authHandlers) registerRoutes(mux *http.ServeMux, requireAuth func(http.Handler) http.Handler) {
 	// ── Public auth routes (no JWT required) ─────────────────────────────────
-	mux.Handle("POST /v1/auth/otp/request",
+	mux.Handle("POST /auth/otp/request",
 		httpTrace(http.HandlerFunc(a.handleRequestOTP)),
 	)
-	mux.Handle("POST /v1/auth/otp/verify",
+	mux.Handle("POST /auth/otp/verify",
 		httpTrace(http.HandlerFunc(a.handleVerifyOTP)),
 	)
-	mux.Handle("POST /v1/auth/token/refresh",
+	mux.Handle("POST /auth/token/refresh",
 		httpTrace(http.HandlerFunc(a.handleRefreshTokens)),
 	)
 
 	// ── Authenticated routes ──────────────────────────────────────────────────
-	mux.Handle("POST /v1/auth/logout",
+	mux.Handle("POST /auth/logout",
 		httpTrace(requireAuth(http.HandlerFunc(a.handleLogout))),
 	)
-	mux.Handle("GET /v1/me",
+	mux.Handle("GET /me",
 		httpTrace(requireAuth(http.HandlerFunc(a.handleGetMe))),
 	)
-	mux.Handle("PATCH /v1/me",
+	mux.Handle("PATCH /me",
 		httpTrace(requireAuth(http.HandlerFunc(a.handleUpdateMe))),
 	)
-	mux.Handle("DELETE /v1/me",
+	mux.Handle("DELETE /me",
 		httpTrace(requireAuth(http.HandlerFunc(a.handleDeleteMe))),
 	)
-	mux.Handle("POST /v1/auth/step-up/request",
+	mux.Handle("POST /auth/step-up/request",
 		httpTrace(requireAuth(http.HandlerFunc(a.handleRequestStepUpOTP))),
 	)
-	mux.Handle("POST /v1/auth/step-up/verify",
+	mux.Handle("POST /auth/step-up/verify",
 		httpTrace(requireAuth(http.HandlerFunc(a.handleVerifyStepUpOTP))),
 	)
-	mux.Handle("POST /v1/me/devices",
+	mux.Handle("POST /me/devices",
 		httpTrace(requireAuth(http.HandlerFunc(a.handleRegisterDevice))),
 	)
 }

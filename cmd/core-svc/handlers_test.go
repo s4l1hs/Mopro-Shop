@@ -141,7 +141,7 @@ func newRequest(method, path, body string) *http.Request {
 
 func TestHandleCancelOrder_Success(t *testing.T) {
 	svc := &stubOrderSvc{}
-	r := newRequest("POST", "/v1/orders/1/cancel", `{"reason":"changed mind"}`)
+	r := newRequest("POST", "/orders/1/cancel", `{"reason":"changed mind"}`)
 	r.SetPathValue("id", "1")
 	w := httptest.NewRecorder()
 	handleCancelOrder(svc)(w, r)
@@ -156,7 +156,7 @@ func TestHandleCancelOrder_InvalidTransition(t *testing.T) {
 			return fmt.Errorf("%w: cannot cancel shipped order", order.ErrInvalidTransition)
 		},
 	}
-	r := newRequest("POST", "/v1/orders/1/cancel", `{"reason":"test"}`)
+	r := newRequest("POST", "/orders/1/cancel", `{"reason":"test"}`)
 	r.SetPathValue("id", "1")
 	w := httptest.NewRecorder()
 	handleCancelOrder(svc)(w, r)
@@ -171,7 +171,7 @@ func TestHandleCancelOrder_NotFound(t *testing.T) {
 			return order.ErrOrderNotFound
 		},
 	}
-	r := newRequest("POST", "/v1/orders/9999/cancel", `{}`)
+	r := newRequest("POST", "/orders/9999/cancel", `{}`)
 	r.SetPathValue("id", "9999")
 	w := httptest.NewRecorder()
 	handleCancelOrder(svc)(w, r)
@@ -192,7 +192,7 @@ func TestHandleRefundOrder_Success(t *testing.T) {
 	paymentRepo := &stubPaymentRepo{}
 	ob := &stubOutbox{}
 
-	r := newRequest("POST", "/v1/orders/1/refund", `{}`)
+	r := newRequest("POST", "/orders/1/refund", `{}`)
 	r.SetPathValue("id", "1")
 	r.Header.Set("Idempotency-Key", "refund-test-001")
 	w := httptest.NewRecorder()
@@ -215,7 +215,7 @@ func TestHandleRefundOrder_WrongStatus(t *testing.T) {
 			return order.Order{ID: id, Status: order.StatusPendingPayment}, nil, nil
 		},
 	}
-	r := newRequest("POST", "/v1/orders/1/refund", `{}`)
+	r := newRequest("POST", "/orders/1/refund", `{}`)
 	r.SetPathValue("id", "1")
 	r.Header.Set("Idempotency-Key", "refund-test-002")
 	w := httptest.NewRecorder()
@@ -231,7 +231,7 @@ func TestHandleRefundOrder_NoPaymentFound(t *testing.T) {
 			return payment.PaymentIntent{}, payment.ErrPaymentNotFound
 		},
 	}
-	r := newRequest("POST", "/v1/orders/1/refund", `{}`)
+	r := newRequest("POST", "/orders/1/refund", `{}`)
 	r.SetPathValue("id", "1")
 	r.Header.Set("Idempotency-Key", "refund-test-003")
 	w := httptest.NewRecorder()
@@ -242,7 +242,7 @@ func TestHandleRefundOrder_NoPaymentFound(t *testing.T) {
 }
 
 func TestHandleRefundOrder_MissingIdempotencyKey(t *testing.T) {
-	r := newRequest("POST", "/v1/orders/1/refund", `{}`)
+	r := newRequest("POST", "/orders/1/refund", `{}`)
 	r.SetPathValue("id", "1")
 	// No Idempotency-Key header
 	w := httptest.NewRecorder()
@@ -267,7 +267,7 @@ func TestHandleSellerBreakdown_Success(t *testing.T) {
 			}, nil
 		},
 	}
-	r := httptest.NewRequest("GET", "/v1/seller/orders/1/breakdown", nil)
+	r := httptest.NewRequest("GET", "/seller/orders/1/breakdown", nil)
 	r.SetPathValue("id", "1")
 	r.Header.Set("X-Mopro-Seller-Id", "42")
 	w := httptest.NewRecorder()
@@ -293,7 +293,7 @@ func TestHandleSellerBreakdown_WrongSeller(t *testing.T) {
 			}, nil
 		},
 	}
-	r := httptest.NewRequest("GET", "/v1/seller/orders/1/breakdown", nil)
+	r := httptest.NewRequest("GET", "/seller/orders/1/breakdown", nil)
 	r.SetPathValue("id", "1")
 	r.Header.Set("X-Mopro-Seller-Id", "42") // seller 42 has no items in this order
 	w := httptest.NewRecorder()
@@ -304,7 +304,7 @@ func TestHandleSellerBreakdown_WrongSeller(t *testing.T) {
 }
 
 func TestHandleSellerBreakdown_MissingSellerHeader(t *testing.T) {
-	r := httptest.NewRequest("GET", "/v1/seller/orders/1/breakdown", nil)
+	r := httptest.NewRequest("GET", "/seller/orders/1/breakdown", nil)
 	r.SetPathValue("id", "1")
 	w := httptest.NewRecorder()
 	handleSellerBreakdown(&stubOrderSvc{})(w, r)
@@ -319,7 +319,7 @@ func TestHandleSellerBreakdown_OrderNotFound(t *testing.T) {
 			return order.Order{}, nil, order.ErrOrderNotFound
 		},
 	}
-	r := httptest.NewRequest("GET", "/v1/seller/orders/9999/breakdown", nil)
+	r := httptest.NewRequest("GET", "/seller/orders/9999/breakdown", nil)
 	r.SetPathValue("id", "9999")
 	r.Header.Set("X-Mopro-Seller-Id", "42")
 	w := httptest.NewRecorder()

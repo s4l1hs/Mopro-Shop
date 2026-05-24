@@ -129,6 +129,18 @@ const (
 	Debit  WalletTransactionType = "debit"
 )
 
+// Defines values for RequestOtpJSONBodyPurpose.
+const (
+	RequestOtpJSONBodyPurposeLogin  RequestOtpJSONBodyPurpose = "login"
+	RequestOtpJSONBodyPurposeStepUp RequestOtpJSONBodyPurpose = "step_up"
+)
+
+// Defines values for VerifyOtpJSONBodyPurpose.
+const (
+	VerifyOtpJSONBodyPurposeLogin  VerifyOtpJSONBodyPurpose = "login"
+	VerifyOtpJSONBodyPurposeStepUp VerifyOtpJSONBodyPurpose = "step_up"
+)
+
 // Defines values for ListBannersParamsPlacement.
 const (
 	ListBannersParamsPlacementCategory ListBannersParamsPlacement = "category"
@@ -519,7 +531,7 @@ type Reservation struct {
 	// ExpiresAt Reservation is released automatically after this time (typically 10 min)
 	ExpiresAt time.Time `json:"expires_at"`
 
-	// Id Reservation ID; pass to POST /v1/orders or POST /v1/orders/checkout
+	// Id Reservation ID; pass to POST /orders or POST /orders/checkout
 	Id string `json:"id"`
 }
 
@@ -663,6 +675,9 @@ type IdempotencyKey = openapi_types.UUID
 // TraceId defines model for TraceId.
 type TraceId = string
 
+// BadRequest Standard error response wrapper used by all error status codes
+type BadRequest = ErrorEnvelope
+
 // Conflict Standard error response wrapper used by all error status codes
 type Conflict = ErrorEnvelope
 
@@ -686,14 +701,6 @@ type Unauthorized = ErrorEnvelope
 
 // UnprocessableEntity Standard error response wrapper used by all error status codes
 type UnprocessableEntity = ErrorEnvelope
-
-// HealthzParams defines parameters for Healthz.
-type HealthzParams struct {
-	// XTraceId Client-generated trace identifier (UUID or opaque string).
-	// Echoed in error responses as `error.trace_id`.
-	// Falls back to a server-generated UUID if absent.
-	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
-}
 
 // ListAddressesParams defines parameters for ListAddresses.
 type ListAddressesParams struct {
@@ -764,6 +771,12 @@ type LogoutParams struct {
 type RequestOtpJSONBody struct {
 	// Phone Turkish mobile number in E.164 format. Must start with +905.
 	Phone string `json:"phone"`
+
+	// Purpose OTP purpose. Use `login` for initial authentication (default).
+	// Use `step_up` only if you need a step-up OTP outside the authenticated
+	// step-up flow (`POST /auth/step-up/request`). Most clients should omit
+	// this field and rely on the default.
+	Purpose *RequestOtpJSONBodyPurpose `json:"purpose,omitempty"`
 }
 
 // RequestOtpParams defines parameters for RequestOtp.
@@ -774,10 +787,16 @@ type RequestOtpParams struct {
 	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
 }
 
+// RequestOtpJSONBodyPurpose defines parameters for RequestOtp.
+type RequestOtpJSONBodyPurpose string
+
 // VerifyOtpJSONBody defines parameters for VerifyOtp.
 type VerifyOtpJSONBody struct {
 	Code  string `json:"code"`
 	Phone string `json:"phone"`
+
+	// Purpose Must match the purpose used in the corresponding /otp/request call. Defaults to `login`.
+	Purpose *VerifyOtpJSONBodyPurpose `json:"purpose,omitempty"`
 }
 
 // VerifyOtpParams defines parameters for VerifyOtp.
@@ -792,6 +811,9 @@ type VerifyOtpParams struct {
 	// cached response without re-executing the operation.
 	XIdempotencyKey IdempotencyKey `json:"X-Idempotency-Key"`
 }
+
+// VerifyOtpJSONBodyPurpose defines parameters for VerifyOtp.
+type VerifyOtpJSONBodyPurpose string
 
 // StepUpJSONBody defines parameters for StepUp.
 type StepUpJSONBody struct {
@@ -959,6 +981,14 @@ type ListCategoriesParams struct {
 type GetCategoryCommissionParams struct {
 	Market *string `form:"market,omitempty" json:"market,omitempty"`
 
+	// XTraceId Client-generated trace identifier (UUID or opaque string).
+	// Echoed in error responses as `error.trace_id`.
+	// Falls back to a server-generated UUID if absent.
+	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
+}
+
+// HealthzParams defines parameters for Healthz.
+type HealthzParams struct {
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
 	// Echoed in error responses as `error.trace_id`.
 	// Falls back to a server-generated UUID if absent.

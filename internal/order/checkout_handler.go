@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-// checkoutInitiateRequest is the JSON body for POST /v1/checkout/initiate.
+// checkoutInitiateRequest is the JSON body for POST /checkout/initiate.
 type checkoutInitiateRequest struct {
 	ReservationID string `json:"reservation_id"`
 	Market        string `json:"market,omitempty"`
@@ -22,7 +22,7 @@ type checkoutInitiateResponse struct {
 	Orders      []Order `json:"orders"`
 }
 
-// HandleInitiateCheckout returns an http.HandlerFunc for POST /v1/checkout/initiate.
+// HandleInitiateCheckout returns an http.HandlerFunc for POST /checkout/initiate.
 // userIDFromContext must be injected by the auth middleware (JWT claim).
 func HandleInitiateCheckout(svc Service, userIDFromContext func(*http.Request) (int64, bool)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

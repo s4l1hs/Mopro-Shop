@@ -18,23 +18,23 @@
 # ARCHITECTURE.md § 4.2 — fin-svc HTTP server: wallet/cashback/payout read
 # fin-svc listens on :8081 (core-svc and jobs-svc on :8080)
 (fin_routes) {
-	handle /v1/wallet/* {
+	handle /wallet/* {
 		reverse_proxy fin-svc:8081
 	}
-	handle /v1/cashback/* {
+	handle /cashback/* {
 		reverse_proxy fin-svc:8081
 	}
-	handle /v1/payouts/* {
+	handle /payouts/* {
 		reverse_proxy fin-svc:8081
 	}
-	handle /v1/admin/* {
+	handle /admin/* {
 		reverse_proxy fin-svc:8081
 	}
 }
 
 # jobs-svc owns: notifications, media, support, sizefinder, antifraud-inference
 (jobs_routes) {
-	handle /v1/jobs/* {
+	handle /jobs/* {
 		reverse_proxy jobs-svc:8080
 	}
 }
@@ -61,7 +61,7 @@ api.moproshop.com {
 	#   Sipay:      hash_key = base64(SHA512(merchant_key + status_code + invoice_id + amount + currency))
 	#   Craftgate:  x-craftgate-signature = HMAC-SHA256(rawBody, webhook_secret)
 	#   iyzico:     no header signature; verify via paymentId server-side lookup
-	@psp_webhook path /v1/payments/webhook/*
+	@psp_webhook path /payments/webhook/*
 	handle @psp_webhook {
 		# NO rate_limit, NO @cf_only enforcer applied to PSP webhooks.
 		# The webhook handler itself verifies the provider HMAC signature.
@@ -72,13 +72,13 @@ api.moproshop.com {
 	# NO rate-limit / auth middleware — signature verification is carrier-specific
 	# and handled inside shippingService.HandleWebhook (HMAC for Sürat/MNG,
 	# Bearer token for HepsiJet). "delivered" triggers ecom.order.delivered.v1.
-	@shipping_webhook path /v1/shipping/webhook/*
+	@shipping_webhook path /shipping/webhook/*
 	handle @shipping_webhook {
 		reverse_proxy core-svc:8080
 	}
 
 	# ── Seller transparency endpoint ──────────────────────────────────────────
-	# GET /v1/seller/orders/:id/breakdown → core-svc (CLAUDE.md § 4.8)
+	# GET /seller/orders/:id/breakdown → core-svc (CLAUDE.md § 4.8)
 
 	# TODO(rate-limit-sprint): caddy-ratelimit plugin required (xcaddy custom build).
 	# rate_limit {
@@ -89,7 +89,7 @@ api.moproshop.com {
 	#     }
 	# }
 
-	# Default: all /v1/* and /api/* not matched above → core-svc
+	# Default: all /* not matched above → core-svc
 	handle {
 		reverse_proxy core-svc:8080
 	}
@@ -102,7 +102,7 @@ seller.moproshop.com {
 	import healthz_native
 
 	# Seller panel SPA + transparency endpoints (ARCHITECTURE.md § 6)
-	# Primary: GET /api/v1/seller/orders/:id/breakdown  (CLAUDE.md § 4.8)
+	# Primary: GET /seller/orders/{id}/breakdown  (CLAUDE.md § 4.8)
 	reverse_proxy core-svc:8080
 }
 
@@ -150,7 +150,7 @@ api.localhost {
 	import jobs_routes
 
 	# ── PSP payment webhooks — NO middleware, HMAC verified in handler ────────
-	@psp_webhook path /v1/payments/webhook/*
+	@psp_webhook path /payments/webhook/*
 	handle @psp_webhook {
 		# NO rate_limit, NO @cf_only enforcer applied to PSP webhooks.
 		# The webhook handler itself verifies the provider HMAC signature.
@@ -158,7 +158,7 @@ api.localhost {
 	}
 
 	# ── Shipping carrier webhooks ─────────────────────────────────────────────
-	@shipping_webhook path /v1/shipping/webhook/*
+	@shipping_webhook path /shipping/webhook/*
 	handle @shipping_webhook {
 		reverse_proxy core-svc:8080
 	}
@@ -166,7 +166,7 @@ api.localhost {
 	# TODO(rate-limit-sprint): caddy-ratelimit plugin required (xcaddy custom build)
 	# rate_limit { zone api_per_ip { key {client_ip}; window 1m; max 600 } }
 
-	# Default: all /v1/* not matched above → core-svc
+	# Default: all /* not matched above → core-svc
 	handle {
 		reverse_proxy core-svc:8080
 	}
@@ -192,12 +192,12 @@ localhost:80 {
 		respond "OK" 200
 	}
 
-	@fin path /v1/wallet/* /v1/cashback/* /v1/payouts/* /v1/admin/*
+	@fin path /wallet/* /cashback/* /payouts/* /admin/*
 	handle @fin {
 		reverse_proxy fin-svc:8081
 	}
 
-	@jobs path /v1/jobs/*
+	@jobs path /jobs/*
 	handle @jobs {
 		reverse_proxy jobs-svc:8080
 	}

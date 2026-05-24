@@ -110,6 +110,18 @@ const (
 	Bearer TokenPairTokenType = "Bearer"
 )
 
+// Defines values for RequestOtpJSONBodyPurpose.
+const (
+	RequestOtpJSONBodyPurposeLogin  RequestOtpJSONBodyPurpose = "login"
+	RequestOtpJSONBodyPurposeStepUp RequestOtpJSONBodyPurpose = "step_up"
+)
+
+// Defines values for VerifyOtpJSONBodyPurpose.
+const (
+	VerifyOtpJSONBodyPurposeLogin  VerifyOtpJSONBodyPurpose = "login"
+	VerifyOtpJSONBodyPurposeStepUp VerifyOtpJSONBodyPurpose = "step_up"
+)
+
 // Defines values for ListBannersParamsPlacement.
 const (
 	ListBannersParamsPlacementCategory ListBannersParamsPlacement = "category"
@@ -443,7 +455,7 @@ type Reservation struct {
 	// ExpiresAt Reservation is released automatically after this time (typically 10 min)
 	ExpiresAt time.Time `json:"expires_at"`
 
-	// Id Reservation ID; pass to POST /v1/orders or POST /v1/orders/checkout
+	// Id Reservation ID; pass to POST /orders or POST /orders/checkout
 	Id string `json:"id"`
 }
 
@@ -560,6 +572,9 @@ type IdempotencyKey = openapi_types.UUID
 // TraceId defines model for TraceId.
 type TraceId = string
 
+// BadRequest Standard error response wrapper used by all error status codes
+type BadRequest = ErrorEnvelope
+
 // Conflict Standard error response wrapper used by all error status codes
 type Conflict = ErrorEnvelope
 
@@ -583,14 +598,6 @@ type Unauthorized = ErrorEnvelope
 
 // UnprocessableEntity Standard error response wrapper used by all error status codes
 type UnprocessableEntity = ErrorEnvelope
-
-// HealthzParams defines parameters for Healthz.
-type HealthzParams struct {
-	// XTraceId Client-generated trace identifier (UUID or opaque string).
-	// Echoed in error responses as `error.trace_id`.
-	// Falls back to a server-generated UUID if absent.
-	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
-}
 
 // ListAddressesParams defines parameters for ListAddresses.
 type ListAddressesParams struct {
@@ -661,6 +668,12 @@ type LogoutParams struct {
 type RequestOtpJSONBody struct {
 	// Phone Turkish mobile number in E.164 format. Must start with +905.
 	Phone string `json:"phone"`
+
+	// Purpose OTP purpose. Use `login` for initial authentication (default).
+	// Use `step_up` only if you need a step-up OTP outside the authenticated
+	// step-up flow (`POST /auth/step-up/request`). Most clients should omit
+	// this field and rely on the default.
+	Purpose *RequestOtpJSONBodyPurpose `json:"purpose,omitempty"`
 }
 
 // RequestOtpParams defines parameters for RequestOtp.
@@ -671,10 +684,16 @@ type RequestOtpParams struct {
 	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
 }
 
+// RequestOtpJSONBodyPurpose defines parameters for RequestOtp.
+type RequestOtpJSONBodyPurpose string
+
 // VerifyOtpJSONBody defines parameters for VerifyOtp.
 type VerifyOtpJSONBody struct {
 	Code  string `json:"code"`
 	Phone string `json:"phone"`
+
+	// Purpose Must match the purpose used in the corresponding /otp/request call. Defaults to `login`.
+	Purpose *VerifyOtpJSONBodyPurpose `json:"purpose,omitempty"`
 }
 
 // VerifyOtpParams defines parameters for VerifyOtp.
@@ -689,6 +708,9 @@ type VerifyOtpParams struct {
 	// cached response without re-executing the operation.
 	XIdempotencyKey IdempotencyKey `json:"X-Idempotency-Key"`
 }
+
+// VerifyOtpJSONBodyPurpose defines parameters for VerifyOtp.
+type VerifyOtpJSONBodyPurpose string
 
 // StepUpJSONBody defines parameters for StepUp.
 type StepUpJSONBody struct {
@@ -822,6 +844,14 @@ type ListCategoriesParams struct {
 type GetCategoryCommissionParams struct {
 	Market *string `form:"market,omitempty" json:"market,omitempty"`
 
+	// XTraceId Client-generated trace identifier (UUID or opaque string).
+	// Echoed in error responses as `error.trace_id`.
+	// Falls back to a server-generated UUID if absent.
+	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
+}
+
+// HealthzParams defines parameters for Healthz.
+type HealthzParams struct {
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
 	// Echoed in error responses as `error.trace_id`.
 	// Falls back to a server-generated UUID if absent.
@@ -1173,122 +1203,122 @@ type CreateProductJSONRequestBody CreateProductJSONBody
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// List the authenticated user's delivery addresses
+	// (GET /addresses)
+	ListAddresses(w http.ResponseWriter, r *http.Request, params ListAddressesParams)
+	// Add a new delivery address
+	// (POST /addresses)
+	CreateAddress(w http.ResponseWriter, r *http.Request, params CreateAddressParams)
+	// Delete an address
+	// (DELETE /addresses/{id})
+	DeleteAddress(w http.ResponseWriter, r *http.Request, id int64, params DeleteAddressParams)
+	// Update an existing address
+	// (PUT /addresses/{id})
+	UpdateAddress(w http.ResponseWriter, r *http.Request, id int64, params UpdateAddressParams)
+	// Revoke the provided refresh token
+	// (POST /auth/logout)
+	Logout(w http.ResponseWriter, r *http.Request, params LogoutParams)
+	// Request a one-time password via SMS
+	// (POST /auth/otp/request)
+	RequestOtp(w http.ResponseWriter, r *http.Request, params RequestOtpParams)
+	// Verify OTP and issue access + refresh token pair
+	// (POST /auth/otp/verify)
+	VerifyOtp(w http.ResponseWriter, r *http.Request, params VerifyOtpParams)
+	// Exchange access token + fresh OTP for a step-up token (TTL 5 min)
+	// (POST /auth/step-up)
+	StepUp(w http.ResponseWriter, r *http.Request, params StepUpParams)
+	// Exchange a refresh token for a new token pair
+	// (POST /auth/token/refresh)
+	RefreshToken(w http.ResponseWriter, r *http.Request, params RefreshTokenParams)
+	// Promotional banners for a given placement
+	// (GET /banners)
+	ListBanners(w http.ResponseWriter, r *http.Request, params ListBannersParams)
+	// Get the authenticated user's cart (enriched with product data)
+	// (GET /cart)
+	GetCart(w http.ResponseWriter, r *http.Request, params GetCartParams)
+	// Add a variant to the cart; returns the updated enriched cart
+	// (POST /cart/items)
+	AddCartItem(w http.ResponseWriter, r *http.Request, params AddCartItemParams)
+	// Remove a variant from the cart
+	// (DELETE /cart/items/{variant_id})
+	RemoveCartItem(w http.ResponseWriter, r *http.Request, variantId int64, params RemoveCartItemParams)
+	// Release an active reservation (cancel checkout flow)
+	// (POST /cart/release)
+	ReleaseCart(w http.ResponseWriter, r *http.Request, params ReleaseCartParams)
+	// Reserve inventory for all cart items before checkout
+	// (POST /cart/reserve)
+	ReserveCart(w http.ResponseWriter, r *http.Request, params ReserveCartParams)
+	// List all 42 product categories (locale-resolved names)
+	// (GET /categories)
+	ListCategories(w http.ResponseWriter, r *http.Request, params ListCategoriesParams)
+	// Get live commission and KDV rates for a category + market pair
+	// (GET /categories/{id}/commission)
+	GetCategoryCommission(w http.ResponseWriter, r *http.Request, id int64, params GetCategoryCommissionParams)
 	// Health check (liveness probe)
 	// (GET /healthz)
 	Healthz(w http.ResponseWriter, r *http.Request, params HealthzParams)
-	// List the authenticated user's delivery addresses
-	// (GET /v1/addresses)
-	ListAddresses(w http.ResponseWriter, r *http.Request, params ListAddressesParams)
-	// Add a new delivery address
-	// (POST /v1/addresses)
-	CreateAddress(w http.ResponseWriter, r *http.Request, params CreateAddressParams)
-	// Delete an address
-	// (DELETE /v1/addresses/{id})
-	DeleteAddress(w http.ResponseWriter, r *http.Request, id int64, params DeleteAddressParams)
-	// Update an existing address
-	// (PUT /v1/addresses/{id})
-	UpdateAddress(w http.ResponseWriter, r *http.Request, id int64, params UpdateAddressParams)
-	// Revoke the provided refresh token
-	// (POST /v1/auth/logout)
-	Logout(w http.ResponseWriter, r *http.Request, params LogoutParams)
-	// Request a one-time password via SMS
-	// (POST /v1/auth/otp/request)
-	RequestOtp(w http.ResponseWriter, r *http.Request, params RequestOtpParams)
-	// Verify OTP and issue access + refresh token pair
-	// (POST /v1/auth/otp/verify)
-	VerifyOtp(w http.ResponseWriter, r *http.Request, params VerifyOtpParams)
-	// Exchange access token + fresh OTP for a step-up token (TTL 5 min)
-	// (POST /v1/auth/step-up)
-	StepUp(w http.ResponseWriter, r *http.Request, params StepUpParams)
-	// Exchange a refresh token for a new token pair
-	// (POST /v1/auth/token/refresh)
-	RefreshToken(w http.ResponseWriter, r *http.Request, params RefreshTokenParams)
-	// Promotional banners for a given placement
-	// (GET /v1/banners)
-	ListBanners(w http.ResponseWriter, r *http.Request, params ListBannersParams)
-	// Get the authenticated user's cart (enriched with product data)
-	// (GET /v1/cart)
-	GetCart(w http.ResponseWriter, r *http.Request, params GetCartParams)
-	// Add a variant to the cart; returns the updated enriched cart
-	// (POST /v1/cart/items)
-	AddCartItem(w http.ResponseWriter, r *http.Request, params AddCartItemParams)
-	// Remove a variant from the cart
-	// (DELETE /v1/cart/items/{variant_id})
-	RemoveCartItem(w http.ResponseWriter, r *http.Request, variantId int64, params RemoveCartItemParams)
-	// Release an active reservation (cancel checkout flow)
-	// (POST /v1/cart/release)
-	ReleaseCart(w http.ResponseWriter, r *http.Request, params ReleaseCartParams)
-	// Reserve inventory for all cart items before checkout
-	// (POST /v1/cart/reserve)
-	ReserveCart(w http.ResponseWriter, r *http.Request, params ReserveCartParams)
-	// List all 42 product categories (locale-resolved names)
-	// (GET /v1/categories)
-	ListCategories(w http.ResponseWriter, r *http.Request, params ListCategoriesParams)
-	// Get live commission and KDV rates for a category + market pair
-	// (GET /v1/categories/{id}/commission)
-	GetCategoryCommission(w http.ResponseWriter, r *http.Request, id int64, params GetCategoryCommissionParams)
 	// Soft-delete the authenticated user account (KVKK / GDPR)
-	// (DELETE /v1/me)
+	// (DELETE /me)
 	DeleteMe(w http.ResponseWriter, r *http.Request, params DeleteMeParams)
 	// Get authenticated user profile
-	// (GET /v1/me)
+	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request, params GetMeParams)
 	// Update user profile fields
-	// (PUT /v1/me)
+	// (PATCH /me)
 	UpdateMe(w http.ResponseWriter, r *http.Request, params UpdateMeParams)
 	// Register a device FCM token for push notifications
-	// (POST /v1/me/devices)
+	// (POST /me/devices)
 	RegisterDevice(w http.ResponseWriter, r *http.Request, params RegisterDeviceParams)
 	// Remove a registered device (deregister push notifications)
-	// (DELETE /v1/me/devices/{id})
+	// (DELETE /me/devices/{id})
 	UnregisterDevice(w http.ResponseWriter, r *http.Request, id int64, params UnregisterDeviceParams)
 	// List the authenticated user's orders
-	// (GET /v1/orders)
+	// (GET /orders)
 	ListOrders(w http.ResponseWriter, r *http.Request, params ListOrdersParams)
 	// Create an order from a reservation (admin / internal)
-	// (POST /v1/orders)
+	// (POST /orders)
 	CreateOrder(w http.ResponseWriter, r *http.Request, params CreateOrderParams)
 	// Atomically reserve cart → create order → initiate PSP payment
-	// (POST /v1/orders/checkout)
+	// (POST /orders/checkout)
 	Checkout(w http.ResponseWriter, r *http.Request, params CheckoutParams)
 	// Get order detail
-	// (GET /v1/orders/{id})
+	// (GET /orders/{id})
 	GetOrder(w http.ResponseWriter, r *http.Request, id int64, params GetOrderParams)
 	// Cancel an order (only while in pending/confirmed status)
-	// (POST /v1/orders/{id}/cancel)
+	// (POST /orders/{id}/cancel)
 	CancelOrder(w http.ResponseWriter, r *http.Request, id int64, params CancelOrderParams)
 	// Trigger a full refund for a delivered order (admin only)
-	// (POST /v1/orders/{id}/refund)
+	// (POST /orders/{id}/refund)
 	RefundOrder(w http.ResponseWriter, r *http.Request, id int64, params RefundOrderParams)
 	// List return requests for an order
-	// (GET /v1/orders/{id}/returns)
+	// (GET /orders/{id}/returns)
 	ListReturns(w http.ResponseWriter, r *http.Request, id int64, params ListReturnsParams)
 	// Submit a return request for delivered order items
-	// (POST /v1/orders/{id}/returns)
+	// (POST /orders/{id}/returns)
 	CreateReturn(w http.ResponseWriter, r *http.Request, id int64, params CreateReturnParams)
 	// List products with optional category filter, pagination, and sort
-	// (GET /v1/products)
+	// (GET /products)
 	ListProducts(w http.ResponseWriter, r *http.Request, params ListProductsParams)
 	// Create a new product listing (admin / seller onboarding)
-	// (POST /v1/products)
+	// (POST /products)
 	CreateProduct(w http.ResponseWriter, r *http.Request, params CreateProductParams)
 	// Get full product detail including variants and cashback preview
-	// (GET /v1/products/{id})
+	// (GET /products/{id})
 	GetProduct(w http.ResponseWriter, r *http.Request, id int64, params GetProductParams)
 	// Personalised product recommendations for the authenticated user
-	// (GET /v1/recommendations)
+	// (GET /recommendations)
 	ListRecommendations(w http.ResponseWriter, r *http.Request, params ListRecommendationsParams)
 	// Full-text product search with filters
-	// (GET /v1/search)
+	// (GET /search)
 	Search(w http.ResponseWriter, r *http.Request, params SearchParams)
 	// Autocomplete suggestions (debounce 250 ms on client)
-	// (GET /v1/search/suggest)
+	// (GET /search/suggest)
 	SearchSuggest(w http.ResponseWriter, r *http.Request, params SearchSuggestParams)
 	// Current trending search terms
-	// (GET /v1/search/trending)
+	// (GET /search/trending)
 	SearchTrending(w http.ResponseWriter, r *http.Request, params SearchTrendingParams)
 	// Seller transparency breakdown for a specific order
-	// (GET /v1/seller/orders/{id}/breakdown)
+	// (GET /seller/orders/{id}/breakdown)
 	GetSellerOrderBreakdown(w http.ResponseWriter, r *http.Request, id int64, params GetSellerOrderBreakdownParams)
 }
 
@@ -1300,46 +1330,6 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
-
-// Healthz operation middleware
-func (siw *ServerInterfaceWrapper) Healthz(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params HealthzParams
-
-	headers := r.Header
-
-	// ------------- Optional header parameter "X-Trace-Id" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("X-Trace-Id")]; found {
-		var XTraceId TraceId
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Trace-Id", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "X-Trace-Id", valueList[0], &XTraceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Trace-Id", Err: err})
-			return
-		}
-
-		params.XTraceId = &XTraceId
-
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.Healthz(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
 
 // ListAddresses operation middleware
 func (siw *ServerInterfaceWrapper) ListAddresses(w http.ResponseWriter, r *http.Request) {
@@ -2401,6 +2391,46 @@ func (siw *ServerInterfaceWrapper) GetCategoryCommission(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetCategoryCommission(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Healthz operation middleware
+func (siw *ServerInterfaceWrapper) Healthz(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params HealthzParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Trace-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Trace-Id")]; found {
+		var XTraceId TraceId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Trace-Id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Trace-Id", valueList[0], &XTraceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Trace-Id", Err: err})
+			return
+		}
+
+		params.XTraceId = &XTraceId
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Healthz(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3955,48 +3985,50 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc("GET "+options.BaseURL+"/addresses", wrapper.ListAddresses)
+	m.HandleFunc("POST "+options.BaseURL+"/addresses", wrapper.CreateAddress)
+	m.HandleFunc("DELETE "+options.BaseURL+"/addresses/{id}", wrapper.DeleteAddress)
+	m.HandleFunc("PUT "+options.BaseURL+"/addresses/{id}", wrapper.UpdateAddress)
+	m.HandleFunc("POST "+options.BaseURL+"/auth/logout", wrapper.Logout)
+	m.HandleFunc("POST "+options.BaseURL+"/auth/otp/request", wrapper.RequestOtp)
+	m.HandleFunc("POST "+options.BaseURL+"/auth/otp/verify", wrapper.VerifyOtp)
+	m.HandleFunc("POST "+options.BaseURL+"/auth/step-up", wrapper.StepUp)
+	m.HandleFunc("POST "+options.BaseURL+"/auth/token/refresh", wrapper.RefreshToken)
+	m.HandleFunc("GET "+options.BaseURL+"/banners", wrapper.ListBanners)
+	m.HandleFunc("GET "+options.BaseURL+"/cart", wrapper.GetCart)
+	m.HandleFunc("POST "+options.BaseURL+"/cart/items", wrapper.AddCartItem)
+	m.HandleFunc("DELETE "+options.BaseURL+"/cart/items/{variant_id}", wrapper.RemoveCartItem)
+	m.HandleFunc("POST "+options.BaseURL+"/cart/release", wrapper.ReleaseCart)
+	m.HandleFunc("POST "+options.BaseURL+"/cart/reserve", wrapper.ReserveCart)
+	m.HandleFunc("GET "+options.BaseURL+"/categories", wrapper.ListCategories)
+	m.HandleFunc("GET "+options.BaseURL+"/categories/{id}/commission", wrapper.GetCategoryCommission)
 	m.HandleFunc("GET "+options.BaseURL+"/healthz", wrapper.Healthz)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/addresses", wrapper.ListAddresses)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/addresses", wrapper.CreateAddress)
-	m.HandleFunc("DELETE "+options.BaseURL+"/v1/addresses/{id}", wrapper.DeleteAddress)
-	m.HandleFunc("PUT "+options.BaseURL+"/v1/addresses/{id}", wrapper.UpdateAddress)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/auth/logout", wrapper.Logout)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/auth/otp/request", wrapper.RequestOtp)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/auth/otp/verify", wrapper.VerifyOtp)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/auth/step-up", wrapper.StepUp)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/auth/token/refresh", wrapper.RefreshToken)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/banners", wrapper.ListBanners)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/cart", wrapper.GetCart)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/cart/items", wrapper.AddCartItem)
-	m.HandleFunc("DELETE "+options.BaseURL+"/v1/cart/items/{variant_id}", wrapper.RemoveCartItem)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/cart/release", wrapper.ReleaseCart)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/cart/reserve", wrapper.ReserveCart)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/categories", wrapper.ListCategories)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/categories/{id}/commission", wrapper.GetCategoryCommission)
-	m.HandleFunc("DELETE "+options.BaseURL+"/v1/me", wrapper.DeleteMe)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/me", wrapper.GetMe)
-	m.HandleFunc("PUT "+options.BaseURL+"/v1/me", wrapper.UpdateMe)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/me/devices", wrapper.RegisterDevice)
-	m.HandleFunc("DELETE "+options.BaseURL+"/v1/me/devices/{id}", wrapper.UnregisterDevice)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/orders", wrapper.ListOrders)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/orders", wrapper.CreateOrder)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/orders/checkout", wrapper.Checkout)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/orders/{id}", wrapper.GetOrder)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/orders/{id}/cancel", wrapper.CancelOrder)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/orders/{id}/refund", wrapper.RefundOrder)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/orders/{id}/returns", wrapper.ListReturns)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/orders/{id}/returns", wrapper.CreateReturn)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/products", wrapper.ListProducts)
-	m.HandleFunc("POST "+options.BaseURL+"/v1/products", wrapper.CreateProduct)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/products/{id}", wrapper.GetProduct)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/recommendations", wrapper.ListRecommendations)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/search", wrapper.Search)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/search/suggest", wrapper.SearchSuggest)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/search/trending", wrapper.SearchTrending)
-	m.HandleFunc("GET "+options.BaseURL+"/v1/seller/orders/{id}/breakdown", wrapper.GetSellerOrderBreakdown)
+	m.HandleFunc("DELETE "+options.BaseURL+"/me", wrapper.DeleteMe)
+	m.HandleFunc("GET "+options.BaseURL+"/me", wrapper.GetMe)
+	m.HandleFunc("PATCH "+options.BaseURL+"/me", wrapper.UpdateMe)
+	m.HandleFunc("POST "+options.BaseURL+"/me/devices", wrapper.RegisterDevice)
+	m.HandleFunc("DELETE "+options.BaseURL+"/me/devices/{id}", wrapper.UnregisterDevice)
+	m.HandleFunc("GET "+options.BaseURL+"/orders", wrapper.ListOrders)
+	m.HandleFunc("POST "+options.BaseURL+"/orders", wrapper.CreateOrder)
+	m.HandleFunc("POST "+options.BaseURL+"/orders/checkout", wrapper.Checkout)
+	m.HandleFunc("GET "+options.BaseURL+"/orders/{id}", wrapper.GetOrder)
+	m.HandleFunc("POST "+options.BaseURL+"/orders/{id}/cancel", wrapper.CancelOrder)
+	m.HandleFunc("POST "+options.BaseURL+"/orders/{id}/refund", wrapper.RefundOrder)
+	m.HandleFunc("GET "+options.BaseURL+"/orders/{id}/returns", wrapper.ListReturns)
+	m.HandleFunc("POST "+options.BaseURL+"/orders/{id}/returns", wrapper.CreateReturn)
+	m.HandleFunc("GET "+options.BaseURL+"/products", wrapper.ListProducts)
+	m.HandleFunc("POST "+options.BaseURL+"/products", wrapper.CreateProduct)
+	m.HandleFunc("GET "+options.BaseURL+"/products/{id}", wrapper.GetProduct)
+	m.HandleFunc("GET "+options.BaseURL+"/recommendations", wrapper.ListRecommendations)
+	m.HandleFunc("GET "+options.BaseURL+"/search", wrapper.Search)
+	m.HandleFunc("GET "+options.BaseURL+"/search/suggest", wrapper.SearchSuggest)
+	m.HandleFunc("GET "+options.BaseURL+"/search/trending", wrapper.SearchTrending)
+	m.HandleFunc("GET "+options.BaseURL+"/seller/orders/{id}/breakdown", wrapper.GetSellerOrderBreakdown)
 
 	return m
 }
+
+type BadRequestJSONResponse ErrorEnvelope
 
 type ConflictJSONResponse ErrorEnvelope
 
@@ -4027,24 +4059,6 @@ type TooManyRequestsJSONResponse struct {
 type UnauthorizedJSONResponse ErrorEnvelope
 
 type UnprocessableEntityJSONResponse ErrorEnvelope
-
-type HealthzRequestObject struct {
-	Params HealthzParams
-}
-
-type HealthzResponseObject interface {
-	VisitHealthzResponse(w http.ResponseWriter) error
-}
-
-type Healthz200TextResponse string
-
-func (response Healthz200TextResponse) VisitHealthzResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(200)
-
-	_, err := w.Write([]byte(response))
-	return err
-}
 
 type ListAddressesRequestObject struct {
 	Params ListAddressesParams
@@ -4311,6 +4325,15 @@ type RequestOtp204Response struct {
 func (response RequestOtp204Response) VisitRequestOtpResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
+}
+
+type RequestOtp400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response RequestOtp400JSONResponse) VisitRequestOtpResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
 }
 
 type RequestOtp422JSONResponse struct {
@@ -4861,6 +4884,24 @@ func (response GetCategoryCommission500JSONResponse) VisitGetCategoryCommissionR
 	w.WriteHeader(500)
 
 	return json.NewEncoder(w).Encode(response)
+}
+
+type HealthzRequestObject struct {
+	Params HealthzParams
+}
+
+type HealthzResponseObject interface {
+	VisitHealthzResponse(w http.ResponseWriter) error
+}
+
+type Healthz200TextResponse string
+
+func (response Healthz200TextResponse) VisitHealthzResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(200)
+
+	_, err := w.Write([]byte(response))
+	return err
 }
 
 type DeleteMeRequestObject struct {
@@ -5895,122 +5936,122 @@ func (response GetSellerOrderBreakdown500JSONResponse) VisitGetSellerOrderBreakd
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// List the authenticated user's delivery addresses
+	// (GET /addresses)
+	ListAddresses(ctx context.Context, request ListAddressesRequestObject) (ListAddressesResponseObject, error)
+	// Add a new delivery address
+	// (POST /addresses)
+	CreateAddress(ctx context.Context, request CreateAddressRequestObject) (CreateAddressResponseObject, error)
+	// Delete an address
+	// (DELETE /addresses/{id})
+	DeleteAddress(ctx context.Context, request DeleteAddressRequestObject) (DeleteAddressResponseObject, error)
+	// Update an existing address
+	// (PUT /addresses/{id})
+	UpdateAddress(ctx context.Context, request UpdateAddressRequestObject) (UpdateAddressResponseObject, error)
+	// Revoke the provided refresh token
+	// (POST /auth/logout)
+	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
+	// Request a one-time password via SMS
+	// (POST /auth/otp/request)
+	RequestOtp(ctx context.Context, request RequestOtpRequestObject) (RequestOtpResponseObject, error)
+	// Verify OTP and issue access + refresh token pair
+	// (POST /auth/otp/verify)
+	VerifyOtp(ctx context.Context, request VerifyOtpRequestObject) (VerifyOtpResponseObject, error)
+	// Exchange access token + fresh OTP for a step-up token (TTL 5 min)
+	// (POST /auth/step-up)
+	StepUp(ctx context.Context, request StepUpRequestObject) (StepUpResponseObject, error)
+	// Exchange a refresh token for a new token pair
+	// (POST /auth/token/refresh)
+	RefreshToken(ctx context.Context, request RefreshTokenRequestObject) (RefreshTokenResponseObject, error)
+	// Promotional banners for a given placement
+	// (GET /banners)
+	ListBanners(ctx context.Context, request ListBannersRequestObject) (ListBannersResponseObject, error)
+	// Get the authenticated user's cart (enriched with product data)
+	// (GET /cart)
+	GetCart(ctx context.Context, request GetCartRequestObject) (GetCartResponseObject, error)
+	// Add a variant to the cart; returns the updated enriched cart
+	// (POST /cart/items)
+	AddCartItem(ctx context.Context, request AddCartItemRequestObject) (AddCartItemResponseObject, error)
+	// Remove a variant from the cart
+	// (DELETE /cart/items/{variant_id})
+	RemoveCartItem(ctx context.Context, request RemoveCartItemRequestObject) (RemoveCartItemResponseObject, error)
+	// Release an active reservation (cancel checkout flow)
+	// (POST /cart/release)
+	ReleaseCart(ctx context.Context, request ReleaseCartRequestObject) (ReleaseCartResponseObject, error)
+	// Reserve inventory for all cart items before checkout
+	// (POST /cart/reserve)
+	ReserveCart(ctx context.Context, request ReserveCartRequestObject) (ReserveCartResponseObject, error)
+	// List all 42 product categories (locale-resolved names)
+	// (GET /categories)
+	ListCategories(ctx context.Context, request ListCategoriesRequestObject) (ListCategoriesResponseObject, error)
+	// Get live commission and KDV rates for a category + market pair
+	// (GET /categories/{id}/commission)
+	GetCategoryCommission(ctx context.Context, request GetCategoryCommissionRequestObject) (GetCategoryCommissionResponseObject, error)
 	// Health check (liveness probe)
 	// (GET /healthz)
 	Healthz(ctx context.Context, request HealthzRequestObject) (HealthzResponseObject, error)
-	// List the authenticated user's delivery addresses
-	// (GET /v1/addresses)
-	ListAddresses(ctx context.Context, request ListAddressesRequestObject) (ListAddressesResponseObject, error)
-	// Add a new delivery address
-	// (POST /v1/addresses)
-	CreateAddress(ctx context.Context, request CreateAddressRequestObject) (CreateAddressResponseObject, error)
-	// Delete an address
-	// (DELETE /v1/addresses/{id})
-	DeleteAddress(ctx context.Context, request DeleteAddressRequestObject) (DeleteAddressResponseObject, error)
-	// Update an existing address
-	// (PUT /v1/addresses/{id})
-	UpdateAddress(ctx context.Context, request UpdateAddressRequestObject) (UpdateAddressResponseObject, error)
-	// Revoke the provided refresh token
-	// (POST /v1/auth/logout)
-	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
-	// Request a one-time password via SMS
-	// (POST /v1/auth/otp/request)
-	RequestOtp(ctx context.Context, request RequestOtpRequestObject) (RequestOtpResponseObject, error)
-	// Verify OTP and issue access + refresh token pair
-	// (POST /v1/auth/otp/verify)
-	VerifyOtp(ctx context.Context, request VerifyOtpRequestObject) (VerifyOtpResponseObject, error)
-	// Exchange access token + fresh OTP for a step-up token (TTL 5 min)
-	// (POST /v1/auth/step-up)
-	StepUp(ctx context.Context, request StepUpRequestObject) (StepUpResponseObject, error)
-	// Exchange a refresh token for a new token pair
-	// (POST /v1/auth/token/refresh)
-	RefreshToken(ctx context.Context, request RefreshTokenRequestObject) (RefreshTokenResponseObject, error)
-	// Promotional banners for a given placement
-	// (GET /v1/banners)
-	ListBanners(ctx context.Context, request ListBannersRequestObject) (ListBannersResponseObject, error)
-	// Get the authenticated user's cart (enriched with product data)
-	// (GET /v1/cart)
-	GetCart(ctx context.Context, request GetCartRequestObject) (GetCartResponseObject, error)
-	// Add a variant to the cart; returns the updated enriched cart
-	// (POST /v1/cart/items)
-	AddCartItem(ctx context.Context, request AddCartItemRequestObject) (AddCartItemResponseObject, error)
-	// Remove a variant from the cart
-	// (DELETE /v1/cart/items/{variant_id})
-	RemoveCartItem(ctx context.Context, request RemoveCartItemRequestObject) (RemoveCartItemResponseObject, error)
-	// Release an active reservation (cancel checkout flow)
-	// (POST /v1/cart/release)
-	ReleaseCart(ctx context.Context, request ReleaseCartRequestObject) (ReleaseCartResponseObject, error)
-	// Reserve inventory for all cart items before checkout
-	// (POST /v1/cart/reserve)
-	ReserveCart(ctx context.Context, request ReserveCartRequestObject) (ReserveCartResponseObject, error)
-	// List all 42 product categories (locale-resolved names)
-	// (GET /v1/categories)
-	ListCategories(ctx context.Context, request ListCategoriesRequestObject) (ListCategoriesResponseObject, error)
-	// Get live commission and KDV rates for a category + market pair
-	// (GET /v1/categories/{id}/commission)
-	GetCategoryCommission(ctx context.Context, request GetCategoryCommissionRequestObject) (GetCategoryCommissionResponseObject, error)
 	// Soft-delete the authenticated user account (KVKK / GDPR)
-	// (DELETE /v1/me)
+	// (DELETE /me)
 	DeleteMe(ctx context.Context, request DeleteMeRequestObject) (DeleteMeResponseObject, error)
 	// Get authenticated user profile
-	// (GET /v1/me)
+	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
 	// Update user profile fields
-	// (PUT /v1/me)
+	// (PATCH /me)
 	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
 	// Register a device FCM token for push notifications
-	// (POST /v1/me/devices)
+	// (POST /me/devices)
 	RegisterDevice(ctx context.Context, request RegisterDeviceRequestObject) (RegisterDeviceResponseObject, error)
 	// Remove a registered device (deregister push notifications)
-	// (DELETE /v1/me/devices/{id})
+	// (DELETE /me/devices/{id})
 	UnregisterDevice(ctx context.Context, request UnregisterDeviceRequestObject) (UnregisterDeviceResponseObject, error)
 	// List the authenticated user's orders
-	// (GET /v1/orders)
+	// (GET /orders)
 	ListOrders(ctx context.Context, request ListOrdersRequestObject) (ListOrdersResponseObject, error)
 	// Create an order from a reservation (admin / internal)
-	// (POST /v1/orders)
+	// (POST /orders)
 	CreateOrder(ctx context.Context, request CreateOrderRequestObject) (CreateOrderResponseObject, error)
 	// Atomically reserve cart → create order → initiate PSP payment
-	// (POST /v1/orders/checkout)
+	// (POST /orders/checkout)
 	Checkout(ctx context.Context, request CheckoutRequestObject) (CheckoutResponseObject, error)
 	// Get order detail
-	// (GET /v1/orders/{id})
+	// (GET /orders/{id})
 	GetOrder(ctx context.Context, request GetOrderRequestObject) (GetOrderResponseObject, error)
 	// Cancel an order (only while in pending/confirmed status)
-	// (POST /v1/orders/{id}/cancel)
+	// (POST /orders/{id}/cancel)
 	CancelOrder(ctx context.Context, request CancelOrderRequestObject) (CancelOrderResponseObject, error)
 	// Trigger a full refund for a delivered order (admin only)
-	// (POST /v1/orders/{id}/refund)
+	// (POST /orders/{id}/refund)
 	RefundOrder(ctx context.Context, request RefundOrderRequestObject) (RefundOrderResponseObject, error)
 	// List return requests for an order
-	// (GET /v1/orders/{id}/returns)
+	// (GET /orders/{id}/returns)
 	ListReturns(ctx context.Context, request ListReturnsRequestObject) (ListReturnsResponseObject, error)
 	// Submit a return request for delivered order items
-	// (POST /v1/orders/{id}/returns)
+	// (POST /orders/{id}/returns)
 	CreateReturn(ctx context.Context, request CreateReturnRequestObject) (CreateReturnResponseObject, error)
 	// List products with optional category filter, pagination, and sort
-	// (GET /v1/products)
+	// (GET /products)
 	ListProducts(ctx context.Context, request ListProductsRequestObject) (ListProductsResponseObject, error)
 	// Create a new product listing (admin / seller onboarding)
-	// (POST /v1/products)
+	// (POST /products)
 	CreateProduct(ctx context.Context, request CreateProductRequestObject) (CreateProductResponseObject, error)
 	// Get full product detail including variants and cashback preview
-	// (GET /v1/products/{id})
+	// (GET /products/{id})
 	GetProduct(ctx context.Context, request GetProductRequestObject) (GetProductResponseObject, error)
 	// Personalised product recommendations for the authenticated user
-	// (GET /v1/recommendations)
+	// (GET /recommendations)
 	ListRecommendations(ctx context.Context, request ListRecommendationsRequestObject) (ListRecommendationsResponseObject, error)
 	// Full-text product search with filters
-	// (GET /v1/search)
+	// (GET /search)
 	Search(ctx context.Context, request SearchRequestObject) (SearchResponseObject, error)
 	// Autocomplete suggestions (debounce 250 ms on client)
-	// (GET /v1/search/suggest)
+	// (GET /search/suggest)
 	SearchSuggest(ctx context.Context, request SearchSuggestRequestObject) (SearchSuggestResponseObject, error)
 	// Current trending search terms
-	// (GET /v1/search/trending)
+	// (GET /search/trending)
 	SearchTrending(ctx context.Context, request SearchTrendingRequestObject) (SearchTrendingResponseObject, error)
 	// Seller transparency breakdown for a specific order
-	// (GET /v1/seller/orders/{id}/breakdown)
+	// (GET /seller/orders/{id}/breakdown)
 	GetSellerOrderBreakdown(ctx context.Context, request GetSellerOrderBreakdownRequestObject) (GetSellerOrderBreakdownResponseObject, error)
 }
 
@@ -6041,32 +6082,6 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
-}
-
-// Healthz operation middleware
-func (sh *strictHandler) Healthz(w http.ResponseWriter, r *http.Request, params HealthzParams) {
-	var request HealthzRequestObject
-
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.Healthz(ctx, request.(HealthzRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "Healthz")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(HealthzResponseObject); ok {
-		if err := validResponse.VisitHealthzResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
 }
 
 // ListAddresses operation middleware
@@ -6571,6 +6586,32 @@ func (sh *strictHandler) GetCategoryCommission(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetCategoryCommissionResponseObject); ok {
 		if err := validResponse.VisitGetCategoryCommissionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Healthz operation middleware
+func (sh *strictHandler) Healthz(w http.ResponseWriter, r *http.Request, params HealthzParams) {
+	var request HealthzRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Healthz(ctx, request.(HealthzRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Healthz")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(HealthzResponseObject); ok {
+		if err := validResponse.VisitHealthzResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

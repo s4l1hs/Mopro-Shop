@@ -122,14 +122,14 @@ func TestFinIntegration_GetCashbackPlan_OtherUserPlan_Returns404(t *testing.T) {
 
 	// Owner can access their plan.
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, fmt.Sprintf("/v1/cashback/plans/%d", planID), planOwner))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, fmt.Sprintf("/cashback/plans/%d", planID), planOwner))
 	if w.Code != http.StatusOK {
 		t.Fatalf("owner: expected 200, got %d (body: %s)", w.Code, w.Body.String())
 	}
 
 	// Attacker gets 404, not 403 (existence must not be leaked).
 	w = httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, fmt.Sprintf("/v1/cashback/plans/%d", planID), attacker))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, fmt.Sprintf("/cashback/plans/%d", planID), attacker))
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("attacker: expected 404, got %d (body: %s)", w.Code, w.Body.String())
 	}
@@ -149,14 +149,14 @@ func TestFinIntegration_ListCashbackPayments_OtherUserPlan_Returns404(t *testing
 
 	// Owner can access the payments list (empty is fine).
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, fmt.Sprintf("/v1/cashback/plans/%d/payments", planID), planOwner))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, fmt.Sprintf("/cashback/plans/%d/payments", planID), planOwner))
 	if w.Code != http.StatusOK {
 		t.Fatalf("owner: expected 200, got %d (body: %s)", w.Code, w.Body.String())
 	}
 
 	// Attacker gets 404.
 	w = httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, fmt.Sprintf("/v1/cashback/plans/%d/payments", planID), attacker))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, fmt.Sprintf("/cashback/plans/%d/payments", planID), attacker))
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("attacker: expected 404, got %d (body: %s)", w.Code, w.Body.String())
 	}
@@ -175,14 +175,14 @@ func TestFinIntegration_ListWalletTransactions_OnlyShowsCurrentUserWallet(t *tes
 
 	// Request for user1.
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/v1/wallet/transactions", user1))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/wallet/transactions", user1))
 	if w.Code != http.StatusOK {
 		t.Fatalf("user1: expected 200, got %d", w.Code)
 	}
 
 	// Request for user2 — separate wallet, never sees user1's entries.
 	w = httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/v1/wallet/transactions", user2))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/wallet/transactions", user2))
 	if w.Code != http.StatusOK {
 		t.Fatalf("user2: expected 200, got %d", w.Code)
 	}
@@ -218,7 +218,7 @@ func TestFinIntegration_ListCashbackPlans_OtherUserPlans_NotVisible(t *testing.T
 
 	// user2 must see an empty list — their WHERE user_id clause excludes user1's plan.
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/v1/cashback/plans", user2))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/cashback/plans", user2))
 	if w.Code != http.StatusOK {
 		t.Fatalf("user2: expected 200, got %d", w.Code)
 	}
@@ -235,7 +235,7 @@ func TestFinIntegration_ListCashbackPlans_OtherUserPlans_NotVisible(t *testing.T
 
 	// user1 must see exactly their plan.
 	w = httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/v1/cashback/plans", user1))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/cashback/plans", user1))
 	if w.Code != http.StatusOK {
 		t.Fatalf("user1: expected 200, got %d", w.Code)
 	}
@@ -260,7 +260,7 @@ func TestFinIntegration_GetWalletBalance_AlwaysScopedToContextUserID(t *testing.
 	// Both users request their balance independently — each gets their own (0 for new users).
 	for _, uid := range []int64{user1, user2} {
 		w := httptest.NewRecorder()
-		h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/v1/wallet/balance", uid))
+		h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/wallet/balance", uid))
 		if w.Code != http.StatusOK {
 			t.Fatalf("user %d: expected 200, got %d (body: %s)", uid, w.Code, w.Body.String())
 		}
@@ -286,7 +286,7 @@ func TestFinIntegration_FullFlow_JWT_Wallet_Cashback(t *testing.T) {
 
 	// 1. Get wallet balance (new user — no wallet account yet, returns 0).
 	w := httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/v1/wallet/balance", userID))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/wallet/balance", userID))
 	if w.Code != http.StatusOK {
 		t.Fatalf("balance: expected 200, got %d", w.Code)
 	}
@@ -298,7 +298,7 @@ func TestFinIntegration_FullFlow_JWT_Wallet_Cashback(t *testing.T) {
 
 	// 2. List cashback plans — must include the seeded plan.
 	w = httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/v1/cashback/plans", userID))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/cashback/plans", userID))
 	if w.Code != http.StatusOK {
 		t.Fatalf("list plans: expected 200, got %d", w.Code)
 	}
@@ -315,7 +315,7 @@ func TestFinIntegration_FullFlow_JWT_Wallet_Cashback(t *testing.T) {
 
 	// 3. Get the specific plan.
 	w = httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, fmt.Sprintf("/v1/cashback/plans/%d", planID), userID))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, fmt.Sprintf("/cashback/plans/%d", planID), userID))
 	if w.Code != http.StatusOK {
 		t.Fatalf("get plan: expected 200, got %d", w.Code)
 	}
@@ -329,7 +329,7 @@ func TestFinIntegration_FullFlow_JWT_Wallet_Cashback(t *testing.T) {
 
 	// 4. List payments for the plan (empty — no cron run yet).
 	w = httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, fmt.Sprintf("/v1/cashback/plans/%d/payments", planID), userID))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, fmt.Sprintf("/cashback/plans/%d/payments", planID), userID))
 	if w.Code != http.StatusOK {
 		t.Fatalf("list payments: expected 200, got %d", w.Code)
 	}
@@ -343,7 +343,7 @@ func TestFinIntegration_FullFlow_JWT_Wallet_Cashback(t *testing.T) {
 
 	// 5. List wallet transactions (empty for new wallet).
 	w = httptest.NewRecorder()
-	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/v1/wallet/transactions", userID))
+	h.ServeHTTP(w, finAuthedReq(t, http.MethodGet, "/wallet/transactions", userID))
 	if w.Code != http.StatusOK {
 		t.Fatalf("wallet txns: expected 200, got %d", w.Code)
 	}

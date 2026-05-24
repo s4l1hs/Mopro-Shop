@@ -36,7 +36,7 @@ import (
 // TestE2E_KargoWebhookToCashbackPlan is the Phase 1.6 full-chain happy-path.
 // Chain verified:
 //  1. Seed order (status='shipped') + shipment (state='in_transit', carrier='surat')
-//  2. POST /v1/shipping/webhook/surat with valid HMAC → httptest.Server
+//  2. POST /shipping/webhook/surat with valid HMAC → httptest.Server
 //  3. Poll (5s / 50ms): shipments.state='delivered', orders.status='delivered', outbox row
 //  4. RunBatch publishes outbox → Redis Streams; assert published_at NOT NULL
 //  5. Assert ecom.order.delivered.v1 in Redis Streams (XRange)
@@ -157,7 +157,7 @@ func TestE2E_KargoWebhookToCashbackPlan(t *testing.T) { //nolint:gocyclo,cyclop
 
 	// ── 4. POST webhook via httptest.Server ────────────────────────────────────
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /v1/shipping/webhook/surat", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /shipping/webhook/surat", func(w http.ResponseWriter, r *http.Request) {
 		rawBody, _ := io.ReadAll(r.Body)
 		headers := make(map[string]string)
 		for k := range r.Header {
@@ -187,7 +187,7 @@ func TestE2E_KargoWebhookToCashbackPlan(t *testing.T) { //nolint:gocyclo,cyclop
 	sig := hex.EncodeToString(mac.Sum(nil))
 
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost,
-		srv.URL+"/v1/shipping/webhook/surat", bytes.NewBufferString(webhookBody))
+		srv.URL+"/shipping/webhook/surat", bytes.NewBufferString(webhookBody))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Surat-Sign", sig)
 
