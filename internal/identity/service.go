@@ -389,8 +389,8 @@ func generateOpaqueToken() string {
 
 // refreshTokenCreation bundles the raw opaque token with the domain record for creation.
 type refreshTokenCreation struct {
-	raw   string        // 64-char hex — returned to the client, never stored
-	token RefreshToken  // stored in DB; token.TokenHash = SHA-256(raw)
+	raw   string       // 64-char hex — returned to the client, never stored
+	token RefreshToken // stored in DB; token.TokenHash = SHA-256(raw)
 }
 
 // newRefreshTokenCreation generates a new opaque token + its DB record.

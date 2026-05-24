@@ -433,4 +433,3 @@ func netTryCoinBalance(t *testing.T, pool *pgxpool.Pool) int64 {
 	}
 	return net
 }
-

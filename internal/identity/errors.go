@@ -24,9 +24,9 @@ var (
 // ── Token errors ──────────────────────────────────────────────────────────────
 
 var (
-	ErrTokenNotFound   = errors.New("identity: refresh token not found")
-	ErrTokenExpired    = errors.New("identity: refresh token expired")
-	ErrTokenRevoked    = errors.New("identity: refresh token revoked")
+	ErrTokenNotFound = errors.New("identity: refresh token not found")
+	ErrTokenExpired  = errors.New("identity: refresh token expired")
+	ErrTokenRevoked  = errors.New("identity: refresh token revoked")
 	// ErrTokenFamilyRevoked is returned when a revoked token from the same rotation family
 	// is presented — indicates potential token theft; the entire family is revoked.
 	ErrTokenFamilyRevoked = errors.New("identity: refresh token family revoked (theft detected)")
@@ -50,8 +50,8 @@ var (
 // ── SMS errors ────────────────────────────────────────────────────────────────
 
 var (
-	ErrSMSSendFailed            = errors.New("identity: SMS send failed")
-	ErrSMSInsufficientBalance   = errors.New("identity: SMS provider insufficient balance")
+	ErrSMSSendFailed          = errors.New("identity: SMS send failed")
+	ErrSMSInsufficientBalance = errors.New("identity: SMS provider insufficient balance")
 )
 
 // ── Crypto / input errors ─────────────────────────────────────────────────────

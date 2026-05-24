@@ -366,4 +366,3 @@ func extractClientIP(r *http.Request) string {
 	host, _, _ := net.SplitHostPort(r.RemoteAddr)
 	return host
 }
-

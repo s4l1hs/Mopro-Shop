@@ -60,8 +60,8 @@ func New(baseURL string, timeout time.Duration, log *slog.Logger) Pinger {
 
 type noopPinger struct{}
 
-func (noopPinger) Start(_ context.Context)         {}
-func (noopPinger) Success(_ context.Context)       {}
+func (noopPinger) Start(_ context.Context)          {}
+func (noopPinger) Success(_ context.Context)        {}
 func (noopPinger) Fail(_ context.Context, _ string) {}
 
 // ── HTTP implementation ───────────────────────────────────────────────────────

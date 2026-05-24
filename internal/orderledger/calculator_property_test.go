@@ -31,7 +31,7 @@ func validInputGuard(gross, sellerNet, kdv, shipping int64) bool {
 func TestProperty_Compute_Balanced(t *testing.T) {
 	params := gopter.DefaultTestParameters()
 	params.MinSuccessfulTests = 1000
-	params.Rng = rand.New(rand.NewSource(gopterSeed()))
+	params.Rng = rand.New(rand.NewSource(gopterSeed())) //nolint:gosec // G404: math/rand for deterministic property test seeding
 
 	properties := gopter.NewProperties(params)
 
@@ -61,7 +61,7 @@ func TestProperty_Compute_Balanced(t *testing.T) {
 					totalC += l.AmountMinor
 				}
 			}
-			return totalD == gross && totalD == totalC
+			return totalD == gross && totalC == gross
 		},
 		gen.Int64Range(100, int64(1e12)), // gross ≥ 1 TL
 		gen.Int64Range(1, int64(1e12)),   // sellerNet
@@ -77,7 +77,7 @@ func TestProperty_Compute_Balanced(t *testing.T) {
 func TestProperty_Compute_NoZeroLines(t *testing.T) {
 	params := gopter.DefaultTestParameters()
 	params.MinSuccessfulTests = 1000
-	params.Rng = rand.New(rand.NewSource(gopterSeed()))
+	params.Rng = rand.New(rand.NewSource(gopterSeed())) //nolint:gosec // G404: math/rand for deterministic property test seeding
 
 	properties := gopter.NewProperties(params)
 
@@ -120,7 +120,7 @@ func TestProperty_Compute_NoZeroLines(t *testing.T) {
 func TestProperty_Compute_ShippingLinePresence(t *testing.T) {
 	params := gopter.DefaultTestParameters()
 	params.MinSuccessfulTests = 1000
-	params.Rng = rand.New(rand.NewSource(gopterSeed()))
+	params.Rng = rand.New(rand.NewSource(gopterSeed())) //nolint:gosec // G404: math/rand for deterministic property test seeding
 
 	properties := gopter.NewProperties(params)
 
@@ -164,7 +164,7 @@ func TestProperty_Compute_ShippingLinePresence(t *testing.T) {
 func TestProperty_Compute_MinimumLines(t *testing.T) {
 	params := gopter.DefaultTestParameters()
 	params.MinSuccessfulTests = 1000
-	params.Rng = rand.New(rand.NewSource(gopterSeed()))
+	params.Rng = rand.New(rand.NewSource(gopterSeed())) //nolint:gosec // G404: math/rand for deterministic property test seeding
 
 	properties := gopter.NewProperties(params)
 

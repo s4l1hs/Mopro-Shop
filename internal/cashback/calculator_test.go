@@ -133,9 +133,9 @@ func TestInstallmentAmount(t *testing.T) {
 		{40, 12820},
 		{77, 12820},
 		{78, 12860},
-		{0, 0},   // out of range — below
-		{79, 0},  // out of range — above
-		{-1, 0},  // out of range — negative
+		{0, 0},  // out of range — below
+		{79, 0}, // out of range — above
+		{-1, 0}, // out of range — negative
 	}
 	for _, tc := range cases {
 		got := InstallmentAmount(terms, tc.n)

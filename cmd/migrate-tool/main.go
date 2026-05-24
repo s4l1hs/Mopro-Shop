@@ -49,7 +49,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "migrate-tool: init failed: %v\n", err)
 		os.Exit(1)
 	}
-	defer m.Close()
+	defer func() { _, _ = m.Close() }()
 
 	switch cmd {
 	case "up":
@@ -70,12 +70,13 @@ func main() {
 
 	case "status":
 		ver, dirty, err := m.Version()
-		if errors.Is(err, migrate.ErrNilVersion) {
+		switch {
+		case errors.Is(err, migrate.ErrNilVersion):
 			fmt.Printf("migrate-tool: status db=%s version=none (no migrations applied)\n", *dbFlag)
-		} else if err != nil {
+		case err != nil:
 			fmt.Fprintf(os.Stderr, "migrate-tool: status error: %v\n", err)
 			os.Exit(1)
-		} else {
+		default:
 			fmt.Printf("migrate-tool: status db=%s version=%d dirty=%v\n", *dbFlag, ver, dirty)
 		}
 
@@ -115,7 +116,7 @@ func migrationsPath(db string) string {
 	}
 	dir := filepath.Dir(exe)
 	for i := 0; i < 6; i++ {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil { //nolint:gosec // G703: path joined from binary location, not user input
 			return filepath.Join(dir, "migrations", db)
 		}
 		dir = filepath.Dir(dir)

@@ -210,7 +210,7 @@ func TestCheck2_DriftInOnePeriod(t *testing.T) {
 			}
 			return 500, 500, nil // pass
 		},
-		check1Deltas: map[string]int64{},
+		check1Deltas:  map[string]int64{},
 		insertAlertID: 99,
 	}
 	pd := &mockPD{}

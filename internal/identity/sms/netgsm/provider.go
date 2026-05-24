@@ -50,10 +50,10 @@ func (p *Provider) Send(ctx context.Context, toE164 string, code string) error {
 	msg := fmt.Sprintf("Doğrulama kodunuz: %s", code)
 
 	params := url.Values{
-		"usercode": {p.username},
-		"password": {p.password},
-		"gsmno":    {phone},
-		"message":  {msg},
+		"usercode":  {p.username},
+		"password":  {p.password},
+		"gsmno":     {phone},
+		"message":   {msg},
 		"msgheader": {p.header},
 		"dil":       {"TR"},
 	}

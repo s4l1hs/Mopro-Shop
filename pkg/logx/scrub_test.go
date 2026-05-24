@@ -45,7 +45,7 @@ func TestMaskPhone_Short(t *testing.T) {
 func TestProperty_MaskPhone_LastFourPreserved(t *testing.T) {
 	params := gopter.DefaultTestParameters()
 	params.MinSuccessfulTests = 1000
-	params.Rng = rand.New(rand.NewSource(42))
+	params.Rng = rand.New(rand.NewSource(42)) //nolint:gosec // G404: math/rand for deterministic property test seeding
 
 	properties := gopter.NewProperties(params)
 
@@ -78,7 +78,7 @@ func TestProperty_MaskPhone_LastFourPreserved(t *testing.T) {
 func TestProperty_MaskPhone_NoFullDigitLeak(t *testing.T) {
 	params := gopter.DefaultTestParameters()
 	params.MinSuccessfulTests = 1000
-	params.Rng = rand.New(rand.NewSource(42))
+	params.Rng = rand.New(rand.NewSource(42)) //nolint:gosec // G404: math/rand for deterministic property test seeding
 
 	properties := gopter.NewProperties(params)
 

@@ -72,8 +72,8 @@ func TestAllNamedMetricsRegisterWithoutError(t *testing.T) {
 	// all seeded metrics appear in Gather output.
 	reg := metrics.New("test-svc")
 	httpM := metrics.NewHTTPMetrics(reg)
-	_ = metrics.NewDBMetrics(reg)     // DB/Redis only appear after infra queries
-	_ = metrics.NewRedisMetrics(reg)  // same — no infrastructure in unit tests
+	_ = metrics.NewDBMetrics(reg)    // DB/Redis only appear after infra queries
+	_ = metrics.NewRedisMetrics(reg) // same — no infrastructure in unit tests
 	ebM := metrics.NewEventBusMetrics(reg)
 	outM := metrics.NewOutboxMetrics(reg)
 	bizM := metrics.NewBusinessMetrics(reg)

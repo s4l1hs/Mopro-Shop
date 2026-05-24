@@ -28,12 +28,12 @@ func New(cfg shipping.MNGConfig) *Adapter {
 }
 
 var stateMap = map[string]shipping.ShipmentState{
-	"KABUL":       shipping.ShipmentStatePickedUp,
-	"TRANSFER":    shipping.ShipmentStateInTransit,
-	"DAGITIMDA":   shipping.ShipmentStateOutForDelivery,
-	"TESLIM":      shipping.ShipmentStateDelivered,
-	"IADE":        shipping.ShipmentStateReturned,
-	"IPTAL":       shipping.ShipmentStateCancelled,
+	"KABUL":     shipping.ShipmentStatePickedUp,
+	"TRANSFER":  shipping.ShipmentStateInTransit,
+	"DAGITIMDA": shipping.ShipmentStateOutForDelivery,
+	"TESLIM":    shipping.ShipmentStateDelivered,
+	"IADE":      shipping.ShipmentStateReturned,
+	"IPTAL":     shipping.ShipmentStateCancelled,
 }
 
 func mapState(raw string) shipping.ShipmentState {

@@ -14,13 +14,13 @@ import (
 // ── mocks ──────────────────────────────────────────────────────────────────────
 
 type mockWalletPoster struct {
-	findAccountID        int64
-	findAccountErr       error
-	sellerPayableID      int64
-	sellerPayableErr     error
-	postTxnID            int64
-	postErr              error
-	postCallCount        int
+	findAccountID    int64
+	findAccountErr   error
+	sellerPayableID  int64
+	sellerPayableErr error
+	postTxnID        int64
+	postErr          error
+	postCallCount    int
 }
 
 func (m *mockWalletPoster) PostInTx(_ context.Context, _ pgx.Tx, _ ledger.PostInput) (int64, error) {
@@ -37,9 +37,9 @@ func (m *mockWalletPoster) FindOrOpenSellerPayable(_ context.Context, _ int64, _
 }
 
 type mockRepository struct {
-	existing       *CapturePosting
-	findErr        error
-	insertErr      error
+	existing        *CapturePosting
+	findErr         error
+	insertErr       error
 	insertCallCount int
 }
 

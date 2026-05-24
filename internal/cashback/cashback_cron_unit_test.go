@@ -15,15 +15,15 @@ import (
 // ── mock repository ───────────────────────────────────────────────────────────
 
 type mockCashbackRepo struct {
-	duePlans       []Plan
-	insertPlanRet  Plan
+	duePlans        []Plan
+	insertPlanRet   Plan
 	insertPlanIsNew bool
-	insertPlanErr  error
-	incrCountRet   int
-	incrCompleted  bool
-	incrErr        error
-	withTxErr      error
-	getPlans       []Plan
+	insertPlanErr   error
+	incrCountRet    int
+	incrCompleted   bool
+	incrErr         error
+	withTxErr       error
+	getPlans        []Plan
 }
 
 func (m *mockCashbackRepo) InsertPlanIfAbsent(_ context.Context, _ pgx.Tx, p Plan) (Plan, bool, error) {

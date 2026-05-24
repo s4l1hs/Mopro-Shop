@@ -16,31 +16,31 @@ import (
 // ── mock repository ────────────────────────────────────────────────────────────
 
 type mockPayoutRepo struct {
-	payouts             []Payout
-	insertPayoutErr     error
-	findPayoutByKeyRet  Payout
-	findPayoutByKeyErr  error
+	payouts            []Payout
+	insertPayoutErr    error
+	findPayoutByKeyRet Payout
+	findPayoutByKeyErr error
 
-	batches             []PayoutBatch
-	insertBatchRet      PayoutBatch
-	insertBatchErr      error
-	findBatchByKeyRet   PayoutBatch
-	findBatchByKeyErr   error
-	updateBatchPaidErr  error
+	batches              []PayoutBatch
+	insertBatchRet       PayoutBatch
+	insertBatchErr       error
+	findBatchByKeyRet    PayoutBatch
+	findBatchByKeyErr    error
+	updateBatchPaidErr   error
 	updateBatchStatusErr error
-	updateBatchPspErr   error
+	updateBatchPspErr    error
 
-	pspAccounts          map[int64]SellerPspAccount
-	upsertPspErr         error
-	findPspErr           error
+	pspAccounts  map[int64]SellerPspAccount
+	upsertPspErr error
+	findPspErr   error
 
-	insertAlertErr      error
-	hasOpenAlert        bool
-	hasOpenAlertErr     error
+	insertAlertErr  error
+	hasOpenAlert    bool
+	hasOpenAlertErr error
 
-	withTxErr           error
-	lastBatchStatus     BatchStatus
-	lastAlertInserted   *LedgerAlert
+	withTxErr         error
+	lastBatchStatus   BatchStatus
+	lastAlertInserted *LedgerAlert
 }
 
 func (m *mockPayoutRepo) InsertPayout(_ context.Context, _ pgx.Tx, p Payout) (Payout, error) {
@@ -60,7 +60,9 @@ func (m *mockPayoutRepo) FetchScheduledPayouts(_ context.Context, _ time.Time, _
 	return m.payouts, nil
 }
 
-func (m *mockPayoutRepo) UpdatePayoutBatchID(_ context.Context, _ pgx.Tx, _, _ int64) error { return nil }
+func (m *mockPayoutRepo) UpdatePayoutBatchID(_ context.Context, _ pgx.Tx, _, _ int64) error {
+	return nil
+}
 
 func (m *mockPayoutRepo) InsertBatch(_ context.Context, _ pgx.Tx, b PayoutBatch) (PayoutBatch, error) {
 	if m.insertBatchErr != nil {
@@ -86,7 +88,9 @@ func (m *mockPayoutRepo) UpdateBatchPaid(_ context.Context, _ pgx.Tx, _, _ int64
 	return m.updateBatchPaidErr
 }
 
-func (m *mockPayoutRepo) MarkPayoutsPaidByBatch(_ context.Context, _ pgx.Tx, _ int64) error { return nil }
+func (m *mockPayoutRepo) MarkPayoutsPaidByBatch(_ context.Context, _ pgx.Tx, _ int64) error {
+	return nil
+}
 
 func (m *mockPayoutRepo) UpdateBatchStatus(_ context.Context, _ int64, status BatchStatus, _ string) error {
 	m.lastBatchStatus = status
@@ -158,11 +162,11 @@ func (m *mockWalletPoster) FindOrOpenSellerPayable(_ context.Context, _ int64, _
 // ── mock PspTransferer ─────────────────────────────────────────────────────────
 
 type mockPsp struct {
-	transferResp  TransferResponse
-	transferErr   error
-	statusResp    TransferResponse
-	statusErr     error
-	callCount     int
+	transferResp TransferResponse
+	transferErr  error
+	statusResp   TransferResponse
+	statusErr    error
+	callCount    int
 }
 
 func (m *mockPsp) Transfer(_ context.Context, _ TransferRequest) (TransferResponse, error) {
@@ -389,7 +393,7 @@ func TestRunDailyPayouts_HappyPath_ShadowMode(t *testing.T) {
 func TestRunDailyPayouts_BatchAlreadyPaid_Skipped(t *testing.T) {
 	p := scheduledPayout(1, 10)
 	repo := &mockPayoutRepo{
-		payouts: []Payout{p},
+		payouts:           []Payout{p},
 		findBatchByKeyRet: PayoutBatch{ID: 1, Status: BatchStatusPaid},
 	}
 	svc := newSvc(repo, &mockWalletPoster{findAccountID: 1}, &mockPsp{})

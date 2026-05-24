@@ -20,8 +20,8 @@ import (
 // ── order.Service mock ────────────────────────────────────────────────────────
 
 type stubOrderSvc struct {
-	getOrderFn    func(ctx context.Context, id int64) (order.Order, []order.OrderItem, error)
-	cancelOrderFn func(ctx context.Context, id int64, reason string) error
+	getOrderFn     func(ctx context.Context, id int64) (order.Order, []order.OrderItem, error)
+	cancelOrderFn  func(ctx context.Context, id int64, reason string) error
 	updateStatusFn func(ctx context.Context, id int64, status order.OrderStatus) error
 }
 

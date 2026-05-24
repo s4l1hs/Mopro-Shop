@@ -135,25 +135,25 @@ func TestContract_ListCashbackPlans_ResponseSchema(t *testing.T) {
 
 	// Validate CashbackPlan schema
 	planFixture := map[string]interface{}{
-		"id":                         int64(7),
-		"order_id":                   int64(1001),
-		"product_id":                 int64(1),
-		"product_title":              "Siyah Tişört",
-		"product_image_url":          &productImageURL,
-		"monthly_amount_minor":       int64(625),
-		"currency":                   "TRY_COIN",
+		"id":                          int64(7),
+		"order_id":                    int64(1001),
+		"product_id":                  int64(1),
+		"product_title":               "Siyah Tişört",
+		"product_image_url":           &productImageURL,
+		"monthly_amount_minor":        int64(625),
+		"currency":                    "TRY_COIN",
 		"reference_interest_rate_bps": 5000,
-		"start_date":                 "2026-01-18",
-		"status":                     "active",
-		"created_at":                 time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC).Format(time.RFC3339),
+		"start_date":                  "2026-01-18",
+		"status":                      "active",
+		"created_at":                  time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC).Format(time.RFC3339),
 	}
 	validateFixture(t, doc, "CashbackPlan", planFixture)
 
 	// Validate CursorPaginationMeta schema
 	paginationFixture := map[string]interface{}{
-		"next_cursor":  "dGVzdC1jdXJzb3I=",
-		"has_more":     false,
-		"limit":        20,
+		"next_cursor": "dGVzdC1jdXJzb3I=",
+		"has_more":    false,
+		"limit":       20,
 	}
 	validateFixture(t, doc, "CursorPaginationMeta", paginationFixture)
 }

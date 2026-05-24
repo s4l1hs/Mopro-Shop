@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	TopicSellerPspOnboarded  = "ecom.seller.psp_onboarded.v1"
+	TopicSellerPspOnboarded   = "ecom.seller.psp_onboarded.v1"
 	ConsumerGroupPspOnboarded = "sellerpayout-psp-reg"
 )
 

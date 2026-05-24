@@ -20,10 +20,10 @@ const (
 
 // driftPayload matches the JSON written by reconcile.Repository.InsertAlertInTx.
 type driftPayload struct {
-	AlertID           int64  `json:"alert_id"`
-	CheckName         string `json:"check_name"`
-	CurrencyOrPeriod  string `json:"currency_or_period"`
-	DriftMinor        int64  `json:"drift_minor"`
+	AlertID          int64  `json:"alert_id"`
+	CheckName        string `json:"check_name"`
+	CurrencyOrPeriod string `json:"currency_or_period"`
+	DriftMinor       int64  `json:"drift_minor"`
 }
 
 // StartReconcileDriftConsumer blocks, reading fin.reconciliation.drift_critical.v1

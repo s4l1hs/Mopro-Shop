@@ -23,7 +23,7 @@ type soapHeader struct {
 }
 
 type wsseSecurity struct {
-	NS           string        `xml:"xmlns:wsse,attr"`
+	NS            string        `xml:"xmlns:wsse,attr"`
 	UsernameToken usernameToken `xml:"UsernameToken"`
 }
 

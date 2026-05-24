@@ -15,7 +15,7 @@ import (
 // ── stubs ─────────────────────────────────────────────────────────────────────
 
 type stubOrderSvc struct {
-	mu                sync.Mutex
+	mu                 sync.Mutex
 	markDeliveredCalls int
 }
 

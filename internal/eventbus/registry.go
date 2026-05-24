@@ -33,10 +33,10 @@ type EventEntry struct {
 var Registry = []EventEntry{
 	// ── ecom domain: order ────────────────────────────────────────────────────────
 	{
-		EventType:       "ecom.order.delivered.v1",
-		ProducerModule:  "internal/order",
-		ConsumerGroups:  []string{"fin-cashback-consumer", "fin-sellerpayout-consumer"},
-		Status:          StatusActiveConsumed,
+		EventType:      "ecom.order.delivered.v1",
+		ProducerModule: "internal/order",
+		ConsumerGroups: []string{"fin-cashback-consumer", "fin-sellerpayout-consumer"},
+		Status:         StatusActiveConsumed,
 	},
 	{
 		EventType:       "ecom.order.paid.v1",

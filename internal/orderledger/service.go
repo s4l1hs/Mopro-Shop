@@ -37,7 +37,7 @@ func NewService(repo Repository, wallet WalletPoster, log *slog.Logger, biz *met
 //  1. Pre-check: FindPostingByOrderID returns early if the audit row exists.
 //  2. UNIQUE(order_id) on capture_postings: ErrAlreadyPosted on concurrent retry.
 //  3. wallet.PostInTx idempotency key: UNIQUE transactions.idempotency_key.
-func (s *captureService) PostCapture(ctx context.Context, ev OrderPaidEvent) error {
+func (s *captureService) PostCapture(ctx context.Context, ev OrderPaidEvent) error { //nolint:gocyclo // double-entry capture with idempotency; complexity is inherent
 	// Fast idempotency check before starting an expensive SERIALIZABLE tx.
 	existing, err := s.repo.FindPostingByOrderID(ctx, ev.OrderID)
 	if err != nil {

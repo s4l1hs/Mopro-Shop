@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	TopicSellerFraudHoldSet    = "ecom.seller.fraud_hold_set.v1"
-	ConsumerGroupFraudHoldSet  = "sellerpayout-fraud-hold"
+	TopicSellerFraudHoldSet   = "ecom.seller.fraud_hold_set.v1"
+	ConsumerGroupFraudHoldSet = "sellerpayout-fraud-hold"
 )
 
 // fraudHoldPayload matches the JSON written by the antifraud module in core-svc.

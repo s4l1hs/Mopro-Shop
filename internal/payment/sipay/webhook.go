@@ -112,7 +112,7 @@ func NewWebhookHandlerWithConfirmer(
 }
 
 // ServeHTTP implements http.Handler.
-func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //nolint:gocyclo // handles all Sipay webhook states and error codes; complexity is inherent
 	ctx := r.Context()
 
 	body, err := io.ReadAll(io.LimitReader(r.Body, webhookMaxBodyBytes))

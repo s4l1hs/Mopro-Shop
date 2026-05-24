@@ -39,8 +39,9 @@ func (m *mockRepo) SearchProductsSummary(_ context.Context, query, _ string, _, 
 // TestCashbackPreviewFormula validates the integer-arithmetic formula:
 // price=10000, commission_pct_bps=2000 → monthly_coin=83
 // Formula: comm = 10000 * 2000 / 10000 = 2000
-//          yearly = 2000 * 5000 / 10000 = 1000
-//          monthly = 1000 / 12 = 83
+//
+//	yearly = 2000 * 5000 / 10000 = 1000
+//	monthly = 1000 / 12 = 83
 func TestCashbackPreviewFormula(t *testing.T) {
 	priceMinor := int64(10000)
 	commissionPctBps := int64(2000)

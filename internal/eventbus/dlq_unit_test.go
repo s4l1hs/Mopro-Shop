@@ -19,13 +19,13 @@ import (
 // ── Stubs ─────────────────────────────────────────────────────────────────────
 
 type stubDLQRepo struct {
-	mu            sync.Mutex
-	insertResult  DLQInsertResult
-	insertID      int64
-	insertErr     error
-	countResult   int
-	insertCalls   int
-	countCalls    int
+	mu           sync.Mutex
+	insertResult DLQInsertResult
+	insertID     int64
+	insertErr    error
+	countResult  int
+	insertCalls  int
+	countCalls   int
 }
 
 func (s *stubDLQRepo) InsertIfThreshold(_ context.Context, _ DLQRow, _ AttemptRow) (DLQInsertResult, int64, error) {
@@ -40,10 +40,10 @@ func (s *stubDLQRepo) CountInWindow(_ context.Context, _ string, _ int) (int, er
 	s.countCalls++
 	return s.countResult, nil
 }
-func (s *stubDLQRepo) List(_ context.Context, _ DLQFilter) ([]DLQRow, error)           { return nil, nil }
-func (s *stubDLQRepo) GetByID(_ context.Context, _ int64) (DLQRow, error)               { return DLQRow{}, nil }
-func (s *stubDLQRepo) MarkReplayed(_ context.Context, _ int64, _, _ string) error       { return nil }
-func (s *stubDLQRepo) MarkDismissed(_ context.Context, _ int64, _, _ string) error      { return nil }
+func (s *stubDLQRepo) List(_ context.Context, _ DLQFilter) ([]DLQRow, error)       { return nil, nil }
+func (s *stubDLQRepo) GetByID(_ context.Context, _ int64) (DLQRow, error)          { return DLQRow{}, nil }
+func (s *stubDLQRepo) MarkReplayed(_ context.Context, _ int64, _, _ string) error  { return nil }
+func (s *stubDLQRepo) MarkDismissed(_ context.Context, _ int64, _, _ string) error { return nil }
 
 type stubSlack struct {
 	mu    sync.Mutex
@@ -141,8 +141,8 @@ func TestDLQInsertion_FirstTime_InsertsAndAlerts(t *testing.T) {
 	}
 }
 
-// 2. Already DLQed (UNIQUE conflict): INSERT returns DLQAlreadyExists →
-//    Slack NOT called, XACK attempted to clear PEL.
+//  2. Already DLQed (UNIQUE conflict): INSERT returns DLQAlreadyExists →
+//     Slack NOT called, XACK attempted to clear PEL.
 func TestDLQInsertion_AlreadyDLQed_SkipsSlack(t *testing.T) {
 	dlq := &stubDLQRepo{insertResult: DLQAlreadyExists, insertID: 17}
 	sl := &stubSlack{}

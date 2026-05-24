@@ -58,10 +58,10 @@ func (s *stubWalletSvc) FindAccountByOwnerAnyStatus(ctx context.Context, ownerTy
 func (s *stubWalletSvc) GetAccount(_ context.Context, _ int64) (wallet.Account, error) {
 	return wallet.Account{}, nil
 }
-func (s *stubWalletSvc) SetReadOnly(_ context.Context, _ string) error        { return nil }
-func (s *stubWalletSvc) ClearReadOnly(_ context.Context) error                { return nil }
-func (s *stubWalletSvc) InvalidateReadOnlyCache()                              {}
-func (s *stubWalletSvc) StartRefresher(_ context.Context)                     {}
+func (s *stubWalletSvc) SetReadOnly(_ context.Context, _ string) error { return nil }
+func (s *stubWalletSvc) ClearReadOnly(_ context.Context) error         { return nil }
+func (s *stubWalletSvc) InvalidateReadOnlyCache()                      {}
+func (s *stubWalletSvc) StartRefresher(_ context.Context)              {}
 func (s *stubWalletSvc) ListEntriesByAccount(ctx context.Context, accountID int64, limit int, beforeID int64) ([]wallet.LedgerEntryRow, error) {
 	if s.listEntriesFn != nil {
 		return s.listEntriesFn(ctx, accountID, limit, beforeID)

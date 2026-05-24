@@ -31,14 +31,14 @@ import (
 )
 
 const (
-	workerPoolSize = 8    // concurrent handler goroutines per Subscribe call (PROMPTS.md § 0.4)
-	xreadCount     = 100  // messages per XREADGROUP batch (PROMPTS.md § 1237)
+	workerPoolSize = 8   // concurrent handler goroutines per Subscribe call (PROMPTS.md § 0.4)
+	xreadCount     = 100 // messages per XREADGROUP batch (PROMPTS.md § 1237)
 	xreadBlockMS   = 5000 * time.Millisecond
 	defaultMaxLen  = 10000
-	attemptWorkers = 4    // worker goroutines draining the attempt-log channel
-	attemptChanBuf = 512  // buffered channel capacity for attempt-log rows
-	sev2Window     = 10   // minutes: window for SEV2 storm rate check
-	sev2Threshold  = 10   // DLQ count > sev2Threshold in window → SEV2 alert
+	attemptWorkers = 4   // worker goroutines draining the attempt-log channel
+	attemptChanBuf = 512 // buffered channel capacity for attempt-log rows
+	sev2Window     = 10  // minutes: window for SEV2 storm rate check
+	sev2Threshold  = 10  // DLQ count > sev2Threshold in window → SEV2 alert
 )
 
 // Option configures a RedisBus at construction time.
@@ -95,7 +95,7 @@ type RedisBus struct {
 	attemptRepo AttemptRepository
 	dlqRepo     DLQRepository
 	slackPoster SlackPoster
-	sev2Sent    sync.Map // key: string (topic) → time.Time of last SEV2 alert
+	sev2Sent    sync.Map                 // key: string (topic) → time.Time of last SEV2 alert
 	ebMetrics   *metrics.EventBusMetrics // nil when metrics not wired
 	svcName     string                   // for metric labels; empty when metrics not wired
 
@@ -659,7 +659,6 @@ func (b *RedisBus) sendAttempt(row AttemptRow) {
 		)
 	}
 }
-
 
 // maxLenFor returns the MAXLEN for a stream, reading a per-stream env override first.
 //

@@ -22,13 +22,13 @@ type User struct {
 
 // OTP is a one-time password code record.
 type OTP struct {
-	ID          int64
-	PhoneHash   []byte
-	Purpose     string // "login" | "step_up"
-	CodeHash    string // bcrypt(cost=10) of 6-digit plaintext code
-	CreatedAt   time.Time
-	ExpiresAt   time.Time
-	VerifiedAt  *time.Time
+	ID         int64
+	PhoneHash  []byte
+	Purpose    string // "login" | "step_up"
+	CodeHash   string // bcrypt(cost=10) of 6-digit plaintext code
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
+	VerifiedAt *time.Time
 }
 
 // RefreshToken is an opaque rotation-capable session token.
@@ -99,17 +99,17 @@ const (
 // PII fields (Name, Phone, FullAddress, Neighborhood) are stored AES-GCM encrypted;
 // District, City, PostalCode are stored plaintext for logistics routing.
 type Address struct {
-	ID           int64 `json:"id"`
-	UserID       int64 `json:"user_id"`
-	Label        string `json:"label"`
-	Name         string `json:"name"` // decrypted display name
-	Phone        string `json:"phone"` // decrypted E.164 phone
-	FullAddress  string `json:"full_address"` // decrypted street address line
-	Neighborhood string `json:"neighborhood"` // decrypted neighborhood; empty when absent
-	District     string `json:"district"`
-	City         string `json:"city"`
-	PostalCode   string `json:"postal_code"`
-	IsDefault    bool `json:"is_default"`
+	ID           int64     `json:"id"`
+	UserID       int64     `json:"user_id"`
+	Label        string    `json:"label"`
+	Name         string    `json:"name"`         // decrypted display name
+	Phone        string    `json:"phone"`        // decrypted E.164 phone
+	FullAddress  string    `json:"full_address"` // decrypted street address line
+	Neighborhood string    `json:"neighborhood"` // decrypted neighborhood; empty when absent
+	District     string    `json:"district"`
+	City         string    `json:"city"`
+	PostalCode   string    `json:"postal_code"`
+	IsDefault    bool      `json:"is_default"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -125,7 +125,7 @@ type AddressInput struct {
 	District     string `json:"district"`
 	City         string `json:"city"`
 	PostalCode   string `json:"postal_code"` // optional
-	IsDefault    bool `json:"is_default"`
+	IsDefault    bool   `json:"is_default"`
 }
 
 // AddressRow is the encrypted storage representation passed from service to repo.

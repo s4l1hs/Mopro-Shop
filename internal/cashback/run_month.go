@@ -191,4 +191,3 @@ func periodToFirstDay(period int) time.Time {
 	month := period % 100
 	return time.Date(year, time.Month(month), 1, 0, 0, 0, 0, time.UTC)
 }
-

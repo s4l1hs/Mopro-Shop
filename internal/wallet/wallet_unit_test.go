@@ -14,30 +14,30 @@ import (
 // ── mock repository ───────────────────────────────────────────────────────────
 
 type mockRepo struct {
-	insertTxnID           int64
-	insertTxnErr          error
-	getTxnID              int64
-	getTxnErr             error
-	insertEntryErr        error
-	getCurrencies         map[int64]string
-	getCurrErr            error
-	findByTypeAcct        Account
-	findByTypeErr         error
-	findByOwnerAcct       Account
-	findByOwnerErr        error
-	findByOwnerAnyAcct    Account
-	findByOwnerAnyErr     error
-	getAccountAcct        Account
-	getAccountErr         error
-	insertAcctID          int64
-	insertAcctErr         error
-	balanceMV             int64
-	balanceMVErr          error
-	balanceStrict         int64
-	balanceStrictErr      error
-	sysState              SystemState
-	sysStateErr           error
-	setSysStateCalled     bool
+	insertTxnID        int64
+	insertTxnErr       error
+	getTxnID           int64
+	getTxnErr          error
+	insertEntryErr     error
+	getCurrencies      map[int64]string
+	getCurrErr         error
+	findByTypeAcct     Account
+	findByTypeErr      error
+	findByOwnerAcct    Account
+	findByOwnerErr     error
+	findByOwnerAnyAcct Account
+	findByOwnerAnyErr  error
+	getAccountAcct     Account
+	getAccountErr      error
+	insertAcctID       int64
+	insertAcctErr      error
+	balanceMV          int64
+	balanceMVErr       error
+	balanceStrict      int64
+	balanceStrictErr   error
+	sysState           SystemState
+	sysStateErr        error
+	setSysStateCalled  bool
 }
 
 func (m *mockRepo) WithTx(ctx context.Context, level pgx.TxIsoLevel, fn func(pgx.Tx) error) error {

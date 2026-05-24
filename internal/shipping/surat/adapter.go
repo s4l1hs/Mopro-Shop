@@ -30,12 +30,12 @@ func New(cfg shipping.SuratConfig) *Adapter {
 // ── carrier state map ─────────────────────────────────────────────────────────
 
 var stateMap = map[string]shipping.ShipmentState{
-	"RECEIVED":          shipping.ShipmentStatePickedUp,
-	"IN_TRANSIT":        shipping.ShipmentStateInTransit,
-	"OUT_FOR_DELIVERY":  shipping.ShipmentStateOutForDelivery,
-	"DELIVERED":         shipping.ShipmentStateDelivered,
-	"RETURNED":          shipping.ShipmentStateReturned,
-	"CANCELLED":         shipping.ShipmentStateCancelled,
+	"RECEIVED":         shipping.ShipmentStatePickedUp,
+	"IN_TRANSIT":       shipping.ShipmentStateInTransit,
+	"OUT_FOR_DELIVERY": shipping.ShipmentStateOutForDelivery,
+	"DELIVERED":        shipping.ShipmentStateDelivered,
+	"RETURNED":         shipping.ShipmentStateReturned,
+	"CANCELLED":        shipping.ShipmentStateCancelled,
 }
 
 func mapState(raw string) shipping.ShipmentState {

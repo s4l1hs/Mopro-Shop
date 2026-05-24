@@ -260,4 +260,3 @@ func (m *multiCaptureSMS) Send(_ context.Context, _, code string) error {
 	m.codes = append(m.codes, code)
 	return nil
 }
-

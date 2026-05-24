@@ -17,8 +17,8 @@ import (
 type contextKey string
 
 const (
-	ctxKeyUserID  contextKey = "identity.user_id"
-	ctxKeyClaims  contextKey = "identity.claims"
+	ctxKeyUserID contextKey = "identity.user_id"
+	ctxKeyClaims contextKey = "identity.claims"
 )
 
 // RequireAuth validates the Bearer JWT in Authorization header.

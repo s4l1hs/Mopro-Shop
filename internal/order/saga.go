@@ -26,7 +26,7 @@ var ErrCheckoutSessionRequired = errors.New("order: SessionID (Idempotency-Key) 
 //  4. Call PSP: InitiatePayment for the total amount.
 //  5. On success: update session to psp_initiated with provider_ref.
 //  6. On failure: cancel all orders + update session to failed, return error.
-func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckoutRequest) (InitiateCheckoutResponse, error) {
+func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckoutRequest) (InitiateCheckoutResponse, error) { //nolint:gocyclo // multi-step checkout saga; complexity is inherent
 	// Disk panic guard: fail-open so a Redis outage never blocks checkout.
 	if s.diskChecker != nil {
 		checkCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)

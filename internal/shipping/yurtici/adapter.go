@@ -27,9 +27,9 @@ func New(cfg shipping.YurticiConfig) *Adapter {
 // ── CalculateRate ─────────────────────────────────────────────────────────────
 
 type rateRequestBody struct {
-	XMLName     xml.Name `xml:"CalculateRate"`
-	WeightGrams int      `xml:"WeightGrams"`
-	CustomerCode string  `xml:"CustomerCode"`
+	XMLName      xml.Name `xml:"CalculateRate"`
+	WeightGrams  int      `xml:"WeightGrams"`
+	CustomerCode string   `xml:"CustomerCode"`
 }
 
 type rateResponseBody struct {

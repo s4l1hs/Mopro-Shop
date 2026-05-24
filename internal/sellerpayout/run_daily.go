@@ -119,12 +119,12 @@ func (s *payoutService) processBatch(
 	var batch PayoutBatch
 	if err := s.repo.WithTx(ctx, pgx.ReadCommitted, func(tx pgx.Tx) error {
 		b, insertErr := s.repo.InsertBatch(ctx, tx, PayoutBatch{
-			SellerID:       sellerID,
-			Currency:       currency,
-			PayoutDate:     payoutDate,
+			SellerID:         sellerID,
+			Currency:         currency,
+			PayoutDate:       payoutDate,
 			TotalAmountMinor: totalMinor,
-			IdempotencyKey: batchKey,
-			Market:         market,
+			IdempotencyKey:   batchKey,
+			Market:           market,
 		})
 		if insertErr != nil {
 			return insertErr

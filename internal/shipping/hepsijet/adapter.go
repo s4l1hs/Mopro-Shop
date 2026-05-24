@@ -26,12 +26,12 @@ func New(cfg shipping.HepsiJetConfig) *Adapter {
 }
 
 var stateMap = map[string]shipping.ShipmentState{
-	"PACKAGE_RECEIVED":    shipping.ShipmentStatePickedUp,
-	"IN_TRANSIT":          shipping.ShipmentStateInTransit,
-	"OUT_FOR_DELIVERY":    shipping.ShipmentStateOutForDelivery,
-	"DELIVERED":           shipping.ShipmentStateDelivered,
-	"RETURNED_TO_SENDER":  shipping.ShipmentStateReturned,
-	"CANCELLED":           shipping.ShipmentStateCancelled,
+	"PACKAGE_RECEIVED":   shipping.ShipmentStatePickedUp,
+	"IN_TRANSIT":         shipping.ShipmentStateInTransit,
+	"OUT_FOR_DELIVERY":   shipping.ShipmentStateOutForDelivery,
+	"DELIVERED":          shipping.ShipmentStateDelivered,
+	"RETURNED_TO_SENDER": shipping.ShipmentStateReturned,
+	"CANCELLED":          shipping.ShipmentStateCancelled,
 }
 
 func mapState(raw string) shipping.ShipmentState {

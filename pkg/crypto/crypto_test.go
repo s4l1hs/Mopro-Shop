@@ -45,7 +45,7 @@ func TestNIST_AES256GCM_TestCase14(t *testing.T) {
 	pt := mustHex(t, "00000000000000000000000000000000")
 	wantCT := mustHex(t, "cea7403d4d606b6e074ec5d3baf39d18")
 	wantTag := mustHex(t, "d0d1c8a799996bf0265b98b5d48ab919")
-	want := append(wantCT, wantTag...)
+	wantCT = append(wantCT, wantTag...)
 
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -56,8 +56,8 @@ func TestNIST_AES256GCM_TestCase14(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := gcm.Seal(nil, nonce, pt, nil)
-	if !bytes.Equal(got, want) {
-		t.Errorf("NIST TC14 output mismatch: got %x, want %x", got, want)
+	if !bytes.Equal(got, wantCT) {
+		t.Errorf("NIST TC14 output mismatch: got %x, want %x", got, wantCT)
 	}
 }
 
@@ -154,8 +154,8 @@ func TestDecryptWithKey_InvalidBase64(t *testing.T) {
 func TestMain(m *testing.M) {
 	// Set env vars once before all tests so sync.Once loads real key material.
 	// 32 zero bytes base64-encoded = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-	os.Setenv("PII_KEK_BASE64", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
-	os.Setenv("PII_PEPPER", "test-pepper-for-unit-tests-only")
+	_ = os.Setenv("PII_KEK_BASE64", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+	_ = os.Setenv("PII_PEPPER", "test-pepper-for-unit-tests-only")
 	os.Exit(m.Run())
 }
 

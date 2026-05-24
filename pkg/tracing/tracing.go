@@ -12,6 +12,7 @@ import (
 )
 
 // Init configures a global TracerProvider with an OTLP gRPC exporter.
+//
 // Deprecated: call otelx.Init directly for full configuration control.
 func Init(serviceName string) (*trace.TracerProvider, error) {
 	_, err := otelx.Init(context.Background(), otelx.Config{

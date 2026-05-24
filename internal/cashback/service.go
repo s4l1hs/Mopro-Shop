@@ -20,7 +20,7 @@ type cashbackService struct {
 	calLoader        timex.CalendarLoader
 	walletPoster     WalletPoster
 	log              *slog.Logger
-	cashbackCurrency string // coin currency code, read from env DEFAULT_CASHBACK_CURRENCY
+	cashbackCurrency string                   // coin currency code, read from env DEFAULT_CASHBACK_CURRENCY
 	biz              *metrics.BusinessMetrics // nil disables business KPI counters
 }
 

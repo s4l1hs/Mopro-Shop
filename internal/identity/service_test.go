@@ -18,23 +18,23 @@ import (
 
 func TestMain(m *testing.M) {
 	// Set PII env vars so pkg/crypto functions work in unit tests.
-	os.Setenv("PII_KEK_BASE64", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
-	os.Setenv("PII_PEPPER", "test-pepper-for-identity-unit-tests")
+	_ = os.Setenv("PII_KEK_BASE64", "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+	_ = os.Setenv("PII_PEPPER", "test-pepper-for-identity-unit-tests")
 	os.Exit(m.Run())
 }
 
 // ── Mock implementations ──────────────────────────────────────────────────────
 
 type mockRepo struct {
-	users         map[int64]*identity.User
-	otps          []*identity.OTP
-	tokens        map[string]*identity.RefreshToken
-	addrStore     []identity.Address // for address IDOR tests
-	createOTPErr  error
-	findOTPErr    error
-	verifyErr     error
-	rotateErr     error
-	revokeErr     error
+	users        map[int64]*identity.User
+	otps         []*identity.OTP
+	tokens       map[string]*identity.RefreshToken
+	addrStore    []identity.Address // for address IDOR tests
+	createOTPErr error
+	findOTPErr   error
+	verifyErr    error
+	rotateErr    error
+	revokeErr    error
 }
 
 func newMockRepo() *mockRepo {

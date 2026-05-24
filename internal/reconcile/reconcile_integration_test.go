@@ -28,8 +28,8 @@ import (
 // ── test DSN helpers ────────────────────────────────────────────────────────
 
 const (
-	defaultLedgerAdminDSN  = "postgres://ledger_admin:test123@localhost:6434/mopro_ledger"
-	defaultReconcileDSN    = "postgres://reconcile_user:reconcile_password@localhost:6434/mopro_ledger"
+	defaultLedgerAdminDSN = "postgres://ledger_admin:test123@localhost:6434/mopro_ledger"
+	defaultReconcileDSN   = "postgres://reconcile_user:reconcile_password@localhost:6434/mopro_ledger"
 )
 
 func ledgerAdminDSN() string {

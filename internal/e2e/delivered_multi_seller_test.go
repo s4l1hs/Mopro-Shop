@@ -140,19 +140,19 @@ func TestE2E_DeliveredEventTwoSellersIdempotent(t *testing.T) { //nolint:gocyclo
 	// Seller A: variant 5011 (catID=30, 7% comm) + variant 5012 (catID=30, 7% comm)
 	// Seller B: variant 5013 (catID=40, 10% comm)
 	const (
-		sellerA    = int64(201)
-		sellerB    = int64(202)
-		variantA1  = int64(5011)
-		variantA2  = int64(5012)
-		variantB1  = int64(5013)
-		catA       = int64(30)
-		catB       = int64(40)
-		commBpsA   = 700  // 7%
-		commBpsB   = 1000 // 10%
-		kdvBps     = 2000 // 20%
-		priceA1    = int64(50000) // 500.00 TL
-		priceA2    = int64(30000) // 300.00 TL
-		priceB1    = int64(80000) // 800.00 TL
+		sellerA   = int64(201)
+		sellerB   = int64(202)
+		variantA1 = int64(5011)
+		variantA2 = int64(5012)
+		variantB1 = int64(5013)
+		catA      = int64(30)
+		catB      = int64(40)
+		commBpsA  = 700          // 7%
+		commBpsB  = 1000         // 10%
+		kdvBps    = 2000         // 20%
+		priceA1   = int64(50000) // 500.00 TL
+		priceA2   = int64(30000) // 300.00 TL
+		priceB1   = int64(80000) // 800.00 TL
 	)
 
 	// Helper: compute seller net minor.

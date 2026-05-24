@@ -25,9 +25,9 @@ type orderService struct {
 	catalog          catalog.Service
 	outbox           outbox.Repository
 	defaultMarket    string
-	cashbackCurrency string // e.g. "TRY_COIN" for TR; read from env at startup
-	psp              payment.Service     // nil for legacy NewService (no PSP call in Checkout)
-	diskChecker      DiskPressureChecker // nil disables disk panic check
+	cashbackCurrency string                   // e.g. "TRY_COIN" for TR; read from env at startup
+	psp              payment.Service          // nil for legacy NewService (no PSP call in Checkout)
+	diskChecker      DiskPressureChecker      // nil disables disk panic check
 	biz              *metrics.BusinessMetrics // nil disables business KPI counters
 }
 
@@ -400,14 +400,14 @@ func buildPaidPayload(o Order, items []OrderItem, paidAt time.Time) paidPayload 
 }
 
 type paidPayload struct {
-	OrderID       int64            `json:"order_id"`
-	UserID        int64            `json:"user_id"`
-	SellerID      int64            `json:"seller_id"`
-	PaidAt        time.Time        `json:"paid_at"`
-	AmountMinor   int64            `json:"amount_minor"`
-	ShippingMinor int64            `json:"shipping_minor"`
-	Currency      string           `json:"currency"`
-	Market        string           `json:"market"`
+	OrderID       int64             `json:"order_id"`
+	UserID        int64             `json:"user_id"`
+	SellerID      int64             `json:"seller_id"`
+	PaidAt        time.Time         `json:"paid_at"`
+	AmountMinor   int64             `json:"amount_minor"`
+	ShippingMinor int64             `json:"shipping_minor"`
+	Currency      string            `json:"currency"`
+	Market        string            `json:"market"`
 	Items         []paidItemPayload `json:"items"`
 }
 

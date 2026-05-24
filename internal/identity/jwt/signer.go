@@ -30,9 +30,9 @@ type Claims struct {
 
 // AccessTTL and StepUpTTL are the fixed token lifetimes (CLAUDE.md § 4.2 auth spec).
 const (
-	AccessTTL  = 15 * time.Minute
-	StepUpTTL  = 5 * time.Minute
-	ScopeAPI   = "api"
+	AccessTTL   = 15 * time.Minute
+	StepUpTTL   = 5 * time.Minute
+	ScopeAPI    = "api"
 	ScopeStepUp = "high_sensitivity"
 )
 

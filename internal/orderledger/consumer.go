@@ -19,15 +19,15 @@ const (
 
 // orderPaidPayload matches the enriched JSON written by order.MarkPaid.
 type orderPaidPayload struct {
-	OrderID       int64              `json:"order_id"`
-	UserID        int64              `json:"user_id"`
-	SellerID      int64              `json:"seller_id"`
-	PaidAt        time.Time          `json:"paid_at"`
-	AmountMinor   int64              `json:"amount_minor"`
-	ShippingMinor int64              `json:"shipping_minor"`
-	Currency      string             `json:"currency"`
-	Market        string             `json:"market"`
-	Items         []orderPaidItem    `json:"items"`
+	OrderID       int64           `json:"order_id"`
+	UserID        int64           `json:"user_id"`
+	SellerID      int64           `json:"seller_id"`
+	PaidAt        time.Time       `json:"paid_at"`
+	AmountMinor   int64           `json:"amount_minor"`
+	ShippingMinor int64           `json:"shipping_minor"`
+	Currency      string          `json:"currency"`
+	Market        string          `json:"market"`
+	Items         []orderPaidItem `json:"items"`
 }
 
 type orderPaidItem struct {

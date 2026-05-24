@@ -56,13 +56,13 @@ func New(mode Mode, baseURL, appKey, appSecret, appID string, log *slog.Logger) 
 		log = slog.Default()
 	}
 	return &Client{
-		mode:      mode,
-		baseURL:   strings.TrimRight(baseURL, "/"),
-		appKey:    appKey,
-		appSecret: appSecret,
-		appID:     appID,
+		mode:       mode,
+		baseURL:    strings.TrimRight(baseURL, "/"),
+		appKey:     appKey,
+		appSecret:  appSecret,
+		appID:      appID,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
-		log:       log,
+		log:        log,
 	}
 }
 

@@ -372,7 +372,9 @@ func (noopDLQRepository) InsertIfThreshold(_ context.Context, _ DLQRow, _ Attemp
 func (noopDLQRepository) CountInWindow(_ context.Context, _ string, _ int) (int, error) {
 	return 0, nil
 }
-func (noopDLQRepository) List(_ context.Context, _ DLQFilter) ([]DLQRow, error)         { return nil, nil }
-func (noopDLQRepository) GetByID(_ context.Context, _ int64) (DLQRow, error)             { return DLQRow{}, pgx.ErrNoRows }
-func (noopDLQRepository) MarkReplayed(_ context.Context, _ int64, _, _ string) error     { return nil }
-func (noopDLQRepository) MarkDismissed(_ context.Context, _ int64, _, _ string) error    { return nil }
+func (noopDLQRepository) List(_ context.Context, _ DLQFilter) ([]DLQRow, error) { return nil, nil }
+func (noopDLQRepository) GetByID(_ context.Context, _ int64) (DLQRow, error) {
+	return DLQRow{}, pgx.ErrNoRows
+}
+func (noopDLQRepository) MarkReplayed(_ context.Context, _ int64, _, _ string) error  { return nil }
+func (noopDLQRepository) MarkDismissed(_ context.Context, _ int64, _, _ string) error { return nil }

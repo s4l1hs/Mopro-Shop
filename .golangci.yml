@@ -99,6 +99,11 @@ linters:
       # cmd/*/main.go wires up multiple services — startup complexity is intentional
       - path: "cmd/.*\\.go"
         linters: [gocyclo]
+      # cmd/*/main.go exits during fatal startup before deferred OTel shutdown has value;
+      # skipping the shutdown flush on a startup failure path is intentional.
+      - path: "cmd/.*\\.go"
+        linters: [gocritic]
+        text: "exitAfterDefer"
       # PostInTx validates multi-currency double-entry + idempotency; complex by design
       - path: "internal/wallet/service\\.go"
         linters: [gocyclo]
@@ -108,3 +113,7 @@ linters:
       # shipping test servers use json/xml encoders in httptest handlers; errors non-fatal
       - path: "internal/shipping/.*/adapter_test\\.go"
         linters: [errcheck]
+      # property tests use math/rand for deterministic seeding of gopter RNG — not security-sensitive
+      - path: "_test\\.go"
+        linters: [gosec]
+        text: "G404"

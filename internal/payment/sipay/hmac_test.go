@@ -12,11 +12,11 @@ import (
 // against the sandbox environment.
 func TestComputeHashKey(t *testing.T) {
 	tests := []struct {
-		name        string
-		merchantKey string
-		statusCode  string
-		invoiceID   string
-		totalAmount string
+		name         string
+		merchantKey  string
+		statusCode   string
+		invoiceID    string
+		totalAmount  string
 		currencyCode string
 		// wantPrefix allows testing the first few chars since the full hash is 88 chars.
 		wantLen int
