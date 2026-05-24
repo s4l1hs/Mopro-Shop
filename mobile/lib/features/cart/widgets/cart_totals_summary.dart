@@ -2,16 +2,19 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mopro/features/cart/data/cart_dto.dart';
+import 'package:mopro/utils/money.dart';
 
 class CartTotalsSummary extends StatelessWidget {
   const CartTotalsSummary({
     required this.cart,
     required this.onCheckout,
+    this.cashbackMonthlyMinor,
     super.key,
   });
 
   final CartDto cart;
   final VoidCallback? onCheckout;
+  final int? cashbackMonthlyMinor;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +50,14 @@ class CartTotalsSummary extends StatelessWidget {
               message: 'cart.warning_item_limit'.tr(),
               colorScheme: colorScheme,
             ),
+          if (cashbackMonthlyMinor != null && cashbackMonthlyMinor! > 0) ...[
+            _CashbackSummaryBox(
+              monthly: cashbackMonthlyMinor!,
+              colorScheme: colorScheme,
+              theme: theme,
+            ),
+            const SizedBox(height: 8),
+          ],
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -80,6 +91,63 @@ class CartTotalsSummary extends StatelessWidget {
                 label: Text('cart.proceed_to_checkout'.tr()),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CashbackSummaryBox extends StatelessWidget {
+  const _CashbackSummaryBox({
+    required this.monthly,
+    required this.colorScheme,
+    required this.theme,
+  });
+
+  final int monthly;
+  final ColorScheme colorScheme;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withOpacity(0.05),
+        border: Border.all(color: colorScheme.primary.withOpacity(0.20)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.card_giftcard_outlined,
+            size: 18,
+            color: colorScheme.primary,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'cart.cashback_monthly'
+                      .tr(namedArgs: {'amount': MoneyUtils.formatMinor(monthly, currency: 'TRY_COIN')}),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  'cart.cashback_perpetual'.tr(),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

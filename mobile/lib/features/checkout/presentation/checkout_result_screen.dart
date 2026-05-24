@@ -14,6 +14,21 @@ class CheckoutResultScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final checkoutState = ref.watch(checkoutControllerProvider);
     final orders = checkoutState.response?.orders ?? [];
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    // Clear cart and reset checkout state on first success render
+    ref.listen(checkoutControllerProvider, (prev, _) {
+      if (prev == null && !failed && orders.isNotEmpty) {
+        ref.read(cartProvider.notifier).clear();
+      }
+    });
+
+    // Compute cashback activation date: first order created_at + 3 business days (approx 5 calendar days)
+    final firstOrder = orders.isNotEmpty ? orders.first : null;
+    final cashbackDate = firstOrder != null
+        ? firstOrder.createdAt.add(const Duration(days: 5))
+        : null;
 
     return PopScope(
       canPop: false,
@@ -28,30 +43,50 @@ class CheckoutResultScreen extends ConsumerWidget {
                 Icon(
                   failed ? Icons.error_outline : Icons.check_circle_outline,
                   size: 80,
-                  color: failed
-                      ? Theme.of(context).colorScheme.error
-                      : Theme.of(context).colorScheme.primary,
+                  color: failed ? cs.error : cs.primary,
                 ),
                 const SizedBox(height: 24),
                 Text(
                   failed
                       ? 'checkout.result_failed_title'.tr()
                       : 'checkout.result_success_title'.tr(),
-                  style: Theme.of(context).textTheme.headlineSmall,
+                  style: theme.textTheme.headlineSmall,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
+                if (!failed && orders.isNotEmpty) ...[
+                  Text(
+                    'checkout.result_order_numbers'.tr(
+                      namedArgs: {
+                        'numbers': orders.map((o) => '#${o.id}').join(', '),
+                      },
+                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 Text(
                   failed
                       ? 'checkout.result_failed_body'.tr()
                       : 'checkout.result_success_body'.tr(
                           namedArgs: {'count': '${orders.length}'},
                         ),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
                   textAlign: TextAlign.center,
                 ),
+                if (!failed && cashbackDate != null) ...[
+                  const SizedBox(height: 16),
+                  _CashbackActivationBadge(
+                    date: cashbackDate,
+                    theme: theme,
+                    cs: cs,
+                  ),
+                ],
                 const Spacer(),
                 if (failed) ...[
                   OutlinedButton(
@@ -92,6 +127,48 @@ class CheckoutResultScreen extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CashbackActivationBadge extends StatelessWidget {
+  const _CashbackActivationBadge({
+    required this.date,
+    required this.theme,
+    required this.cs,
+  });
+
+  final DateTime date;
+  final ThemeData theme;
+  final ColorScheme cs;
+
+  @override
+  Widget build(BuildContext context) {
+    final dateStr =
+        '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.primary.withOpacity(0.20)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.card_giftcard_outlined, size: 20, color: cs.primary),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              'checkout.cashback_activation_date'
+                  .tr(namedArgs: {'date': dateStr}),
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: cs.primary),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
       ),
     );
   }

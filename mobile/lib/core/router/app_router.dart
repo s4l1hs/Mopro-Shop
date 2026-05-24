@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/features/account/account_screen.dart';
+import 'package:mopro/features/account/cards_screen.dart';
+import 'package:mopro/features/account/profile_screen.dart';
+import 'package:mopro/features/account/security_screen.dart';
 import 'package:mopro/features/address/screens/address_form_screen.dart';
 import 'package:mopro/features/address/screens/address_list_screen.dart';
 import 'package:mopro/features/auth/login_screen.dart';
@@ -20,6 +23,7 @@ import 'package:mopro/features/checkout/presentation/checkout_3ds_webview_screen
 import 'package:mopro/features/checkout/presentation/checkout_address_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_payment_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_result_screen.dart';
+import 'package:mopro/features/checkout/presentation/checkout_review_screen.dart';
 import 'package:mopro/features/favorites/favorites_screen.dart';
 import 'package:mopro/features/order/presentation/order_detail_screen.dart';
 import 'package:mopro/features/order/presentation/order_history_screen.dart';
@@ -54,7 +58,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       final needsAuth = loc.startsWith('/checkout') ||
           loc.startsWith('/account') ||
           loc == '/wallet' ||
-          loc.startsWith('/wallet/');
+          loc.startsWith('/wallet/') ||
+          loc.startsWith('/orders');
 
       return switch (auth) {
         null || AuthUnauthenticated() => isAuthRoute
@@ -179,6 +184,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const CheckoutPaymentScreen(),
           ),
           GoRoute(
+            path: 'review',
+            builder: (_, __) => const CheckoutReviewScreen(),
+          ),
+          GoRoute(
             path: '3ds',
             builder: (_, __) => const Checkout3dsWebviewScreen(),
           ),
@@ -191,6 +200,22 @@ final routerProvider = Provider<GoRouter>((ref) {
             },
           ),
         ],
+      ),
+      // ── Account sub-pages ──────────────────────────────────────────────────
+      GoRoute(
+        path: '/account/profile',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, __) => const AccountProfileScreen(),
+      ),
+      GoRoute(
+        path: '/account/security',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, __) => const SecurityScreen(),
+      ),
+      GoRoute(
+        path: '/account/cards',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, __) => const CardsScreen(),
       ),
       // ── Orders (root-level for deep links) ─────────────────────────────────
       GoRoute(

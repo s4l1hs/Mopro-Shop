@@ -6,8 +6,8 @@ import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/features/address/providers/addresses_provider.dart';
 import 'package:mopro/features/checkout/application/checkout_controller.dart';
+import 'package:mopro/features/checkout/widgets/checkout_stepper.dart';
 import 'package:mopro_api/mopro_api.dart';
-
 
 class CheckoutAddressScreen extends ConsumerWidget {
   const CheckoutAddressScreen({super.key});
@@ -28,58 +28,67 @@ class CheckoutAddressScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: addressState.addresses.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) {
-          final appError = err is AppError
-              ? err
-              : UnknownError(statusCode: 0, message: err.toString());
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: ErrorBanner(
-              error: appError,
-              onRetry: () => ref.read(addressesProvider.notifier).refresh(),
-            ),
-          );
-        },
-        data: (addresses) {
-          if (addresses.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.location_off_outlined, size: 64),
-                  const SizedBox(height: 16),
-                  Text('address.empty'.tr()),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: Text('address.add'.tr()),
-                    onPressed: () => context.push('/profile/addresses/new'),
+      body: Column(
+        children: [
+          const CheckoutStepper(currentStep: 0),
+          Expanded(
+            child: addressState.addresses.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (err, _) {
+                final appError = err is AppError
+                    ? err
+                    : UnknownError(statusCode: 0, message: err.toString());
+                return Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ErrorBanner(
+                    error: appError,
+                    onRetry: () =>
+                        ref.read(addressesProvider.notifier).refresh(),
                   ),
-                ],
-              ),
-            );
-          }
+                );
+              },
+              data: (addresses) {
+                if (addresses.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.location_off_outlined, size: 64),
+                        const SizedBox(height: 16),
+                        Text('address.empty'.tr()),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          icon: const Icon(Icons.add),
+                          label: Text('address.add'.tr()),
+                          onPressed: () =>
+                              context.push('/profile/addresses/new'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
 
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
-            itemCount: addresses.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, i) {
-              final addr = addresses[i];
-              final isSelected =
-                  checkoutState.selectedAddressId == addr.id;
-              return _SelectableAddressCard(
-                address: addr,
-                isSelected: isSelected,
-                onTap: () => ref
-                    .read(checkoutControllerProvider.notifier)
-                    .selectAddress(addr.id),
-              );
-            },
-          );
-        },
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 100),
+                  itemCount: addresses.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) {
+                    final addr = addresses[i];
+                    final isSelected =
+                        checkoutState.selectedAddressId == addr.id;
+                    return _SelectableAddressCard(
+                      address: addr,
+                      isSelected: isSelected,
+                      onTap: () => ref
+                          .read(checkoutControllerProvider.notifier)
+                          .selectAddress(addr.id),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: _BottomBar(
         enabled: checkoutState.selectedAddressId != null,
@@ -143,7 +152,9 @@ class _SelectableAddressCard extends StatelessWidget {
                           const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: cs.primaryContainer,
                               borderRadius: BorderRadius.circular(8),

@@ -17,6 +17,7 @@ class CartScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(cartProvider);
+    final cashbackAsync = ref.watch(cartMonthlyCashbackProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -61,7 +62,8 @@ class CartScreen extends ConsumerWidget {
               ),
               CartTotalsSummary(
                 cart: cart,
-                onCheckout: () => context.push('/checkout/address'),
+                onCheckout: () => context.push('/checkout'),
+                cashbackMonthlyMinor: cashbackAsync.valueOrNull,
               ),
             ],
           );

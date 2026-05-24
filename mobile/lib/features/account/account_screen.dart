@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
+import 'package:mopro/features/order/application/orders_provider.dart';
+import 'package:mopro/features/wallet/providers/cashback_plans_provider.dart';
+import 'package:mopro/features/wallet/providers/wallet_provider.dart';
+import 'package:mopro/utils/money.dart';
+import 'package:mopro_api/mopro_api.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
@@ -11,12 +16,34 @@ class AccountScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final ordersState = ref.watch(ordersProvider);
+    final walletState = ref.watch(walletProvider);
+    final plansState = ref.watch(cashbackPlansProvider);
+
+    final activeOrderCount = ordersState.orders.valueOrNull
+            ?.where(
+              (o) =>
+                  o.status != 'delivered' &&
+                  o.status != 'cancelled' &&
+                  o.status != 'refunded',
+            )
+            .length ??
+        0;
+
+    final balanceMinor =
+        walletState.balance.valueOrNull?.amountMinor ?? 0;
+
+    final activePlanCount =
+        plansState.plans.valueOrNull
+            ?.where((p) => p.status == CashbackPlanStatusEnum.active)
+            .length ??
+            0;
 
     return Scaffold(
       appBar: AppBar(title: Text('nav.account'.tr())),
       body: ListView(
         children: [
-          // Avatar header
+          // ── Avatar header ──────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.all(24),
             child: Row(
@@ -40,6 +67,45 @@ class AccountScreen extends ConsumerWidget {
               ],
             ),
           ),
+          // ── Summary stats ──────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: GridView.count(
+              crossAxisCount: 3,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 1.15,
+              children: [
+                _StatCard(
+                  label: 'account.active_orders'.tr(),
+                  value: '$activeOrderCount',
+                  icon: Icons.shopping_bag_outlined,
+                  cs: cs,
+                  theme: theme,
+                  onTap: () => context.push('/orders'),
+                ),
+                _StatCard(
+                  label: 'account.coin_balance'.tr(),
+                  value: MoneyUtils.formatMinor(balanceMinor, currency: 'TRY_COIN'),
+                  icon: Icons.account_balance_wallet_outlined,
+                  cs: cs,
+                  theme: theme,
+                  onTap: () => context.push('/wallet'),
+                ),
+                _StatCard(
+                  label: 'account.active_plans'.tr(),
+                  value: '$activePlanCount',
+                  icon: Icons.card_giftcard_outlined,
+                  cs: cs,
+                  theme: theme,
+                  onTap: () => context.push('/wallet'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
           const Divider(height: 1),
           _Section(
             title: 'account.orders_section'.tr(),
@@ -89,6 +155,61 @@ class AccountScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 32),
         ],
+      ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.cs,
+    required this.theme,
+    required this.onTap,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final ColorScheme cs;
+  final ThemeData theme;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 22, color: cs.primary),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(color: cs.onSurfaceVariant),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }

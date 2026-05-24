@@ -4,9 +4,28 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/di/providers.dart';
 import 'package:mopro/core/network/app_error.dart';
+import 'package:mopro/features/cart/application/cart_cashback_cache.dart';
 import 'package:mopro/features/cart/data/cart_dto.dart';
 import 'package:mopro/features/cart/data/cart_repository.dart';
 import 'package:mopro/features/cart/data/cart_repository_impl.dart';
+
+// ── Derived providers ─────────────────────────────────────────────────────────
+
+/// Total monthly cashback (in minor units) across all cart lines.
+/// Reads from the local cashback cache (populated at "Add to Cart" time).
+final cartMonthlyCashbackProvider =
+    FutureProvider.autoDispose<int>((ref) async {
+  final cart = ref.watch(cartProvider).cart.valueOrNull;
+  if (cart == null || cart.isEmpty) return 0;
+  final cache = ref.read(cartCashbackCacheProvider);
+  final all = await cache.getAll();
+  var total = 0;
+  for (final line in cart.lines) {
+    final monthly = all[line.variantId] ?? 0;
+    total += monthly * line.qty;
+  }
+  return total;
+});
 
 // ── Repository provider ───────────────────────────────────────────────────────
 

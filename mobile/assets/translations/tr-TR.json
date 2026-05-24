@@ -108,7 +108,15 @@
     "cards": "Kartlarım",
     "security": "Güvenlik",
     "logout": "Çıkış Yap",
-    "logout_confirm": "Çıkış yapmak istediğinizden emin misiniz?"
+    "logout_confirm": "Çıkış yapmak istediğinizden emin misiniz?",
+    "orders_section": "SİPARİŞLER",
+    "settings_section": "AYARLAR",
+    "my_orders": "Siparişlerim",
+    "cashback_wallet": "Cashback Cüzdanım",
+    "active_orders": "Aktif Sipariş",
+    "coin_balance": "Mopro Coin",
+    "active_plans": "Aktif Plan",
+    "saved_cards": "Kayıtlı Kartlarım"
   },
   "address": {
     "list_title": "Adreslerim",
@@ -150,6 +158,7 @@
     "related_title": "Benzer Ürünler"
   },
   "cashback": {
+    "schedule_title": "Cashback Takvimi",
     "preview_title": "Mopro Cashback",
     "cashback_preview": "Bu üründen aylık {monthly} Mopro Coin alacaksınız — SÜRESİZ.",
     "monthly_coin": "Aylık {amount} Coin",
@@ -193,9 +202,31 @@
     "swipe_hint": "Silmek için kaydırın",
     "qty_label": "{qty} adet",
     "added_to_cart": "Sepete eklendi",
-    "add_failed": "Sepete eklenemedi"
+    "add_failed": "Sepete eklenemedi",
+    "cashback_monthly": "Aylık {amount} Cashback",
+    "cashback_perpetual": "Plan süresiz devam eder"
   },
   "checkout": {
+    "step_address": "Adres",
+    "step_payment": "Ödeme",
+    "step_review": "Onay",
+    "review_title": "Sipariş Onayı",
+    "review_items": "Sipariş Özeti",
+    "card_details": "Kart Bilgileri",
+    "card_number": "Kart Numarası",
+    "card_holder": "Kart Üzerindeki Ad",
+    "card_expiry": "Son Kullanma Tarihi",
+    "card_cvv": "CVV",
+    "card_number_required": "Kart numarası gerekli",
+    "card_number_invalid": "Geçersiz kart numarası",
+    "card_holder_required": "Ad soyad gerekli",
+    "card_expiry_required": "Son kullanma tarihi gerekli",
+    "card_expiry_invalid": "Geçersiz tarih",
+    "card_cvv_required": "CVV gerekli",
+    "consent_sales": "Ön Bilgilendirme Formunu okudum ve kabul ediyorum.",
+    "consent_distance_contract": "Mesafeli Satış Sözleşmesini okudum ve kabul ediyorum.",
+    "result_order_numbers": "Sipariş No: {numbers}",
+    "cashback_activation_date": "İlk cashback ödemesi tahminen {date} tarihinde aktarılacak.",
     "address_title": "Teslimat Adresi",
     "address_subtitle": "Siparişinizin gönderileceği adresi seçin",
     "select_address": "Teslimat Adresi Seç",
@@ -284,7 +315,12 @@
     "created_at": "Sipariş Tarihi",
     "payout_info": "Satıcı ödemesi teslimattan 3 iş günü sonra gerçekleşir.",
     "refresh_hint": "Güncelle",
-    "timeline_label": "Sipariş Durumu"
+    "timeline_label": "Sipariş Durumu",
+    "search_hint": "Sipariş numarası veya ürün ara...",
+    "filter_all": "Tümü",
+    "filter_active": "Aktif",
+    "filter_completed": "Tamamlanan",
+    "filter_cancelled": "İptal Edilen"
   },
   "status": {
     "pending_payment": "Ödeme bekleniyor",
@@ -309,6 +345,28 @@
     "transaction_type_other": "Diğer",
     "direction_debit": "Giden",
     "direction_credit": "Gelen"
+  },
+  "security": {
+    "active_sessions": "Aktif Oturumlar",
+    "current": "Bu cihaz",
+    "revoke": "Sonlandır",
+    "login_history": "Giriş Geçmişi"
+  },
+  "profile": {
+    "tc_id": "TC Kimlik No",
+    "tc_id_helper": "İsteğe bağlı — e-fatura için gereklidir",
+    "tc_id_length": "TC Kimlik No 11 haneli olmalıdır",
+    "tc_id_no_zero": "TC Kimlik No 0 ile başlayamaz",
+    "tc_id_digits": "TC Kimlik No sadece rakam içerebilir",
+    "tc_id_invalid": "Geçersiz TC Kimlik No",
+    "required": "Bu alan zorunludur",
+    "save": "Kaydet",
+    "saved": "Profil güncellendi"
+  },
+  "cards": {
+    "empty": "Kayıtlı kart bulunmuyor",
+    "empty_subtitle": "Ödeme sırasında kart bilgilerinizi girebilirsiniz",
+    "add": "Kart Ekle"
   },
   "seller": {
     "breakdown_title": "Sipariş Özeti",

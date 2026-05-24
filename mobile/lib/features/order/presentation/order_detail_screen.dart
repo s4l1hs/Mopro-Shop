@@ -8,7 +8,9 @@ import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/features/order/application/order_detail_provider.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/features/order/data/order_item_dto.dart';
+import 'package:mopro/features/order/widgets/cashback_schedule.dart';
 import 'package:mopro/features/order/widgets/order_status_chip.dart';
+import 'package:mopro/utils/money.dart';
 
 class OrderDetailScreen extends ConsumerWidget {
   const OrderDetailScreen({required this.orderId, super.key});
@@ -144,7 +146,7 @@ class _OrderDetailBody extends ConsumerWidget {
                     isTotal: true,
                   ),
                   const SizedBox(height: 24),
-                  if (OrderStatus.canCancel(order.status))
+                  if (OrderStatus.canCancel(order.status)) ...[
                     OutlinedButton(
                       onPressed: () => _confirmCancel(context, ref),
                       style: OutlinedButton.styleFrom(
@@ -154,6 +156,39 @@ class _OrderDetailBody extends ConsumerWidget {
                       ),
                       child: Text('order.cancel'.tr()),
                     ),
+                    const SizedBox(height: 16),
+                  ],
+                  // ── Cashback schedule ──────────────────────────────────
+                  if (order.items.isNotEmpty) ...[
+                    Text(
+                      'cashback.schedule_title'.tr(),
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    Builder(
+                      builder: (_) {
+                        final totalMonthly = order.items.fold<int>(
+                          0,
+                          (sum, item) =>
+                              sum +
+                              MoneyUtils.cashbackMonthlyMinor(
+                                item.priceMinor * item.qty,
+                                item.commissionPctBps,
+                              ),
+                        );
+                        if (totalMonthly <= 0) return const SizedBox.shrink();
+                        return CashbackSchedule(
+                          monthlyMinor: totalMonthly,
+                          currency: order.currency.contains('COIN')
+                              ? order.currency
+                              : '${order.currency}_COIN',
+                          startDate: order.deliveredAt != null
+                              ? order.deliveredAt!.add(const Duration(days: 5))
+                              : DateTime.now(),
+                        );
+                      },
+                    ),
+                  ],
                   const SizedBox(height: 32),
                 ],
               ),
