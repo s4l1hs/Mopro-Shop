@@ -16,3 +16,15 @@ export interface ProductListResponse {
   page: number;
   per_page: number;
 }
+
+export interface ProductDetail extends Product {
+  images?: string[];
+  description?: string;
+  specs?: Record<string, string>;
+  rating?: { stars: number; count: number };
+  discount_price_minor?: number;
+  category_slug?: string;
+  category_name?: string;
+  parent_category_slug?: string;
+  parent_category_name?: string;
+}

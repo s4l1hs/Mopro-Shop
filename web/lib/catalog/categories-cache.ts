@@ -30,3 +30,15 @@ export function buildCategoryTree(
     children: categories.filter((c) => c.parent_id === parent.id).slice(0, 4),
   }));
 }
+
+export function useCategoryBySlugQuery(slug: string) {
+  return useQuery({
+    queryKey: ["category", slug],
+    queryFn: async () => {
+      const cats = await fetchCategories();
+      return cats.find((c) => c.slug === slug) ?? null;
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+}
