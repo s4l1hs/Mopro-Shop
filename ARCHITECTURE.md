@@ -101,7 +101,7 @@ core-svc binary
     ├── cart
     ├── order        (saga orchestrator; emits ecom.order.delivered.v1 with delivered_at)
     ├── payment      (PSP adapter — Sipay/Craftgate/iyzico/Stripe/...)
-    ├── seller       (seller panel; transparency endpoint /api/v1/seller/orders/:id/breakdown)
+    ├── seller       (seller panel; transparency endpoint /seller/orders/{id}/breakdown)
     └── search       (Meilisearch wrapper)
 ```
 
@@ -144,7 +144,7 @@ jobs-svc binary
     ├── support
     ├── media
     ├── sizefinder
-    ├── antifraud_inference       (v7: serves /internal/v1/antifraud/score)
+    ├── antifraud_inference       (v7: serves /internal/antifraud/score)
     └── einvoice                  (v7: GİB integration via bulut sağlayıcı)
 ```
 
@@ -163,7 +163,7 @@ provider routes to GİB. See § 8.7 for provider comparison.
 End-to-end happy path:
 
 ```
-1. POST /v1/orders/checkout (mobile) ───► Caddy
+1. POST /orders/checkout (mobile) ───► Caddy
 2. Caddy ───► core-svc:8080
 3. core-svc.order calls cart, catalog (commission_pct snapshot), payment (in-memory)
 4. core-svc.payment calls PSP (HTTPS egress through CloudFlare to Sipay/Craftgate)
@@ -313,7 +313,7 @@ See § 8.6 for per-carrier API endpoint reference.
 | Provider | Sandbox URL | Auth | Notable Endpoints | Webhook Signature |
 |---|---|---|---|---|
 | **Sipay** (primary) | `https://provisioning.sipay.com.tr/ccpayment` | Token (`/api/token` w/ merchant_key+app_id+app_secret); cache 30 min | `/api/paySmart3D`, `/api/refund`, `/api/checkstatus`, `/sub_merchant_register`, `/sub_merchant_pay`, `/sub_merchant_settlement` | `hash_key` = `base64(SHA512(merchant_key + status_code + invoice_id + total_amount + currency_code))` — raw SHA-512 concatenation, NOT HMAC. TODO(sipay-sandbox-verify): confirm field order against live sandbox response. |
-| **Craftgate** (backup) | `https://sandbox-api.craftgate.io` | HMAC-SHA256 per request (`x-api-key`, `x-rnd-key`, `x-signature`) | `/payment/v1/payments`, `/payment/v1/init-3ds`, `/payment/v1/complete-3ds`, `/onboarding/v1/sub-merchants`, `/payout/v1/payout` | `x-craftgate-signature` = `hmacSha256(rawBody, webhook_secret)` |
+| **Craftgate** (backup) | `https://sandbox-api.craftgate.io` | HMAC-SHA256 per request (`x-api-key`, `x-rnd-key`, `x-signature`) | `/payment/payments`, `/payment/init-3ds`, `/payment/complete-3ds`, `/onboarding/sub-merchants`, `/payout/payout` | `x-craftgate-signature` = `hmacSha256(rawBody, webhook_secret)` |
 | **iyzico** (fallback) | `https://sandbox-api.iyzipay.com` | HMAC-SHA1 + Base64 (`Authorization: IYZWS <key>:<hash>`) | `/payment/3dsecure/initialize`, `/payment/3dsecure/auth`, `/payment/refund`, `/payment/cancel`, `/onboarding/sub-merchant`, `/payment/iyzipos/marketplace/payout` | (callback URL only, no header signature; verify via `paymentId` lookup) |
 
 **PSP fee comparison (May 2026 negotiated baseline; per transaction):**
@@ -340,11 +340,11 @@ Six carriers behind a single `shipping.Service` interface. Each adapter implemen
 
 | Carrier | API style | Sandbox URL / Test mode | Auth | Notable Endpoints | Webhook |
 |---|---|---|---|---|---|
-| **Aras Kargo** | SOAP (legacy) + REST (new) | `https://test-customerservices.araskargo.com.tr/aras-rest-api/test/` | Basic auth (username + password + customer_code) | `POST /api/v1/shipment` (create), `GET /api/v1/shipment/{trackingNo}` (track), `POST /api/v1/shipment/{trackingNo}/cancel` | Polling-based (no native webhook); poll every 5 min via cron |
+| **Aras Kargo** | SOAP (legacy) + REST (new) | `https://test-customerservices.araskargo.com.tr/aras-rest-api/test/` | Basic auth (username + password + customer_code) | `POST /api/shipment` (create), `GET /api/shipment/{trackingNo}` (track), `POST /api/shipment/{trackingNo}/cancel` | Polling-based (no native webhook); poll every 5 min via cron |
 | **Yurtiçi Kargo** | SOAP | `https://testservis.yurticikargo.com/KOPSWebServices/services/ShippingOrderServiceV2` | WS-Security UsernameToken | `createShippingOrder`, `queryShipment`, `cancelShippingOrder` | Polling; subscribe to status webhook in admin panel for prod |
-| **Sürat Kargo** | REST | `https://uatxapi.suratkargo.com.tr` | Bearer JWT (`POST /api/auth/login`) | `POST /api/shipment/create`, `GET /api/tracking/{barcode}`, `POST /api/return/create` | Webhook to our `/v1/shipping/webhook/surat`; signature: `X-Surat-Sign` = `hmacSha256(body, secret)` |
-| **MNG Kargo** | REST | `https://testapi.mngkargo.com.tr/mngapi` | API-Key header + JWT | `POST /api/standardcmdapi/createOrder`, `GET /api/cargotracking/{trackingNo}` | Webhook to `/v1/shipping/webhook/mng`; HMAC-SHA256 |
-| **HepsiJet** | REST | `https://api-test.hepsijet.com` | OAuth2 client_credentials | `POST /v1/shipments`, `GET /v1/shipments/{id}`, `POST /v1/shipments/{id}/return` | Webhook to `/v1/shipping/webhook/hepsijet`; bearer-token validated |
+| **Sürat Kargo** | REST | `https://uatxapi.suratkargo.com.tr` | Bearer JWT (`POST /api/auth/login`) | `POST /api/shipment/create`, `GET /api/tracking/{barcode}`, `POST /api/return/create` | Webhook to our `/shipping/webhook/surat`; signature: `X-Surat-Sign` = `hmacSha256(body, secret)` |
+| **MNG Kargo** | REST | `https://testapi.mngkargo.com.tr/mngapi` | API-Key header + JWT | `POST /api/standardcmdapi/createOrder`, `GET /api/cargotracking/{trackingNo}` | Webhook to `/shipping/webhook/mng`; HMAC-SHA256 |
+| **HepsiJet** | REST | `https://api-test.hepsijet.com` | OAuth2 client_credentials | `POST /shipments`, `GET /shipments/{id}`, `POST /shipments/{id}/return` | Webhook to `/shipping/webhook/hepsijet`; bearer-token validated |
 | **PTT Kargo** | SOAP | `https://wstest.ptt.gov.tr/MusteriHizmetleriWS/services` | Basic auth + customer_code | `BarkodOlustur`, `KargoTakip`, `IadeOlustur` | No native webhook; daily batch reconcile |
 
 **Carrier selection:** Per-product or per-shop default. Buyer at checkout can override with available alternatives. Free shipping rules per `ref_schema.shipping_rules` (threshold + carrier).

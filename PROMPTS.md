@@ -508,16 +508,16 @@ READ FIRST: ARCHITECTURE.md § 1.
 Create /deploy/caddy/Caddyfile:
   api.moproshop.com:
     reverse_proxy core-svc:8080
-    handle_path /v1/wallet/*  { reverse_proxy fin-svc:8080 }
-    handle_path /v1/cashback/* { reverse_proxy fin-svc:8080 }
-    handle_path /v1/payouts/*  { reverse_proxy fin-svc:8080 }
-    handle_path /v1/jobs/*     { reverse_proxy jobs-svc:8080 }
+    handle_path /wallet/*  { reverse_proxy fin-svc:8080 }
+    handle_path /cashback/* { reverse_proxy fin-svc:8080 }
+    handle_path /payouts/*  { reverse_proxy fin-svc:8080 }
+    handle_path /jobs/*     { reverse_proxy jobs-svc:8080 }
     rate_limit { zone api_per_ip { key {client_ip} window 1m max 600 } }
     @cf_only header CF-Connecting-IP * { request_header X-Forwarded-For {http.request.header.CF-Connecting-IP} }
     not @cf_only respond 403
 
   seller.moproshop.com:
-    reverse_proxy core-svc:8080  (only /api/v1/seller/* + static seller panel)
+    reverse_proxy core-svc:8080  (only /seller/* + static seller panel)
 
   img.moproshop.com:
     reverse_proxy https://<b2-bucket-public-url>
@@ -568,11 +568,11 @@ Migration /migrations/ecom/0010_catalog.sql per DATA_DICTIONARY.md § 6.
 Validate: variant.PriceCurrency MUST exist in ref_schema.currencies (active=TRUE).
 
 HTTP handlers in core-svc:
-  POST /v1/products
-  POST /v1/products/:id/variants
-  PUT  /v1/products/:id/translations/:locale
-  GET  /v1/products/:id
-  GET  /v1/categories/:id/commission?market=TR    ← used by seller panel cashback preview
+  POST /products
+  POST /products/:id/variants
+  PUT  /products/:id/translations/:locale
+  GET  /products/:id
+  GET  /categories/:id/commission?market=TR    ← used by seller panel cashback preview
 
 For each handler: Idempotency-Key required, Locale resolved from Accept-Language.
 
@@ -583,7 +583,7 @@ Report: file list, test output, sample API curls.
 
 **Verification / Done Criteria:**
 - [ ] All endpoints work.
-- [ ] `GET /v1/categories/30/commission?market=TR` returns `{commission_pct_bps: 700, kdv_pct_bps: 2000}`.
+- [ ] `GET /categories/30/commission?market=TR` returns `{commission_pct_bps: 700, kdv_pct_bps: 2000}`.
 - [ ] Coverage ≥ 80%.
 
 ---
@@ -719,7 +719,7 @@ Token TTL ~30 min; cache in Redis with refresh-on-401.
 Endpoints:
   POST /api/getPos              — list installments + commission
   POST /api/paySmart3D          — initiate 3DS payment, returns HTML to render
-  POST /api/payCompleted        — webhook receiver (we IMPLEMENT this on our side at /v1/payments/webhook/sipay)
+  POST /api/payCompleted        — webhook receiver (we IMPLEMENT this on our side at /payments/webhook/sipay)
   POST /api/refund              — refund a captured payment
   POST /api/checkstatus         — poll payment status
   POST /sub_merchant_register   — register a seller as sub-merchant
@@ -746,16 +746,16 @@ Auth: HMAC-SHA256. Each request:
   x-signature: hmacSha256( apiKey + rndKey + apiSecret + uriPath + jsonBody, secret )
 
 Endpoints:
-  POST /payment/v1/payments              — create payment (3DS or non-3DS)
-  POST /payment/v1/payments/{id}/refund  — refund
-  POST /payment/v1/init-3ds              — initiate 3DS
-  POST /payment/v1/complete-3ds          — finalize 3DS after returnURL hit
-  POST /onboarding/v1/sub-merchants      — create sub-merchant (seller)
-  POST /payout/v1/payout                 — payout to sub-merchant bank account
-  GET  /payment/v1/payments/{id}         — query status
+  POST /payment/payments              — create payment (3DS or non-3DS)
+  POST /payment/payments/{id}/refund  — refund
+  POST /payment/init-3ds              — initiate 3DS
+  POST /payment/complete-3ds          — finalize 3DS after returnURL hit
+  POST /onboarding/sub-merchants      — create sub-merchant (seller)
+  POST /payout/payout                 — payout to sub-merchant bank account
+  GET  /payment/payments/{id}         — query status
 
 Webhook:
-  POST to our /v1/payments/webhook/craftgate
+  POST to our /payments/webhook/craftgate
   Signature: x-craftgate-signature header = hmacSha256(rawBody, CRAFTGATE_WEBHOOK_SECRET)
 
 Sandbox creds env names:
@@ -832,14 +832,14 @@ Report: 3 adapter files, contract test, webhook signature samples, sandbox curl 
 
 ```
 Update /deploy/caddy/Caddyfile to ensure all Phase 1 endpoints route correctly:
-  /v1/products, /v1/products/:id/*, /v1/categories/:id/commission → core-svc
-  /v1/cart/* → core-svc
-  /v1/orders/*, /v1/orders/:id/* → core-svc
-  /v1/payments/webhook/sipay → core-svc
-  /v1/payments/webhook/craftgate → core-svc
-  /v1/payments/webhook/iyzico → core-svc
-  /v1/shipping/webhook/{aras|yurtici|surat|mng|hepsijet|ptt} → core-svc
-  /api/v1/seller/orders/:id/breakdown → core-svc (transparency)
+  /products, /products/:id/*, /categories/:id/commission → core-svc
+  /cart/* → core-svc
+  /orders/*, /orders/:id/* → core-svc
+  /payments/webhook/sipay → core-svc
+  /payments/webhook/craftgate → core-svc
+  /payments/webhook/iyzico → core-svc
+  /shipping/webhook/{aras|yurtici|surat|mng|hepsijet|ptt} → core-svc
+  /seller/orders/{id}/breakdown → core-svc (transparency)
 
 After redeploying Caddy, run smoke tests on all routes.
 Report curl outputs.
@@ -881,10 +881,10 @@ Per ARCHITECTURE.md § 8.6, each adapter wraps the official API:
 Test base: https://test-customerservices.araskargo.com.tr/aras-rest-api/test/
 Auth: HTTP Basic with (username, password, customer_code).
 Implement REST endpoints (preferred):
-  POST /api/v1/shipment              { sender, receiver, package_dims, cod_amount? }
-  GET  /api/v1/shipment/{trackingNo}
-  POST /api/v1/shipment/{trackingNo}/cancel  { reason }
-  GET  /api/v1/rates                 { from_postal, to_postal, weight }
+  POST /api/shipment              { sender, receiver, package_dims, cod_amount? }
+  GET  /api/shipment/{trackingNo}
+  POST /api/shipment/{trackingNo}/cancel  { reason }
+  GET  /api/rates                 { from_postal, to_postal, weight }
 NO native webhook → /internal/shipping/aras/poller.go runs a 5-min cron polling
 all 'in_transit' shipments and updates state. On state change → emit
 ecom.shipping.<state>.v1 via outbox.
@@ -902,7 +902,7 @@ Endpoints:
   POST /api/shipment/create      { senderInfo, receiverInfo, parcelInfo }
   GET  /api/tracking/{barcode}
   POST /api/return/create        { originalBarcode, reason }
-Native webhook: POST /v1/shipping/webhook/surat
+Native webhook: POST /shipping/webhook/surat
 Signature: X-Surat-Sign header = hmacSha256(rawBody, SURAT_WEBHOOK_SECRET)
 
 — MNG KARGO (REST + API-Key) —
@@ -912,18 +912,18 @@ Endpoints:
   POST /api/standardcmdapi/createOrder
   GET  /api/cargotracking/{trackingNo}
   POST /api/standardcmdapi/cancelOrder
-Native webhook: POST /v1/shipping/webhook/mng
+Native webhook: POST /shipping/webhook/mng
 Signature: X-MNG-Signature = hmacSha256(rawBody, MNG_WEBHOOK_SECRET)
 
 — HEPSİJET (REST + OAuth2) —
 Test base: https://api-test.hepsijet.com
-Auth: OAuth2 client_credentials grant (POST /v1/auth/token; cache token).
+Auth: OAuth2 client_credentials grant (POST /auth/token; cache token).
 Endpoints:
-  POST /v1/shipments
-  GET  /v1/shipments/{id}
-  POST /v1/shipments/{id}/return
-  POST /v1/shipments/{id}/cancel
-Native webhook: POST /v1/shipping/webhook/hepsijet
+  POST /shipments
+  GET  /shipments/{id}
+  POST /shipments/{id}/return
+  POST /shipments/{id}/cancel
+Native webhook: POST /shipping/webhook/hepsijet
 Auth: bearer token in webhook header validated against same OAuth2 token
 
 — PTT KARGO (SOAP) —
@@ -1625,7 +1625,7 @@ Service interface:
   RejectListing(ctx, productID, reviewerID, reason) → notify seller
 
 Architecture decision: ML INFERENCE runs in jobs-svc (CPU-bound, isolated).
-core-svc.antifraud calls jobs-svc HTTP /internal/v1/antifraud/score.
+core-svc.antifraud calls jobs-svc HTTP /internal/antifraud/score.
 
 ═══ MODEL 1: NLP TEXT CLASSIFIER ═══
 Task: Given (title + description + brand), predict the category.
@@ -1858,9 +1858,9 @@ Implement /mobile/lib/features/wallet/:
   - Pull to refresh
 
 API:
-  GET /v1/wallet/balance?currency=TRY_COIN
-  GET /v1/cashback/plans?status=active
-  GET /v1/cashback/plans/:id/payments
+  GET /wallet/balance?currency=TRY_COIN
+  GET /cashback/plans?status=active
+  GET /cashback/plans/:id/payments
 
 State management: Riverpod 2 AsyncNotifier per resource.
 
@@ -1888,11 +1888,11 @@ Report: widget tree, sample screen render in golden tests, API request log.
 Implement /seller-panel (separate Vue/React app deployed under seller.moproshop.com).
 
 Sayfa: Sipariş Detay
-  - GET /api/v1/seller/orders/:id/breakdown
+  - GET /seller/orders/{id}/breakdown
   - Render rows: variant | qty | brüt | komisyon (% + ₺) | KDV | hizmet bedeli (0 ₺) | net
   - Total row at the bottom
   - Side panel: Trendyol vs Hepsiburada vs Mopro karşılaştırma (rendered from same data; service fee fields show 0 ₺ for Mopro, ~5/7 ₺ for competitors per PRD § 2.2.4)
-  - Footer: "Ödeme tarihi: Sipariş teslim + 3 iş günü = <DD.MM.YYYY>" (read from /v1/payouts/:order_id endpoint)
+  - Footer: "Ödeme tarihi: Sipariş teslim + 3 iş günü = <DD.MM.YYYY>" (read from /payouts/:order_id endpoint)
 
 Sayfa: Aylık Komisyon Faturası
   - Lists all paid orders for the month
@@ -1934,46 +1934,46 @@ Her ekran için bu spec'i uygula. Ekran ekran:
 3. PhoneEntryScreen
    - +90 country code prefix (kilitli; Phase 1)
    - Telefon input, format mask "5XX XXX XX XX"
-   - "Devam" CTA → POST /v1/auth/otp/request
+   - "Devam" CTA → POST /auth/otp/request
    - Loading state, hata durumunda toast
 
 4. OtpVerifyScreen
    - 6 haneli OTP, auto-advance, paste destekli
    - 60s sayaç + "Tekrar gönder" disabled until 0
-   - POST /v1/auth/otp/verify → JWT + refresh token
+   - POST /auth/otp/verify → JWT + refresh token
    - İlk girişse: route ProfileSetupScreen, değilse HomeScreen
 
 5. ProfileSetupScreen — Sadece ilk girişte
    - Ad, soyad, doğum tarihi (opt), e-posta (opt)
-   - "Tamamla" → PUT /v1/me + route Home
+   - "Tamamla" → PUT /me + route Home
 
 ═══ DISCOVERY ═══
 6. HomeScreen (/lib/features/home/)
    - Top bar: arama icon, sepet icon (badge), bildirim icon
-   - Banner carousel (3-5, GET /v1/banners?placement=home)
+   - Banner carousel (3-5, GET /banners?placement=home)
    - "Bugün Cashback Şampiyonları" yatay scroll (en yüksek aylık coin/ürün)
    - Kategori chip listesi (top 12)
-   - "Sana Özel" GET /v1/recommendations
-   - "Yeni Gelenler" GET /v1/products?sort=newest
+   - "Sana Özel" GET /recommendations
+   - "Yeni Gelenler" GET /products?sort=newest
    - Pull-to-refresh
    - Bottom nav: Anasayfa | Kategori | Sepet | Cüzdan | Profil
 
 7. CategoryListScreen
    - 42 kategori grid (icon + isim)
-   - GET /v1/categories
+   - GET /categories
    - Tap → CategoryProductsScreen
 
 8. CategoryProductsScreen
    - Filter (fiyat aralığı, marka, renk, beden, indirimli, hızlı kargo)
    - Sort (önerilen, en yeni, fiyat artan/azalan, en çok satan)
-   - Sonsuz scroll, GET /v1/products?category_id=X&page=N
+   - Sonsuz scroll, GET /products?category_id=X&page=N
    - Her kart: foto, başlık, fiyat, "Aylık X.XX coin/ay" rozeti, sepete ekle butonu
 
 9. SearchScreen
    - Arama bar (autofocus on tap from home)
    - Geçmiş aramalar (lokal storage)
-   - Trend aramalar (GET /v1/search/trending)
-   - Live suggestions: GET /v1/search/suggest?q=X (debounce 250ms)
+   - Trend aramalar (GET /search/trending)
+   - Live suggestions: GET /search/suggest?q=X (debounce 250ms)
    - Sonuç sayfası: aynı CategoryProductsScreen widget'ı
 
 10. ProductDetailScreen — kritik
@@ -1987,7 +1987,7 @@ Her ekran için bu spec'i uygula. Ekran ekran:
    - Açıklama, özellikler, kargo süresi, iade koşulları (collapsible)
    - "Müşteri Yorumları" (puanlar + filtreli liste)
    - "Beraber Alınanlar" (yatay scroll)
-   - GET /v1/products/:id
+   - GET /products/:id
 
 ═══ CART & CHECKOUT ═══
 11. CartScreen
@@ -1995,16 +1995,16 @@ Her ekran için bu spec'i uygula. Ekran ekran:
    - Her satır: foto, başlık, varyant, qty stepper, fiyat, kaldır
    - Sticky bottom: ara toplam, "X coin/ay kazanacaksın" özet, "Devam Et" CTA
    - Boş sepet state'i + CTA "Alışverişe Başla"
-   - GET /v1/cart, PATCH /v1/cart/items/:id, DELETE /v1/cart/items/:id
+   - GET /cart, PATCH /cart/items/:id, DELETE /cart/items/:id
 
 12. AddressSelectScreen (checkout 1/4)
    - Kayıtlı adres listesi
    - "Yeni adres ekle" CTA → AddressFormScreen
-   - GET /v1/addresses
+   - GET /addresses
 
 13. AddressFormScreen
    - Ad-soyad, telefon, il (dropdown 81 il), ilçe (dependent dropdown), mahalle, açık adres, posta kodu
-   - "Kaydet" → POST /v1/addresses
+   - "Kaydet" → POST /addresses
 
 14. CargoSelectScreen (checkout 2/4)
    - Calculated rates from all carriers (CalculateRate API)
@@ -2027,7 +2027,7 @@ Her ekran için bu spec'i uygula. Ekran ekran:
    - Ara toplam, kargo, KDV, TOPLAM
    - "Bu siparişten aylık X.XX Mopro Coin kazanacaksın — SÜRESİZ" highlight
    - KVKK + satış sözleşmesi onay checkbox'ları (zorunlu)
-   - "Siparişi Tamamla" CTA → POST /v1/orders/checkout (Idempotency-Key header)
+   - "Siparişi Tamamla" CTA → POST /orders/checkout (Idempotency-Key header)
    - Sonra 3DS HTML render veya direkt OrderConfirmedScreen
 
 17. ThreeDSWebViewScreen
@@ -2044,7 +2044,7 @@ Her ekran için bu spec'i uygula. Ekran ekran:
 19. OrderListScreen
    - Sekmeler: Aktif | Tamamlanan | İptal/İade
    - Her kart: sipariş no, tarih, durum (renkli badge), ürün adedi, toplam, "Detay" tap
-   - GET /v1/orders?status=X&page=N
+   - GET /orders?status=X&page=N
 
 20. OrderDetailScreen
    - Sipariş no, tarih, durum timeline (görsel: Sipariş alındı → Hazırlanıyor → Kargoda → Teslim edildi)
@@ -2060,7 +2060,7 @@ Her ekran için bu spec'i uygula. Ekran ekran:
    - İade nedeni (dropdown: hatalı ürün, beğenmedim, hasarlı, diğer)
    - Açıklama (text)
    - Foto yükle (max 3)
-   - "İade Başlat" → POST /v1/orders/:id/returns
+   - "İade Başlat" → POST /orders/:id/returns
    - Sonra: "İade kargo kodu yakında WhatsApp/SMS ile gelecek"
 
 22. ReturnTrackScreen
@@ -2075,7 +2075,7 @@ Her ekran için bu spec'i uygula. Ekran ekran:
    - Aktif planlar sayısı: "12 aktif plan, aylık toplam Z.ZZ coin"
    - "Tüm Planlar" tap → CashbackPlansScreen
    - Aylık coin akış grafiği (son 12 ay + 12 ay projeksiyon)
-   - GET /v1/wallet/balance, GET /v1/cashback/plans
+   - GET /wallet/balance, GET /cashback/plans
 
 24. CashbackPlansScreen
    - Aktif plan listesi
@@ -2095,7 +2095,7 @@ Her ekran için bu spec'i uygula. Ekran ekran:
    - Anlık kur + komisyon
    - "Banka hesabıma gönder" → IBAN seç (kayıtlı listeden)
    - Step-up auth (biometric/SMS OTP)
-   - Onay → POST /v1/wallet/convert
+   - Onay → POST /wallet/convert
 
 ═══ PROFILE ═══
 27. ProfileScreen (bottom nav)
@@ -2129,7 +2129,7 @@ Her ekran için bu spec'i uygula. Ekran ekran:
    - Uyarı: "Tüm aktif cashback planların iptal olur, kazanılmamış coin'in kaybolur"
    - Sebep dropdown (zorunlu)
    - Şifre/OTP onay
-   - "Hesabımı Kalıcı Olarak Sil" → POST /v1/me/delete (GDPR/KVKK 30 gün geri alınabilir)
+   - "Hesabımı Kalıcı Olarak Sil" → POST /me/delete (GDPR/KVKK 30 gün geri alınabilir)
 
 ═══ SUPPORT ═══
 32. SupportHomeScreen
@@ -2145,7 +2145,7 @@ Her ekran için bu spec'i uygula. Ekran ekran:
 
 34. SupportTicketFormScreen
    - Konu dropdown, açıklama, ekler (foto)
-   - "Gönder" → POST /v1/support/tickets
+   - "Gönder" → POST /support/tickets
 
 35. SupportTicketListScreen
    - Açık/Kapalı taleplerin listesi
@@ -2325,10 +2325,10 @@ Endpoints:
   POST /einvoice/cancel/{foriba_id}
     Body: { reason }   // only allowed if 8 days have not passed AND GİB not yet ACCEPTED
   POST /webhook/register
-    Body: { url: "https://api.moproshop.com/v1/einvoice/webhook/foriba", events: ["sent","delivered","rejected","cancelled"] }
+    Body: { url: "https://api.moproshop.com/einvoice/webhook/foriba", events: ["sent","delivered","rejected","cancelled"] }
 
 Webhook receiver (in core-svc or jobs-svc):
-  POST /v1/einvoice/webhook/foriba
+  POST /einvoice/webhook/foriba
     Verify X-Foriba-Signature = hmacSha256(rawBody, FORIBA_WEBHOOK_SECRET)
     Update einvoice_schema.invoices.status accordingly.
 
@@ -2541,7 +2541,7 @@ Step-up auth: require biometric/OTP per CLAUDE.md § 6.
 
 Property test: For random (coinAmount, rate, spread), the two ledger transactions sum-balance independently per currency.
 
-Add /v1/wallet/convert endpoint in fin-svc (admin-only until launch day, then public).
+Add /wallet/convert endpoint in fin-svc (admin-only until launch day, then public).
 
 Report: code, property test output, end-to-end test with mock PSP.
 ```

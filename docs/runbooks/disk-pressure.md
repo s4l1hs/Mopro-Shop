@@ -16,7 +16,7 @@
 | 92 % | PANIC | All of above + `docker container prune -f --filter until=1h` + large-log truncation + Redis `SET panic:disk_full 1` |
 | < 80 % | RECOVERY | Redis `DEL panic:disk_full` + PD resolve |
 
-**Checkout impact:** When `panic:disk_full = 1` in Redis, `POST /v1/checkout/initiate` returns **503 Service Unavailable**. All other endpoints are unaffected.
+**Checkout impact:** When `panic:disk_full = 1` in Redis, `POST /checkout/initiate` returns **503 Service Unavailable**. All other endpoints are unaffected.
 
 ---
 
@@ -114,7 +114,7 @@ If disk cannot be brought below 80 % within 15 minutes:
 
 After recovery:
 1. Confirm `redis-cli GET panic:disk_full` returns `(nil)`.
-2. Verify checkout works: `curl -X POST https://api.mopro.com/v1/checkout/initiate ...`
+2. Verify checkout works: `curl -X POST https://api.mopro.com/checkout/initiate ...`
 3. Identify root cause: log growth? Docker image accumulation? DB growth?
 4. Add a permanent fix: log rotation config, image cleanup cron, or disk resize.
 5. Resolve PagerDuty incident if not auto-resolved.

@@ -280,7 +280,7 @@ logs:
   configs:
     - name: docker-logs
       clients:
-        - url: https://logs-prod-XX.grafana.net/loki/api/v1/push
+        - url: https://logs-prod-XX.grafana.net/loki/api/push
           basic_auth: { username: ${GRAFANA_LOKI_USER}, password: ${GRAFANA_LOKI_PASS} }
           external_labels:
             market: ${MARKET}

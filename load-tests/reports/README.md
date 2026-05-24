@@ -30,9 +30,9 @@ Each markdown report contains:
 
 With the single VDS (6 vCPU, 24 GB RAM) at idle:
 
-- `/v1/categories` p95 should be < 30 ms (simple DB query)
-- `/v1/search?q=*` p95 should be < 150 ms (Meilisearch hit)
-- `/v1/addresses` CRUD p95 should be < 200 ms (PII encryption + DB write)
+- `/categories` p95 should be < 30 ms (simple DB query)
+- `/search?q=*` p95 should be < 150 ms (Meilisearch hit)
+- `/addresses` CRUD p95 should be < 200 ms (PII encryption + DB write)
 - Error rate should be 0% during baseline (no real users competing)
 
 Any deviation from these expectations indicates a config or performance issue

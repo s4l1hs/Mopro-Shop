@@ -53,7 +53,7 @@ Every SEV1 and SEV2 needs a blameless post-mortem within 5 business days.
 ### 2.2 Panic mode behavior
 
 At 92 % the script sets `panic:disk_full = 1` in Redis. The checkout endpoint
-(`POST /v1/checkout/initiate`) reads this key with a 100 ms timeout; if set, it
+(`POST /checkout/initiate`) reads this key with a 100 ms timeout; if set, it
 returns **HTTP 503** immediately. All other endpoints and background jobs are
 unaffected — the DB remains fully writable.
 
@@ -478,7 +478,7 @@ sed -i 's/PSP_PROVIDER=sipay/PSP_PROVIDER=craftgate/' /opt/mopro/.env
 docker compose up -d core-svc fin-svc
 
 # 3. Verify checkout works
-curl -X POST https://api.moproshop.com/v1/orders/checkout/test
+curl -X POST https://api.moproshop.com/orders/checkout/test
 
 # 4. New orders use Craftgate; existing in-flight orders complete on Sipay (via stored PSP reference).
 # Cashback engine is unaffected (it's downstream of order completion).

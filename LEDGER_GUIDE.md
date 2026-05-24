@@ -678,7 +678,7 @@ func (s *payoutService) payOnce(ctx context.Context, p sellerpayout.Payout) erro
 
 ```go
 // /internal/seller/handler.go (in core-svc)
-// GET /api/v1/seller/orders/:order_id/breakdown
+// GET /seller/orders/{id}/breakdown
 func (h *sellerHandler) GetOrderBreakdown(c *gin.Context) {
     orderID := mustParseInt64(c.Param("order_id"))
 

@@ -23,9 +23,9 @@ internet is rejected by Caddy via host header validation.
 
 | Path prefix | Backend binary | Port | Docker service |
 |---|---|---|---|
-| `/v1/wallet/*` | `fin-svc` | `8081` | `fin-svc` |
-| `/v1/cashback/*` | `fin-svc` | `8081` | `fin-svc` |
-| `/v1/*` (all other) | `core-svc` | `8080` | `core-svc` |
+| `/wallet/*` | `fin-svc` | `8081` | `fin-svc` |
+| `/cashback/*` | `fin-svc` | `8081` | `fin-svc` |
+| `/*` (all other) | `core-svc` | `8080` | `core-svc` |
 | `/healthz` | `core-svc` | `8080` | `core-svc` |
 
 `jobs-svc` (port `8082`) does not expose any public HTTP endpoints. It is reachable
@@ -43,9 +43,9 @@ CloudFlare (WAF + CDN)
    │
    ▼
 Caddy :443 (mopro-net)
-   ├─ /v1/wallet/*    ──▶  fin-svc:8081  (mopro-fin-net)
-   ├─ /v1/cashback/*  ──▶  fin-svc:8081  (mopro-fin-net)
-   └─ /v1/*           ──▶  core-svc:8080 (mopro-net)
+   ├─ /wallet/*    ──▶  fin-svc:8081  (mopro-fin-net)
+   ├─ /cashback/*  ──▶  fin-svc:8081  (mopro-fin-net)
+   └─ /*           ──▶  core-svc:8080 (mopro-net)
 ```
 
 `fin-svc` sits on both `mopro-net` (Redis access) and `mopro-fin-net` (postgres-ledger +
@@ -70,12 +70,12 @@ The Caddyfile lives at `deploy/caddy/Caddyfile`. Key routing directives:
 
 ```caddy
 @fin_routes {
-    path /v1/wallet/*
-    path /v1/cashback/*
+    path /wallet/*
+    path /cashback/*
 }
 reverse_proxy @fin_routes fin-svc:8081
 
-reverse_proxy /v1/* core-svc:8080
+reverse_proxy /* core-svc:8080
 reverse_proxy /healthz core-svc:8080
 ```
 

@@ -3,8 +3,10 @@
 ## Summary
 
 `api/openapi.yaml` is the authoritative contract for all Mopro Shop HTTP endpoints.
-The current API version is `v1` (path prefix `/v1/`). This document defines what
-constitutes a breaking change and how breaking changes are handled.
+The API is currently **unversioned** — no path prefix. Endpoints are served directly
+at `/auth/...`, `/orders/...`, etc. This was a pre-launch decision: no public clients
+exist yet, so no migration window was needed. This document defines what constitutes
+a breaking change and how breaking changes will be handled once clients exist.
 
 ---
 
@@ -14,7 +16,7 @@ constitutes a breaking change and how breaking changes are handled.
 
 - Adding a **new optional field** to a response body.
 - Adding a **new optional query parameter**.
-- Adding a **new endpoint** under the existing `/v1/` prefix.
+- Adding a **new endpoint** (no prefix restrictions — all endpoints at root `/` level).
 - Expanding an enum by adding new values (clients must handle unknown enum values gracefully).
 - Improving error messages (same `code`, better `message`).
 - Performance improvements with no behavioral change.
@@ -34,15 +36,21 @@ constitutes a breaking change and how breaking changes are handled.
 
 ## Breaking Change Process
 
-1. **Add the new shape under `/v2/`** — implement the new endpoint alongside the v1 version.
-2. **Dual-serve period**: v1 and v2 are served simultaneously for **at least 6 months**.
-   During this window, the v1 endpoint is marked `deprecated: true` in the spec.
+When a breaking change is unavoidable after clients exist:
+
+1. **Add the new shape as a parallel endpoint** — implement the new endpoint alongside
+   the current one. Use a clear, descriptive path (e.g., `/checkout/v2/initiate`
+   for targeted endpoint-level versioning, or an `X-Api-Version` header approach).
+2. **Dual-serve period**: old and new endpoints are served simultaneously for
+   **at least 6 months**.
+   During this window, the old endpoint returns `Deprecation: true` header.
 3. **Mobile release coordination**: a new mobile build must ship and reach ≥ 95% adoption
-   before v1 removal is scheduled.
-4. **Sunset header**: add `Sunset: <RFC 1123 date>` to v1 responses 60 days before removal.
-5. **Remove v1**: after the dual-serve window AND adoption target is met, open a PR that
-   removes the v1 endpoint from the spec and from all generated files. This PR requires
-   explicit human approval from the product owner.
+   before old endpoint removal is scheduled.
+4. **Sunset header**: add `Sunset: <RFC 1123 date>` to old endpoint responses 60 days
+   before removal.
+5. **Remove old endpoint**: after the dual-serve window AND adoption target is met, open
+   a PR that removes the old endpoint from the spec and from all generated files. This
+   PR requires explicit human approval from the product owner.
 
 A breaking change that does not follow this process is a **production incident**.
 
@@ -66,7 +74,7 @@ Before merging any change to `api/openapi.yaml`:
 - [ ] `make api-lint` → 0 Spectral errors
 - [ ] `make api-gen` → generated files updated and staged
 - [ ] `make contract-test` → all contract tests pass
-- [ ] If breaking: versioning process started (v2 endpoint added, v1 marked deprecated)
+- [ ] If breaking: versioning process started (parallel endpoint added, old one marked deprecated)
 - [ ] PR description documents WHAT changed and WHY
 
 ---

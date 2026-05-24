@@ -683,8 +683,8 @@ SIPAY_APP_ID=<your_sandbox_app_id>
 SIPAY_APP_SECRET=<your_sandbox_app_secret>
 SIPAY_MERCHANT_ID=<your_sandbox_merchant_id>
 SIPAY_MERCHANT_KEY=<your_sandbox_merchant_key>
-SIPAY_RETURN_URL=https://<your-tunnel-subdomain>/api/v1/payment/return
-SIPAY_CANCEL_URL=https://<your-tunnel-subdomain>/api/v1/payment/cancel
+SIPAY_RETURN_URL=https://<your-tunnel-subdomain>/api/payment/return
+SIPAY_CANCEL_URL=https://<your-tunnel-subdomain>/api/payment/cancel
 ```
 
 > **D2 guard**: If `GO_ENV=production` is set, the adapter rejects `SIPAY_MERCHANT_KEY` values
@@ -781,7 +781,7 @@ Use `curl` to send a synthetic Sipay webhook and verify the 3-layer dedup:
 # base64( SHA-512( merchant_key + status_code + invoice_id + total_amount + currency_code ) )
 
 # Send a synthetic captured webhook
-curl -s -X POST http://localhost:8080/v1/payments/webhook/sipay \
+curl -s -X POST http://localhost:8080/payments/webhook/sipay \
   -H "Content-Type: application/json" \
   -d '{
     "status_code": 100,
@@ -847,7 +847,7 @@ intentionally want to reset.
 
 ### CashbackPlan.product_id = 0 means "data unavailable"
 
-`cashback_schema.plans` does not yet store product information (product_id, product_title, product_image_url). Phase 4.3a returns the following fallback values in the `GET /v1/cashback/plans` and `GET /v1/cashback/plans/{id}` responses:
+`cashback_schema.plans` does not yet store product information (product_id, product_title, product_image_url). Phase 4.3a returns the following fallback values in the `GET /cashback/plans` and `GET /cashback/plans/{id}` responses:
 
 | Field | Phase 4.3a value | Production value (Phase 4.3b+) |
 |---|---|---|
@@ -976,7 +976,7 @@ DEV_OTP_ACCEPT_ANY=true  # .env.local only — NEVER production
 ENV=development           # must NOT be "production"
 ```
 
-When `DEV_OTP_ACCEPT_ANY=true`, `POST /v1/auth/otp/verify` accepts **any** 6-digit
+When `DEV_OTP_ACCEPT_ANY=true`, `POST /auth/otp/verify` accepts **any** 6-digit
 code for any phone. The service panics at startup if this env is set together with
 `ENV=production`. This guard is tested in `TestDevOTPAcceptAny_PanicsOnProduction`.
 
@@ -991,7 +991,7 @@ a startup panic and fail the deployment.
 docker compose --env-file .env.local up -d
 
 # 2. Request OTP (mock SMS — code in logs)
-curl -s -X POST http://localhost/v1/auth/otp/request \
+curl -s -X POST http://localhost/auth/otp/request \
   -H "Content-Type: application/json" \
   -d '{"phone":"+905321234567","purpose":"login"}' | jq
 
@@ -999,13 +999,13 @@ curl -s -X POST http://localhost/v1/auth/otp/request \
 CODE=$(docker compose logs core-svc 2>&1 | grep "sms mock" | tail -1 | grep -oP '"code":"\K[0-9]{6}')
 
 # 4. Verify OTP — get token pair
-TOKEN_PAIR=$(curl -s -X POST http://localhost/v1/auth/otp/verify \
+TOKEN_PAIR=$(curl -s -X POST http://localhost/auth/otp/verify \
   -H "Content-Type: application/json" \
   -d "{\"phone\":\"+905321234567\",\"purpose\":\"login\",\"code\":\"$CODE\"}")
 ACCESS=$(echo $TOKEN_PAIR | jq -r .access_token)
 
-# 5. GET /v1/me
-curl -s -H "Authorization: Bearer $ACCESS" http://localhost/v1/me | jq
+# 5. GET /me
+curl -s -H "Authorization: Bearer $ACCESS" http://localhost/me | jq
 ```
 
 #### Migration convention for identity
@@ -1113,7 +1113,7 @@ threshold levels:
 | ≥ 92 % | PANIC log + `docker container prune` + log truncation + Redis `SET panic:disk_full 1` |
 | Recovery < 80 % | Redis `DEL panic:disk_full` + PD resolve (automatic) |
 
-**Checkout impact:** `POST /v1/checkout/initiate` returns HTTP 503 while
+**Checkout impact:** `POST /checkout/initiate` returns HTTP 503 while
 `panic:disk_full = 1` in Redis. All other endpoints and financial crons are
 unaffected. The check uses a 100 ms timeout and fails open (Redis unavailable
 → checkout proceeds normally).

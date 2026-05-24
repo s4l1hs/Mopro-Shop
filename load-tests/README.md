@@ -50,14 +50,14 @@ cd load-tests/
 
 | # | Endpoint                        | Method | Expected |
 |---|----------------------------------|--------|----------|
-| 1 | `/v1/auth/otp/request`          | POST   | 204      |
-| 2 | `/v1/auth/otp/verify`           | POST   | 200      |
-| 3 | `/v1/categories`                | GET    | 200      |
-| 4 | `/v1/products?category_id=X`    | GET    | 200      |
-| 5 | `/v1/search?q=elbise`           | GET    | 200      |
-| 6 | `/v1/addresses` CRUD            | CRUD   | 201/200/204 |
-| 7 | `/v1/cart` operations           | CRUD   | 200/422  |
-| 8 | `/v1/checkout/initiate`         | POST   | 400/422  |
+| 1 | `/auth/otp/request`          | POST   | 204      |
+| 2 | `/auth/otp/verify`           | POST   | 200      |
+| 3 | `/categories`                | GET    | 200      |
+| 4 | `/products?category_id=X`    | GET    | 200      |
+| 5 | `/search?q=elbise`           | GET    | 200      |
+| 6 | `/addresses` CRUD            | CRUD   | 201/200/204 |
+| 7 | `/cart` operations           | CRUD   | 200/422  |
+| 8 | `/checkout/initiate`         | POST   | 400/422  |
 
 ## SLO Targets (D6)
 

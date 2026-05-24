@@ -80,7 +80,7 @@ immediately return 401 on next use; clients refresh transparently.
 
 ```bash
 # Smoke test: request OTP → verify → check token
-curl -sf -X POST https://api.moproshop.com/v1/auth/otp/request \
+curl -sf -X POST https://api.moproshop.com/auth/otp/request \
      -H "Content-Type: application/json" \
      -d '{"phone":"+905321234567"}' \
   && echo "OTP request OK"

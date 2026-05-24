@@ -195,7 +195,7 @@ The `seller-payout-engine` module inside fin-svc owns seller net payout lifecycl
 - **Daily payout cron (`seller-payout-daily-cron`) runs every day 02:30 UTC.** Selects rows with `unlock_at <= today AND status='scheduled'`.
 - **Each payout writes** `D liability:seller_payable:TRY` ← → `C asset:bank:escrow:TRY` and initiates a PSP transfer (idempotency-key = `payout_id`).
 - **Plan is FROZEN at order completion (delivered_at).** Net amount is locked using the snapshotted commission and KDV at sale time.
-- **Seller transparency endpoint:** `GET /api/v1/seller/orders/:id/breakdown` returns the exact breakdown (brüt, komisyon, KDV, hizmet bedeli=0, net) so the seller panel can render the Trendyol-style transparent table.
+- **Seller transparency endpoint:** `GET /seller/orders/{id}/breakdown` returns the exact breakdown (brüt, komisyon, KDV, hizmet bedeli=0, net) so the seller panel can render the Trendyol-style transparent table.
 
 ### 4.9 Float Yield Rules (Treasury)
 
