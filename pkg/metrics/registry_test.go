@@ -82,8 +82,8 @@ func TestAllNamedMetricsRegisterWithoutError(t *testing.T) {
 	httpHandler := httpM.Middleware("test-svc", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
-	req := httptest.NewRequest(http.MethodGet, "/v1/products", nil)
-	req.Pattern = "GET /v1/products"
+	req := httptest.NewRequest(http.MethodGet, "/products", nil)
+	req.Pattern = "GET /products"
 	httpHandler.ServeHTTP(httptest.NewRecorder(), req)
 
 	// Seed eventbus + outbox + business metrics.

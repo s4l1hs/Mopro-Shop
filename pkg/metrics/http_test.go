@@ -19,8 +19,8 @@ func TestHTTPMiddleware_IncrementsCounter(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest(http.MethodGet, "/v1/products", nil)
-	req.Pattern = "GET /v1/products"
+	req := httptest.NewRequest(http.MethodGet, "/products", nil)
+	req.Pattern = "GET /products"
 	rw := httptest.NewRecorder()
 	handler.ServeHTTP(rw, req)
 
@@ -57,8 +57,8 @@ func TestHTTPMiddleware_StatusCodeLabel(t *testing.T) {
 		handler := m.Middleware("test-svc", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(tc.status)
 		}))
-		req := httptest.NewRequest(http.MethodGet, "/v1/test", nil)
-		req.Pattern = "GET /v1/test"
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.Pattern = "GET /test"
 		rw := httptest.NewRecorder()
 		handler.ServeHTTP(rw, req)
 	}
@@ -93,8 +93,8 @@ func TestHTTPMiddleware_ObservesHistogram(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/checkout", nil)
-	req.Pattern = "POST /v1/checkout/initiate"
+	req := httptest.NewRequest(http.MethodPost, "/checkout", nil)
+	req.Pattern = "POST /checkout/initiate"
 	rw := httptest.NewRecorder()
 	handler.ServeHTTP(rw, req)
 

@@ -40,7 +40,7 @@ func NewHTTPMetrics(reg *Registry) *HTTPMetrics {
 // (not per-request) to avoid label cardinality explosions.
 //
 // Route is taken from r.Pattern (Go 1.22+ stdlib mux route template, e.g.
-// "GET /v1/orders/{id}"). Falls back to r.URL.Path when Pattern is empty.
+// "GET /orders/{id}"). Falls back to r.URL.Path when Pattern is empty.
 // Using the template avoids a new label series for every unique order ID.
 func (m *HTTPMetrics) Middleware(svc string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
