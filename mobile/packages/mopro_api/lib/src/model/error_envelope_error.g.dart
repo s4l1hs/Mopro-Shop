@@ -28,5 +28,5 @@ Map<String, dynamic> _$ErrorEnvelopeErrorToJson(ErrorEnvelopeError instance) =>
       'code': instance.code,
       'message': instance.message,
       'trace_id': instance.traceId,
-      'fields': ?instance.fields?.map((e) => e.toJson()).toList(),
+      if (instance.fields?.map((e) => e.toJson()).toList() != null) 'fields': instance.fields?.map((e) => e.toJson()).toList(),
     };

@@ -43,9 +43,9 @@ User _$UserFromJson(Map<String, dynamic> json) => $checkedCreate(
 Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
   'id': instance.id,
   'phone': instance.phone,
-  'name_first': ?instance.nameFirst,
-  'name_last': ?instance.nameLast,
-  'email': ?instance.email,
+  if (instance.nameFirst != null) 'name_first': instance.nameFirst,
+  if (instance.nameLast != null) 'name_last': instance.nameLast,
+  if (instance.email != null) 'email': instance.email,
   'locale': instance.locale,
   'created_at': instance.createdAt.toIso8601String(),
   'updated_at': instance.updatedAt.toIso8601String(),

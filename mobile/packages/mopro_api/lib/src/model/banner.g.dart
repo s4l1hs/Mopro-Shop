@@ -43,8 +43,8 @@ Map<String, dynamic> _$BannerToJson(Banner instance) => <String, dynamic>{
   'placement': instance.placement,
   'image_url': instance.imageUrl,
   'action_type': _$BannerActionTypeEnumEnumMap[instance.actionType]!,
-  'action_url': ?instance.actionUrl,
-  'expires_at': ?instance.expiresAt?.toIso8601String(),
+  if (instance.actionUrl != null) 'action_url': instance.actionUrl,
+  if (instance.expiresAt?.toIso8601String() != null) 'expires_at': instance.expiresAt?.toIso8601String(),
 };
 
 const _$BannerActionTypeEnumEnumMap = {

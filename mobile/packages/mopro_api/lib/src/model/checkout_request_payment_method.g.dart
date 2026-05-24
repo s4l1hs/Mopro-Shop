@@ -29,7 +29,7 @@ Map<String, dynamic> _$CheckoutRequestPaymentMethodToJson(
   CheckoutRequestPaymentMethod instance,
 ) => <String, dynamic>{
   'type': _$CheckoutRequestPaymentMethodTypeEnumEnumMap[instance.type]!,
-  'saved_card_id': ?instance.savedCardId,
+  if (instance.savedCardId != null) 'saved_card_id': instance.savedCardId,
 };
 
 const _$CheckoutRequestPaymentMethodTypeEnumEnumMap = {

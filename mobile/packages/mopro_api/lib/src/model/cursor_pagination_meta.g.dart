@@ -26,5 +26,5 @@ Map<String, dynamic> _$CursorPaginationMetaToJson(
   CursorPaginationMeta instance,
 ) => <String, dynamic>{
   'has_more': instance.hasMore,
-  'next_cursor': ?instance.nextCursor,
+  if (instance.nextCursor != null) 'next_cursor': instance.nextCursor,
 };

@@ -68,7 +68,7 @@ Map<String, dynamic> _$ProductSummaryToJson(ProductSummary instance) =>
       'title': instance.title,
       'price_minor': instance.priceMinor,
       'price_currency': instance.priceCurrency,
-      'cover_image_url': ?instance.coverImageUrl,
+      if (instance.coverImageUrl != null) 'cover_image_url': instance.coverImageUrl,
       'cashback_preview': instance.cashbackPreview.toJson(),
     };
 

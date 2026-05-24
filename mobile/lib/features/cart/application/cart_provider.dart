@@ -104,7 +104,7 @@ class CartNotifier extends Notifier<CartState> {
       final repo = ref.read(cartRepositoryProvider);
       await repo.clear();
       state = state.copyWith(
-        cart: const AsyncData(CartDto.empty()),
+        cart: AsyncData(CartDto.empty()),
         isMutating: false,
       );
     } catch (_) {

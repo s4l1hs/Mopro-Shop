@@ -23,13 +23,11 @@ Widget _wrap(Widget child) => EasyLocalization(
 
 void main() {
   testWidgets('renders product title', (tester) async {
-    bool removeCalled = false;
-
     await tester.pumpWidget(
       _wrap(
         CartLineCard(
           line: _line(),
-          onRemove: () => removeCalled = true,
+          onRemove: () {},
           onDecrement: () {},
           onIncrement: () {},
         ),

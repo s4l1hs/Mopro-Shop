@@ -77,7 +77,7 @@ Map<String, dynamic> _$CashbackPlanToJson(CashbackPlan instance) =>
       'order_id': instance.orderId,
       'product_id': instance.productId,
       'product_title': instance.productTitle,
-      'product_image_url': ?instance.productImageUrl,
+      if (instance.productImageUrl != null) 'product_image_url': instance.productImageUrl,
       'monthly_amount_minor': instance.monthlyAmountMinor,
       'currency': instance.currency,
       'status': _$CashbackPlanStatusEnumEnumMap[instance.status]!,

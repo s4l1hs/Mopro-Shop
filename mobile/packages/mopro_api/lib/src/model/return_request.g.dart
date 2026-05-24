@@ -31,8 +31,8 @@ ReturnRequest _$ReturnRequestFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$ReturnRequestToJson(ReturnRequest instance) =>
     <String, dynamic>{
       'reason': _$ReturnRequestReasonEnumEnumMap[instance.reason]!,
-      'description': ?instance.description,
-      'items': ?instance.items?.map((e) => e.toJson()).toList(),
+      if (instance.description != null) 'description': instance.description,
+      if (instance.items?.map((e) => e.toJson()).toList() != null) 'items': instance.items?.map((e) => e.toJson()).toList(),
     };
 
 const _$ReturnRequestReasonEnumEnumMap = {

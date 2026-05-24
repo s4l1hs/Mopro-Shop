@@ -20,7 +20,7 @@ class RequestOtpRequest {
 
     required  this.phone,
 
-     this.purpose = const RequestOtpRequestPurposeEnum._('login'),
+     this.purpose = RequestOtpRequestPurposeEnum.login,
   });
 
       /// Turkish mobile number in E.164 format. Must start with +905.

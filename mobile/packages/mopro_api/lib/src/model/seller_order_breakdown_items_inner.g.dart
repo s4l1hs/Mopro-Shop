@@ -65,7 +65,7 @@ Map<String, dynamic> _$SellerOrderBreakdownItemsInnerToJson(
   'quantity': instance.quantity,
   'gross_minor': instance.grossMinor,
   'commission_minor': instance.commissionMinor,
-  'commission_pct': ?instance.commissionPct,
+  if (instance.commissionPct != null) 'commission_pct': instance.commissionPct,
   'kdv_minor': instance.kdvMinor,
   'service_fee_minor': instance.serviceFeeMinor,
   'net_minor': instance.netMinor,

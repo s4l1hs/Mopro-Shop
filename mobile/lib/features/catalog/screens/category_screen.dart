@@ -7,7 +7,6 @@ import 'package:mopro/core/widgets/empty_state.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/features/catalog/providers/categories_provider.dart';
 import 'package:mopro/features/catalog/widgets/category_grid.dart';
-import 'package:mopro_api/mopro_api.dart';
 
 class CategoryScreen extends ConsumerWidget {
   const CategoryScreen({super.key});

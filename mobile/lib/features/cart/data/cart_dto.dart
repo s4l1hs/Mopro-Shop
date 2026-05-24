@@ -19,7 +19,7 @@ class CartDto {
   final int kdvIncludedMinor;
 
   bool get isEmpty => lines.isEmpty;
-  bool get isAboveTotalLimit => grandTotalMinor >= 5_000_000; // ₺50,000 in minor units
+  bool get isAboveTotalLimit => grandTotalMinor >= 5000000; // ₺50,000 in minor units
   bool get isAtItemLimit => lines.length >= 50;
 
   factory CartDto.fromJson(Map<String, dynamic> json) => CartDto(

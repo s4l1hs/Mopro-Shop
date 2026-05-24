@@ -22,7 +22,7 @@ class VerifyOtpRequest {
 
     required  this.code,
 
-     this.purpose = const VerifyOtpRequestPurposeEnum._('login'),
+     this.purpose = VerifyOtpRequestPurposeEnum.login,
   });
 
   @JsonKey(
