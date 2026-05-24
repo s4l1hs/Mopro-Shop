@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { TokenPair } from "@/types/api";
 
-const API_BASE = process.env.API_BASE_URL ?? "http://localhost:8080";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 const ACCESS_TOKEN_MAX_AGE = 900;
 const REFRESH_TOKEN_MAX_AGE = 30 * 86400;
 const SECURE = process.env.NODE_ENV === "production";
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const upstream = await fetch(`${API_BASE}/v1/auth/refresh`, {
+    const upstream = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -65,7 +65,8 @@ export async function POST(req: NextRequest) {
     });
 
     return res;
-  } catch {
+  } catch (e) {
+    console.error("[refresh] upstream error:", e);
     return NextResponse.json(
       { error: { code: "network_error", message: "Backend unreachable" } },
       { status: 503 },

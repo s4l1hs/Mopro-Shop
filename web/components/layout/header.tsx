@@ -56,16 +56,16 @@ export function Header() {
               <Link href="/">{t("home")}</Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/kategoriler">{t("categories")}</Link>
+              <Link href="/categories">{t("categories")}</Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/hesabim/cuzdanim">{t("wallet")}</Link>
+              <Link href="/account/wallet">{t("wallet")}</Link>
             </Button>
           </nav>
 
           {/* Cart */}
           <Button variant="ghost" size="icon" asChild aria-label={t("cart")}>
-            <Link href="/sepet" className="relative">
+            <Link href="/cart" className="relative">
               <ShoppingCart className="h-5 w-5" />
               {itemCount > 0 && (
                 <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
@@ -77,7 +77,7 @@ export function Header() {
 
           {/* Account */}
           <Button variant="ghost" size="icon" asChild aria-label={t("profile")}>
-            <Link href="/hesabim">
+            <Link href="/account">
               <User className="h-5 w-5" />
             </Link>
           </Button>
@@ -93,9 +93,9 @@ export function Header() {
           <nav className="mt-6 flex flex-col gap-1">
             {[
               { href: "/", label: t("home") },
-              { href: "/kategoriler", label: t("categories") },
-              { href: "/hesabim/cuzdanim", label: t("wallet") },
-              { href: "/hesabim", label: t("profile") },
+              { href: "/categories", label: t("categories") },
+              { href: "/account/wallet", label: t("wallet") },
+              { href: "/account", label: t("profile") },
             ].map(({ href, label }) => (
               <Button
                 key={href}

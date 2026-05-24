@@ -17,10 +17,10 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: "/", icon: Home, labelKey: "home" },
-  { href: "/kategoriler", icon: Grid2x2, labelKey: "categories" },
-  { href: "/sepet", icon: ShoppingCart, labelKey: "cart", showBadge: true },
-  { href: "/hesabim/cuzdanim", icon: Wallet, labelKey: "wallet" },
-  { href: "/hesabim", icon: User, labelKey: "profile" },
+  { href: "/categories", icon: Grid2x2, labelKey: "categories" },
+  { href: "/cart", icon: ShoppingCart, labelKey: "cart", showBadge: true },
+  { href: "/account/wallet", icon: Wallet, labelKey: "wallet" },
+  { href: "/account", icon: User, labelKey: "profile" },
 ];
 
 export function MobileNav() {

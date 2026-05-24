@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_BASE = process.env.API_BASE_URL ?? "http://localhost:8080";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080";
 
 export async function POST(req: NextRequest) {
   const accessToken = req.cookies.get("mopro_at")?.value;
@@ -8,14 +8,15 @@ export async function POST(req: NextRequest) {
   // Best-effort: tell the backend to revoke the session
   if (accessToken) {
     try {
-      await fetch(`${API_BASE}/v1/auth/session`, {
+      await fetch(`${API_BASE}/auth/session`, {
         method: "DELETE",
         headers: {
           "Authorization": `Bearer ${accessToken}`,
           "Accept": "application/json",
         },
       });
-    } catch {
+    } catch (e) {
+    console.error("[logout] upstream error:", e);
       // ignore — we clear cookies regardless
     }
   }

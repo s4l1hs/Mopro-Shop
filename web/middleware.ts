@@ -5,9 +5,9 @@ import { routing } from "./i18n/routing";
 const intlMiddleware = createMiddleware(routing);
 
 // Routes that require authentication (matched after stripping locale prefix)
-const PROTECTED_PREFIXES = ["/hesabim", "/odeme"];
+const PROTECTED_PREFIXES = ["/account", "/checkout"];
 // Routes that are only for unauthenticated users
-const AUTH_ONLY_PREFIXES = ["/giris"];
+const AUTH_ONLY_PREFIXES = ["/login"];
 
 function stripLocale(pathname: string): string {
   return pathname.replace(/^\/(tr|en)(\/|$)/, "/");
@@ -24,7 +24,7 @@ export default function middleware(request: NextRequest): NextResponse {
   const stripped = stripLocale(pathname);
   const hasSession = request.cookies.has("mopro_s");
 
-  // Redirect authenticated users away from /giris
+  // Redirect authenticated users away from /login
   if (AUTH_ONLY_PREFIXES.some((p) => stripped.startsWith(p)) && hasSession) {
     const locale = pathname.startsWith("/en") ? "en" : "tr";
     const next = request.nextUrl.searchParams.get("next");
@@ -36,7 +36,7 @@ export default function middleware(request: NextRequest): NextResponse {
   if (PROTECTED_PREFIXES.some((p) => stripped.startsWith(p)) && !hasSession) {
     const locale = pathname.startsWith("/en") ? "en" : "tr";
     const next = encodeURIComponent(pathname);
-    const base = locale === "tr" ? "/giris" : "/en/giris";
+    const base = locale === "tr" ? "/login" : "/en/login";
     return NextResponse.redirect(new URL(`${base}?next=${next}`, request.url));
   }
 

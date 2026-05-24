@@ -7,20 +7,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ApiError } from "@/lib/api-client";
+import { formatTrPhoneForDisplay, normalizeTrPhone } from "@/lib/phone";
 
 type Step = "phone" | "otp";
 
 const OTP_RESEND_SECONDS = 60;
 const PHONE_PREFIX = "+90";
 
-// Normalise to E.164 (+90XXXXXXXXXX) for the API
-function toE164(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.startsWith("90") && digits.length === 12) return `+${digits}`;
-  if (digits.startsWith("0") && digits.length === 11) return `+90${digits.slice(1)}`;
-  if (digits.length === 10) return `+90${digits}`;
-  return `+90${digits}`;
-}
+// Digits must match /^5\d{9}$/ before submit is enabled
+const VALID_DIGITS_RE = /^5\d{9}$/;
 
 export default function GirisPage() {
   const t = useTranslations("auth");
@@ -29,7 +24,10 @@ export default function GirisPage() {
   const next = searchParams.get("next") ?? "/";
 
   const [step, setStep] = useState<Step>("phone");
-  const [phone, setPhone] = useState("");
+  // phoneDigits: raw 10-digit string used for validation and E.164 construction
+  const [phoneDigits, setPhoneDigits] = useState("");
+  // phoneDisplay: formatted "555 123 45 67" shown in the input
+  const [phoneDisplay, setPhoneDisplay] = useState("");
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,9 +55,35 @@ export default function GirisPage() {
     };
   }, []);
 
+  const applyDigits = (d: string) => {
+    const truncated = d.replace(/\D/g, "").slice(0, 10);
+    setPhoneDigits(truncated);
+    setPhoneDisplay(formatTrPhoneForDisplay(truncated));
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
+    applyDigits(e.currentTarget.value);
+  };
+
+  const handlePhonePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    setError(null);
+    const text = e.clipboardData.getData("text");
+    // Attempt full normalization first (strips country code, validates length)
+    const e164 = normalizeTrPhone(text);
+    if (e164) {
+      applyDigits(e164.slice(3)); // "+905551234567" → "5551234567"
+    } else {
+      // Fall back: strip non-digits and truncate to 10
+      applyDigits(text.replace(/\D/g, "").slice(0, 10));
+    }
+  };
+
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phone.trim()) return;
+    const e164 = normalizeTrPhone(phoneDigits);
+    if (!e164) return;
     setError(null);
     setLoading(true);
 
@@ -67,7 +91,7 @@ export default function GirisPage() {
       const res = await fetch("/api/auth/otp-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: toE164(phone), market: "TR" }),
+        body: JSON.stringify({ phone: e164, market: "TR" }),
       });
 
       if (!res.ok) {
@@ -96,6 +120,8 @@ export default function GirisPage() {
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (otp.length !== 6) return;
+    const e164 = normalizeTrPhone(phoneDigits);
+    if (!e164) return;
     setError(null);
     setLoading(true);
 
@@ -103,7 +129,7 @@ export default function GirisPage() {
       const res = await fetch("/api/auth/otp-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: toE164(phone), code: otp }),
+        body: JSON.stringify({ phone: e164, code: otp }),
       });
 
       if (!res.ok) {
@@ -123,7 +149,7 @@ export default function GirisPage() {
       toast.success("Giriş başarılı");
 
       if (!data.profile_complete) {
-        router.replace("/hesabim/profili-tamamla");
+        router.replace("/account/complete-profile");
       } else {
         router.replace(next);
       }
@@ -140,13 +166,15 @@ export default function GirisPage() {
 
   const handleResend = async () => {
     if (countdown > 0 || loading) return;
+    const e164 = normalizeTrPhone(phoneDigits);
+    if (!e164) return;
     setError(null);
     setLoading(true);
     try {
       const res = await fetch("/api/auth/otp-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: toE164(phone), market: "TR" }),
+        body: JSON.stringify({ phone: e164, market: "TR" }),
       });
       if (res.ok) {
         startCountdown();
@@ -159,6 +187,10 @@ export default function GirisPage() {
       setLoading(false);
     }
   };
+
+  // Show inline error when first digit is typed but is not 5
+  const showFirstDigitError = phoneDigits.length > 0 && !phoneDigits.startsWith("5");
+  const phoneValid = VALID_DIGITS_RE.test(phoneDigits);
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-sm flex-col items-center justify-center px-4 py-12">
@@ -182,19 +214,23 @@ export default function GirisPage() {
                   id="phone"
                   type="tel"
                   inputMode="numeric"
+                  pattern="[0-9]*"
                   autoComplete="tel"
                   placeholder={t("phone_hint")}
-                  value={phone}
-                  onChange={(e) => {
-                    setError(null);
-                    setPhone(e.target.value.replace(/[^\d\s]/g, ""));
-                  }}
+                  value={phoneDisplay}
+                  onChange={handlePhoneChange}
+                  onPaste={handlePhonePaste}
                   className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                   maxLength={13}
                   required
                   autoFocus
                 />
               </div>
+              {showFirstDigitError && (
+                <p role="alert" className="text-xs text-destructive">
+                  TR mobil numarası 5 ile başlamalı
+                </p>
+              )}
             </div>
 
             {error && (
@@ -203,7 +239,7 @@ export default function GirisPage() {
               </p>
             )}
 
-            <Button type="submit" disabled={loading || phone.trim().length < 10} className="w-full">
+            <Button type="submit" disabled={loading || !phoneValid} className="w-full">
               {loading ? "…" : t("send_otp")}
             </Button>
           </form>
@@ -212,7 +248,7 @@ export default function GirisPage() {
             <div>
               <h1 className="text-2xl font-bold text-foreground">{t("otp_title")}</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                {t("otp_subtitle", { phone: `${PHONE_PREFIX} ${phone}` })}
+                {t("otp_subtitle", { phone: `${PHONE_PREFIX} ${phoneDisplay}` })}
               </p>
             </div>
 
