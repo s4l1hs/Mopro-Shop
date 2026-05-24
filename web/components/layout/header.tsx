@@ -1,115 +1,110 @@
 "use client";
 
-import { Menu, Search, ShoppingCart, User } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { Heart, Search, ShoppingCart } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useCartStore } from "@/store/cart";
+import { cn } from "@/lib/utils";
+import { CategoryMegaMenu } from "./category-mega-menu";
+import { HeaderSearch } from "./header-search";
+import { HeaderUserMenu } from "./header-user-menu";
+import { MobileNavSheet } from "./mobile-nav-sheet";
 
 export function Header() {
-  const t = useTranslations("nav");
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const itemCount = useCartStore((s) => s.itemCount);
+  const [scrolled, setScrolled] = useState(false);
+  const cartCount = useCartStore((s) => s.itemCount);
+
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 0);
+    // Set initial state in case page loads mid-scroll
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
-        {/* Mobile hamburger */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="lg:hidden"
-          onClick={() => setMobileOpen(true)}
-          aria-label="Menüyü aç"
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
+    <header
+      className={cn(
+        "sticky top-0 z-50 w-full bg-background/95 backdrop-blur-sm transition-all duration-150",
+        scrolled
+          ? "border-b border-border shadow-sm"
+          : "border-b border-transparent",
+      )}
+    >
+      {/* ===== MAIN BAR ===== */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex h-14 lg:h-16 items-center gap-2 sm:gap-3">
+          {/* Mobile: hamburger sheet (self-contained trigger) */}
+          <MobileNavSheet />
 
-        {/* Logo */}
-        <Link
-          href="/"
-          className="text-xl font-bold tracking-tight text-primary"
-          aria-label="Mopro ana sayfa"
-        >
-          mopro
-        </Link>
+          {/* Logo */}
+          <Link
+            href="/"
+            className="shrink-0 text-xl font-bold tracking-tight text-primary"
+            aria-label="Mopro ana sayfa"
+          >
+            mopro
+          </Link>
 
-        {/* Desktop search (W2 placeholder) */}
-        <div className="hidden flex-1 lg:flex">
-          <div className="relative w-full max-w-lg">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="search"
-              placeholder={useTranslations("catalog")("search_hint")}
-              className="h-9 w-full rounded-md border border-input bg-muted pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              readOnly
-            />
+          {/* Desktop: flex-grow search bar */}
+          <div className="hidden lg:flex flex-1 mx-3">
+            <HeaderSearch className="w-full max-w-xl" />
           </div>
-        </div>
 
-        <div className="ml-auto flex items-center gap-1">
-          {/* Desktop nav links */}
-          <nav className="hidden items-center gap-1 lg:flex">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/">{t("home")}</Link>
-            </Button>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/categories">{t("categories")}</Link>
-            </Button>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/account/wallet">{t("wallet")}</Link>
-            </Button>
-          </nav>
+          {/* Spacer to push action icons right on mobile */}
+          <div className="flex-1 lg:hidden" />
 
-          {/* Cart */}
-          <Button variant="ghost" size="icon" asChild aria-label={t("cart")}>
-            <Link href="/cart" className="relative">
-              <ShoppingCart className="h-5 w-5" />
-              {itemCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                  {itemCount > 99 ? "99+" : itemCount}
-                </span>
-              )}
-            </Link>
-          </Button>
+          {/* Action icons */}
+          <div className="flex items-center gap-0.5">
+            {/* Desktop: ThemeToggle */}
+            <ThemeToggle className="hidden lg:inline-flex" />
 
-          {/* Account */}
-          <Button variant="ghost" size="icon" asChild aria-label={t("profile")}>
-            <Link href="/account">
-              <User className="h-5 w-5" />
-            </Link>
-          </Button>
+            {/* Mobile: search navigates to /search page */}
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Ara"
+              className="lg:hidden"
+              asChild
+            >
+              <Link href="/search">
+                <Search className="h-5 w-5" />
+              </Link>
+            </Button>
+
+            {/* Wishlist (stub — U5 adds wishlist) */}
+            <Button variant="ghost" size="icon" aria-label="Favoriler" asChild>
+              <Link href="/account/wishlist">
+                <Heart className="h-5 w-5" />
+              </Link>
+            </Button>
+
+            {/* Cart with badge */}
+            <Button variant="ghost" size="icon" aria-label="Sepet" asChild>
+              <Link href="/cart" className="relative">
+                <ShoppingCart className="h-5 w-5" />
+                {cartCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+                    {cartCount > 99 ? "99+" : cartCount}
+                  </span>
+                )}
+              </Link>
+            </Button>
+
+            {/* Desktop: user menu (login or account dropdown) */}
+            <HeaderUserMenu className="hidden lg:flex" />
+          </div>
         </div>
       </div>
 
-      {/* Mobile nav sheet */}
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="left">
-          <SheetHeader>
-            <SheetTitle className="text-primary">mopro</SheetTitle>
-          </SheetHeader>
-          <nav className="mt-6 flex flex-col gap-1">
-            {[
-              { href: "/", label: t("home") },
-              { href: "/categories", label: t("categories") },
-              { href: "/account/wallet", label: t("wallet") },
-              { href: "/account", label: t("profile") },
-            ].map(({ href, label }) => (
-              <Button
-                key={href}
-                variant="ghost"
-                className="justify-start"
-                asChild
-                onClick={() => setMobileOpen(false)}
-              >
-                <Link href={href}>{label}</Link>
-              </Button>
-            ))}
-          </nav>
-        </SheetContent>
-      </Sheet>
+      {/* ===== CATEGORY STRIP (desktop only) ===== */}
+      <div className="hidden lg:block border-t border-border/40">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <CategoryMegaMenu />
+        </div>
+      </div>
     </header>
   );
 }

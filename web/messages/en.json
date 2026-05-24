@@ -44,7 +44,19 @@
     "categories": "Categories",
     "cart": "Cart",
     "wallet": "Wallet",
-    "profile": "Profile"
+    "profile": "Profile",
+    "login": "Sign In",
+    "logout": "Sign Out",
+    "search_placeholder": "Search products, categories or brands...",
+    "theme_toggle": "Light / Dark",
+    "new_arrivals": "New Arrivals",
+    "bestsellers": "Best Sellers",
+    "discounts": "Discounts",
+    "wishlist": "Wishlist",
+    "my_account": "My Account",
+    "my_orders": "My Orders",
+    "my_addresses": "My Addresses",
+    "my_wallet": "My Wallet"
   },
   "home": {
     "title": "Discover"
@@ -274,6 +286,20 @@
     "kvkk": "Your personal data is protected under KVKK.",
     "privacy": "Privacy Policy",
     "terms": "Terms of Service",
-    "rights": "© 2026 Mopro. All rights reserved."
+    "rights": "© 2026 Mopro. All rights reserved.",
+    "about": "About Mopro",
+    "about_us": "About Us",
+    "careers": "Careers",
+    "blog": "Blog",
+    "help": "Help",
+    "faq": "FAQ",
+    "contact": "Contact",
+    "returns": "Returns & Exchanges",
+    "legal": "Legal",
+    "cookie_policy": "Cookie Policy",
+    "follow_us": "Follow Us",
+    "newsletter_placeholder": "Your email address",
+    "newsletter_submit": "Subscribe",
+    "copyright": "© 2026 Mopro Ticaret A.Ş. All rights reserved."
   }
 }

@@ -44,7 +44,19 @@
     "categories": "Kategoriler",
     "cart": "Sepet",
     "wallet": "Cüzdan",
-    "profile": "Profil"
+    "profile": "Profil",
+    "login": "Giriş Yap",
+    "logout": "Çıkış Yap",
+    "search_placeholder": "Ürün, kategori veya marka ara...",
+    "theme_toggle": "Açık / Koyu",
+    "new_arrivals": "Yeni Gelenler",
+    "bestsellers": "Çok Satanlar",
+    "discounts": "İndirimler",
+    "wishlist": "Favoriler",
+    "my_account": "Hesabım",
+    "my_orders": "Siparişlerim",
+    "my_addresses": "Adreslerim",
+    "my_wallet": "Cüzdanım"
   },
   "home": {
     "title": "Keşfet"
@@ -274,6 +286,20 @@
     "kvkk": "Kişisel verileriniz KVKK kapsamında korunmaktadır.",
     "privacy": "Gizlilik Politikası",
     "terms": "Kullanım Koşulları",
-    "rights": "© 2026 Mopro. Tüm hakları saklıdır."
+    "rights": "© 2026 Mopro. Tüm hakları saklıdır.",
+    "about": "Mopro Hakkında",
+    "about_us": "Hakkımızda",
+    "careers": "Kariyer",
+    "blog": "Blog",
+    "help": "Yardım",
+    "faq": "Sıkça Sorulan Sorular",
+    "contact": "İletişim",
+    "returns": "İade & Değişim",
+    "legal": "Hukuk",
+    "cookie_policy": "Çerez Politikası",
+    "follow_us": "Bizi Takip Et",
+    "newsletter_placeholder": "E-posta adresiniz",
+    "newsletter_submit": "Kayıt Ol",
+    "copyright": "© 2026 Mopro Ticaret A.Ş. Tüm hakları saklıdır."
   }
 }
