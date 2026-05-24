@@ -16,7 +16,7 @@ export function checkoutTest() {
   // POST with a fake reservation ID — tests the full auth + validation path.
   // 400/422 = expected (reservation not found or validation error).
   const res = http.post(
-    `${BASE_URL}/v1/checkout/initiate`,
+    `${BASE_URL}/checkout/initiate`,
     JSON.stringify({
       reservation_id: 'load-test-fake-reservation-000',
       market:         'TR',

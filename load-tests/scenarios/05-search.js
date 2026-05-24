@@ -1,6 +1,6 @@
 /**
  * S5 — Search (Postgres tsvector / Meilisearch hit).
- * Tests /v1/search?q=<term> with common Turkish fashion queries.
+ * Tests /search?q=<term> with common Turkish fashion queries.
  * No auth required. Expected: 200.
  */
 import http from 'k6/http';
@@ -17,7 +17,7 @@ const QUERIES = [
 export function searchTest() {
   const q = QUERIES[(__VU + __ITER) % QUERIES.length];
   const res = http.get(
-    `${BASE_URL}/v1/search?q=${encodeURIComponent(q)}&limit=20`,
+    `${BASE_URL}/search?q=${encodeURIComponent(q)}&limit=20`,
     readParams(null),
   );
 

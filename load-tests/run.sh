@@ -69,7 +69,7 @@ import json, urllib.request, urllib.error, sys, os
 
 tf  = '$TOKENS_FILE'
 rf  = '$REFRESH_FILE'
-url = '$BASE_URL/v1/auth/token/refresh'
+url = '$BASE_URL/auth/token/refresh'
 
 refreshes = json.load(open(rf))
 tokens    = json.load(open(tf)) if os.path.exists(tf) else {}
@@ -126,7 +126,7 @@ fi
 hdr "Refreshing OTPs for S2 (otp-verify)"
 OTPS_FILE="$LOAD_TESTS_DIR/.otps.json"
 
-echo '[]' > "$OTPS_FILE"  # default: empty → S2 falls back to /v1/me
+echo '[]' > "$OTPS_FILE"  # default: empty → S2 falls back to /me
 
 otp_refreshed=0
 otp_failed=0
@@ -136,7 +136,7 @@ for i in $(seq 0 19); do
   phone="+9055500$(printf '%05d' $i)"
 
   http_code=$(curl -s \
-    -X POST "$BASE_URL/v1/auth/otp/request" \
+    -X POST "$BASE_URL/auth/otp/request" \
     -H "Content-Type: application/json" \
     -d "{\"phone\":\"$phone\",\"purpose\":\"login\"}" \
     -w "%{http_code}" -o /dev/null 2>/dev/null || echo "000")

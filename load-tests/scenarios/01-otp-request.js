@@ -1,6 +1,6 @@
 /**
  * S1 — OTP Request burst (auth pre-warm).
- * Tests /v1/auth/otp/request under concurrent load.
+ * Tests /auth/otp/request under concurrent load.
  * Each VU uses its own phone number so rate limiting doesn't interfere.
  * Expected: 204 (success) or 429 (rate limited — rate limiter is working).
  */
@@ -20,7 +20,7 @@ export function otpRequestTest() {
   };
 
   const res = http.post(
-    `${BASE_URL}/v1/auth/otp/request`,
+    `${BASE_URL}/auth/otp/request`,
     JSON.stringify({ phone, purpose: 'login' }),
     params,
   );

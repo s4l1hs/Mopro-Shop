@@ -28,7 +28,7 @@ export function addressesTest() {
 
   // ── CREATE ──────────────────────────────────────────────────────────────────
   const createRes = http.post(
-    `${BASE_URL}/v1/addresses`,
+    `${BASE_URL}/addresses`,
     JSON.stringify(testAddress(phone)),
     writeParams(token, newIdempotencyKey()),
   );
@@ -49,13 +49,13 @@ export function addressesTest() {
   sleep(0.1);
 
   // ── LIST ────────────────────────────────────────────────────────────────────
-  const listRes = http.get(`${BASE_URL}/v1/addresses`, readParams(token));
+  const listRes = http.get(`${BASE_URL}/addresses`, readParams(token));
   assertResponse(listRes, 200, 'address-list');
 
   sleep(0.1);
 
   // ── GET ONE ─────────────────────────────────────────────────────────────────
-  const getRes = http.get(`${BASE_URL}/v1/addresses/${addrId}`, readParams(token));
+  const getRes = http.get(`${BASE_URL}/addresses/${addrId}`, readParams(token));
   assertResponse(getRes, 200, 'address-get');
 
   sleep(0.1);
@@ -63,7 +63,7 @@ export function addressesTest() {
   // ── UPDATE ──────────────────────────────────────────────────────────────────
   const updated = { ...testAddress(phone), label: 'Load Test Address Updated' };
   const putRes = http.put(
-    `${BASE_URL}/v1/addresses/${addrId}`,
+    `${BASE_URL}/addresses/${addrId}`,
     JSON.stringify(updated),
     writeParams(token, newIdempotencyKey()),
   );
@@ -73,7 +73,7 @@ export function addressesTest() {
 
   // ── DELETE ──────────────────────────────────────────────────────────────────
   const delRes = http.del(
-    `${BASE_URL}/v1/addresses/${addrId}`,
+    `${BASE_URL}/addresses/${addrId}`,
     null,
     writeParams(token, null),
   );

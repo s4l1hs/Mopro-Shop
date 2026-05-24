@@ -50,7 +50,7 @@ if [[ -f "$TOKENS_FILE" ]]; then
     if [[ -n "$first_token" ]]; then
       http_code=$(curl -sf -o /dev/null -w "%{http_code}" \
         -H "Authorization: Bearer $first_token" \
-        "$BASE_URL/v1/me" 2>/dev/null || echo "000")
+        "$BASE_URL/me" 2>/dev/null || echo "000")
       if [[ "$http_code" == "200" ]]; then
         ok "Tokens valid ($existing users in $TOKENS_FILE). Skipping re-provisioning."
         ok "Run with FORCE_REPROVISION=1 to force a fresh setup."
@@ -80,7 +80,7 @@ for i in $(seq 0 $((COUNT-1))); do
   # NOTE: use -s (silent) but NOT -f (fail) so curl still outputs the HTTP code
   # for 4xx responses without the error code being swallowed.
   http_code=$(curl -s \
-    -X POST "$BASE_URL/v1/auth/otp/request" \
+    -X POST "$BASE_URL/auth/otp/request" \
     -H "Content-Type: application/json" \
     -d "{\"phone\":\"$phone\",\"purpose\":\"login\"}" \
     -w "%{http_code}" -o /dev/null 2>/dev/null || echo "000")
@@ -90,7 +90,7 @@ for i in $(seq 0 $((COUNT-1))); do
     sleep "${BATCH_WAIT_SECONDS:-3600}"
     # Retry once after waiting
     http_code=$(curl -s \
-      -X POST "$BASE_URL/v1/auth/otp/request" \
+      -X POST "$BASE_URL/auth/otp/request" \
       -H "Content-Type: application/json" \
       -d "{\"phone\":\"$phone\",\"purpose\":\"login\"}" \
       -w "%{http_code}" -o /dev/null 2>/dev/null || echo "000")
@@ -120,7 +120,7 @@ for i in $(seq 0 $((COUNT-1))); do
 
   # ── 3. OTP verify ───────────────────────────────────────────────────────────
   resp=$(curl -s \
-    -X POST "$BASE_URL/v1/auth/otp/verify" \
+    -X POST "$BASE_URL/auth/otp/verify" \
     -H "Content-Type: application/json" \
     -H "Idempotency-Key: setup-verify-$(printf '%05d' $i)-$$" \
     -d "{\"phone\":\"$phone\",\"code\":\"$code\",\"purpose\":\"login\"}" \
@@ -141,7 +141,7 @@ for i in $(seq 0 $((COUNT-1))); do
   # ── 4. Create test address ───────────────────────────────────────────────────
   addr_body="{\"label\":\"Load Test\",\"name\":\"Test Kullanici\",\"phone\":\"$phone\",\"full_address\":\"Test Cad. No:1\",\"city\":\"Istanbul\",\"district\":\"Kadikoy\",\"postal_code\":\"34710\"}"
   addr_code=$(curl -s \
-    -X POST "$BASE_URL/v1/addresses" \
+    -X POST "$BASE_URL/addresses" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer $access_token" \
     -H "Idempotency-Key: setup-addr-$(printf '%05d' $i)-$$" \

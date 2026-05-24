@@ -16,7 +16,7 @@ export function cartTest() {
 
   // ── ADD ITEM (non-existent variant — tests middleware chain) ─────────────
   const addRes = http.post(
-    `${BASE_URL}/v1/cart/items`,
+    `${BASE_URL}/cart/items`,
     JSON.stringify({ variant_id: 999999, qty: 1 }),
     {
       ...writeParams(token, newIdempotencyKey()),
@@ -29,14 +29,14 @@ export function cartTest() {
   sleep(0.1);
 
   // ── GET CART (always 200, may be empty) ──────────────────────────────────
-  const getRes = http.get(`${BASE_URL}/v1/cart`, readParams(token));
+  const getRes = http.get(`${BASE_URL}/cart`, readParams(token));
   assertResponse(getRes, 200, 'cart-get');
 
   sleep(0.1);
 
   // ── RESERVE (empty cart → 422 Unprocessable) ─────────────────────────────
   const reserveRes = http.post(
-    `${BASE_URL}/v1/cart/reserve`,
+    `${BASE_URL}/cart/reserve`,
     '{}',
     {
       ...writeParams(token, newIdempotencyKey()),

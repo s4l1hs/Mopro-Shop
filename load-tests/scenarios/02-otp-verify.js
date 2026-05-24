@@ -18,7 +18,7 @@ export function otpVerifyTest() {
   if (otp) {
     // Fresh OTP available: test the full verify endpoint.
     const res = http.post(
-      `${BASE_URL}/v1/auth/otp/verify`,
+      `${BASE_URL}/auth/otp/verify`,
       JSON.stringify({ phone: otp.phone, code: otp.code, purpose: 'login' }),
       writeParams(null, newIdempotencyKey()),
     );
@@ -28,7 +28,7 @@ export function otpVerifyTest() {
     // This exercises the same JWT verification middleware path.
     const { token } = getAuth();
     const res = http.get(
-      `${BASE_URL}/v1/me`,
+      `${BASE_URL}/me`,
       { headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }, tags: { type: 'read' } },
     );
     // 200 means token valid; 401 means expired (setup.sh needs re-run).

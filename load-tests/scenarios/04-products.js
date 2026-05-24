@@ -1,6 +1,6 @@
 /**
  * S4 — Products list (read, may return empty data pre-catalog-seed).
- * Tests /v1/products?category_id=1 — validates the DB path and response
+ * Tests /products?category_id=1 — validates the DB path and response
  * shape even when no products exist yet.
  * No auth required. Expected: 200.
  */
@@ -15,7 +15,7 @@ const CATEGORY_IDS = [1, 2, 3, 4, 5, 6, 7, 8];
 export function productsTest() {
   const catId = CATEGORY_IDS[__VU % CATEGORY_IDS.length];
   const res = http.get(
-    `${BASE_URL}/v1/products?category_id=${catId}&limit=20`,
+    `${BASE_URL}/products?category_id=${catId}&limit=20`,
     readParams(null),
   );
 
