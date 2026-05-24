@@ -15,7 +15,7 @@ const STATUS_CONFIG: Record<
   },
   shipped: {
     label: "Kargoda",
-    className: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
+    className: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
   },
   delivered: {
     label: "Teslim edildi",
