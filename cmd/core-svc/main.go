@@ -24,6 +24,7 @@ import (
 	"github.com/mopro/platform/internal/identity"
 	"github.com/mopro/platform/internal/identity/cleanup"
 	identityjwt "github.com/mopro/platform/internal/identity/jwt"
+	"github.com/mopro/platform/internal/idempotency"
 	"github.com/mopro/platform/internal/identity/middleware"
 	"github.com/mopro/platform/internal/identity/ratelimit"
 	"github.com/mopro/platform/internal/identity/sms"
@@ -437,9 +438,14 @@ func main() {
 		httpTrace(http.HandlerFunc(handleShippingWebhook(shippingSvc, "hepsijet"))),
 	)
 
+	idemMW := idempotency.New(
+		idempotency.NewRedisStore(rc),
+		middleware.UserIDFromCtx,
+	)
+
 	srv := &http.Server{
 		Addr:         ":8080",
-		Handler:      mux,
+		Handler:      idemMW.Wrap(mux),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -602,9 +608,6 @@ func handleCreateProduct(svc catalog.Service, defaultCurrency, defaultLocale str
 			return
 		}
 
-		// Header presence is enforced above (requireIdempotencyKey → 422 if missing).
-		// TODO(idempotency-sprint): add dedup store so a repeated Idempotency-Key
-		// returns the cached previous response instead of re-running CreateProduct.
 		p, err := svc.CreateProduct(r.Context(), req)
 		if err != nil {
 			if errors.Is(err, catalog.ErrInvalidCurrency) {
