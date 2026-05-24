@@ -1,15 +1,19 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/utils/coin_formatter.dart';
-import 'package:mopro/core/widgets/empty_state.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/catalog/providers/product_detail_provider.dart';
+import 'package:mopro/features/catalog/providers/products_rail_provider.dart';
+import 'package:mopro/features/catalog/widgets/pdp_image_gallery.dart';
+import 'package:mopro/features/catalog/widgets/product_card.dart';
+import 'package:mopro/features/favorites/favorites_provider.dart';
+import 'package:mopro/utils/money.dart';
+import 'package:mopro/widgets/skeleton_box.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 class ProductDetailScreen extends ConsumerWidget {
@@ -21,29 +25,33 @@ class ProductDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(productDetailProvider(productId));
 
-    return Scaffold(
-      appBar: AppBar(),
-      body: state.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) {
-          final appError = err is AppError
-              ? err
-              : UnknownError(statusCode: 0, message: err.toString());
-          if (appError is NotFoundError) {
-            return EmptyState.notFound();
-          }
-          return Padding(
+    return state.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (err, _) {
+        final appError = err is AppError
+            ? err
+            : UnknownError(statusCode: 0, message: err.toString());
+        if (appError is NotFoundError) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(child: Text('Ürün bulunamadı.')),
+          );
+        }
+        return Scaffold(
+          appBar: AppBar(),
+          body: Padding(
             padding: const EdgeInsets.all(16),
             child: ErrorBanner(
               error: appError,
-              onRetry: () => ref
-                  .read(productDetailProvider(productId).notifier)
-                  .refresh(),
+              onRetry: () =>
+                  ref.read(productDetailProvider(productId).notifier).refresh(),
             ),
-          );
-        },
-        data: (product) => _ProductDetailBody(product: product),
-      ),
+          ),
+        );
+      },
+      data: (product) => _ProductDetailBody(product: product),
     );
   }
 }
@@ -54,134 +62,102 @@ class _ProductDetailBody extends ConsumerStatefulWidget {
   final Product product;
 
   @override
-  ConsumerState<_ProductDetailBody> createState() =>
-      _ProductDetailBodyState();
+  ConsumerState<_ProductDetailBody> createState() => _ProductDetailBodyState();
 }
 
-class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody> {
+class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
   Variant? _selectedVariant;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
     if (widget.product.variants.isNotEmpty) {
       _selectedVariant = widget.product.variants.first;
     }
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final product = widget.product;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final isMutating = ref.watch(cartProvider).isMutating;
-
-    final coverUrl = _selectedVariant?.imageUrls.firstOrNull ??
-        product.variants.firstOrNull?.imageUrls.firstOrNull;
+    final isFav = ref.watch(isFavoriteProvider(product.id));
+    final imageUrls = (_selectedVariant?.imageUrls.isNotEmpty ?? false)
+        ? _selectedVariant!.imageUrls
+        : product.variants.firstOrNull?.imageUrls ?? [];
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: AspectRatio(
-              aspectRatio: 1,
-              child: coverUrl != null && coverUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: coverUrl,
-                      fit: BoxFit.cover,
-                      errorWidget: (_, __, ___) => _placeholder(colorScheme),
-                    )
-                  : _placeholder(colorScheme),
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            expandedHeight: MediaQuery.of(context).size.width,
+            pinned: true,
+            stretch: true,
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            actions: [
+              IconButton(
+                icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
+                onPressed: () =>
+                    ref.read(favoritesProvider.notifier).toggle(product.id),
+              ),
+              const SizedBox(width: 4),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              background: PdpImageGallery(
+                imageUrls: imageUrls,
+                heroTag: 'product-image-${product.id}',
+              ),
             ),
           ),
           SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.title,
-                    style: theme.textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'product.sold_by'.tr(
-                      namedArgs: {'seller': product.sellerName},
-                    ),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (_selectedVariant != null)
-                    Text(
-                      NumberFormat.currency(
-                        locale: 'tr_TR',
-                        symbol: '₺',
-                        decimalDigits: 2,
-                      ).format(_selectedVariant!.priceMinor / 100.0),
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                  const SizedBox(height: 16),
-                  _CashbackPreviewCard(preview: product.cashbackPreview),
-                  const SizedBox(height: 16),
-                  if (product.variants.length > 1) ...[
-                    Text(
-                      'product.select_variant'.tr(),
-                      style: theme.textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: product.variants.map((v) {
-                        final selected = _selectedVariant?.id == v.id;
-                        return FilterChip(
-                          label: Text(_variantLabel(v)),
-                          selected: selected,
-                          onSelected: (_) =>
-                              setState(() => _selectedVariant = v),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  Text(
-                    product.description,
-                    style: theme.textTheme.bodyMedium,
-                  ),
+            child: _BuyBox(
+              product: product,
+              selectedVariant: _selectedVariant,
+              onVariantChanged: (v) =>
+                  setState(() => _selectedVariant = v),
+            ),
+          ),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _TabBarDelegate(
+              TabBar(
+                controller: _tabController,
+                tabs: [
+                  Tab(text: 'product.description_tab'.tr()),
+                  Tab(text: 'product.specs_tab'.tr()),
+                  Tab(text: 'product.reviews_tab'.tr()),
+                  Tab(text: 'product.qa_tab'.tr()),
                 ],
               ),
             ),
           ),
-          const SliverToBoxAdapter(child: SizedBox(height: 96)),
         ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: FilledButton(
-            onPressed: _selectedVariant != null && !isMutating
-                ? () => _addToCart(context)
-                : null,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            _DescriptionTab(
+              description: product.description,
+              productId: product.id,
             ),
-            child: isMutating
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Text('product.add_to_cart'.tr()),
-          ),
+            const _StubTab(),
+            const _StubTab(),
+            const _StubTab(),
+          ],
         ),
+      ),
+      bottomNavigationBar: _StickyBuyBar(
+        selectedVariant: _selectedVariant,
+        isMutating: isMutating,
+        onAddToCart: () => _addToCart(context),
       ),
     );
   }
@@ -214,11 +190,76 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody> {
       }
     }
   }
+}
 
-  Widget _placeholder(ColorScheme cs) => Container(
-        color: cs.surfaceContainerHighest,
-        child: Icon(Icons.image_outlined, size: 64, color: cs.outlineVariant),
-      );
+// ── Buy Box ────────────────────────────────────────────────────────────────────
+
+class _BuyBox extends StatelessWidget {
+  const _BuyBox({
+    required this.product,
+    required this.selectedVariant,
+    required this.onVariantChanged,
+  });
+
+  final Product product;
+  final Variant? selectedVariant;
+  final ValueChanged<Variant> onVariantChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(product.title, style: theme.textTheme.titleLarge),
+          const SizedBox(height: 4),
+          Text(
+            'product.sold_by'.tr(namedArgs: {'seller': product.sellerName}),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          if (selectedVariant != null) ...[
+            Text(
+              MoneyUtils.formatMinor(selectedVariant!.priceMinor),
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            _StockPill(stock: selectedVariant!.stock),
+          ],
+          const SizedBox(height: 16),
+          _CashbackCard(preview: product.cashbackPreview),
+          if (product.variants.length > 1) ...[
+            const SizedBox(height: 16),
+            Text(
+              'product.select_variant'.tr(),
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: product.variants.map((v) {
+                final selected = selectedVariant?.id == v.id;
+                return FilterChip(
+                  label: Text(_variantLabel(v)),
+                  selected: selected,
+                  onSelected: (_) => onVariantChanged(v),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   String _variantLabel(Variant v) {
     final parts = <String>[];
@@ -228,18 +269,82 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody> {
   }
 }
 
-class _CashbackPreviewCard extends StatelessWidget {
-  const _CashbackPreviewCard({required this.preview});
+class _StockPill extends StatelessWidget {
+  const _StockPill({required this.stock});
 
-  final CashbackPreview preview;
+  final int stock;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
+    if (stock <= 0) {
+      return _Pill(
+        label: 'product.out_of_stock'.tr(),
+        color: colorScheme.errorContainer,
+        textColor: colorScheme.onErrorContainer,
+      );
+    }
+    if (stock <= 5) {
+      return _Pill(
+        label: 'product.low_stock'.tr(namedArgs: {'count': stock.toString()}),
+        color: colorScheme.tertiaryContainer,
+        textColor: colorScheme.onTertiaryContainer,
+      );
+    }
+    return _Pill(
+      label: 'product.in_stock'.tr(),
+      color: colorScheme.secondaryContainer,
+      textColor: colorScheme.onSecondaryContainer,
+    );
+  }
+}
+
+class _Pill extends StatelessWidget {
+  const _Pill({
+    required this.label,
+    required this.color,
+    required this.textColor,
+  });
+
+  final String label;
+  final Color color;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context)
+            .textTheme
+            .labelSmall
+            ?.copyWith(color: textColor),
+      ),
+    );
+  }
+}
+
+class _CashbackCard extends StatelessWidget {
+  const _CashbackCard({required this.preview});
+
+  final CashbackPreview preview;
+
+  @override
+  Widget build(BuildContext context) {
+    if (preview.monthlyCoinMinor <= 0) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(12),
@@ -249,9 +354,12 @@ class _CashbackPreviewCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.currency_exchange,
-                  color: colorScheme.onPrimaryContainer, size: 18),
-              const SizedBox(width: 8),
+              Icon(
+                Icons.currency_exchange,
+                size: 16,
+                color: colorScheme.onPrimaryContainer,
+              ),
+              const SizedBox(width: 6),
               Text(
                 'cashback.preview_title'.tr(),
                 style: theme.textTheme.titleSmall?.copyWith(
@@ -261,7 +369,7 @@ class _CashbackPreviewCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             'cashback.cashback_preview'.tr(
               namedArgs: {
@@ -272,9 +380,8 @@ class _CashbackPreviewCard extends StatelessWidget {
                 ),
               },
             ),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onPrimaryContainer,
-            ),
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: colorScheme.onPrimaryContainer),
           ),
           const SizedBox(height: 4),
           Text(
@@ -284,6 +391,187 @@ class _CashbackPreviewCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Tab bar delegate ─────────────────────────────────────────────────────────
+
+class _TabBarDelegate extends SliverPersistentHeaderDelegate {
+  const _TabBarDelegate(this.tabBar);
+
+  final TabBar tabBar;
+
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surface,
+      child: tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_TabBarDelegate old) => old.tabBar != tabBar;
+}
+
+// ── Tab contents ─────────────────────────────────────────────────────────────
+
+class _DescriptionTab extends ConsumerWidget {
+  const _DescriptionTab({
+    required this.description,
+    required this.productId,
+  });
+
+  final String description;
+  final int productId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final relatedAsync = ref.watch(productsRailProvider('recommended'));
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: MarkdownBody(data: description),
+          ),
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 4, 8),
+            child: Text(
+              'product.related_title'.tr(),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.bold),
+            ),
+          ),
+          SizedBox(
+            height: 258,
+            child: relatedAsync.when(
+              loading: () => ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: 4,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, __) => const SizedBox(
+                  width: 152,
+                  child: SkeletonProductCard(),
+                ),
+              ),
+              error: (_, __) => const SizedBox.shrink(),
+              data: (products) {
+                final filtered =
+                    products.where((p) => p.id != productId).take(4).toList();
+                if (filtered.isEmpty) return const SizedBox.shrink();
+                return ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, i) {
+                    final p = filtered[i];
+                    return SizedBox(
+                      width: 152,
+                      child: ProductCard(
+                        product: p,
+                        onTap: () => context.push('/products/${p.id}'),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}
+
+class _StubTab extends StatelessWidget {
+  const _StubTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(
+        'common.loading'.tr(),
+        style: Theme.of(context)
+            .textTheme
+            .bodyMedium
+            ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
+    );
+  }
+}
+
+// ── Sticky buy bar ────────────────────────────────────────────────────────────
+
+class _StickyBuyBar extends StatelessWidget {
+  const _StickyBuyBar({
+    required this.selectedVariant,
+    required this.isMutating,
+    required this.onAddToCart,
+  });
+
+  final Variant? selectedVariant;
+  final bool isMutating;
+  final VoidCallback onAddToCart;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Row(
+          children: [
+            if (selectedVariant != null) ...[
+              Text(
+                MoneyUtils.formatMinor(selectedVariant!.priceMinor),
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: FilledButton(
+                onPressed:
+                    selectedVariant != null && !isMutating ? onAddToCart : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
+                child: isMutating
+                    ? const SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text('product.add_to_cart'.tr()),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

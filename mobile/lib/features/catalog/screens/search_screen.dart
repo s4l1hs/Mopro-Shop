@@ -2,96 +2,176 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:mopro/core/network/app_error.dart';
-import 'package:mopro/core/widgets/empty_state.dart';
-import 'package:mopro/core/widgets/error_banner.dart';
+import 'package:mopro/features/catalog/providers/categories_provider.dart';
+import 'package:mopro/features/catalog/providers/recent_searches_provider.dart';
 import 'package:mopro/features/catalog/providers/search_provider.dart';
-import 'package:mopro/features/catalog/widgets/product_grid.dart';
 import 'package:mopro/features/catalog/widgets/search_input.dart';
+import 'package:mopro/features/catalog/widgets/sort_sheet.dart';
+import 'package:mopro/widgets/catalog/catalog_shell.dart';
 
-class SearchScreen extends ConsumerWidget {
+class SearchScreen extends ConsumerStatefulWidget {
   const SearchScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends ConsumerState<SearchScreen> {
+  final _searchController = TextEditingController();
+  String _sort = 'recommended';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(searchProvider);
+    final recent = ref.watch(recentSearchesProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: SearchInput(
-          onChanged: ref.read(searchProvider.notifier).setQuery,
+          controller: _searchController,
+          onChanged: (q) {
+            ref.read(searchProvider.notifier).setQuery(q);
+            if (q.trim().length > 1) {
+              ref.read(recentSearchesProvider.notifier).add(q.trim());
+            }
+          },
           autofocus: true,
         ),
         titleSpacing: 0,
       ),
       body: state.isEmpty
-          ? EmptyState.empty()
-          : state.results.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
-              error: (err, _) {
-                final appError = err is AppError
-                    ? err
-                    : UnknownError(statusCode: 0, message: err.toString());
-                return Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: ErrorBanner(
-                    error: appError,
-                    onRetry: () => ref
-                        .read(searchProvider.notifier)
-                        .setQuery(state.query),
-                  ),
-                );
+          ? _EmptySearchBody(
+              recent: recent,
+              onSelectRecent: (q) {
+                _searchController.text = q;
+                ref.read(searchProvider.notifier).setQuery(q);
               },
-              data: (results) {
-                if (results.isEmpty) {
-                  return EmptyState.notFound();
-                }
-                return CustomScrollView(
-                  slivers: [
-                    SliverPadding(
-                      padding: const EdgeInsets.all(12),
-                      sliver: ProductGrid(
-                        products: results,
-                        onProductTap: (p) =>
-                            context.push('/products/${p.id}'),
+            )
+          : CatalogShell(
+              products: state.results.valueOrNull ?? [],
+              isLoading: state.results.isLoading,
+              hasMore: state.hasMore,
+              loadingMore: state.loadingMore,
+              loadMoreError: state.loadMoreError,
+              onLoadMore: () =>
+                  ref.read(searchProvider.notifier).loadMore(),
+              currentSort: _sort,
+              onSort: _showSortSheet,
+            ),
+    );
+  }
+
+  Future<void> _showSortSheet() async {
+    final selected = await showSortSheet(context, current: _sort);
+    if (selected != null && selected != _sort) {
+      setState(() => _sort = selected);
+    }
+  }
+}
+
+class _EmptySearchBody extends ConsumerWidget {
+  const _EmptySearchBody({
+    required this.recent,
+    required this.onSelectRecent,
+  });
+
+  final List<String> recent;
+  final ValueChanged<String> onSelectRecent;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (recent.isNotEmpty) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'search.recent_searches'.tr(),
+                  style: theme.textTheme.titleSmall,
+                ),
+                TextButton(
+                  onPressed: () =>
+                      ref.read(recentSearchesProvider.notifier).clear(),
+                  child: Text('search.clear_recent'.tr()),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: recent
+                  .map(
+                    (q) => InputChip(
+                      label: Text(q),
+                      onPressed: () => onSelectRecent(q),
+                      onDeleted: () =>
+                          ref.read(recentSearchesProvider.notifier).remove(q),
+                      deleteIcon: const Icon(Icons.close, size: 14),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 24),
+          ],
+          const _CategorySuggestions(),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategorySuggestions extends ConsumerWidget {
+  const _CategorySuggestions();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final categoriesState = ref.watch(categoriesProvider);
+
+    return categoriesState.categories.maybeWhen(
+      data: (cats) {
+        final roots = cats.where((c) => c.parentId == null).take(8).toList();
+        if (roots.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'search.suggested_categories'.tr(),
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: roots
+                  .map(
+                    (cat) => ActionChip(
+                      label: Text(cat.name),
+                      onPressed: () => context.push(
+                        '/categories/${cat.id}',
+                        extra: cat.name,
                       ),
                     ),
-                    if (state.hasMore)
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Center(
-                            child: state.loadingMore
-                                ? const CircularProgressIndicator()
-                                : OutlinedButton(
-                                    onPressed: () => ref
-                                        .read(searchProvider.notifier)
-                                        .loadMore(),
-                                    child: Text('catalog.load_more'.tr()),
-                                  ),
-                          ),
-                        ),
-                      ),
-                    if (state.loadMoreError != null)
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: ErrorBanner(
-                            error: state.loadMoreError!,
-                            onRetry: () =>
-                                ref
-                                    .read(searchProvider.notifier)
-                                    .loadMore(),
-                          ),
-                        ),
-                      ),
-                    const SliverToBoxAdapter(
-                        child: SizedBox(height: 24)),
-                  ],
-                );
-              },
+                  )
+                  .toList(),
             ),
+          ],
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
     );
   }
 }

@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 class SearchInput extends StatefulWidget {
   const SearchInput({
     required this.onChanged,
+    this.controller,
     this.autofocus = false,
     super.key,
   });
 
   final ValueChanged<String> onChanged;
+  final TextEditingController? controller;
   final bool autofocus;
 
   @override
@@ -16,11 +18,25 @@ class SearchInput extends StatefulWidget {
 }
 
 class _SearchInputState extends State<SearchInput> {
-  final _controller = TextEditingController();
+  late final TextEditingController _controller;
+  late final bool _ownsController;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.controller != null) {
+      _controller = widget.controller!;
+      _ownsController = false;
+    } else {
+      _controller = TextEditingController();
+      _ownsController = true;
+    }
+    _controller.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (_ownsController) _controller.dispose();
     super.dispose();
   }
 
@@ -28,7 +44,7 @@ class _SearchInputState extends State<SearchInput> {
   Widget build(BuildContext context) {
     return SearchBar(
       controller: _controller,
-      hintText: 'catalog.search_hint'.tr(),
+      hintText: 'search.hint'.tr(),
       leading: const Icon(Icons.search),
       trailing: [
         if (_controller.text.isNotEmpty)

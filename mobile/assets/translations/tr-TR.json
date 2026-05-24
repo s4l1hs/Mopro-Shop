@@ -42,24 +42,73 @@
   "nav": {
     "home": "Ana Sayfa",
     "categories": "Kategoriler",
+    "favorites": "Favorilerim",
     "cart": "Sepet",
+    "account": "Hesabım",
     "wallet": "Cüzdan",
     "profile": "Profil"
   },
   "home": {
-    "title": "Keşfet"
+    "title": "Keşfet",
+    "categories_title": "Kategoriler",
+    "section_recommended": "Senin için seçtiklerimiz",
+    "section_bestsellers": "Çok satanlar",
+    "section_newest": "Yeni gelenler",
+    "see_all": "Tümünü gör",
+    "trust_free_shipping": "Ücretsiz Kargo",
+    "trust_secure_payment": "Güvenli Ödeme",
+    "trust_easy_return": "Kolay İade",
+    "trust_perpetual_cashback": "Sürekli Cashback"
   },
   "catalog": {
     "categories": "Kategoriler",
     "search_hint": "Ürün ara...",
     "filter": "Filtrele",
     "sort": "Sırala",
-    "load_more": "Daha fazla yükle"
+    "load_more": "Daha fazla yükle",
+    "sort_title": "Sırala",
+    "filter_title": "Filtrele",
+    "sort_recommended": "Önerilen",
+    "sort_bestseller": "Çok satanlar",
+    "sort_newest": "En yeniler",
+    "sort_price_asc": "Fiyat: Düşükten Yükseğe",
+    "sort_price_desc": "Fiyat: Yüksekten Düşüğe",
+    "sort_cashback_desc": "En Yüksek Cashback",
+    "filter_price_range": "Fiyat Aralığı",
+    "filter_min_price": "Min",
+    "filter_max_price": "Max",
+    "filter_free_shipping": "Ücretsiz Kargo",
+    "filter_in_stock": "Stokta Var",
+    "filter_cashback_only": "Sadece Cashback'li Ürünler",
+    "filter_apply": "Uygula",
+    "filter_reset": "Sıfırla"
+  },
+  "search": {
+    "hint": "Ürün, marka veya kategori ara...",
+    "recent_searches": "Son Aramalar",
+    "clear_recent": "Temizle",
+    "suggested_categories": "Kategoriler"
   },
   "empty_state": {
     "empty_message": "Henüz içerik yok",
     "error_message": "Bir hata oluştu. Lütfen tekrar deneyin.",
     "not_found_message": "Aradığınız ürün bulunamadı."
+  },
+  "favorites": {
+    "title": "Favorilerim",
+    "empty_title": "Henüz favori yok",
+    "empty_subtitle": "Beğendiğin ürünleri favorilere ekle"
+  },
+  "account": {
+    "title": "Hesabım",
+    "orders": "Siparişlerim",
+    "wallet": "Cüzdanım",
+    "profile": "Profil",
+    "addresses": "Adreslerim",
+    "cards": "Kartlarım",
+    "security": "Güvenlik",
+    "logout": "Çıkış Yap",
+    "logout_confirm": "Çıkış yapmak istediğinizden emin misiniz?"
   },
   "address": {
     "list_title": "Adreslerim",
@@ -90,8 +139,15 @@
     "stock_left": "Son {count} ürün",
     "select_variant": "Seçenek",
     "added_to_cart": "Sepete eklendi",
-    "out_of_stock": "Stok yetersiz",
-    "cart_limit_exceeded": "Sepet limiti aşıldı"
+    "out_of_stock": "Stok yok",
+    "in_stock": "Stokta",
+    "low_stock": "Son {count} adet",
+    "cart_limit_exceeded": "Sepet limiti aşıldı",
+    "description_tab": "Açıklama",
+    "specs_tab": "Özellikler",
+    "reviews_tab": "Değerlendirmeler",
+    "qa_tab": "Soru & Cevap",
+    "related_title": "Benzer Ürünler"
   },
   "cashback": {
     "preview_title": "Mopro Cashback",

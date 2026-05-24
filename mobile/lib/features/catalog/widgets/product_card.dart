@@ -1,7 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:mopro/features/catalog/widgets/cashback_chip.dart';
+import 'package:mopro/utils/money.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 class ProductCard extends StatelessWidget {
@@ -18,10 +18,7 @@ class ProductCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final price = product.priceMinor / 100.0;
-    final priceStr =
-        NumberFormat.currency(locale: 'tr_TR', symbol: '₺', decimalDigits: 2)
-            .format(price);
+    final priceStr = MoneyUtils.formatMinor(product.priceMinor);
 
     return GestureDetector(
       onTap: onTap,
@@ -32,22 +29,25 @@ class ProductCard extends StatelessWidget {
           children: [
             AspectRatio(
               aspectRatio: 1,
-              child: product.coverImageUrl != null &&
-                      product.coverImageUrl!.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: product.coverImageUrl!,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(
-                        color: colorScheme.surfaceContainerHighest,
-                        child: const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
+              child: Hero(
+                tag: 'product-image-${product.id}',
+                child: product.coverImageUrl != null &&
+                        product.coverImageUrl!.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: product.coverImageUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          color: colorScheme.surfaceContainerHighest,
+                          child: const Center(
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
                         ),
-                      ),
-                      errorWidget: (_, __, ___) => _PlaceholderImage(
-                        colorScheme: colorScheme,
-                      ),
-                    )
-                  : _PlaceholderImage(colorScheme: colorScheme),
+                        errorWidget: (_, __, ___) => _PlaceholderImage(
+                          colorScheme: colorScheme,
+                        ),
+                      )
+                    : _PlaceholderImage(colorScheme: colorScheme),
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(8),
