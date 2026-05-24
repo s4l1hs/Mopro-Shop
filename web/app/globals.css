@@ -55,6 +55,37 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
+  /* Dark mode token overrides — applied when <html class="dark"> via next-themes */
+  .dark {
+    --color-background: oklch(0.11 0.015 264);
+    --color-foreground: oklch(0.985 0.002 264);
+
+    --color-card: oklch(0.155 0.015 264);
+    --color-card-foreground: oklch(0.985 0.002 264);
+
+    --color-popover: oklch(0.155 0.015 264);
+    --color-popover-foreground: oklch(0.985 0.002 264);
+
+    --color-primary: oklch(0.68 0.17 264.3);
+    --color-primary-foreground: oklch(0.11 0 0);
+
+    --color-secondary: oklch(0.2 0.02 264);
+    --color-secondary-foreground: oklch(0.9 0.003 264);
+
+    --color-muted: oklch(0.18 0.012 264);
+    --color-muted-foreground: oklch(0.6 0.008 264);
+
+    --color-accent: oklch(0.2 0.015 264);
+    --color-accent-foreground: oklch(0.9 0 0);
+
+    --color-destructive: oklch(0.55 0.22 27.3);
+    --color-destructive-foreground: oklch(0.985 0 0);
+
+    --color-border: oklch(0.25 0.015 264);
+    --color-input: oklch(0.25 0.015 264);
+    --color-ring: oklch(0.68 0.17 264.3);
+  }
+
   /* Mobile bottom nav safe area */
   .pb-safe {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
