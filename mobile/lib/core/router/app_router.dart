@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
-import 'package:mopro/core/widgets/bottom_nav_shell.dart';
+import 'package:mopro/features/account/account_screen.dart';
 import 'package:mopro/features/address/screens/address_form_screen.dart';
 import 'package:mopro/features/address/screens/address_list_screen.dart';
 import 'package:mopro/features/auth/login_screen.dart';
@@ -20,20 +20,22 @@ import 'package:mopro/features/checkout/presentation/checkout_3ds_webview_screen
 import 'package:mopro/features/checkout/presentation/checkout_address_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_payment_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_result_screen.dart';
+import 'package:mopro/features/favorites/favorites_screen.dart';
 import 'package:mopro/features/order/presentation/order_detail_screen.dart';
 import 'package:mopro/features/order/presentation/order_history_screen.dart';
-import 'package:mopro/features/profile/profile_tab_screen.dart';
 import 'package:mopro/features/wallet/plan_detail_screen.dart';
-import 'package:mopro_api/mopro_api.dart';
 import 'package:mopro/features/wallet/wallet_screen.dart';
+import 'package:mopro/shell/app_shell.dart';
+import 'package:mopro_api/mopro_api.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 final _homeNavKey = GlobalKey<NavigatorState>(debugLabel: 'homeNav');
 final _categoriesNavKey =
     GlobalKey<NavigatorState>(debugLabel: 'categoriesNav');
+final _favoritesNavKey =
+    GlobalKey<NavigatorState>(debugLabel: 'favoritesNav');
 final _cartNavKey = GlobalKey<NavigatorState>(debugLabel: 'cartNav');
-final _walletNavKey = GlobalKey<NavigatorState>(debugLabel: 'walletNav');
-final _profileNavKey = GlobalKey<NavigatorState>(debugLabel: 'profileNav');
+final _accountNavKey = GlobalKey<NavigatorState>(debugLabel: 'accountNav');
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -48,9 +50,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loc = state.matchedLocation;
       final isAuthRoute = loc.startsWith('/auth');
 
+      // Guard: /checkout and /account/* require authentication
+      final needsAuth = loc.startsWith('/checkout') ||
+          loc.startsWith('/account') ||
+          loc == '/wallet' ||
+          loc.startsWith('/wallet/');
+
       return switch (auth) {
-        null || AuthUnauthenticated() =>
-          isAuthRoute ? null : '/auth/phone',
+        null || AuthUnauthenticated() => isAuthRoute
+            ? null
+            : needsAuth
+                ? '/auth/phone?next=${Uri.encodeComponent(loc)}'
+                : '/auth/phone',
         AuthProfileIncomplete() =>
           loc == '/auth/profile' ? null : '/auth/profile',
         AuthAuthenticated() => isAuthRoute ? '/' : null,
@@ -135,6 +146,28 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      // ── Wallet (root-level; accessible from account screen) ────────────────
+      GoRoute(
+        path: '/wallet',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, __) => const WalletScreen(),
+        routes: [
+          GoRoute(
+            path: 'plans/:id',
+            builder: (_, state) {
+              final raw = state.pathParameters['id'];
+              final planId = raw != null ? int.tryParse(raw) : null;
+              if (planId == null || planId <= 0) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => rootNavigatorKey.currentContext?.go('/wallet'),
+                );
+                return const WalletScreen();
+              }
+              return PlanDetailScreen(planId: planId);
+            },
+          ),
+        ],
+      ),
       // ── Checkout overlay (full-screen above nav shell) ──────────────────────
       GoRoute(
         path: '/checkout',
@@ -181,8 +214,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+      // ── Bottom nav shell — 5 tabs: home / categories / favorites / cart / account
       StatefulShellRoute.indexedStack(
-        builder: (_, __, shell) => BottomNavShell(navigationShell: shell),
+        builder: (_, __, shell) => AppShell(navigationShell: shell),
         branches: [
           StatefulShellBranch(
             navigatorKey: _homeNavKey,
@@ -203,6 +237,15 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
+            navigatorKey: _favoritesNavKey,
+            routes: [
+              GoRoute(
+                path: '/favorites',
+                builder: (_, __) => const FavoritesScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
             navigatorKey: _cartNavKey,
             routes: [
               GoRoute(
@@ -212,38 +255,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             ],
           ),
           StatefulShellBranch(
-            navigatorKey: _walletNavKey,
+            navigatorKey: _accountNavKey,
             routes: [
               GoRoute(
-                path: '/wallet',
-                builder: (_, __) => const WalletScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'plans/:id',
-                    builder: (_, state) {
-                      final raw = state.pathParameters['id'];
-                      final planId =
-                          raw != null ? int.tryParse(raw) : null;
-                      if (planId == null || planId <= 0) {
-                        WidgetsBinding.instance.addPostFrameCallback(
-                          (_) =>
-                              _walletNavKey.currentContext?.go('/wallet'),
-                        );
-                        return const WalletScreen();
-                      }
-                      return PlanDetailScreen(planId: planId);
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            navigatorKey: _profileNavKey,
-            routes: [
-              GoRoute(
-                path: '/profile',
-                builder: (_, __) => const ProfileTabScreen(),
+                path: '/account',
+                builder: (_, __) => const AccountScreen(),
               ),
             ],
           ),

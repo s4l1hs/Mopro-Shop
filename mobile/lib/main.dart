@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mopro/app.dart';
 import 'package:mopro/core/di/providers.dart';
+import 'package:mopro/design/theme_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Injected at build time via --dart-define-from-file=dart_defines/dev.json
 const _apiBaseUrl = String.fromEnvironment(
@@ -14,6 +16,7 @@ const _apiBaseUrl = String.fromEnvironment(
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await EasyLocalization.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
   await Future.wait([
     initializeDateFormatting('tr_TR'),
     initializeDateFormatting('en_US'),
@@ -32,6 +35,7 @@ void main() async {
       child: ProviderScope(
         overrides: [
           apiBaseUrlProvider.overrideWithValue(_apiBaseUrl),
+          sharedPreferencesProvider.overrideWithValue(prefs),
         ],
         child: const MoproApp(),
       ),
