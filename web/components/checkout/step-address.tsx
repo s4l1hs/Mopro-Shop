@@ -27,9 +27,11 @@ export type AddressFormValues = z.infer<typeof addressSchema>;
 interface StepAddressProps {
   defaultValues?: Partial<AddressFormValues> | undefined;
   onNext: (values: AddressFormValues) => void;
+  submitLabel?: string | undefined;
+  onCancel?: (() => void) | undefined;
 }
 
-export function StepAddress({ defaultValues, onNext }: StepAddressProps) {
+export function StepAddress({ defaultValues, onNext, submitLabel, onCancel }: StepAddressProps) {
   const {
     register,
     handleSubmit,
@@ -117,9 +119,14 @@ export function StepAddress({ defaultValues, onNext }: StepAddressProps) {
         />
       </Field>
 
-      <div className="pt-2">
+      <div className="pt-2 flex gap-2">
+        {onCancel && (
+          <Button type="button" variant="outline" onClick={onCancel}>
+            İptal
+          </Button>
+        )}
         <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
-          Devam et — Ödeme
+          {submitLabel ?? "Devam et — Ödeme"}
         </Button>
       </div>
     </form>

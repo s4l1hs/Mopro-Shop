@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import { Heart } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useIsFavorite, useFavoritesStore } from "@/lib/favorites/favorites-store";
 import { CashbackChip } from "./cashback-chip";
 import { PriceDisplay } from "./price-display";
 
@@ -33,6 +33,9 @@ export function ProductCard({
   currency = "TRY",
   className,
 }: ProductCardProps) {
+  const numericId = Number(id);
+  const isFavorite = useIsFavorite(numericId);
+  const toggle = useFavoritesStore((s) => s.toggle);
   const href = slug ? `/products/${id}/${slug}` : `/products/${id}`;
 
   return (
@@ -63,19 +66,21 @@ export function ProductCard({
           {/* Heart button */}
           <button
             type="button"
-            aria-label="Favorilere ekle"
+            aria-label={isFavorite ? "Favorilerden çıkar" : "Favorilere ekle"}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              toast("Yakında — favorilere ekle özelliği");
+              toggle(numericId);
             }}
             className={cn(
               "absolute top-2 right-2 flex items-center justify-center p-1.5 rounded-full",
-              "bg-background/80 backdrop-blur-sm text-foreground/70 hover:text-foreground",
-              "transition-colors",
+              "bg-background/80 backdrop-blur-sm transition-colors",
+              isFavorite
+                ? "text-red-500 hover:text-red-600"
+                : "text-foreground/70 hover:text-foreground",
             )}
           >
-            <Heart className="h-4 w-4" />
+            <Heart className={cn("h-4 w-4", isFavorite && "fill-current")} />
           </button>
         </div>
 
