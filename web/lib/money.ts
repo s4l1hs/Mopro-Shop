@@ -36,7 +36,7 @@ export function formatPrice(minor: number, currency = "TRY"): string {
 // commission_minor = round(price * commission_pct_bps / 10000)
 // yearly_yield = round(commission_minor * 5000 / 10000)  [reference_interest_rate = 5000 bps = 50%]
 // monthly_coin = round(yearly_yield / 12)
-// Inlined: monthly = round(price * commission_pct_bps / 240000)
+// Inlined: monthly = round(price * commission_pct_bps / 156000)
 export function cashbackMonthlyMinor(priceMinor: number, commissionPctBps: number): number {
-  return Math.round((priceMinor * commissionPctBps) / 240_000);
+  return Math.floor((priceMinor * commissionPctBps) / 156_000);
 }
