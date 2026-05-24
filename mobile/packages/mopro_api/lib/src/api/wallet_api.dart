@@ -44,7 +44,7 @@ class WalletApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/wallet/balance';
+    final _path = r'/wallet/balance';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -131,7 +131,7 @@ _responseData = rawData == null ? null : deserialize<WalletBalance, WalletBalanc
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/wallet/transactions';
+    final _path = r'/wallet/transactions';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{

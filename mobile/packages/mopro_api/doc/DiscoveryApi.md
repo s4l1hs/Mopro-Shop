@@ -9,8 +9,8 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**listBanners**](DiscoveryApi.md#listbanners) | **GET** /v1/banners | Promotional banners for a given placement
-[**listRecommendations**](DiscoveryApi.md#listrecommendations) | **GET** /v1/recommendations | Personalised product recommendations for the authenticated user
+[**listBanners**](DiscoveryApi.md#listbanners) | **GET** /banners | Promotional banners for a given placement
+[**listRecommendations**](DiscoveryApi.md#listrecommendations) | **GET** /recommendations | Personalised product recommendations for the authenticated user
 
 
 # **listBanners**

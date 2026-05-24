@@ -47,7 +47,7 @@ class AddressApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/addresses';
+    final _path = r'/addresses';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -148,7 +148,7 @@ _responseData = rawData == null ? null : deserialize<Address, Address>(rawData, 
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/addresses/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/addresses/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'DELETE',
       headers: <String, dynamic>{
@@ -203,7 +203,7 @@ _responseData = rawData == null ? null : deserialize<Address, Address>(rawData, 
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/addresses';
+    final _path = r'/addresses';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -287,7 +287,7 @@ _responseData = rawData == null ? null : deserialize<ListAddresses200Response, L
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/addresses/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/addresses/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'PUT',
       headers: <String, dynamic>{

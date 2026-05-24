@@ -7,7 +7,7 @@ void main() {
   // TODO add properties to the entity
 
   group(Reservation, () {
-    // Reservation ID; pass to POST /v1/orders or POST /v1/orders/checkout
+    // Reservation ID; pass to POST /orders or POST /orders/checkout
     // String id
     test('to test the property `id`', () async {
       // TODO

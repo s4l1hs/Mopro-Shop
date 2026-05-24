@@ -45,7 +45,7 @@ class SellerApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/seller/orders/{id}/breakdown'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/seller/orders/{id}/breakdown'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{

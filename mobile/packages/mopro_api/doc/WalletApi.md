@@ -9,8 +9,8 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**getWalletBalance**](WalletApi.md#getwalletbalance) | **GET** /v1/wallet/balance | Get the authenticated user&#39;s coin wallet balance
-[**listWalletTransactions**](WalletApi.md#listwallettransactions) | **GET** /v1/wallet/transactions | List wallet transaction history (cursor-paginated)
+[**getWalletBalance**](WalletApi.md#getwalletbalance) | **GET** /wallet/balance | Get the authenticated user&#39;s coin wallet balance
+[**listWalletTransactions**](WalletApi.md#listwallettransactions) | **GET** /wallet/transactions | List wallet transaction history (cursor-paginated)
 
 
 # **getWalletBalance**

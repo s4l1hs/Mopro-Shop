@@ -1,6 +1,6 @@
 import 'package:mopro/features/order/data/order_dto.dart';
 
-/// Response from POST /v1/checkout/initiate.
+/// Response from POST /checkout/initiate.
 ///
 /// The backend Phase 4.5a returns:
 ///   session_id     — checkout session identifier

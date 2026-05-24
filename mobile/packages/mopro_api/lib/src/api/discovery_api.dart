@@ -44,7 +44,7 @@ class DiscoveryApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/banners';
+    final _path = r'/banners';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -127,7 +127,7 @@ _responseData = rawData == null ? null : deserialize<ListBanners200Response, Lis
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/recommendations';
+    final _path = r'/recommendations';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{

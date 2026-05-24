@@ -49,7 +49,7 @@ class MeApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/me';
+    final _path = r'/me';
     final _options = Options(
       method: r'DELETE',
       headers: <String, dynamic>{
@@ -122,7 +122,7 @@ _bodyData=jsonEncode(deleteMeRequest);
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/me';
+    final _path = r'/me';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -204,7 +204,7 @@ _responseData = rawData == null ? null : deserialize<User, User>(rawData, 'User'
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/me/devices';
+    final _path = r'/me/devices';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -305,7 +305,7 @@ _responseData = rawData == null ? null : deserialize<Device, Device>(rawData, 'D
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/me/devices/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/me/devices/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'DELETE',
       headers: <String, dynamic>{
@@ -364,7 +364,7 @@ _responseData = rawData == null ? null : deserialize<Device, Device>(rawData, 'D
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/me';
+    final _path = r'/me';
     final _options = Options(
       method: r'PATCH',
       headers: <String, dynamic>{

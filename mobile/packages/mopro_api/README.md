@@ -24,7 +24,7 @@ to a `stepUpAuth` endpoint returns `403` with `code: step_up_required`.
 Client flow:
 1. Receive `403 step_up_required`.
 2. Present OTP entry screen.
-3. `POST /v1/auth/step-up` with access token + fresh OTP code → `step_up_token`.
+3. `POST /auth/step-up` with access token + fresh OTP code → `step_up_token`.
 4. Retry the original request with `Authorization: Bearer <step_up_token>`.
 
 ## X-Trace-Id
@@ -39,9 +39,9 @@ the cached response without re-executing the operation.
 
 ## Binary routing
 Caddy routes by path prefix:
-- `/v1/wallet/_*` → fin-svc
-- `/v1/cashback/_*` → fin-svc
-- All other `/v1/_*` → core-svc
+- `/wallet/_*` → fin-svc
+- `/cashback/_*` → fin-svc
+- All other `/_*` → core-svc
 See `deploy/CADDY-ROUTING.md` for the authoritative mapping.
 
 
@@ -112,54 +112,54 @@ All URIs are relative to *https://api.moproshop.com*
 
 Class | Method | HTTP request | Description
 ------------ | ------------- | ------------- | -------------
-[*AddressApi*](doc/AddressApi.md) | [**createAddress**](doc/AddressApi.md#createaddress) | **POST** /v1/addresses | Add a new delivery address
-[*AddressApi*](doc/AddressApi.md) | [**deleteAddress**](doc/AddressApi.md#deleteaddress) | **DELETE** /v1/addresses/{id} | Delete an address
-[*AddressApi*](doc/AddressApi.md) | [**listAddresses**](doc/AddressApi.md#listaddresses) | **GET** /v1/addresses | List the authenticated user&#39;s delivery addresses
-[*AddressApi*](doc/AddressApi.md) | [**updateAddress**](doc/AddressApi.md#updateaddress) | **PUT** /v1/addresses/{id} | Update an existing address
-[*AdminApi*](doc/AdminApi.md) | [**createOrder**](doc/AdminApi.md#createorder) | **POST** /v1/orders | Create an order from a reservation (admin / internal)
-[*AdminApi*](doc/AdminApi.md) | [**createProduct**](doc/AdminApi.md#createproduct) | **POST** /v1/products | Create a new product listing (admin / seller onboarding)
-[*AdminApi*](doc/AdminApi.md) | [**getCategoryCommission**](doc/AdminApi.md#getcategorycommission) | **GET** /v1/categories/{id}/commission | Get live commission and KDV rates for a category + market pair
-[*AdminApi*](doc/AdminApi.md) | [**refundOrder**](doc/AdminApi.md#refundorder) | **POST** /v1/orders/{id}/refund | Trigger a full refund for a delivered order (admin only)
-[*AuthApi*](doc/AuthApi.md) | [**logout**](doc/AuthApi.md#logout) | **POST** /v1/auth/logout | Revoke the provided refresh token
-[*AuthApi*](doc/AuthApi.md) | [**refreshToken**](doc/AuthApi.md#refreshtoken) | **POST** /v1/auth/token/refresh | Exchange a refresh token for a new token pair
-[*AuthApi*](doc/AuthApi.md) | [**requestOtp**](doc/AuthApi.md#requestotp) | **POST** /v1/auth/otp/request | Request a one-time password via SMS
-[*AuthApi*](doc/AuthApi.md) | [**stepUp**](doc/AuthApi.md#stepup) | **POST** /v1/auth/step-up | Exchange access token + fresh OTP for a step-up token (TTL 5 min)
-[*AuthApi*](doc/AuthApi.md) | [**verifyOtp**](doc/AuthApi.md#verifyotp) | **POST** /v1/auth/otp/verify | Verify OTP and issue access + refresh token pair
-[*CartApi*](doc/CartApi.md) | [**addCartItem**](doc/CartApi.md#addcartitem) | **POST** /v1/cart/items | Add a variant to the cart; returns the updated enriched cart
-[*CartApi*](doc/CartApi.md) | [**getCart**](doc/CartApi.md#getcart) | **GET** /v1/cart | Get the authenticated user&#39;s cart (enriched with product data)
-[*CartApi*](doc/CartApi.md) | [**releaseCart**](doc/CartApi.md#releasecart) | **POST** /v1/cart/release | Release an active reservation (cancel checkout flow)
-[*CartApi*](doc/CartApi.md) | [**removeCartItem**](doc/CartApi.md#removecartitem) | **DELETE** /v1/cart/items/{variant_id} | Remove a variant from the cart
-[*CartApi*](doc/CartApi.md) | [**reserveCart**](doc/CartApi.md#reservecart) | **POST** /v1/cart/reserve | Reserve inventory for all cart items before checkout
-[*CashbackApi*](doc/CashbackApi.md) | [**getCashbackPlan**](doc/CashbackApi.md#getcashbackplan) | **GET** /v1/cashback/plans/{id} | Get a single cashback plan
-[*CashbackApi*](doc/CashbackApi.md) | [**listCashbackPayments**](doc/CashbackApi.md#listcashbackpayments) | **GET** /v1/cashback/plans/{id}/payments | List monthly payment history for a cashback plan (cursor-paginated)
-[*CashbackApi*](doc/CashbackApi.md) | [**listCashbackPlans**](doc/CashbackApi.md#listcashbackplans) | **GET** /v1/cashback/plans | List the authenticated user&#39;s perpetual cashback plans
-[*CatalogApi*](doc/CatalogApi.md) | [**createProduct**](doc/CatalogApi.md#createproduct) | **POST** /v1/products | Create a new product listing (admin / seller onboarding)
-[*CatalogApi*](doc/CatalogApi.md) | [**getCategoryCommission**](doc/CatalogApi.md#getcategorycommission) | **GET** /v1/categories/{id}/commission | Get live commission and KDV rates for a category + market pair
-[*CatalogApi*](doc/CatalogApi.md) | [**getProduct**](doc/CatalogApi.md#getproduct) | **GET** /v1/products/{id} | Get full product detail including variants and cashback preview
-[*CatalogApi*](doc/CatalogApi.md) | [**listCategories**](doc/CatalogApi.md#listcategories) | **GET** /v1/categories | List all 42 product categories (locale-resolved names)
-[*CatalogApi*](doc/CatalogApi.md) | [**listProducts**](doc/CatalogApi.md#listproducts) | **GET** /v1/products | List products with optional category filter, pagination, and sort
-[*DiscoveryApi*](doc/DiscoveryApi.md) | [**listBanners**](doc/DiscoveryApi.md#listbanners) | **GET** /v1/banners | Promotional banners for a given placement
-[*DiscoveryApi*](doc/DiscoveryApi.md) | [**listRecommendations**](doc/DiscoveryApi.md#listrecommendations) | **GET** /v1/recommendations | Personalised product recommendations for the authenticated user
+[*AddressApi*](doc/AddressApi.md) | [**createAddress**](doc/AddressApi.md#createaddress) | **POST** /addresses | Add a new delivery address
+[*AddressApi*](doc/AddressApi.md) | [**deleteAddress**](doc/AddressApi.md#deleteaddress) | **DELETE** /addresses/{id} | Delete an address
+[*AddressApi*](doc/AddressApi.md) | [**listAddresses**](doc/AddressApi.md#listaddresses) | **GET** /addresses | List the authenticated user&#39;s delivery addresses
+[*AddressApi*](doc/AddressApi.md) | [**updateAddress**](doc/AddressApi.md#updateaddress) | **PUT** /addresses/{id} | Update an existing address
+[*AdminApi*](doc/AdminApi.md) | [**createOrder**](doc/AdminApi.md#createorder) | **POST** /orders | Create an order from a reservation (admin / internal)
+[*AdminApi*](doc/AdminApi.md) | [**createProduct**](doc/AdminApi.md#createproduct) | **POST** /products | Create a new product listing (admin / seller onboarding)
+[*AdminApi*](doc/AdminApi.md) | [**getCategoryCommission**](doc/AdminApi.md#getcategorycommission) | **GET** /categories/{id}/commission | Get live commission and KDV rates for a category + market pair
+[*AdminApi*](doc/AdminApi.md) | [**refundOrder**](doc/AdminApi.md#refundorder) | **POST** /orders/{id}/refund | Trigger a full refund for a delivered order (admin only)
+[*AuthApi*](doc/AuthApi.md) | [**logout**](doc/AuthApi.md#logout) | **POST** /auth/logout | Revoke the provided refresh token
+[*AuthApi*](doc/AuthApi.md) | [**refreshToken**](doc/AuthApi.md#refreshtoken) | **POST** /auth/token/refresh | Exchange a refresh token for a new token pair
+[*AuthApi*](doc/AuthApi.md) | [**requestOtp**](doc/AuthApi.md#requestotp) | **POST** /auth/otp/request | Request a one-time password via SMS
+[*AuthApi*](doc/AuthApi.md) | [**stepUp**](doc/AuthApi.md#stepup) | **POST** /auth/step-up | Exchange access token + fresh OTP for a step-up token (TTL 5 min)
+[*AuthApi*](doc/AuthApi.md) | [**verifyOtp**](doc/AuthApi.md#verifyotp) | **POST** /auth/otp/verify | Verify OTP and issue access + refresh token pair
+[*CartApi*](doc/CartApi.md) | [**addCartItem**](doc/CartApi.md#addcartitem) | **POST** /cart/items | Add a variant to the cart; returns the updated enriched cart
+[*CartApi*](doc/CartApi.md) | [**getCart**](doc/CartApi.md#getcart) | **GET** /cart | Get the authenticated user&#39;s cart (enriched with product data)
+[*CartApi*](doc/CartApi.md) | [**releaseCart**](doc/CartApi.md#releasecart) | **POST** /cart/release | Release an active reservation (cancel checkout flow)
+[*CartApi*](doc/CartApi.md) | [**removeCartItem**](doc/CartApi.md#removecartitem) | **DELETE** /cart/items/{variant_id} | Remove a variant from the cart
+[*CartApi*](doc/CartApi.md) | [**reserveCart**](doc/CartApi.md#reservecart) | **POST** /cart/reserve | Reserve inventory for all cart items before checkout
+[*CashbackApi*](doc/CashbackApi.md) | [**getCashbackPlan**](doc/CashbackApi.md#getcashbackplan) | **GET** /cashback/plans/{id} | Get a single cashback plan
+[*CashbackApi*](doc/CashbackApi.md) | [**listCashbackPayments**](doc/CashbackApi.md#listcashbackpayments) | **GET** /cashback/plans/{id}/payments | List monthly payment history for a cashback plan (cursor-paginated)
+[*CashbackApi*](doc/CashbackApi.md) | [**listCashbackPlans**](doc/CashbackApi.md#listcashbackplans) | **GET** /cashback/plans | List the authenticated user&#39;s perpetual cashback plans
+[*CatalogApi*](doc/CatalogApi.md) | [**createProduct**](doc/CatalogApi.md#createproduct) | **POST** /products | Create a new product listing (admin / seller onboarding)
+[*CatalogApi*](doc/CatalogApi.md) | [**getCategoryCommission**](doc/CatalogApi.md#getcategorycommission) | **GET** /categories/{id}/commission | Get live commission and KDV rates for a category + market pair
+[*CatalogApi*](doc/CatalogApi.md) | [**getProduct**](doc/CatalogApi.md#getproduct) | **GET** /products/{id} | Get full product detail including variants and cashback preview
+[*CatalogApi*](doc/CatalogApi.md) | [**listCategories**](doc/CatalogApi.md#listcategories) | **GET** /categories | List all 42 product categories (locale-resolved names)
+[*CatalogApi*](doc/CatalogApi.md) | [**listProducts**](doc/CatalogApi.md#listproducts) | **GET** /products | List products with optional category filter, pagination, and sort
+[*DiscoveryApi*](doc/DiscoveryApi.md) | [**listBanners**](doc/DiscoveryApi.md#listbanners) | **GET** /banners | Promotional banners for a given placement
+[*DiscoveryApi*](doc/DiscoveryApi.md) | [**listRecommendations**](doc/DiscoveryApi.md#listrecommendations) | **GET** /recommendations | Personalised product recommendations for the authenticated user
 [*HealthApi*](doc/HealthApi.md) | [**healthz**](doc/HealthApi.md#healthz) | **GET** /healthz | Health check (liveness probe)
-[*MeApi*](doc/MeApi.md) | [**deleteMe**](doc/MeApi.md#deleteme) | **DELETE** /v1/me | Soft-delete the authenticated user account (KVKK / GDPR)
-[*MeApi*](doc/MeApi.md) | [**getMe**](doc/MeApi.md#getme) | **GET** /v1/me | Get authenticated user profile
-[*MeApi*](doc/MeApi.md) | [**registerDevice**](doc/MeApi.md#registerdevice) | **POST** /v1/me/devices | Register a device FCM token for push notifications
-[*MeApi*](doc/MeApi.md) | [**unregisterDevice**](doc/MeApi.md#unregisterdevice) | **DELETE** /v1/me/devices/{id} | Remove a registered device (deregister push notifications)
-[*MeApi*](doc/MeApi.md) | [**updateMe**](doc/MeApi.md#updateme) | **PUT** /v1/me | Update user profile fields
-[*OrdersApi*](doc/OrdersApi.md) | [**cancelOrder**](doc/OrdersApi.md#cancelorder) | **POST** /v1/orders/{id}/cancel | Cancel an order (only while in pending/confirmed status)
-[*OrdersApi*](doc/OrdersApi.md) | [**checkout**](doc/OrdersApi.md#checkout) | **POST** /v1/orders/checkout | Atomically reserve cart → create order → initiate PSP payment
-[*OrdersApi*](doc/OrdersApi.md) | [**createOrder**](doc/OrdersApi.md#createorder) | **POST** /v1/orders | Create an order from a reservation (admin / internal)
-[*OrdersApi*](doc/OrdersApi.md) | [**createReturn**](doc/OrdersApi.md#createreturn) | **POST** /v1/orders/{id}/returns | Submit a return request for delivered order items
-[*OrdersApi*](doc/OrdersApi.md) | [**getOrder**](doc/OrdersApi.md#getorder) | **GET** /v1/orders/{id} | Get order detail
-[*OrdersApi*](doc/OrdersApi.md) | [**listOrders**](doc/OrdersApi.md#listorders) | **GET** /v1/orders | List the authenticated user&#39;s orders
-[*OrdersApi*](doc/OrdersApi.md) | [**listReturns**](doc/OrdersApi.md#listreturns) | **GET** /v1/orders/{id}/returns | List return requests for an order
-[*OrdersApi*](doc/OrdersApi.md) | [**refundOrder**](doc/OrdersApi.md#refundorder) | **POST** /v1/orders/{id}/refund | Trigger a full refund for a delivered order (admin only)
-[*SearchApi*](doc/SearchApi.md) | [**search**](doc/SearchApi.md#search) | **GET** /v1/search | Full-text product search with filters
-[*SearchApi*](doc/SearchApi.md) | [**searchSuggest**](doc/SearchApi.md#searchsuggest) | **GET** /v1/search/suggest | Autocomplete suggestions (debounce 250 ms on client)
-[*SearchApi*](doc/SearchApi.md) | [**searchTrending**](doc/SearchApi.md#searchtrending) | **GET** /v1/search/trending | Current trending search terms
-[*SellerApi*](doc/SellerApi.md) | [**getSellerOrderBreakdown**](doc/SellerApi.md#getsellerorderbreakdown) | **GET** /v1/seller/orders/{id}/breakdown | Seller transparency breakdown for a specific order
-[*WalletApi*](doc/WalletApi.md) | [**getWalletBalance**](doc/WalletApi.md#getwalletbalance) | **GET** /v1/wallet/balance | Get the authenticated user&#39;s coin wallet balance
-[*WalletApi*](doc/WalletApi.md) | [**listWalletTransactions**](doc/WalletApi.md#listwallettransactions) | **GET** /v1/wallet/transactions | List wallet transaction history (cursor-paginated)
+[*MeApi*](doc/MeApi.md) | [**deleteMe**](doc/MeApi.md#deleteme) | **DELETE** /me | Soft-delete the authenticated user account (KVKK / GDPR)
+[*MeApi*](doc/MeApi.md) | [**getMe**](doc/MeApi.md#getme) | **GET** /me | Get authenticated user profile
+[*MeApi*](doc/MeApi.md) | [**registerDevice**](doc/MeApi.md#registerdevice) | **POST** /me/devices | Register a device FCM token for push notifications
+[*MeApi*](doc/MeApi.md) | [**unregisterDevice**](doc/MeApi.md#unregisterdevice) | **DELETE** /me/devices/{id} | Remove a registered device (deregister push notifications)
+[*MeApi*](doc/MeApi.md) | [**updateMe**](doc/MeApi.md#updateme) | **PATCH** /me | Update user profile fields
+[*OrdersApi*](doc/OrdersApi.md) | [**cancelOrder**](doc/OrdersApi.md#cancelorder) | **POST** /orders/{id}/cancel | Cancel an order (only while in pending/confirmed status)
+[*OrdersApi*](doc/OrdersApi.md) | [**checkout**](doc/OrdersApi.md#checkout) | **POST** /orders/checkout | Atomically reserve cart → create order → initiate PSP payment
+[*OrdersApi*](doc/OrdersApi.md) | [**createOrder**](doc/OrdersApi.md#createorder) | **POST** /orders | Create an order from a reservation (admin / internal)
+[*OrdersApi*](doc/OrdersApi.md) | [**createReturn**](doc/OrdersApi.md#createreturn) | **POST** /orders/{id}/returns | Submit a return request for delivered order items
+[*OrdersApi*](doc/OrdersApi.md) | [**getOrder**](doc/OrdersApi.md#getorder) | **GET** /orders/{id} | Get order detail
+[*OrdersApi*](doc/OrdersApi.md) | [**listOrders**](doc/OrdersApi.md#listorders) | **GET** /orders | List the authenticated user&#39;s orders
+[*OrdersApi*](doc/OrdersApi.md) | [**listReturns**](doc/OrdersApi.md#listreturns) | **GET** /orders/{id}/returns | List return requests for an order
+[*OrdersApi*](doc/OrdersApi.md) | [**refundOrder**](doc/OrdersApi.md#refundorder) | **POST** /orders/{id}/refund | Trigger a full refund for a delivered order (admin only)
+[*SearchApi*](doc/SearchApi.md) | [**search**](doc/SearchApi.md#search) | **GET** /search | Full-text product search with filters
+[*SearchApi*](doc/SearchApi.md) | [**searchSuggest**](doc/SearchApi.md#searchsuggest) | **GET** /search/suggest | Autocomplete suggestions (debounce 250 ms on client)
+[*SearchApi*](doc/SearchApi.md) | [**searchTrending**](doc/SearchApi.md#searchtrending) | **GET** /search/trending | Current trending search terms
+[*SellerApi*](doc/SellerApi.md) | [**getSellerOrderBreakdown**](doc/SellerApi.md#getsellerorderbreakdown) | **GET** /seller/orders/{id}/breakdown | Seller transparency breakdown for a specific order
+[*WalletApi*](doc/WalletApi.md) | [**getWalletBalance**](doc/WalletApi.md#getwalletbalance) | **GET** /wallet/balance | Get the authenticated user&#39;s coin wallet balance
+[*WalletApi*](doc/WalletApi.md) | [**listWalletTransactions**](doc/WalletApi.md#listwallettransactions) | **GET** /wallet/transactions | List wallet transaction history (cursor-paginated)
 
 
 ## Documentation For Models

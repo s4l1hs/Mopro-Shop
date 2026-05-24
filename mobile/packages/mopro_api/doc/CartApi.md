@@ -9,11 +9,11 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**addCartItem**](CartApi.md#addcartitem) | **POST** /v1/cart/items | Add a variant to the cart; returns the updated enriched cart
-[**getCart**](CartApi.md#getcart) | **GET** /v1/cart | Get the authenticated user&#39;s cart (enriched with product data)
-[**releaseCart**](CartApi.md#releasecart) | **POST** /v1/cart/release | Release an active reservation (cancel checkout flow)
-[**removeCartItem**](CartApi.md#removecartitem) | **DELETE** /v1/cart/items/{variant_id} | Remove a variant from the cart
-[**reserveCart**](CartApi.md#reservecart) | **POST** /v1/cart/reserve | Reserve inventory for all cart items before checkout
+[**addCartItem**](CartApi.md#addcartitem) | **POST** /cart/items | Add a variant to the cart; returns the updated enriched cart
+[**getCart**](CartApi.md#getcart) | **GET** /cart | Get the authenticated user&#39;s cart (enriched with product data)
+[**releaseCart**](CartApi.md#releasecart) | **POST** /cart/release | Release an active reservation (cancel checkout flow)
+[**removeCartItem**](CartApi.md#removecartitem) | **DELETE** /cart/items/{variant_id} | Remove a variant from the cart
+[**reserveCart**](CartApi.md#reservecart) | **POST** /cart/reserve | Reserve inventory for all cart items before checkout
 
 
 # **addCartItem**
@@ -21,7 +21,7 @@ Method | HTTP request | Description
 
 Add a variant to the cart; returns the updated enriched cart
 
-Returns the full enriched cart (same schema as GET /v1/cart) in the response, eliminating the need for a follow-up GET round-trip. 
+Returns the full enriched cart (same schema as GET /cart) in the response, eliminating the need for a follow-up GET round-trip. 
 
 ### Example
 ```dart

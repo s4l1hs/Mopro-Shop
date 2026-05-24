@@ -9,7 +9,7 @@ void main() {
   group(CartApi, () {
     // Add a variant to the cart; returns the updated enriched cart
     //
-    // Returns the full enriched cart (same schema as GET /v1/cart) in the response, eliminating the need for a follow-up GET round-trip. 
+    // Returns the full enriched cart (same schema as GET /cart) in the response, eliminating the need for a follow-up GET round-trip. 
     //
     //Future<Cart> addCartItem(String xIdempotencyKey, AddCartItemRequest addCartItemRequest, { String xTraceId }) async
     test('test addCartItem', () async {

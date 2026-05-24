@@ -9,14 +9,14 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**cancelOrder**](OrdersApi.md#cancelorder) | **POST** /v1/orders/{id}/cancel | Cancel an order (only while in pending/confirmed status)
-[**checkout**](OrdersApi.md#checkout) | **POST** /v1/orders/checkout | Atomically reserve cart → create order → initiate PSP payment
-[**createOrder**](OrdersApi.md#createorder) | **POST** /v1/orders | Create an order from a reservation (admin / internal)
-[**createReturn**](OrdersApi.md#createreturn) | **POST** /v1/orders/{id}/returns | Submit a return request for delivered order items
-[**getOrder**](OrdersApi.md#getorder) | **GET** /v1/orders/{id} | Get order detail
-[**listOrders**](OrdersApi.md#listorders) | **GET** /v1/orders | List the authenticated user&#39;s orders
-[**listReturns**](OrdersApi.md#listreturns) | **GET** /v1/orders/{id}/returns | List return requests for an order
-[**refundOrder**](OrdersApi.md#refundorder) | **POST** /v1/orders/{id}/refund | Trigger a full refund for a delivered order (admin only)
+[**cancelOrder**](OrdersApi.md#cancelorder) | **POST** /orders/{id}/cancel | Cancel an order (only while in pending/confirmed status)
+[**checkout**](OrdersApi.md#checkout) | **POST** /orders/checkout | Atomically reserve cart → create order → initiate PSP payment
+[**createOrder**](OrdersApi.md#createorder) | **POST** /orders | Create an order from a reservation (admin / internal)
+[**createReturn**](OrdersApi.md#createreturn) | **POST** /orders/{id}/returns | Submit a return request for delivered order items
+[**getOrder**](OrdersApi.md#getorder) | **GET** /orders/{id} | Get order detail
+[**listOrders**](OrdersApi.md#listorders) | **GET** /orders | List the authenticated user&#39;s orders
+[**listReturns**](OrdersApi.md#listreturns) | **GET** /orders/{id}/returns | List return requests for an order
+[**refundOrder**](OrdersApi.md#refundorder) | **POST** /orders/{id}/refund | Trigger a full refund for a delivered order (admin only)
 
 
 # **cancelOrder**

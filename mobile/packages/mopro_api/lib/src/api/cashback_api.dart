@@ -45,7 +45,7 @@ class CashbackApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/cashback/plans/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/cashback/plans/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -129,7 +129,7 @@ _responseData = rawData == null ? null : deserialize<CashbackPlan, CashbackPlan>
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/cashback/plans/{id}/payments'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/cashback/plans/{id}/payments'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -219,7 +219,7 @@ _responseData = rawData == null ? null : deserialize<ListCashbackPayments200Resp
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/cashback/plans';
+    final _path = r'/cashback/plans';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{

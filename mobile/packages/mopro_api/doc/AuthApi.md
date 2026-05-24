@@ -9,11 +9,11 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**logout**](AuthApi.md#logout) | **POST** /v1/auth/logout | Revoke the provided refresh token
-[**refreshToken**](AuthApi.md#refreshtoken) | **POST** /v1/auth/token/refresh | Exchange a refresh token for a new token pair
-[**requestOtp**](AuthApi.md#requestotp) | **POST** /v1/auth/otp/request | Request a one-time password via SMS
-[**stepUp**](AuthApi.md#stepup) | **POST** /v1/auth/step-up | Exchange access token + fresh OTP for a step-up token (TTL 5 min)
-[**verifyOtp**](AuthApi.md#verifyotp) | **POST** /v1/auth/otp/verify | Verify OTP and issue access + refresh token pair
+[**logout**](AuthApi.md#logout) | **POST** /auth/logout | Revoke the provided refresh token
+[**refreshToken**](AuthApi.md#refreshtoken) | **POST** /auth/token/refresh | Exchange a refresh token for a new token pair
+[**requestOtp**](AuthApi.md#requestotp) | **POST** /auth/otp/request | Request a one-time password via SMS
+[**stepUp**](AuthApi.md#stepup) | **POST** /auth/step-up | Exchange access token + fresh OTP for a step-up token (TTL 5 min)
+[**verifyOtp**](AuthApi.md#verifyotp) | **POST** /auth/otp/verify | Verify OTP and issue access + refresh token pair
 
 
 # **logout**
@@ -154,7 +154,7 @@ No authorization required
 
 Exchange access token + fresh OTP for a step-up token (TTL 5 min)
 
-Call this after receiving `403 step_up_required`. The caller must have already called `/v1/auth/otp/request` to obtain a fresh OTP for the currently authenticated phone number. 
+Call this after receiving `403 step_up_required`. The caller must have already called `/auth/otp/request` to obtain a fresh OTP for the currently authenticated phone number. 
 
 ### Example
 ```dart

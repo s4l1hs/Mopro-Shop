@@ -9,10 +9,10 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**createAddress**](AddressApi.md#createaddress) | **POST** /v1/addresses | Add a new delivery address
-[**deleteAddress**](AddressApi.md#deleteaddress) | **DELETE** /v1/addresses/{id} | Delete an address
-[**listAddresses**](AddressApi.md#listaddresses) | **GET** /v1/addresses | List the authenticated user&#39;s delivery addresses
-[**updateAddress**](AddressApi.md#updateaddress) | **PUT** /v1/addresses/{id} | Update an existing address
+[**createAddress**](AddressApi.md#createaddress) | **POST** /addresses | Add a new delivery address
+[**deleteAddress**](AddressApi.md#deleteaddress) | **DELETE** /addresses/{id} | Delete an address
+[**listAddresses**](AddressApi.md#listaddresses) | **GET** /addresses | List the authenticated user&#39;s delivery addresses
+[**updateAddress**](AddressApi.md#updateaddress) | **PUT** /addresses/{id} | Update an existing address
 
 
 # **createAddress**

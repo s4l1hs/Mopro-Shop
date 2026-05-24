@@ -57,7 +57,7 @@ class SearchApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/search';
+    final _path = r'/search';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -148,7 +148,7 @@ _responseData = rawData == null ? null : deserialize<ListProducts200Response, Li
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/search/suggest';
+    final _path = r'/search/suggest';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -231,7 +231,7 @@ _responseData = rawData == null ? null : deserialize<SearchSuggest200Response, S
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/search/trending';
+    final _path = r'/search/trending';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{

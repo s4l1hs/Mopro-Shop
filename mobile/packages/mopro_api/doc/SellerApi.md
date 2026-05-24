@@ -9,7 +9,7 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**getSellerOrderBreakdown**](SellerApi.md#getsellerorderbreakdown) | **GET** /v1/seller/orders/{id}/breakdown | Seller transparency breakdown for a specific order
+[**getSellerOrderBreakdown**](SellerApi.md#getsellerorderbreakdown) | **GET** /seller/orders/{id}/breakdown | Seller transparency breakdown for a specific order
 
 
 # **getSellerOrderBreakdown**

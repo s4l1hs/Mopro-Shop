@@ -53,7 +53,7 @@ class OrdersApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/orders/{id}/cancel'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/orders/{id}/cancel'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -112,7 +112,7 @@ class OrdersApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/orders/checkout';
+    final _path = r'/orders/checkout';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -213,7 +213,7 @@ _responseData = rawData == null ? null : deserialize<CheckoutResponse, CheckoutR
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/orders';
+    final _path = r'/orders';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -316,7 +316,7 @@ _responseData = rawData == null ? null : deserialize<Order, Order>(rawData, 'Ord
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/orders/{id}/returns'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/orders/{id}/returns'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -415,7 +415,7 @@ _responseData = rawData == null ? null : deserialize<ModelReturn, ModelReturn>(r
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/orders/{id}'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/orders/{id}'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -499,7 +499,7 @@ _responseData = rawData == null ? null : deserialize<Order, Order>(rawData, 'Ord
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/orders';
+    final _path = r'/orders';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -586,7 +586,7 @@ _responseData = rawData == null ? null : deserialize<ListOrders200Response, List
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/orders/{id}/returns'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/orders/{id}/returns'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -670,7 +670,7 @@ _responseData = rawData == null ? null : deserialize<ListReturns200Response, Lis
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/orders/{id}/refund'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/orders/{id}/refund'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{

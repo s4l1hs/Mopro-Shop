@@ -9,11 +9,11 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**deleteMe**](MeApi.md#deleteme) | **DELETE** /v1/me | Soft-delete the authenticated user account (KVKK / GDPR)
-[**getMe**](MeApi.md#getme) | **GET** /v1/me | Get authenticated user profile
-[**registerDevice**](MeApi.md#registerdevice) | **POST** /v1/me/devices | Register a device FCM token for push notifications
-[**unregisterDevice**](MeApi.md#unregisterdevice) | **DELETE** /v1/me/devices/{id} | Remove a registered device (deregister push notifications)
-[**updateMe**](MeApi.md#updateme) | **PUT** /v1/me | Update user profile fields
+[**deleteMe**](MeApi.md#deleteme) | **DELETE** /me | Soft-delete the authenticated user account (KVKK / GDPR)
+[**getMe**](MeApi.md#getme) | **GET** /me | Get authenticated user profile
+[**registerDevice**](MeApi.md#registerdevice) | **POST** /me/devices | Register a device FCM token for push notifications
+[**unregisterDevice**](MeApi.md#unregisterdevice) | **DELETE** /me/devices/{id} | Remove a registered device (deregister push notifications)
+[**updateMe**](MeApi.md#updateme) | **PATCH** /me | Update user profile fields
 
 
 # **deleteMe**

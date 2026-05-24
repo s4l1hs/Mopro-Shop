@@ -21,6 +21,8 @@ class VerifyOtpRequest {
     required  this.phone,
 
     required  this.code,
+
+     this.purpose = const VerifyOtpRequestPurposeEnum._('login'),
   });
 
   @JsonKey(
@@ -47,17 +49,32 @@ class VerifyOtpRequest {
 
 
 
+      /// Must match the purpose used in the corresponding /otp/request call. Defaults to `login`.
+  @JsonKey(
+    defaultValue: 'login',
+    name: r'purpose',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final VerifyOtpRequestPurposeEnum? purpose;
+
+
+
 
 
     @override
     bool operator ==(Object other) => identical(this, other) || other is VerifyOtpRequest &&
       other.phone == phone &&
-      other.code == code;
+      other.code == code &&
+      other.purpose == purpose;
 
     @override
     int get hashCode =>
         phone.hashCode +
-        code.hashCode;
+        code.hashCode +
+        purpose.hashCode;
 
   factory VerifyOtpRequest.fromJson(Map<String, dynamic> json) => _$VerifyOtpRequestFromJson(json);
 
@@ -69,4 +86,22 @@ class VerifyOtpRequest {
   }
 
 }
+
+/// Must match the purpose used in the corresponding /otp/request call. Defaults to `login`.
+enum VerifyOtpRequestPurposeEnum {
+    /// Must match the purpose used in the corresponding /otp/request call. Defaults to `login`.
+@JsonValue(r'login')
+login(r'login'),
+    /// Must match the purpose used in the corresponding /otp/request call. Defaults to `login`.
+@JsonValue(r'step_up')
+stepUp(r'step_up');
+
+const VerifyOtpRequestPurposeEnum(this.value);
+
+final String value;
+
+@override
+String toString() => value;
+}
+
 

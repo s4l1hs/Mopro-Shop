@@ -50,7 +50,7 @@ class AuthApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/auth/logout';
+    final _path = r'/auth/logout';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -127,7 +127,7 @@ _bodyData=jsonEncode(refreshTokenRequest);
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/auth/token/refresh';
+    final _path = r'/auth/token/refresh';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -220,7 +220,7 @@ _responseData = rawData == null ? null : deserialize<TokenPair, TokenPair>(rawDa
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/auth/otp/request';
+    final _path = r'/auth/otp/request';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -264,7 +264,7 @@ _bodyData=jsonEncode(requestOtpRequest);
   }
 
   /// Exchange access token + fresh OTP for a step-up token (TTL 5 min)
-  /// Call this after receiving &#x60;403 step_up_required&#x60;. The caller must have already called &#x60;/v1/auth/otp/request&#x60; to obtain a fresh OTP for the currently authenticated phone number. 
+  /// Call this after receiving &#x60;403 step_up_required&#x60;. The caller must have already called &#x60;/auth/otp/request&#x60; to obtain a fresh OTP for the currently authenticated phone number. 
   ///
   /// Parameters:
   /// * [xIdempotencyKey] - UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation. 
@@ -290,7 +290,7 @@ _bodyData=jsonEncode(requestOtpRequest);
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/auth/step-up';
+    final _path = r'/auth/step-up';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -391,7 +391,7 @@ _responseData = rawData == null ? null : deserialize<StepUpTokenResponse, StepUp
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/auth/otp/verify';
+    final _path = r'/auth/otp/verify';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{

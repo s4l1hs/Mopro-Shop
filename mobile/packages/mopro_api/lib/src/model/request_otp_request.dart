@@ -19,6 +19,8 @@ class RequestOtpRequest {
   RequestOtpRequest({
 
     required  this.phone,
+
+     this.purpose = const RequestOtpRequestPurposeEnum._('login'),
   });
 
       /// Turkish mobile number in E.164 format. Must start with +905.
@@ -34,15 +36,30 @@ class RequestOtpRequest {
 
 
 
+      /// OTP purpose. Use `login` for initial authentication (default). Use `step_up` only if you need a step-up OTP outside the authenticated step-up flow (`POST /auth/step-up/request`). Most clients should omit this field and rely on the default. 
+  @JsonKey(
+    defaultValue: 'login',
+    name: r'purpose',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final RequestOtpRequestPurposeEnum? purpose;
+
+
+
 
 
     @override
     bool operator ==(Object other) => identical(this, other) || other is RequestOtpRequest &&
-      other.phone == phone;
+      other.phone == phone &&
+      other.purpose == purpose;
 
     @override
     int get hashCode =>
-        phone.hashCode;
+        phone.hashCode +
+        purpose.hashCode;
 
   factory RequestOtpRequest.fromJson(Map<String, dynamic> json) => _$RequestOtpRequestFromJson(json);
 
@@ -54,4 +71,22 @@ class RequestOtpRequest {
   }
 
 }
+
+/// OTP purpose. Use `login` for initial authentication (default). Use `step_up` only if you need a step-up OTP outside the authenticated step-up flow (`POST /auth/step-up/request`). Most clients should omit this field and rely on the default. 
+enum RequestOtpRequestPurposeEnum {
+    /// OTP purpose. Use `login` for initial authentication (default). Use `step_up` only if you need a step-up OTP outside the authenticated step-up flow (`POST /auth/step-up/request`). Most clients should omit this field and rely on the default. 
+@JsonValue(r'login')
+login(r'login'),
+    /// OTP purpose. Use `login` for initial authentication (default). Use `step_up` only if you need a step-up OTP outside the authenticated step-up flow (`POST /auth/step-up/request`). Most clients should omit this field and rely on the default. 
+@JsonValue(r'step_up')
+stepUp(r'step_up');
+
+const RequestOtpRequestPurposeEnum(this.value);
+
+final String value;
+
+@override
+String toString() => value;
+}
+
 

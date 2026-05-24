@@ -14,7 +14,7 @@ class CheckoutRepositoryImpl implements CheckoutRepository {
     required String idempotencyKey,
   }) async {
     final resp = await _dio.post<Map<String, dynamic>>(
-      '/v1/checkout/initiate',
+      '/checkout/initiate',
       data: {
         'address_id': addressId,
         'payment_method': paymentMethod,

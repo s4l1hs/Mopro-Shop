@@ -23,7 +23,7 @@ class Reservation {
     required  this.expiresAt,
   });
 
-      /// Reservation ID; pass to POST /v1/orders or POST /v1/orders/checkout
+      /// Reservation ID; pass to POST /orders or POST /orders/checkout
   @JsonKey(
     
     name: r'id',

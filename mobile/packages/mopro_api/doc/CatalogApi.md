@@ -9,11 +9,11 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**createProduct**](CatalogApi.md#createproduct) | **POST** /v1/products | Create a new product listing (admin / seller onboarding)
-[**getCategoryCommission**](CatalogApi.md#getcategorycommission) | **GET** /v1/categories/{id}/commission | Get live commission and KDV rates for a category + market pair
-[**getProduct**](CatalogApi.md#getproduct) | **GET** /v1/products/{id} | Get full product detail including variants and cashback preview
-[**listCategories**](CatalogApi.md#listcategories) | **GET** /v1/categories | List all 42 product categories (locale-resolved names)
-[**listProducts**](CatalogApi.md#listproducts) | **GET** /v1/products | List products with optional category filter, pagination, and sort
+[**createProduct**](CatalogApi.md#createproduct) | **POST** /products | Create a new product listing (admin / seller onboarding)
+[**getCategoryCommission**](CatalogApi.md#getcategorycommission) | **GET** /categories/{id}/commission | Get live commission and KDV rates for a category + market pair
+[**getProduct**](CatalogApi.md#getproduct) | **GET** /products/{id} | Get full product detail including variants and cashback preview
+[**listCategories**](CatalogApi.md#listcategories) | **GET** /categories | List all 42 product categories (locale-resolved names)
+[**listProducts**](CatalogApi.md#listproducts) | **GET** /products | List products with optional category filter, pagination, and sort
 
 
 # **createProduct**

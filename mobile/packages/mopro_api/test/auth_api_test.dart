@@ -32,7 +32,7 @@ void main() {
 
     // Exchange access token + fresh OTP for a step-up token (TTL 5 min)
     //
-    // Call this after receiving `403 step_up_required`. The caller must have already called `/v1/auth/otp/request` to obtain a fresh OTP for the currently authenticated phone number. 
+    // Call this after receiving `403 step_up_required`. The caller must have already called `/auth/otp/request` to obtain a fresh OTP for the currently authenticated phone number. 
     //
     //Future<StepUpTokenResponse> stepUp(String xIdempotencyKey, StepUpRequest stepUpRequest, { String xTraceId }) async
     test('test stepUp', () async {

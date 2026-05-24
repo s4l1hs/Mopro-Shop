@@ -9,7 +9,7 @@ class CartRepositoryImpl implements CartRepository {
 
   @override
   Future<CartDto> getCart() async {
-    final resp = await _dio.get<Map<String, dynamic>>('/v1/cart');
+    final resp = await _dio.get<Map<String, dynamic>>('/cart');
     return CartDto.fromJson(resp.data!);
   }
 
@@ -20,7 +20,7 @@ class CartRepositoryImpl implements CartRepository {
     required int qty,
   }) async {
     final resp = await _dio.post<Map<String, dynamic>>(
-      '/v1/cart/items',
+      '/cart/items',
       data: {
         'product_id': productId,
         'variant_id': variantId,
@@ -36,7 +36,7 @@ class CartRepositoryImpl implements CartRepository {
     required int qty,
   }) async {
     final resp = await _dio.put<Map<String, dynamic>>(
-      '/v1/cart/items/$lineId',
+      '/cart/items/$lineId',
       data: {'qty': qty},
     );
     return CartDto.fromJson(resp.data!);
@@ -44,11 +44,11 @@ class CartRepositoryImpl implements CartRepository {
 
   @override
   Future<void> removeLine({required String lineId}) async {
-    await _dio.delete<void>('/v1/cart/items/$lineId');
+    await _dio.delete<void>('/cart/items/$lineId');
   }
 
   @override
   Future<void> clear() async {
-    await _dio.delete<void>('/v1/cart');
+    await _dio.delete<void>('/cart');
   }
 }

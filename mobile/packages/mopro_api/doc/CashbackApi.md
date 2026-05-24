@@ -9,9 +9,9 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**getCashbackPlan**](CashbackApi.md#getcashbackplan) | **GET** /v1/cashback/plans/{id} | Get a single cashback plan
-[**listCashbackPayments**](CashbackApi.md#listcashbackpayments) | **GET** /v1/cashback/plans/{id}/payments | List monthly payment history for a cashback plan (cursor-paginated)
-[**listCashbackPlans**](CashbackApi.md#listcashbackplans) | **GET** /v1/cashback/plans | List the authenticated user&#39;s perpetual cashback plans
+[**getCashbackPlan**](CashbackApi.md#getcashbackplan) | **GET** /cashback/plans/{id} | Get a single cashback plan
+[**listCashbackPayments**](CashbackApi.md#listcashbackpayments) | **GET** /cashback/plans/{id}/payments | List monthly payment history for a cashback plan (cursor-paginated)
+[**listCashbackPlans**](CashbackApi.md#listcashbackplans) | **GET** /cashback/plans | List the authenticated user&#39;s perpetual cashback plans
 
 
 # **getCashbackPlan**

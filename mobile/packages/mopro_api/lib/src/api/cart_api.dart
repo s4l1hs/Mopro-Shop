@@ -22,7 +22,7 @@ class CartApi {
   const CartApi(this._dio);
 
   /// Add a variant to the cart; returns the updated enriched cart
-  /// Returns the full enriched cart (same schema as GET /v1/cart) in the response, eliminating the need for a follow-up GET round-trip. 
+  /// Returns the full enriched cart (same schema as GET /cart) in the response, eliminating the need for a follow-up GET round-trip. 
   ///
   /// Parameters:
   /// * [xIdempotencyKey] - UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation. 
@@ -48,7 +48,7 @@ class CartApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/cart/items';
+    final _path = r'/cart/items';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -145,7 +145,7 @@ _responseData = rawData == null ? null : deserialize<Cart, Cart>(rawData, 'Cart'
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/cart';
+    final _path = r'/cart';
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -227,7 +227,7 @@ _responseData = rawData == null ? null : deserialize<Cart, Cart>(rawData, 'Cart'
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/cart/release';
+    final _path = r'/cart/release';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -304,7 +304,7 @@ _bodyData=jsonEncode(releaseCartRequest);
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/cart/items/{variant_id}'.replaceAll('{' r'variant_id' '}', variantId.toString());
+    final _path = r'/cart/items/{variant_id}'.replaceAll('{' r'variant_id' '}', variantId.toString());
     final _options = Options(
       method: r'DELETE',
       headers: <String, dynamic>{
@@ -361,7 +361,7 @@ _bodyData=jsonEncode(releaseCartRequest);
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/cart/reserve';
+    final _path = r'/cart/reserve';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{

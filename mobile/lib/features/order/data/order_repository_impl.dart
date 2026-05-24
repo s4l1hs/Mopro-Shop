@@ -13,7 +13,7 @@ class OrderRepositoryImpl implements OrderRepository {
     int perPage = 20,
   }) async {
     final resp = await _dio.get<Map<String, dynamic>>(
-      '/v1/orders',
+      '/orders',
       queryParameters: {'page': page, 'per_page': perPage},
     );
     final body = resp.data!;
@@ -32,14 +32,14 @@ class OrderRepositoryImpl implements OrderRepository {
 
   @override
   Future<OrderDto> getOrder(int id) async {
-    final resp = await _dio.get<Map<String, dynamic>>('/v1/orders/$id');
+    final resp = await _dio.get<Map<String, dynamic>>('/orders/$id');
     return OrderDto.fromJson(resp.data!);
   }
 
   @override
   Future<void> cancelOrder({required int id, String reason = ''}) async {
     await _dio.post<void>(
-      '/v1/orders/$id/cancel',
+      '/orders/$id/cancel',
       data: {'reason': reason},
     );
   }

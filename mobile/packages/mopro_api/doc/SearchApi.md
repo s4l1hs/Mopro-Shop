@@ -9,9 +9,9 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**search**](SearchApi.md#search) | **GET** /v1/search | Full-text product search with filters
-[**searchSuggest**](SearchApi.md#searchsuggest) | **GET** /v1/search/suggest | Autocomplete suggestions (debounce 250 ms on client)
-[**searchTrending**](SearchApi.md#searchtrending) | **GET** /v1/search/trending | Current trending search terms
+[**search**](SearchApi.md#search) | **GET** /search | Full-text product search with filters
+[**searchSuggest**](SearchApi.md#searchsuggest) | **GET** /search/suggest | Autocomplete suggestions (debounce 250 ms on client)
+[**searchTrending**](SearchApi.md#searchtrending) | **GET** /search/trending | Current trending search terms
 
 
 # **search**

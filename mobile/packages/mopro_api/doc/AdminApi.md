@@ -9,10 +9,10 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**createOrder**](AdminApi.md#createorder) | **POST** /v1/orders | Create an order from a reservation (admin / internal)
-[**createProduct**](AdminApi.md#createproduct) | **POST** /v1/products | Create a new product listing (admin / seller onboarding)
-[**getCategoryCommission**](AdminApi.md#getcategorycommission) | **GET** /v1/categories/{id}/commission | Get live commission and KDV rates for a category + market pair
-[**refundOrder**](AdminApi.md#refundorder) | **POST** /v1/orders/{id}/refund | Trigger a full refund for a delivered order (admin only)
+[**createOrder**](AdminApi.md#createorder) | **POST** /orders | Create an order from a reservation (admin / internal)
+[**createProduct**](AdminApi.md#createproduct) | **POST** /products | Create a new product listing (admin / seller onboarding)
+[**getCategoryCommission**](AdminApi.md#getcategorycommission) | **GET** /categories/{id}/commission | Get live commission and KDV rates for a category + market pair
+[**refundOrder**](AdminApi.md#refundorder) | **POST** /orders/{id}/refund | Trigger a full refund for a delivered order (admin only)
 
 
 # **createOrder**

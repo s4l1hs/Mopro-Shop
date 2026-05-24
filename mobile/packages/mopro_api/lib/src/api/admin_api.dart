@@ -50,7 +50,7 @@ class AdminApi {
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/orders';
+    final _path = r'/orders';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -151,7 +151,7 @@ _responseData = rawData == null ? null : deserialize<Order, Order>(rawData, 'Ord
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/products';
+    final _path = r'/products';
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
@@ -252,7 +252,7 @@ _responseData = rawData == null ? null : deserialize<Product, Product>(rawData, 
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/categories/{id}/commission'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/categories/{id}/commission'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'GET',
       headers: <String, dynamic>{
@@ -341,7 +341,7 @@ _responseData = rawData == null ? null : deserialize<CategoryCommission, Categor
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
   }) async {
-    final _path = r'/v1/orders/{id}/refund'.replaceAll('{' r'id' '}', id.toString());
+    final _path = r'/orders/{id}/refund'.replaceAll('{' r'id' '}', id.toString());
     final _options = Options(
       method: r'POST',
       headers: <String, dynamic>{
