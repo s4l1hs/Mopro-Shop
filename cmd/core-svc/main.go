@@ -602,7 +602,9 @@ func handleCreateProduct(svc catalog.Service, defaultCurrency, defaultLocale str
 			return
 		}
 
-		// TODO(idempotency-sprint): enforce idempotency dedup via idempotency store.
+		// Header presence is enforced above (requireIdempotencyKey → 422 if missing).
+		// TODO(idempotency-sprint): add dedup store so a repeated Idempotency-Key
+		// returns the cached previous response instead of re-running CreateProduct.
 		p, err := svc.CreateProduct(r.Context(), req)
 		if err != nil {
 			if errors.Is(err, catalog.ErrInvalidCurrency) {

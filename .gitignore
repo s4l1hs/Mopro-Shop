@@ -43,6 +43,14 @@ docker-compose.override.yml
 bin/
 *.bak
 
+# Editor temp files
+*.orig
+*.swp
+*~
+
+# Claude Code runtime state (session locks, workspace state — not project state)
+.claude/
+
 # Load test secrets and generated outputs
 load-tests/.tokens.json
 load-tests/.refresh.json
