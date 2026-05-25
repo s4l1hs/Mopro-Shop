@@ -10,6 +10,11 @@ User=mopro
 Group=mopro
 # All secrets (RESTIC_PASSWORD, B2_*, HETZNER_*, HEALTHCHECK_*, SLACK_*) live here.
 EnvironmentFile=/opt/mopro/.env
+# Force Go's pure-DNS resolver to prefer IPv4 — fixes B2 TCP hang on Hetzner dual-stack
+# (IPv6 path to api.backblazeb2.com is degraded; Go defaults to IPv6 when available).
+# See docs/ops/backups.md § "B2 IPv6 hang" for diagnosis steps.
+Environment="GODEBUG=netdns=go"
+Environment="RESTIC_PACK_SIZE=16"
 
 ExecStart=/opt/mopro/deploy/scripts/backup-postgres.sh
 

@@ -1,0 +1,12 @@
+[Unit]
+Description=Weekly Mopro Restic prune timer — Sundays 04:30 Istanbul
+Requires=mopro-backup-prune.service
+
+[Timer]
+# After the weekly restore drill (04:00) — prune while drill verifiably succeeded.
+OnCalendar=Sun *-*-* 04:30:00 Europe/Istanbul
+RandomizedDelaySec=1800
+Persistent=true
+
+[Install]
+WantedBy=timers.target

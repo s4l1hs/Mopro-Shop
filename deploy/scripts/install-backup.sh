@@ -116,26 +116,33 @@ chown -R "${MOPRO_USER}:${MOPRO_USER}" "${SSH_DIR}"
 export RESTIC_PASSWORD
 export B2_ACCOUNT_ID="${B2_KEY_ID}"
 export B2_ACCOUNT_KEY="${B2_APP_KEY}"
+# B2 native backend uses f003.backblazeb2.com download URL which is broken in eu-central-003.
+# Use S3-compatible API endpoint instead (different infrastructure, working).
+export AWS_ACCESS_KEY_ID="${B2_KEY_ID}"
+export AWS_SECRET_ACCESS_KEY="${B2_APP_KEY}"
+export GODEBUG="${GODEBUG:-netdns=go}"
 
-B2_REPO="b2:${B2_BUCKET}:mopro-backups"
+B2_REPO="s3:${B2_S3_ENDPOINT:-https://s3.eu-central-003.backblazeb2.com}/${B2_BUCKET}"
 HETZNER_REPO="sftp:mopro-hetzner-backup:${HETZNER_PATH}/mopro-backups"
 
-log "Initialising B2 repository (${B2_REPO})..."
+log "Initialising B2/S3 repository (${B2_REPO})..."
 {
     set +x
     if ! sudo -u "${MOPRO_USER}" \
             RESTIC_PASSWORD="${RESTIC_PASSWORD}" \
-            B2_ACCOUNT_ID="${B2_KEY_ID}" \
-            B2_ACCOUNT_KEY="${B2_APP_KEY}" \
+            AWS_ACCESS_KEY_ID="${B2_KEY_ID}" \
+            AWS_SECRET_ACCESS_KEY="${B2_APP_KEY}" \
+            GODEBUG="${GODEBUG:-netdns=go}" \
             restic -r "${B2_REPO}" snapshots --quiet 2>/dev/null; then
         sudo -u "${MOPRO_USER}" \
             RESTIC_PASSWORD="${RESTIC_PASSWORD}" \
-            B2_ACCOUNT_ID="${B2_KEY_ID}" \
-            B2_ACCOUNT_KEY="${B2_APP_KEY}" \
+            AWS_ACCESS_KEY_ID="${B2_KEY_ID}" \
+            AWS_SECRET_ACCESS_KEY="${B2_APP_KEY}" \
+            GODEBUG="${GODEBUG:-netdns=go}" \
             restic -r "${B2_REPO}" init
-        log "B2 repository initialised."
+        log "B2/S3 repository initialised."
     else
-        log "B2 repository already exists."
+        log "B2/S3 repository already exists."
     fi
     set -x
 }
@@ -158,24 +165,45 @@ if [[ -n "${HETZNER_HOST}" && -n "${HETZNER_USER}" ]]; then
     }
 fi
 
+# ── Snapshot directory ────────────────────────────────────────────────────────
+SNAPSHOT_DIR="/var/lib/mopro/snapshots"
+if [[ ! -d "${SNAPSHOT_DIR}" ]]; then
+    mkdir -p "${SNAPSHOT_DIR}"
+    chown "${MOPRO_USER}:${MOPRO_USER}" "${SNAPSHOT_DIR}"
+    chmod 750 "${SNAPSHOT_DIR}"
+    log "Created snapshot dir: ${SNAPSHOT_DIR}"
+else
+    log "Snapshot dir already exists: ${SNAPSHOT_DIR}"
+fi
+
 # ── Install systemd units ─────────────────────────────────────────────────────
 log "Installing systemd units..."
 cp "${REPO_ROOT}/deploy/systemd/mopro-backup.service"            "${SYSTEMD_DIR}/"
 cp "${REPO_ROOT}/deploy/systemd/mopro-backup.timer"              "${SYSTEMD_DIR}/"
+cp "${REPO_ROOT}/deploy/systemd/mopro-backup-prune.service"      "${SYSTEMD_DIR}/"
+cp "${REPO_ROOT}/deploy/systemd/mopro-backup-prune.timer"        "${SYSTEMD_DIR}/"
+cp "${REPO_ROOT}/deploy/systemd/mopro-snapshot.service"          "${SYSTEMD_DIR}/"
+cp "${REPO_ROOT}/deploy/systemd/mopro-snapshot.timer"            "${SYSTEMD_DIR}/"
 cp "${REPO_ROOT}/deploy/systemd/mopro-restore-drill.service"     "${SYSTEMD_DIR}/"
 cp "${REPO_ROOT}/deploy/systemd/mopro-restore-drill.timer"       "${SYSTEMD_DIR}/"
 chmod +x "${REPO_ROOT}/deploy/scripts/backup-postgres.sh"
+chmod +x "${REPO_ROOT}/deploy/scripts/backup-prune.sh"
+chmod +x "${REPO_ROOT}/deploy/scripts/mopro-snapshot.sh"
 chmod +x "${REPO_ROOT}/deploy/scripts/restore-postgres.sh"
 chmod +x "${REPO_ROOT}/deploy/scripts/restore-drill.sh"
 
 systemctl daemon-reload
+systemctl enable  mopro-snapshot.timer
 systemctl enable  mopro-backup.timer
+systemctl enable  mopro-backup-prune.timer
 systemctl enable  mopro-restore-drill.timer
+systemctl start   mopro-snapshot.timer
 systemctl start   mopro-backup.timer
+systemctl start   mopro-backup-prune.timer
 systemctl start   mopro-restore-drill.timer
 
 log "Timers enabled:"
-systemctl list-timers mopro-backup.timer mopro-restore-drill.timer --no-pager | tail -4 || true
+systemctl list-timers mopro-snapshot.timer mopro-backup.timer mopro-backup-prune.timer mopro-restore-drill.timer --no-pager | tail -6 || true
 
 # ── Run first backup ──────────────────────────────────────────────────────────
 log ""
@@ -193,4 +221,7 @@ log "  1. Verify RESTIC_PASSWORD is stored in your password manager."
 log "  2. Check Slack for backup success notification."
 log "  3. Verify Healthchecks.io shows a ping (HEALTHCHECK_BACKUP_UUID)."
 log "  4. View snapshots: restic -r ${B2_REPO} snapshots"
+log "  5. Confirm hourly snapshot timer: systemctl list-timers mopro-snapshot.timer"
+log "  6. Run a manual snapshot: systemctl start mopro-snapshot.service"
+log "  7. See docs/ops/backups.md for restore round-trip and IPv6 fix details."
 log "===================================================================="

@@ -1,0 +1,27 @@
+[Unit]
+Description=Mopro Restic retention prune (B2 + Hetzner)
+Documentation=file:///opt/mopro/docs/ops/backups.md
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=mopro
+Group=mopro
+EnvironmentFile=/opt/mopro/.env
+# IPv4-prefer fix — same reason as mopro-backup.service.
+Environment="GODEBUG=netdns=go"
+
+ExecStart=/opt/mopro/deploy/scripts/backup-prune.sh
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mopro-backup-prune
+
+Nice=15
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUQuota=30%
+
+# Prune failure is alertable but not critical — B2 backup already succeeded.
+Restart=no

@@ -56,7 +56,9 @@ START_TIME=$(date +%s)
 DATESTAMP=$(date -u +"%Y-%m-%dT%H%M%SZ")
 BACKUP_HOSTNAME=$(hostname -s 2>/dev/null || echo "vds")
 
-B2_REPO="b2:${B2_BUCKET}:mopro-backups"
+# B2 native backend uses f003.backblazeb2.com for downloads which is broken in eu-central-003
+# (accepts TLS but never sends HTTP responses). Use S3-compatible API on different infrastructure.
+B2_REPO="s3:${B2_S3_ENDPOINT:-https://s3.eu-central-003.backblazeb2.com}/${B2_BUCKET}"
 HETZNER_REPO="sftp:mopro-hetzner-backup:${HETZNER_PATH}/mopro-backups"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -135,6 +137,10 @@ log "postgres-ledger dump: ${LEDGER_SIZE}"
 export RESTIC_PASSWORD
 export B2_ACCOUNT_ID="${B2_KEY_ID}"
 export B2_ACCOUNT_KEY="${B2_APP_KEY}"
+# S3 backend aliases (b2: backend unusable; f003.backblazeb2.com broken in eu-central-003)
+export AWS_ACCESS_KEY_ID="${B2_KEY_ID}"
+export AWS_SECRET_ACCESS_KEY="${B2_APP_KEY}"
+export GODEBUG="${GODEBUG:-netdns=go}"
 
 # ── Backup to B2 (primary) ─────────────────────────────────────────────────
 log "Backing up to B2 (${B2_REPO})..."
