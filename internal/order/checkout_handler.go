@@ -14,11 +14,13 @@ type checkoutInitiateRequest struct {
 	BuyerName     string `json:"buyer_name"`
 	BuyerSurname  string `json:"buyer_surname"`
 	BuyerEmail    string `json:"buyer_email"`
+	ReturnURL     string `json:"return_url,omitempty"`
 }
 
 type checkoutInitiateResponse struct {
 	SessionID   string  `json:"session_id"`
 	ThreeDSHTML string  `json:"three_ds_html"`
+	SipayURL    string  `json:"sipay_3ds_url,omitempty"` // web redirect URL
 	Orders      []Order `json:"orders"`
 }
 
@@ -53,6 +55,7 @@ func HandleInitiateCheckout(svc Service, userIDFromContext func(*http.Request) (
 			BuyerName:     body.BuyerName,
 			BuyerSurname:  body.BuyerSurname,
 			BuyerEmail:    body.BuyerEmail,
+			ReturnURL:     body.ReturnURL,
 		})
 		if err != nil {
 			checkoutError(w, err)
@@ -64,6 +67,7 @@ func HandleInitiateCheckout(svc Service, userIDFromContext func(*http.Request) (
 		_ = json.NewEncoder(w).Encode(checkoutInitiateResponse{
 			SessionID:   resp.SessionID,
 			ThreeDSHTML: resp.ThreeDSHTML,
+			SipayURL:    resp.ThreeDSURL,
 			Orders:      resp.Orders,
 		})
 	}

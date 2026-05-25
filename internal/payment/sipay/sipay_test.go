@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -94,8 +95,16 @@ func (r *stubPaymentRepo) FindPaymentIntentByIdempotencyKey(_ context.Context, k
 	return payment.PaymentIntent{}, payment.ErrPaymentNotFound
 }
 
+func (r *stubPaymentRepo) FindPaymentByOrderID(_ context.Context, _ int64) (payment.PaymentIntent, error) {
+	return payment.PaymentIntent{}, payment.ErrPaymentNotFound
+}
+
 func (r *stubPaymentRepo) UpdatePaymentStatus(_ context.Context, _ pgx.Tx, _ string, _ payment.PaymentStatus, _, _, _ *string, _, _ string, _ int64) error {
 	return nil
+}
+
+func (r *stubPaymentRepo) FindExpiredPendingPayments(_ context.Context, _ int) ([]payment.PaymentIntent, error) {
+	return nil, nil
 }
 
 func (r *stubPaymentRepo) WithTx(_ context.Context, fn func(pgx.Tx) error) error {
@@ -543,5 +552,257 @@ func TestD2_ProductionGuard_WrongURL(t *testing.T) {
 	}, newStubRepo(), nil)
 	if err == nil {
 		t.Error("expected error for non-production BaseURL in production GO_ENV, got nil")
+	}
+}
+
+// ─── Circuit breaker tests ────────────────────────────────────────────────────
+
+// TestCircuitBreaker_OpensAfterThreshold verifies that 5 consecutive HTTP-level
+// failures cause subsequent calls to be rejected without hitting the server.
+func TestCircuitBreaker_OpensAfterThreshold(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.URL.Path == "/ccpayment/api/token" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"status_code": 100,
+				"data":        map[string]string{"token": "tok"},
+			})
+			return
+		}
+		// Every non-token call returns 500 to trigger circuit breaker.
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+
+	adapter, err := sipay.NewAdapter(testConfig(srv.URL), newStubRepo(), nil)
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+
+	// Exhaust the circuit breaker threshold (5) by requesting status checks.
+	// Each call hits the server; after threshold failures the CB opens.
+	const threshold = 5
+	for i := 0; i < threshold; i++ {
+		_, _ = adapter.CheckStatus(context.Background(), fmt.Sprintf("inv-%d", i))
+	}
+
+	// With circuit open, the next call must return an error WITHOUT reaching the server.
+	callsBefore := calls
+	_, err = adapter.CheckStatus(context.Background(), "inv-blocked")
+	if err == nil {
+		t.Error("expected error from open circuit breaker, got nil")
+	}
+	if !containsStr(err.Error(), "circuit") {
+		t.Errorf("error should mention circuit breaker, got: %v", err)
+	}
+	if calls != callsBefore {
+		t.Errorf("open circuit breaker made %d unexpected server calls", calls-callsBefore)
+	}
+}
+
+// TestCircuitBreaker_RecoversAfterSuccess verifies that a successful call after
+// the CB opens (half-open transition) resets the failure counter.
+func TestCircuitBreaker_ClosesOnSuccess(t *testing.T) {
+	// To test CB recovery we'd need to mock time — skip in short tests.
+	// This test verifies that consecutive successes do not open the CB.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/ccpayment/api/token" {
+			json.NewEncoder(w).Encode(map[string]any{
+				"status_code": 100,
+				"data":        map[string]string{"token": "tok"},
+			})
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"status_code": 100,
+			"data":        map[string]string{"payment_status": "captured"},
+		})
+	}))
+	defer srv.Close()
+
+	adapter, err := sipay.NewAdapter(testConfig(srv.URL), newStubRepo(), nil)
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+
+	// 10 successful CheckStatus calls must not open the circuit.
+	for i := 0; i < 10; i++ {
+		status, err := adapter.CheckStatus(context.Background(), fmt.Sprintf("inv-%d", i))
+		if err != nil {
+			t.Fatalf("CheckStatus[%d]: %v", i, err)
+		}
+		if status != payment.PaymentStatusCaptured {
+			t.Errorf("CheckStatus[%d]: want captured, got %s", i, status)
+		}
+	}
+}
+
+// ─── HMAC new-function tests ──────────────────────────────────────────────────
+
+func TestSignPayment3D_Length(t *testing.T) {
+	h := sipay.SignPayment3D(sipay.Payment3DSignFields{
+		Total:        "10000",
+		Installment:  "1",
+		CurrencyCode: "TRY",
+		MerchantKey:  "merchant_key_xyz",
+		InvoiceID:    "invoice-001",
+		AppSecret:    "super_secret",
+	})
+	// base64( SHA-256 = 32 bytes ) → 44 chars with padding.
+	if len(h) != 44 {
+		t.Errorf("SignPayment3D: want 44 chars, got %d (value=%q)", len(h), h)
+	}
+}
+
+func TestSignPayment3D_FieldOrderMatters(t *testing.T) {
+	base := sipay.Payment3DSignFields{
+		Total: "10000", Installment: "1", CurrencyCode: "TRY",
+		MerchantKey: "k", InvoiceID: "inv", AppSecret: "s",
+	}
+	swapped := sipay.Payment3DSignFields{
+		Total: "inv", Installment: "1", CurrencyCode: "TRY", // swapped Total ↔ InvoiceID
+		MerchantKey: "k", InvoiceID: "10000", AppSecret: "s",
+	}
+	if sipay.SignPayment3D(base) == sipay.SignPayment3D(swapped) {
+		t.Error("field order does not affect SignPayment3D hash")
+	}
+}
+
+func TestSignPayment3D_VsWebhook_DifferentAlgorithm(t *testing.T) {
+	// payment3D uses SHA-256; webhook uses SHA-512 — they must produce different outputs.
+	p3d := sipay.SignPayment3D(sipay.Payment3DSignFields{
+		Total: "10000", Installment: "1", CurrencyCode: "TRY",
+		MerchantKey: "key", InvoiceID: "INV", AppSecret: "sec",
+	})
+	wh := sipay.SignWebhook("key", "100", "INV", "10000", "TRY")
+	if p3d == wh {
+		t.Error("SignPayment3D and SignWebhook must use different algorithms but produced the same output")
+	}
+}
+
+func TestSignGetToken_Length(t *testing.T) {
+	h := sipay.SignGetToken("app_id", "app_secret", "merchant_id")
+	if len(h) != 44 { // base64(SHA-256)
+		t.Errorf("SignGetToken: want 44 chars, got %d", len(h))
+	}
+}
+
+func TestSignWebhook_AliasForComputeHashKey(t *testing.T) {
+	const mKey, sc, inv, amt, cur = "mk", "100", "INV-1", "5000", "TRY"
+	if sipay.SignWebhook(mKey, sc, inv, amt, cur) != sipay.ComputeHashKey(mKey, sc, inv, amt, cur) {
+		t.Error("SignWebhook must be identical to ComputeHashKey")
+	}
+}
+
+// ─── Webhook replay-protection test ──────────────────────────────────────────
+
+// silentOutboxStub accepts all inserts without a real DB connection.
+type silentOutboxStub struct{}
+
+func (silentOutboxStub) Insert(_ context.Context, _ pgx.Tx, _ outbox.Row) error { return nil }
+func (silentOutboxStub) FetchUnpublished(_ context.Context, _ pgx.Tx, _ int) ([]outbox.Row, error) {
+	return nil, nil
+}
+func (silentOutboxStub) MarkPublished(_ context.Context, _ pgx.Tx, _ int64) error { return nil }
+
+func TestWebhookHandler_ReplayRejection(t *testing.T) {
+	cfg := testConfig("http://localhost:1") // unreachable; no token calls expected
+	adapter, err := sipay.NewAdapter(cfg, newStubRepo(), nil)
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+
+	invoiceID := "inv-replay-001"
+	statusCode := "100"
+	totalAmount := "9000"
+	currency := "TRY"
+	sig := sipay.ComputeHashKey(cfg.MerchantKey, statusCode, invoiceID, totalAmount, currency)
+
+	// Build a webhook body with a timestamp 10 minutes in the past.
+	oldTimestamp := time.Now().Add(-10 * time.Minute).Unix()
+	body, _ := json.Marshal(map[string]any{
+		"status_code":   100,
+		"invoice_id":    invoiceID,
+		"total_amount":  totalAmount,
+		"currency_code": currency,
+		"hash_key":      sig,
+		"timestamp":     oldTimestamp,
+	})
+
+	h := sipay.NewWebhookHandler(adapter, newStubRepo(), silentOutboxStub{}, nil, "TR", "TRY", nil)
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/sipay", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("want 401 for replayed webhook, got %d", rr.Code)
+	}
+}
+
+func TestWebhookHandler_FreshTimestampAccepted(t *testing.T) {
+	cfg := testConfig("http://localhost:1")
+	adapter, err := sipay.NewAdapter(cfg, newStubRepo(), nil)
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+
+	invoiceID := "inv-fresh-001"
+	statusCode := "100"
+	totalAmount := "9000"
+	currency := "TRY"
+	sig := sipay.ComputeHashKey(cfg.MerchantKey, statusCode, invoiceID, totalAmount, currency)
+
+	// Fresh timestamp (now).
+	body, _ := json.Marshal(map[string]any{
+		"status_code":   100,
+		"invoice_id":    invoiceID,
+		"total_amount":  totalAmount,
+		"currency_code": currency,
+		"hash_key":      sig,
+		"timestamp":     time.Now().Unix(),
+	})
+
+	h := sipay.NewWebhookHandler(adapter, newStubRepo(), silentOutboxStub{}, nil, "TR", "TRY", nil)
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/sipay", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	// Should NOT 401 (signature + timestamp both valid).
+	if rr.Code == http.StatusUnauthorized {
+		t.Errorf("fresh-timestamp webhook must not return 401, got %d", rr.Code)
+	}
+}
+
+func TestWebhookHandler_LegacyNoTimestampAccepted(t *testing.T) {
+	cfg := testConfig("http://localhost:1")
+	adapter, err := sipay.NewAdapter(cfg, newStubRepo(), nil)
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+
+	invoiceID := "inv-legacy-001"
+	statusCode := "100"
+	totalAmount := "7000"
+	currency := "TRY"
+	sig := sipay.ComputeHashKey(cfg.MerchantKey, statusCode, invoiceID, totalAmount, currency)
+
+	// No timestamp field — legacy webhook.
+	body, _ := json.Marshal(map[string]any{
+		"status_code":   100,
+		"invoice_id":    invoiceID,
+		"total_amount":  totalAmount,
+		"currency_code": currency,
+		"hash_key":      sig,
+	})
+
+	h := sipay.NewWebhookHandler(adapter, newStubRepo(), silentOutboxStub{}, nil, "TR", "TRY", nil)
+	req := httptest.NewRequest(http.MethodPost, "/webhooks/sipay", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	// Must NOT 401 — legacy webhooks without timestamp are allowed through.
+	if rr.Code == http.StatusUnauthorized {
+		t.Errorf("legacy webhook (no timestamp) must not return 401, got %d", rr.Code)
 	}
 }

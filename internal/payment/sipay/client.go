@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -30,12 +31,90 @@ func init() {
 }
 
 const (
-	tokenTTL       = 25 * time.Minute // Sipay token lifetime minus 5-min buffer
-	maxRetries     = 2
+	connectTimeout = 10 * time.Second
 	requestTimeout = 30 * time.Second
+	tokenTTL       = 25 * time.Minute
+
+	// maxAttempts is the total attempt count for non-idempotent calls (1 + 1 token-refresh retry).
+	maxAttempts = 2
+	// maxReadAttempts is the total attempt count for idempotent reads (1 + 3 backoff retries per task spec).
+	maxReadAttempts = 3
+
+	// Circuit breaker: open after cbThreshold consecutive failures; retry after cbTimeout.
+	cbThreshold = 5
+	cbTimeout   = 30 * time.Second
 )
 
-// tokenCache holds the current bearer token with its expiry.
+// retryBackoffs are sleep durations between successive idempotent-read attempts.
+var retryBackoffs = [maxReadAttempts - 1]time.Duration{250 * time.Millisecond, 500 * time.Millisecond}
+
+// ── Circuit breaker ───────────────────────────────────────────────────────────
+
+type cbStateVal int
+
+const (
+	cbClosed   cbStateVal = 0
+	cbOpen     cbStateVal = 1
+	cbHalfOpen cbStateVal = 2
+)
+
+type circuitBreaker struct {
+	mu        sync.Mutex
+	state     cbStateVal
+	failures  int
+	openedAt  time.Time
+	threshold int
+	timeout   time.Duration
+}
+
+func newCircuitBreaker(threshold int, timeout time.Duration) *circuitBreaker {
+	return &circuitBreaker{threshold: threshold, timeout: timeout}
+}
+
+// allow returns true if the caller should proceed with the request.
+// Transitions Open → HalfOpen when timeout elapses.
+func (cb *circuitBreaker) allow() bool {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	switch cb.state {
+	case cbOpen:
+		if time.Since(cb.openedAt) < cb.timeout {
+			return false
+		}
+		cb.state = cbHalfOpen
+		return true
+	default:
+		return true
+	}
+}
+
+func (cb *circuitBreaker) recordSuccess() {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	cb.state = cbClosed
+	cb.failures = 0
+}
+
+func (cb *circuitBreaker) recordFailure() (opened bool) {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	cb.failures++
+	if cb.state != cbOpen && cb.failures >= cb.threshold {
+		cb.state = cbOpen
+		cb.openedAt = time.Now()
+		return true
+	}
+	return false
+}
+
+func (cb *circuitBreaker) isOpen() bool {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+	return cb.state == cbOpen
+}
+
+// ── Token cache ───────────────────────────────────────────────────────────────
+
 type tokenCache struct {
 	mu        sync.RWMutex
 	token     string
@@ -58,34 +137,65 @@ func (tc *tokenCache) set(token string) {
 	tc.expiresAt = time.Now().Add(tokenTTL)
 }
 
+func (tc *tokenCache) invalidate() {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+	tc.token = ""
+}
+
+// ── Adapter ───────────────────────────────────────────────────────────────────
+
+// AdapterOption configures optional Adapter behaviour.
+type AdapterOption func(*Adapter)
+
+// WithMetrics attaches Prometheus metrics to the Adapter.
+// If not provided, all metric recording is a no-op.
+func WithMetrics(m *SipayMetrics) AdapterOption {
+	return func(a *Adapter) { a.metrics = m }
+}
+
 // Adapter implements payment.Service against the Sipay marketplace API.
 type Adapter struct {
-	cfg    payment.SipayConfig
-	repo   payment.Repository
-	log    *slog.Logger
-	hc     *http.Client
-	tokens tokenCache
+	cfg     payment.SipayConfig
+	repo    payment.Repository
+	log     *slog.Logger
+	hc      *http.Client
+	tokens  tokenCache
+	cb      *circuitBreaker
+	metrics *SipayMetrics // nil = no-op
 }
 
 // NewAdapter constructs a Sipay adapter and validates configuration.
-// D2: in production mode it enforces that BaseURL points to the real Sipay host
+// In GO_ENV=production it enforces that BaseURL points to the real Sipay host
 // and that MerchantKey does NOT start with a sandbox prefix.
-func NewAdapter(cfg payment.SipayConfig, repo payment.Repository, log *slog.Logger) (*Adapter, error) {
+func NewAdapter(cfg payment.SipayConfig, repo payment.Repository, log *slog.Logger, opts ...AdapterOption) (*Adapter, error) {
 	if err := validateConfig(cfg); err != nil {
 		return nil, err
 	}
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Adapter{
+	a := &Adapter{
 		cfg:  cfg,
 		repo: repo,
 		log:  log,
-		hc:   &http.Client{Timeout: requestTimeout},
-	}, nil
+		hc: &http.Client{
+			Timeout: requestTimeout,
+			Transport: &http.Transport{
+				DialContext: (&net.Dialer{
+					Timeout: connectTimeout,
+				}).DialContext,
+			},
+		},
+		cb: newCircuitBreaker(cbThreshold, cbTimeout),
+	}
+	for _, opt := range opts {
+		opt(a)
+	}
+	return a, nil
 }
 
-// validateConfig enforces D2: production guard on BaseURL and MerchantKey.
+// validateConfig enforces the production guard on BaseURL and MerchantKey.
 func validateConfig(cfg payment.SipayConfig) error {
 	if cfg.BaseURL == "" {
 		return fmt.Errorf("sipay: SIPAY_BASE_URL is required")
@@ -104,9 +214,17 @@ func validateConfig(cfg payment.SipayConfig) error {
 	return nil
 }
 
-// --- Token management ---
+// redact returns the first 4 characters of s followed by "****".
+// Use on secret or PCI-sensitive field values before including them in log output.
+func redact(s string) string {
+	if len(s) <= 4 {
+		return "****"
+	}
+	return s[:4] + "****"
+}
 
-// tokenRequest is the body sent to Sipay's /ccpayment/api/token endpoint.
+// ── Token management ──────────────────────────────────────────────────────────
+
 type tokenRequest struct {
 	AppID     string `json:"app_id"`
 	AppSecret string `json:"app_secret"`
@@ -120,7 +238,6 @@ type tokenResponse struct {
 	} `json:"data"`
 }
 
-// getToken returns a cached token or fetches a fresh one.
 func (a *Adapter) getToken(ctx context.Context) (string, error) {
 	if tok, ok := a.tokens.get(); ok {
 		return tok, nil
@@ -140,16 +257,25 @@ func (a *Adapter) fetchToken(ctx context.Context) (string, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	start := time.Now()
 	resp, err := a.hc.Do(req)
+	elapsed := time.Since(start)
 	if err != nil {
+		a.log.Info("sipay: token request failed", "latency_ms", elapsed.Milliseconds(), "err", err)
+		a.metrics.observe("/ccpayment/api/token", "error", elapsed.Seconds())
 		return "", fmt.Errorf("sipay: token HTTP: %w", err)
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
+		a.metrics.observe("/ccpayment/api/token", "read_error", elapsed.Seconds())
 		return "", fmt.Errorf("sipay: read token body: %w", err)
 	}
+
+	statusStr := fmt.Sprintf("%d", resp.StatusCode)
+	a.log.Info("sipay: token request", "status", resp.StatusCode, "latency_ms", elapsed.Milliseconds())
+	a.metrics.observe("/ccpayment/api/token", statusStr, elapsed.Seconds())
 
 	var tr tokenResponse
 	if err := json.Unmarshal(raw, &tr); err != nil {
@@ -163,56 +289,163 @@ func (a *Adapter) fetchToken(ctx context.Context) (string, error) {
 	return tr.Data.Token, nil
 }
 
-// --- Generic request helper ---
+// ── Generic request helper ────────────────────────────────────────────────────
 
 // doJSON sends an authenticated POST and decodes the response into dst.
 // On HTTP 401 it refreshes the token once (retry-on-401 pattern).
+// Not safe for idempotent use with automatic backoff — use doJSONIdempotent for reads.
 func (a *Adapter) doJSON(ctx context.Context, path string, payload, dst any) error {
-	for attempt := 0; attempt < maxRetries; attempt++ {
+	return a.doJSONWithOpts(ctx, path, payload, dst, false)
+}
+
+// doJSONIdempotent is identical to doJSON but applies exponential backoff retries
+// on transient failures. Use only for idempotent read endpoints (CheckStatus, etc.).
+func (a *Adapter) doJSONIdempotent(ctx context.Context, path string, payload, dst any) error {
+	return a.doJSONWithOpts(ctx, path, payload, dst, true)
+}
+
+// attemptResult is the outcome of a single HTTP attempt.
+type attemptResult struct {
+	raw             []byte
+	httpStatus      int
+	elapsed         time.Duration
+	err             error
+	tokenInvalidate bool
+}
+
+// attemptDecision is the action doJSONWithOpts should take after inspecting an attemptResult.
+type attemptDecision int
+
+const (
+	decisionSuccess attemptDecision = iota
+	decisionRetry
+	decisionFatal
+)
+
+// inspect maps an attemptResult to a decision and an error value.
+// It updates circuit-breaker state and metrics as a side effect.
+func (a *Adapter) inspect(path string, res attemptResult) (attemptDecision, error) {
+	if res.tokenInvalidate {
+		a.tokens.invalidate()
+		return decisionRetry, nil
+	}
+	if res.err != nil {
+		if opened := a.cb.recordFailure(); opened {
+			a.metrics.setCBOpen(true)
+			a.log.Warn("sipay: circuit breaker opened", "path", path, "failures", cbThreshold)
+		}
+		return decisionRetry, res.err
+	}
+	if res.httpStatus < 200 || res.httpStatus >= 300 {
+		if opened := a.cb.recordFailure(); opened {
+			a.metrics.setCBOpen(true)
+			a.log.Warn("sipay: circuit breaker opened", "path", path, "http_status", res.httpStatus)
+		}
+		return decisionRetry, fmt.Errorf("sipay: %s returned HTTP %d: %s", path, res.httpStatus, res.raw)
+	}
+	return decisionSuccess, nil
+}
+
+// doAttempt executes one HTTP round-trip and returns a structured result.
+func (a *Adapter) doAttempt(ctx context.Context, path, tok string, body []byte, attempt int) attemptResult {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, a.cfg.BaseURL+path, bytes.NewReader(body))
+	if err != nil {
+		return attemptResult{err: fmt.Errorf("sipay: build request: %w", err)}
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+tok)
+
+	start := time.Now()
+	resp, err := a.hc.Do(req)
+	elapsed := time.Since(start)
+	if err != nil {
+		a.log.Info("sipay: request error",
+			"path", path, "attempt", attempt+1, "latency_ms", elapsed.Milliseconds(), "err", err)
+		a.metrics.observe(path, "error", elapsed.Seconds())
+		return attemptResult{elapsed: elapsed, err: fmt.Errorf("sipay: %s: %w", path, err)}
+	}
+
+	raw, readErr := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if readErr != nil {
+		a.metrics.observe(path, "read_error", elapsed.Seconds())
+		return attemptResult{elapsed: elapsed, err: fmt.Errorf("sipay: read body: %w", readErr)}
+	}
+
+	a.log.Info("sipay: request",
+		"path", path, "attempt", attempt+1,
+		"http_status", resp.StatusCode, "latency_ms", elapsed.Milliseconds())
+	a.metrics.observe(path, fmt.Sprintf("%d", resp.StatusCode), elapsed.Seconds())
+
+	return attemptResult{
+		raw:             raw,
+		httpStatus:      resp.StatusCode,
+		elapsed:         elapsed,
+		tokenInvalidate: resp.StatusCode == http.StatusUnauthorized && attempt == 0,
+	}
+}
+
+func (a *Adapter) doJSONWithOpts(ctx context.Context, path string, payload, dst any, idempotent bool) error {
+	if !a.cb.allow() {
+		a.metrics.observe(path, "circuit_open", 0)
+		return fmt.Errorf("sipay: %s: circuit breaker open — Sipay API unavailable", path)
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("sipay: marshal request: %w", err)
+	}
+
+	limit := maxAttempts
+	if idempotent {
+		limit = maxReadAttempts
+	}
+
+	var lastErr error
+	for attempt := 0; attempt < limit; attempt++ {
+		if attempt > 0 && idempotent {
+			if err := a.backoffDelay(ctx, attempt-1); err != nil {
+				return err
+			}
+		}
+
 		tok, err := a.getToken(ctx)
 		if err != nil {
 			return err
 		}
 
-		body, err := json.Marshal(payload)
-		if err != nil {
-			return fmt.Errorf("sipay: marshal request: %w", err)
-		}
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-			a.cfg.BaseURL+path, bytes.NewReader(body))
-		if err != nil {
-			return fmt.Errorf("sipay: build request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", "Bearer "+tok)
-
-		resp, err := a.hc.Do(req)
-		if err != nil {
-			return fmt.Errorf("sipay: %s: %w", path, err)
-		}
-		raw, readErr := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if readErr != nil {
-			return fmt.Errorf("sipay: read body: %w", readErr)
-		}
-
-		if resp.StatusCode == http.StatusUnauthorized && attempt == 0 {
-			// Force token refresh on the next iteration.
-			a.tokens.mu.Lock()
-			a.tokens.token = ""
-			a.tokens.mu.Unlock()
+		res := a.doAttempt(ctx, path, tok, body, attempt)
+		decision, decErr := a.inspect(path, res)
+		switch decision {
+		case decisionSuccess:
+			if err := json.Unmarshal(res.raw, dst); err != nil {
+				return fmt.Errorf("sipay: decode response from %s: %w", path, err)
+			}
+			a.cb.recordSuccess()
+			a.metrics.setCBOpen(false)
+			return nil
+		case decisionRetry:
+			lastErr = decErr
+			if !idempotent && decErr != nil && !res.tokenInvalidate {
+				return lastErr
+			}
 			continue
+		default:
+			return decErr
 		}
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return fmt.Errorf("sipay: %s returned HTTP %d: %s", path, resp.StatusCode, raw)
-		}
-		if err := json.Unmarshal(raw, dst); err != nil {
-			return fmt.Errorf("sipay: decode response from %s: %w", path, err)
-		}
-		return nil
 	}
-	return fmt.Errorf("sipay: %s: exhausted retries", path)
+	return lastErr
+}
+
+func (a *Adapter) backoffDelay(ctx context.Context, idx int) error {
+	if idx < len(retryBackoffs) {
+		select {
+		case <-time.After(retryBackoffs[idx]):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return nil
 }
 
 // ComputeHashKey is defined in hmac.go.

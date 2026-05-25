@@ -205,6 +205,7 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 		BuyerSurname:   req.BuyerSurname,
 		BuyerEmail:     req.BuyerEmail,
 		Market:         market,
+		ReturnURL:      req.ReturnURL,
 	})
 
 	if pspErr != nil {
@@ -235,6 +236,7 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 	return InitiateCheckoutResponse{
 		SessionID:   req.SessionID,
 		ThreeDSHTML: pspResp.ThreeDSHTML,
+		ThreeDSURL:  pspResp.ThreeDSURL,
 		Orders:      createdOrders,
 	}, nil
 }

@@ -73,6 +73,7 @@ func main() {
 	metrics.NewEventBusMetrics(metricsReg)
 	outboxM := metrics.NewOutboxMetrics(metricsReg)
 	bizM := metrics.NewBusinessMetrics(metricsReg)
+	sipayM := sipay.NewSipayMetrics(metricsReg)
 	// /metrics server starts after signal ctx is created below.
 
 	slog.Info("core-svc: starting", "market", market)
@@ -167,7 +168,7 @@ func main() {
 	}()
 
 	// ── Sipay adapter + webhook handler ──────────────────────────────────────
-	sipayAdapter, err := sipay.NewAdapter(sipaycfg, paymentRepo, slog.Default())
+	sipayAdapter, err := sipay.NewAdapter(sipaycfg, paymentRepo, slog.Default(), sipay.WithMetrics(sipayM))
 	if err != nil {
 		slog.Error("sipay: adapter init failed", "err", err)
 		os.Exit(1)
@@ -199,6 +200,16 @@ func main() {
 	webhookHandler := sipay.NewWebhookHandler(
 		sipayAdapter, paymentRepo, paymentOutbox, rc, market, cashbackCurrency, slog.Default(),
 	).WithCaptureFinalizer(captureFinalizer)
+
+	// ── Payment reconciler — catches webhooks dropped by Sipay ───────────────
+	paymentReconciler := payment.NewReconciler(
+		paymentRepo, paymentSvc, paymentOutbox, market, cashbackCurrency, slog.Default(),
+	)
+	go func() {
+		if err := paymentReconciler.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("core-svc: payment reconciler exited unexpectedly", "err", err)
+		}
+	}()
 
 	// ── Shipping module wiring ───────────────────────────────────────────────
 	shippingRepo := shipping.NewRepository(pool)
@@ -420,6 +431,10 @@ func main() {
 	)
 	mux.Handle("GET /payments/{provider_ref}/status",
 		httpTrace(http.HandlerFunc(handlePaymentStatus(paymentSvc))),
+	)
+	// DB-only status poll for the web redirect page; no auth needed (UUID is unguessable).
+	mux.Handle("GET /payments/{invoiceID}/intent-status",
+		httpTrace(http.HandlerFunc(handlePaymentIntentStatus(paymentRepo))),
 	)
 	// Webhook route — must match Caddyfile @psp_webhook path /payments/webhook/*
 	// so the explicit no-middleware handle block applies (CLAUDE.md § 9).

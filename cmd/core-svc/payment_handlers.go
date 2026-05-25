@@ -65,6 +65,36 @@ func handlePaymentStatus(svc payment.Service) http.HandlerFunc {
 	}
 }
 
+// handlePaymentIntentStatus handles GET /payments/{invoiceID}/intent-status.
+// Returns the DB-stored payment status without calling the PSP. Used by the web
+// polling loop on /checkout/redirect to detect when the Sipay webhook has landed.
+// No auth required — invoiceID is a cryptographically random UUID (unguessable).
+func handlePaymentIntentStatus(repo payment.Repository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		invoiceID := r.PathValue("invoiceID")
+		if invoiceID == "" {
+			jsonError(w, "invoiceID required", http.StatusBadRequest)
+			return
+		}
+		intent, err := repo.FindPaymentIntentByIdempotencyKey(r.Context(), invoiceID)
+		if errors.Is(err, payment.ErrPaymentNotFound) {
+			// Webhook hasn't arrived yet; webhook is source of truth.
+			jsonOK(w, http.StatusOK, map[string]any{"status": "pending"})
+			return
+		}
+		if err != nil {
+			slog.Error("payment: FindPaymentIntentByIdempotencyKey", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		resp := map[string]any{"status": string(intent.Status), "order_id": intent.OrderID}
+		if intent.FailureReason != "" {
+			resp["failure_reason"] = intent.FailureReason
+		}
+		jsonOK(w, http.StatusOK, resp)
+	}
+}
+
 // handleSipayWebhook wraps the Sipay WebhookHandler as an http.HandlerFunc.
 // The actual handler is a *sipay.WebhookHandler injected at startup.
 func handleSipayWebhook(h *sipay.WebhookHandler) http.HandlerFunc {

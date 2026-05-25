@@ -7,6 +7,7 @@ import { OrderSummary } from "@/components/checkout/order-summary";
 import { StepAddress, type AddressFormValues } from "@/components/checkout/step-address";
 import { StepPayment, type PaymentFormValues } from "@/components/checkout/step-payment";
 import { StepReview } from "@/components/checkout/step-review";
+import { getSipayErrorMessage } from "@/lib/payments/error-map";
 import { useCartItems } from "@/store/cart";
 import { cn } from "@/lib/utils";
 
@@ -133,6 +134,11 @@ function CheckoutFlow() {
                 address={addressRef.current}
                 payment={paymentRef.current}
                 onBack={() => goToStep(2)}
+                initialError={
+                  searchParams.get("error")
+                    ? getSipayErrorMessage(searchParams.get("error"))
+                    : undefined
+                }
               />
             </>
           )}

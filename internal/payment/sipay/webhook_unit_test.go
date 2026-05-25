@@ -46,6 +46,9 @@ func (unitStubRepo) UpdatePaymentStatus(_ context.Context, _ pgx.Tx, _ string, _
 func (unitStubRepo) FindPaymentByOrderID(_ context.Context, _ int64) (payment.PaymentIntent, error) {
 	return payment.PaymentIntent{}, payment.ErrPaymentNotFound
 }
+func (unitStubRepo) FindExpiredPendingPayments(_ context.Context, _ int) ([]payment.PaymentIntent, error) {
+	return nil, nil
+}
 func (unitStubRepo) WithTx(_ context.Context, fn func(pgx.Tx) error) error {
 	return fn(nil)
 }

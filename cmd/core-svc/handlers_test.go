@@ -109,6 +109,9 @@ func (s *stubPaymentRepo) UpdatePaymentStatus(ctx context.Context, tx pgx.Tx, pr
 	}
 	return nil
 }
+func (s *stubPaymentRepo) FindExpiredPendingPayments(_ context.Context, _ int) ([]payment.PaymentIntent, error) {
+	return nil, nil
+}
 func (s *stubPaymentRepo) WithTx(_ context.Context, fn func(pgx.Tx) error) error {
 	return fn(nil)
 }

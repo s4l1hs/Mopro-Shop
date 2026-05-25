@@ -60,6 +60,12 @@ type Repository interface {
 		capturedAt, failedAt, refundedAt *string, failureReason, refundRef string,
 		refundAmountMinor int64) error
 
+	// FindExpiredPendingPayments returns up to limit payments that are still in
+	// 'pending' state but whose expires_at timestamp has passed (with a 2-minute
+	// buffer). Used by the background reconciler to catch dropped webhooks.
+	// Rows are locked with SKIP LOCKED so concurrent reconciler instances are safe.
+	FindExpiredPendingPayments(ctx context.Context, limit int) ([]PaymentIntent, error)
+
 	// WithTx begins a transaction and calls fn within it, committing on nil return.
 	WithTx(ctx context.Context, fn func(pgx.Tx) error) error
 }

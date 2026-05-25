@@ -102,11 +102,13 @@ type InitiateCheckoutRequest struct {
 	BuyerName     string
 	BuyerSurname  string
 	BuyerEmail    string
+	ReturnURL     string // 3DS redirect URL on success; falls back to PSP config default when empty
 }
 
 // InitiateCheckoutResponse is returned by Service.InitiateCheckout.
 type InitiateCheckoutResponse struct {
 	SessionID   string  // checkout_session.id
 	ThreeDSHTML string  // rendered by mobile WebView
+	ThreeDSURL  string  // full redirect URL for web clients (extracted from ThreeDSHTML form action)
 	Orders      []Order // per-seller orders created
 }

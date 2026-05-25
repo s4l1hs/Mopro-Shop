@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { OrderSummary } from "./order-summary";
-import { apiFetch } from "@/lib/api-client";
-import { useCartItems, useCartStore } from "@/store/cart";
+import { useCartItems } from "@/store/cart";
+import { useCheckoutStore } from "@/lib/checkout/checkout-store";
+import { getSipayErrorMessage } from "@/lib/payments/error-map";
 import type { AddressFormValues } from "./step-address";
 import type { PaymentFormValues } from "./step-payment";
 
@@ -15,54 +14,82 @@ interface StepReviewProps {
   address: AddressFormValues;
   payment: PaymentFormValues;
   onBack: () => void;
+  initialError?: string | undefined;
 }
 
-export function StepReview({ address, payment, onBack }: StepReviewProps) {
+type SubmitState =
+  | { kind: "idle" }
+  | { kind: "submitting" }
+  | { kind: "redirecting"; url: string }
+  | { kind: "error"; message: string };
+
+export function StepReview({ address, payment, onBack, initialError }: StepReviewProps) {
   const [consent1, setConsent1] = useState(false);
   const [consent2, setConsent2] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+  const [state, setState] = useState<SubmitState>(
+    initialError ? { kind: "error", message: initialError } : { kind: "idle" },
+  );
   const items = useCartItems();
-  const clearCart = useCartStore((s) => s.clearCart);
-  const router = useRouter();
+  const { getOrCreateIdempotencyKey, clearCardData } = useCheckoutStore();
 
+  const submitting = state.kind === "submitting" || state.kind === "redirecting";
   const canSubmit = consent1 && consent2 && !submitting && items.length > 0;
 
   const handlePlaceOrder = async () => {
     if (!canSubmit) return;
-    setSubmitting(true);
+
+    setState({ kind: "submitting" });
+
+    const idempotencyKey = getOrCreateIdempotencyKey();
+
+    // returnURL: Sipay redirects here after 3DS; we parse invoice_id from query params.
+    const returnURL = `${window.location.origin}/checkout/redirect`;
+
+    let data: { sipay_3ds_url?: string; session_id?: string; invoice_id?: string; error?: string; message?: string };
     try {
-      type OrderResponse = { id: string };
-      const res = await apiFetch<OrderResponse>("/orders", {
+      const res = await fetch("/api/payments/intent", {
         method: "POST",
-        body: {
-          items: items.map((it) => ({
-            productId: it.productId,
-            quantity: it.quantity,
-            priceMinor: it.priceMinor,
-          })),
-          address: {
-            fullName: address.fullName,
-            phone: address.phone,
-            city: address.city,
-            district: address.district,
-            addressLine: address.addressLine,
-            postalCode: address.postalCode ?? "",
-          },
-          payment: {
-            // Sipay mock: send masked card data only
-            lastFour: payment.cardNumber.replace(/\s/g, "").slice(-4),
-            holderName: payment.holderName,
-            expiry: payment.expiry,
-          },
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
         },
+        body: JSON.stringify({
+          address: { fullName: address.fullName },
+          return_url: returnURL,
+          consent: {
+            distance_sale: consent2,
+            pre_info: consent1,
+            ts: new Date().toISOString(),
+          },
+        }),
       });
-      clearCart();
-      router.push(`/orders/${res.id}?status=success`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Sipariş gönderilemedi";
-      toast.error(msg);
-      setSubmitting(false);
+
+      data = await res.json();
+
+      if (!res.ok) {
+        const code = data.error ?? "unknown";
+        setState({ kind: "error", message: getSipayErrorMessage(code) });
+        return;
+      }
+    } catch {
+      setState({ kind: "error", message: getSipayErrorMessage(null) });
+      return;
     }
+
+    if (!data.sipay_3ds_url) {
+      setState({
+        kind: "error",
+        message: "3D Secure adresi alınamadı. Lütfen tekrar deneyin.",
+      });
+      return;
+    }
+
+    // Clear sensitive display fields before leaving the page.
+    clearCardData();
+    setState({ kind: "redirecting", url: data.sipay_3ds_url });
+
+    // Full-page nav — not router.push, not iframe — per Sipay 3DS integration spec.
+    window.location.assign(data.sipay_3ds_url);
   };
 
   return (
@@ -80,7 +107,7 @@ export function StepReview({ address, payment, onBack }: StepReviewProps) {
         </div>
       </section>
 
-      {/* Payment summary */}
+      {/* Payment summary — display only; card data not sent to our backend */}
       <section className="space-y-2">
         <h3 className="text-sm font-semibold text-foreground">Ödeme Yöntemi</h3>
         <div className="rounded-md border border-border px-4 py-3 text-sm text-muted-foreground">
@@ -111,6 +138,18 @@ export function StepReview({ address, payment, onBack }: StepReviewProps) {
         </ConsentBox>
       </div>
 
+      {state.kind === "error" && (
+        <p role="alert" className="text-sm text-destructive rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+          {state.message}
+        </p>
+      )}
+
+      {state.kind === "redirecting" && (
+        <p className="text-sm text-muted-foreground text-center animate-pulse">
+          Sipay güvenli ödeme sayfasına yönlendiriliyorsunuz…
+        </p>
+      )}
+
       <div className="flex gap-3 pt-1">
         <Button type="button" variant="outline" onClick={onBack} disabled={submitting}>
           Geri
@@ -121,7 +160,11 @@ export function StepReview({ address, payment, onBack }: StepReviewProps) {
           onClick={handlePlaceOrder}
           className="flex-1"
         >
-          {submitting ? "Sipariş veriliyor…" : "Siparişi onayla"}
+          {state.kind === "submitting"
+            ? "İşleniyor…"
+            : state.kind === "redirecting"
+              ? "Yönlendiriliyor…"
+              : "Siparişi Onayla ve Öde"}
         </Button>
       </div>
     </div>
@@ -149,3 +192,4 @@ function ConsentBox({
     </label>
   );
 }
+

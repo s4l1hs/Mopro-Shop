@@ -21,10 +21,11 @@ type InitiatePaymentRequest struct {
 	CancelURL      string // 3DS redirect on cancel
 }
 
-// InitiatePaymentResponse is the payload returned to the mobile WebView.
+// InitiatePaymentResponse is the payload returned to the caller.
 type InitiatePaymentResponse struct {
 	ProviderRef string    // Sipay invoice_id = IdempotencyKey from request
 	ThreeDSHTML string    // raw HTML fragment the mobile renders in a WebView
+	ThreeDSURL  string    // 3DS redirect URL for web clients (extracted from ThreeDSHTML form action)
 	ExpiresAt   time.Time // payment session expiry (~30 min from now)
 }
 

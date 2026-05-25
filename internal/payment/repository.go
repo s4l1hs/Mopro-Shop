@@ -105,6 +105,42 @@ func (r *pgxPaymentRepository) FindPaymentByOrderID(ctx context.Context, orderID
 	return p, nil
 }
 
+func (r *pgxPaymentRepository) FindExpiredPendingPayments(ctx context.Context, limit int) ([]PaymentIntent, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, order_id, idempotency_key, provider, provider_ref, provider_order_no,
+		        status, amount_minor, currency,
+		        captured_at, failed_at, failure_reason, refunded_at, refund_ref,
+		        refund_amount_minor, raw_response, created_at, updated_at
+		   FROM order_schema.payments
+		  WHERE status = 'pending'
+		    AND expires_at IS NOT NULL
+		    AND expires_at < NOW() - INTERVAL '2 minutes'
+		  ORDER BY expires_at ASC
+		  LIMIT $1
+		  FOR UPDATE SKIP LOCKED`,
+		limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("payment.repo: FindExpiredPendingPayments: %w", err)
+	}
+	defer rows.Close()
+
+	var results []PaymentIntent
+	for rows.Next() {
+		var p PaymentIntent
+		if err := rows.Scan(
+			&p.ID, &p.OrderID, &p.IdempotencyKey, &p.Provider, &p.ProviderRef, &p.ProviderOrderNo,
+			&p.Status, &p.AmountMinor, &p.Currency,
+			&p.CapturedAt, &p.FailedAt, &p.FailureReason, &p.RefundedAt, &p.RefundRef,
+			&p.RefundAmountMinor, &p.RawResponse, &p.CreatedAt, &p.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("payment.repo: FindExpiredPendingPayments scan: %w", err)
+		}
+		results = append(results, p)
+	}
+	return results, rows.Err()
+}
+
 func (r *pgxPaymentRepository) UpdatePaymentStatus(
 	ctx context.Context, tx pgx.Tx, providerRef string, status PaymentStatus,
 	capturedAt, failedAt, refundedAt *string, failureReason, refundRef string,

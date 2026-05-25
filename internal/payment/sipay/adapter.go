@@ -5,11 +5,24 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"time"
 
 	"github.com/mopro/platform/internal/payment"
 )
+
+var formActionRe = regexp.MustCompile(`action="([^"]+)"`)
+
+// extractFormAction returns the first HTML form action URL from an HTML string.
+// Used to derive the Sipay 3DS redirect URL from the ccform response for web clients.
+func extractFormAction(html string) string {
+	m := formActionRe.FindStringSubmatch(html)
+	if len(m) < 2 {
+		return ""
+	}
+	return m[1]
+}
 
 // --- InitiatePayment ---
 
@@ -52,6 +65,16 @@ func (a *Adapter) InitiatePayment(ctx context.Context, req payment.InitiatePayme
 		return payment.InitiatePaymentResponse{}, fmt.Errorf("sipay: idempotency check: %w", err)
 	}
 
+	// Use request return/cancel URLs; fall back to adapter config defaults.
+	returnURL := req.ReturnURL
+	if returnURL == "" {
+		returnURL = a.cfg.ReturnURL
+	}
+	cancelURL := req.CancelURL
+	if cancelURL == "" {
+		cancelURL = a.cfg.CancelURL
+	}
+
 	amountStr := strconv.FormatInt(req.AmountMinor, 10)
 	var resp initPayResp
 	if err := a.doJSON(ctx, "/ccpayment/api/paySmart3D", initPayReq{
@@ -59,8 +82,8 @@ func (a *Adapter) InitiatePayment(ctx context.Context, req payment.InitiatePayme
 		Amount:     amountStr,
 		Currency:   req.Currency,
 		MerchantID: a.cfg.MerchantID,
-		ReturnURL:  req.ReturnURL,
-		CancelURL:  req.CancelURL,
+		ReturnURL:  returnURL,
+		CancelURL:  cancelURL,
 		Name:       req.BuyerName + " " + req.BuyerSurname,
 		Email:      req.BuyerEmail,
 		Market:     req.Market,
@@ -76,7 +99,7 @@ func (a *Adapter) InitiatePayment(ctx context.Context, req payment.InitiatePayme
 		OrderID:        req.OrderID,
 		IdempotencyKey: req.IdempotencyKey,
 		Provider:       "sipay",
-		ProviderRef:    req.IdempotencyKey, // Sipay uses our invoice_id as its reference
+		ProviderRef:    req.IdempotencyKey,
 		Status:         payment.PaymentStatusPending,
 		AmountMinor:    req.AmountMinor,
 		Currency:       req.Currency,
@@ -88,9 +111,11 @@ func (a *Adapter) InitiatePayment(ctx context.Context, req payment.InitiatePayme
 	// out mid-3DS, so we defer the DB write to webhook confirmation.
 	_ = intent
 
+	threeDSURL := extractFormAction(resp.Data.ThreeDSHTML)
 	return payment.InitiatePaymentResponse{
 		ProviderRef: req.IdempotencyKey,
 		ThreeDSHTML: resp.Data.ThreeDSHTML,
+		ThreeDSURL:  threeDSURL,
 		ExpiresAt:   time.Now().Add(30 * time.Minute),
 	}, nil
 }

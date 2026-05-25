@@ -122,9 +122,10 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //n
 		return
 	}
 
-	// Extract hash_key from body to pass as sig to ConfirmWebhook.
+	// Extract hash_key and optional timestamp from body before full parsing.
 	var raw struct {
-		HashKey string `json:"hash_key"`
+		HashKey   string `json:"hash_key"`
+		Timestamp int64  `json:"timestamp"` // Unix seconds; 0 = absent (legacy events)
 	}
 	if err := json.Unmarshal(body, &raw); err != nil {
 		h.log.Warn("sipay webhook: invalid JSON")
@@ -143,6 +144,19 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) { //n
 		h.log.Error("sipay webhook: ConfirmWebhook", "err", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
+	}
+
+	// Replay protection: reject webhooks with a timestamp older than 5 minutes.
+	// Legacy Sipay webhooks omit the timestamp field (raw.Timestamp == 0) and are
+	// allowed through to avoid breaking existing deployments.
+	if raw.Timestamp > 0 {
+		age := time.Since(time.Unix(raw.Timestamp, 0))
+		if age > 5*time.Minute {
+			h.log.Warn("sipay webhook: replay attempt rejected",
+				"provider_ref", ev.ProviderRef, "age_seconds", int(age.Seconds()))
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
 	}
 
 	// Reject unknown event types before any DB or outbox work.
