@@ -9,15 +9,18 @@ class CheckoutRepositoryImpl implements CheckoutRepository {
 
   @override
   Future<CheckoutResponseDto> initiate({
-    required int addressId,
-    required String paymentMethod,
+    required String buyerName,
+    required String buyerSurname,
     required String idempotencyKey,
+    String returnUrl = 'mopro://checkout/result',
   }) async {
     final resp = await _dio.post<Map<String, dynamic>>(
       '/checkout/initiate',
       data: {
-        'address_id': addressId,
-        'payment_method': paymentMethod,
+        'buyer_name': buyerName,
+        'buyer_surname': buyerSurname,
+        'buyer_email': '',
+        'return_url': returnUrl,
       },
       options: Options(
         headers: {'Idempotency-Key': idempotencyKey},

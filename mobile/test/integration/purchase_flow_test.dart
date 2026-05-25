@@ -12,6 +12,7 @@ import 'package:mopro/features/checkout/data/checkout_response_dto.dart';
 import 'package:mopro/features/order/application/orders_provider.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/features/order/data/order_repository.dart';
+import 'package:mopro_api/mopro_api.dart';
 
 // ── Fakes ─────────────────────────────────────────────────────────────────────
 
@@ -96,13 +97,14 @@ class _FakeCartRepo implements CartRepository {
 class _FakeCheckoutRepo implements CheckoutRepository {
   @override
   Future<CheckoutResponseDto> initiate({
-    required int addressId,
-    required String paymentMethod,
+    required String buyerName,
+    required String buyerSurname,
     required String idempotencyKey,
+    String returnUrl = 'mopro://checkout/result',
   }) async =>
       CheckoutResponseDto(
         sessionId: 'sess-1',
-        threeDsHtml: '<html>3DS</html>',
+        sipayThreeDsUrl: 'https://ccpayment.sipay.com.tr/3DGate?token=abc',
         orders: [
           OrderDto(
             id: 101,
@@ -115,6 +117,17 @@ class _FakeCheckoutRepo implements CheckoutRepository {
         ],
       );
 }
+
+Address _fakeAddress({int id = 5}) => Address(
+      id: id,
+      label: 'Ev',
+      name: 'Test Kullanıcı',
+      phone: '05551234567',
+      city: 'İstanbul',
+      district: 'Kadıköy',
+      fullAddress: 'Test Sokak 1',
+      isDefault: true,
+    );
 
 class _FakeOrderRepo implements OrderRepository {
   @override
@@ -183,7 +196,9 @@ void main() {
     expect(cart.grandTotalMinor, 9900);
 
     // Step 3: Select address and place order
-    container.read(checkoutControllerProvider.notifier).selectAddress(5);
+    container
+        .read(checkoutControllerProvider.notifier)
+        .selectAddress(_fakeAddress(id: 5));
     expect(container.read(checkoutControllerProvider).canProceed, true);
 
     await container.read(checkoutControllerProvider.notifier).placeOrder();
@@ -191,6 +206,7 @@ void main() {
     expect(checkoutState.response, isNotNull);
     expect(checkoutState.response!.orders.length, 1);
     expect(checkoutState.response!.orders.first.id, 101);
+    expect(checkoutState.response!.sipayThreeDsUrl, isNotEmpty);
     expect(checkoutState.response!.requires3ds, true);
 
     // Step 4: Verify order appears in history
@@ -218,7 +234,9 @@ void main() {
 
   test('checkout requires address before proceeding', () {
     expect(container.read(checkoutControllerProvider).canProceed, false);
-    container.read(checkoutControllerProvider.notifier).selectAddress(3);
+    container
+        .read(checkoutControllerProvider.notifier)
+        .selectAddress(_fakeAddress(id: 3));
     expect(container.read(checkoutControllerProvider).canProceed, true);
   });
 }

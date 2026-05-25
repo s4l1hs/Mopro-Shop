@@ -6,7 +6,9 @@ import 'package:intl/intl.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/checkout/application/checkout_controller.dart';
+import 'package:mopro/features/checkout/presentation/sipay_webview_screen.dart';
 import 'package:mopro/features/checkout/widgets/checkout_stepper.dart';
+import 'package:mopro/features/payments/sipay_error_map.dart';
 
 class CheckoutReviewScreen extends ConsumerStatefulWidget {
   const CheckoutReviewScreen({super.key});
@@ -21,12 +23,6 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
   bool _consentDistanceContract = false;
 
   @override
-  void initState() {
-    super.initState();
-    // Listen for checkout result to navigate
-  }
-
-  @override
   Widget build(BuildContext context) {
     final checkoutState = ref.watch(checkoutControllerProvider);
     final cartState = ref.watch(cartProvider);
@@ -38,12 +34,23 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
     final grandTotal = cartState.cart.valueOrNull?.grandTotalMinor ?? 0;
     final lines = cartState.cart.valueOrNull?.lines ?? [];
 
+    // Detect a fresh payment intent response and launch the Sipay WebView.
     ref.listen(checkoutControllerProvider, (prev, next) {
-      if (next.response != null && prev?.response == null) {
-        if (next.response!.requires3ds) {
-          context.push('/checkout/3ds');
+      final prevResponse = prev?.response;
+      final nextResponse = next.response;
+      if (nextResponse != null && prevResponse == null) {
+        final url = nextResponse.sipayThreeDsUrl;
+        final invoiceId = next.invoiceId ?? '';
+        if (url.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _launchSipayWebView(url, invoiceId);
+          });
         } else {
-          context.go('/checkout/result');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            context.go('/checkout/result?failed=1');
+          });
         }
       }
     });
@@ -102,7 +109,8 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
                 _ConsentCheckbox(
                   value: _consentSales,
                   label: 'checkout.consent_sales'.tr(),
-                  onChanged: (v) => setState(() => _consentSales = v ?? false),
+                  onChanged: (v) =>
+                      setState(() => _consentSales = v ?? false),
                 ),
                 const SizedBox(height: 8),
                 _ConsentCheckbox(
@@ -111,12 +119,23 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
                   onChanged: (v) =>
                       setState(() => _consentDistanceContract = v ?? false),
                 ),
+                // Network / API error
                 if (checkoutState.error != null) ...[
                   const SizedBox(height: 16),
                   ErrorBanner(
                     error: checkoutState.error!,
                     onRetry: () =>
                         ref.read(checkoutControllerProvider.notifier).placeOrder(),
+                  ),
+                ],
+                // Payment / 3DS failure message
+                if (checkoutState.paymentError != null) ...[
+                  const SizedBox(height: 16),
+                  _PaymentErrorBanner(
+                    message: checkoutState.paymentError!,
+                    onDismiss: () => ref
+                        .read(checkoutControllerProvider.notifier)
+                        .clearPaymentError(),
                   ),
                 ],
               ],
@@ -132,6 +151,34 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
             ref.read(checkoutControllerProvider.notifier).placeOrder(),
       ),
     );
+  }
+
+  Future<void> _launchSipayWebView(String url, String invoiceId) async {
+    final result = await Navigator.of(context).push<SipayResult>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => SipayWebViewScreen(url: url, invoiceId: invoiceId),
+      ),
+    );
+    if (!mounted) return;
+    switch (result) {
+      case null:
+      case SipayResultCancelled():
+        // User closed — clear the pending response so they can retry
+        ref.read(checkoutControllerProvider.notifier)
+          ..clearPaymentError();
+        // Invalidate the response so the ref.listen trigger can fire again on retry
+        break;
+      case SipayResultFailed(:final reason):
+        ref.read(checkoutControllerProvider.notifier).setPaymentError(
+          SipayErrorMap.get(reason),
+        );
+      case SipayResultError(:final message):
+        ref.read(checkoutControllerProvider.notifier).setPaymentError(message);
+      case SipayResultSuccess():
+        // Navigation to /checkout/redirect already happened inside WebView screen
+        break;
+    }
   }
 }
 
@@ -201,6 +248,46 @@ class _ConsentCheckbox extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _PaymentErrorBanner extends StatelessWidget {
+  const _PaymentErrorBanner({required this.message, required this.onDismiss});
+
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.errorContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: cs.error.withOpacity(0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.error_outline, color: cs.onErrorContainer, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: cs.onErrorContainer),
+            ),
+          ),
+          GestureDetector(
+            onTap: onDismiss,
+            child: Icon(Icons.close, size: 16, color: cs.onErrorContainer),
+          ),
+        ],
+      ),
     );
   }
 }

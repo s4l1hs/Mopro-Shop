@@ -19,9 +19,9 @@ import 'package:mopro/features/catalog/screens/category_screen.dart';
 import 'package:mopro/features/catalog/screens/home_screen.dart';
 import 'package:mopro/features/catalog/screens/product_detail_screen.dart';
 import 'package:mopro/features/catalog/screens/search_screen.dart';
-import 'package:mopro/features/checkout/presentation/checkout_3ds_webview_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_address_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_payment_screen.dart';
+import 'package:mopro/features/checkout/presentation/checkout_redirect_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_result_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_review_screen.dart';
 import 'package:mopro/features/favorites/favorites_screen.dart';
@@ -188,8 +188,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const CheckoutReviewScreen(),
           ),
           GoRoute(
-            path: '3ds',
-            builder: (_, __) => const Checkout3dsWebviewScreen(),
+            path: 'redirect',
+            builder: (_, state) {
+              final invoiceId = (state.extra as String?) ?? '';
+              return CheckoutRedirectScreen(invoiceId: invoiceId);
+            },
           ),
           GoRoute(
             path: 'result',

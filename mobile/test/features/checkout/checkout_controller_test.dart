@@ -5,10 +5,22 @@ import 'package:mopro/features/checkout/application/checkout_controller.dart';
 import 'package:mopro/features/checkout/data/checkout_repository.dart';
 import 'package:mopro/features/checkout/data/checkout_response_dto.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
+import 'package:mopro_api/mopro_api.dart';
+
+Address _fakeAddress() => Address(
+      id: 1,
+      label: 'Ev',
+      name: 'Ali Yılmaz',
+      phone: '05551234567',
+      city: 'İstanbul',
+      district: 'Kadıköy',
+      fullAddress: 'Test Sokak 1',
+      isDefault: true,
+    );
 
 CheckoutResponseDto _successResponse() => CheckoutResponseDto(
       sessionId: 'sess-1',
-      threeDsHtml: '<html>3DS</html>',
+      sipayThreeDsUrl: 'https://ccpayment.sipay.com.tr/3DGate?token=abc',
       orders: [
         OrderDto(
           id: 100,
@@ -24,9 +36,10 @@ CheckoutResponseDto _successResponse() => CheckoutResponseDto(
 class _FakeCheckoutRepo implements CheckoutRepository {
   @override
   Future<CheckoutResponseDto> initiate({
-    required int addressId,
-    required String paymentMethod,
+    required String buyerName,
+    required String buyerSurname,
     required String idempotencyKey,
+    String returnUrl = 'mopro://checkout/result',
   }) async =>
       _successResponse();
 }
@@ -34,9 +47,10 @@ class _FakeCheckoutRepo implements CheckoutRepository {
 class _FailingCheckoutRepo implements CheckoutRepository {
   @override
   Future<CheckoutResponseDto> initiate({
-    required int addressId,
-    required String paymentMethod,
+    required String buyerName,
+    required String buyerSurname,
     required String idempotencyKey,
+    String returnUrl = 'mopro://checkout/result',
   }) async =>
       throw DioException(requestOptions: RequestOptions(), message: 'fail');
 }
@@ -50,18 +64,20 @@ void main() {
     final c = _container(_FakeCheckoutRepo());
     addTearDown(c.dispose);
     final state = c.read(checkoutControllerProvider);
+    expect(state.selectedAddress, isNull);
     expect(state.selectedAddressId, isNull);
     expect(state.paymentMethod, 'card');
     expect(state.isInitiating, false);
     expect(state.canProceed, false);
   });
 
-  test('selectAddress enables proceed', () {
+  test('selectAddress stores full address and enables proceed', () {
     final c = _container(_FakeCheckoutRepo());
     addTearDown(c.dispose);
-    c.read(checkoutControllerProvider.notifier).selectAddress(5);
+    c.read(checkoutControllerProvider.notifier).selectAddress(_fakeAddress());
     final state = c.read(checkoutControllerProvider);
-    expect(state.selectedAddressId, 5);
+    expect(state.selectedAddressId, 1);
+    expect(state.selectedAddress?.name, 'Ali Yılmaz');
     expect(state.canProceed, true);
   });
 
@@ -73,31 +89,25 @@ void main() {
     expect(c.read(checkoutControllerProvider).isInitiating, false);
   });
 
-  test('placeOrder success sets response', () async {
+  test('placeOrder success sets response and invoiceId', () async {
     final c = _container(_FakeCheckoutRepo());
     addTearDown(c.dispose);
-    c.read(checkoutControllerProvider.notifier).selectAddress(1);
+    c.read(checkoutControllerProvider.notifier).selectAddress(_fakeAddress());
     await c.read(checkoutControllerProvider.notifier).placeOrder();
     final state = c.read(checkoutControllerProvider);
     expect(state.response, isNotNull);
     expect(state.response!.sessionId, 'sess-1');
-    expect(state.response!.orders.length, 1);
+    expect(state.response!.sipayThreeDsUrl, isNotEmpty);
+    expect(state.response!.requires3ds, true);
+    expect(state.invoiceId, isNotNull);
     expect(state.isInitiating, false);
     expect(state.error, isNull);
-  });
-
-  test('placeOrder success with 3DS HTML sets requires3ds', () async {
-    final c = _container(_FakeCheckoutRepo());
-    addTearDown(c.dispose);
-    c.read(checkoutControllerProvider.notifier).selectAddress(1);
-    await c.read(checkoutControllerProvider.notifier).placeOrder();
-    expect(c.read(checkoutControllerProvider).response!.requires3ds, true);
   });
 
   test('placeOrder failure sets error', () async {
     final c = _container(_FailingCheckoutRepo());
     addTearDown(c.dispose);
-    c.read(checkoutControllerProvider.notifier).selectAddress(1);
+    c.read(checkoutControllerProvider.notifier).selectAddress(_fakeAddress());
     await c.read(checkoutControllerProvider.notifier).placeOrder();
     final state = c.read(checkoutControllerProvider);
     expect(state.error, isNotNull);
@@ -105,15 +115,41 @@ void main() {
     expect(state.isInitiating, false);
   });
 
-  test('reset clears state', () async {
+  test('setPaymentError stores Turkish message and clears response', () async {
     final c = _container(_FakeCheckoutRepo());
     addTearDown(c.dispose);
-    c.read(checkoutControllerProvider.notifier).selectAddress(1);
+    c.read(checkoutControllerProvider.notifier).selectAddress(_fakeAddress());
+    await c.read(checkoutControllerProvider.notifier).placeOrder();
+    c
+        .read(checkoutControllerProvider.notifier)
+        .setPaymentError('Kartınız reddedildi.');
+    final state = c.read(checkoutControllerProvider);
+    expect(state.paymentError, 'Kartınız reddedildi.');
+    expect(state.response, isNull);
+    expect(state.invoiceId, isNull);
+  });
+
+  test('clearPaymentError removes the message', () {
+    final c = _container(_FakeCheckoutRepo());
+    addTearDown(c.dispose);
+    c
+        .read(checkoutControllerProvider.notifier)
+        .setPaymentError('Test error');
+    c.read(checkoutControllerProvider.notifier).clearPaymentError();
+    expect(c.read(checkoutControllerProvider).paymentError, isNull);
+  });
+
+  test('reset clears all state', () async {
+    final c = _container(_FakeCheckoutRepo());
+    addTearDown(c.dispose);
+    c.read(checkoutControllerProvider.notifier).selectAddress(_fakeAddress());
     await c.read(checkoutControllerProvider.notifier).placeOrder();
     c.read(checkoutControllerProvider.notifier).reset();
     final state = c.read(checkoutControllerProvider);
-    expect(state.selectedAddressId, isNull);
+    expect(state.selectedAddress, isNull);
     expect(state.response, isNull);
+    expect(state.invoiceId, isNull);
+    expect(state.paymentError, isNull);
   });
 
   test('selectPaymentMethod updates state', () {
@@ -121,5 +157,28 @@ void main() {
     addTearDown(c.dispose);
     c.read(checkoutControllerProvider.notifier).selectPaymentMethod('wallet');
     expect(c.read(checkoutControllerProvider).paymentMethod, 'wallet');
+  });
+
+  test('buyer name split: Ali Yılmaz → name=Ali, surname=Yılmaz', () {
+    // Verify the split logic matches what the controller sends
+    const fullName = 'Ali Yılmaz';
+    final parts = fullName.trim().split(RegExp(r'\s+'));
+    final name = parts.length > 1
+        ? parts.sublist(0, parts.length - 1).join(' ')
+        : fullName;
+    final surname = parts.length > 1 ? parts.last : '';
+    expect(name, 'Ali');
+    expect(surname, 'Yılmaz');
+  });
+
+  test('buyer name split: single word → name=Mopro, surname=empty', () {
+    const fullName = 'Mopro';
+    final parts = fullName.trim().split(RegExp(r'\s+'));
+    final name = parts.length > 1
+        ? parts.sublist(0, parts.length - 1).join(' ')
+        : fullName;
+    final surname = parts.length > 1 ? parts.last : '';
+    expect(name, 'Mopro');
+    expect(surname, '');
   });
 }

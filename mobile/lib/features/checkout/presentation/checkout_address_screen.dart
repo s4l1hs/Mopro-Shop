@@ -75,13 +75,13 @@ class CheckoutAddressScreen extends ConsumerWidget {
                   itemBuilder: (_, i) {
                     final addr = addresses[i];
                     final isSelected =
-                        checkoutState.selectedAddressId == addr.id;
+                        checkoutState.selectedAddress?.id == addr.id;
                     return _SelectableAddressCard(
                       address: addr,
                       isSelected: isSelected,
                       onTap: () => ref
                           .read(checkoutControllerProvider.notifier)
-                          .selectAddress(addr.id),
+                          .selectAddress(addr),
                     );
                   },
                 );
@@ -91,7 +91,7 @@ class CheckoutAddressScreen extends ConsumerWidget {
         ],
       ),
       bottomNavigationBar: _BottomBar(
-        enabled: checkoutState.selectedAddressId != null,
+        enabled: checkoutState.selectedAddress != null,
         onContinue: () => context.push('/checkout/payment'),
       ),
     );

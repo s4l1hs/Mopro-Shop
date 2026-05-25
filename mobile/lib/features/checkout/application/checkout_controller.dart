@@ -5,6 +5,7 @@ import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/features/checkout/data/checkout_repository.dart';
 import 'package:mopro/features/checkout/data/checkout_repository_impl.dart';
 import 'package:mopro/features/checkout/data/checkout_response_dto.dart';
+import 'package:mopro_api/mopro_api.dart';
 import 'package:uuid/uuid.dart';
 
 // ── Repository provider ───────────────────────────────────────────────────────
@@ -17,35 +18,46 @@ final checkoutRepositoryProvider = Provider<CheckoutRepository>((ref) {
 
 class CheckoutState {
   const CheckoutState({
-    this.selectedAddressId,
+    this.selectedAddress,
     this.paymentMethod = 'card',
     this.isInitiating = false,
     this.response,
+    this.invoiceId,
+    this.paymentError,
     this.error,
   });
 
-  final int? selectedAddressId;
+  final Address? selectedAddress;
   final String paymentMethod;
   final bool isInitiating;
   final CheckoutResponseDto? response;
-  final AppError? error;
+  final String? invoiceId;      // idempotency key sent; used as polling handle
+  final String? paymentError;   // Turkish user-facing 3DS failure message
+  final AppError? error;        // network / API error
 
-  bool get canProceed => selectedAddressId != null && !isInitiating;
+  int? get selectedAddressId => selectedAddress?.id;
+  bool get canProceed => selectedAddress != null && !isInitiating;
 
   CheckoutState copyWith({
-    int? selectedAddressId,
+    Address? selectedAddress,
     String? paymentMethod,
     bool? isInitiating,
     CheckoutResponseDto? response,
+    String? invoiceId,
+    String? paymentError,
     AppError? error,
     bool clearError = false,
     bool clearResponse = false,
+    bool clearPaymentError = false,
+    bool clearInvoiceId = false,
   }) =>
       CheckoutState(
-        selectedAddressId: selectedAddressId ?? this.selectedAddressId,
+        selectedAddress: selectedAddress ?? this.selectedAddress,
         paymentMethod: paymentMethod ?? this.paymentMethod,
         isInitiating: isInitiating ?? this.isInitiating,
         response: clearResponse ? null : response ?? this.response,
+        invoiceId: clearInvoiceId ? null : invoiceId ?? this.invoiceId,
+        paymentError: clearPaymentError ? null : paymentError ?? this.paymentError,
         error: clearError ? null : error ?? this.error,
       );
 }
@@ -63,12 +75,28 @@ class CheckoutController extends Notifier<CheckoutState> {
   @override
   CheckoutState build() => const CheckoutState();
 
-  void selectAddress(int id) {
-    state = state.copyWith(selectedAddressId: id, clearError: true);
+  void selectAddress(Address address) {
+    state = state.copyWith(
+      selectedAddress: address,
+      clearError: true,
+      clearPaymentError: true,
+    );
   }
 
   void selectPaymentMethod(String method) {
     state = state.copyWith(paymentMethod: method, clearError: true);
+  }
+
+  void setPaymentError(String message) {
+    state = state.copyWith(
+      paymentError: message,
+      clearResponse: true,
+      clearInvoiceId: true,
+    );
+  }
+
+  void clearPaymentError() {
+    state = state.copyWith(clearPaymentError: true);
   }
 
   void reset() {
@@ -76,26 +104,37 @@ class CheckoutController extends Notifier<CheckoutState> {
   }
 
   Future<void> placeOrder() async {
-    final addressId = state.selectedAddressId;
-    if (addressId == null) return;
+    final address = state.selectedAddress;
+    if (address == null) return;
 
     state = state.copyWith(
       isInitiating: true,
       clearError: true,
       clearResponse: true,
+      clearPaymentError: true,
+      clearInvoiceId: true,
     );
+
+    // Split "Ali Yılmaz" → buyerName="Ali", buyerSurname="Yılmaz".
+    final nameParts = address.name.trim().split(RegExp(r'\s+'));
+    final buyerName = nameParts.length > 1
+        ? nameParts.sublist(0, nameParts.length - 1).join(' ')
+        : address.name;
+    final buyerSurname = nameParts.length > 1 ? nameParts.last : '';
+
+    final idempotencyKey = const Uuid().v4();
 
     try {
       final repo = ref.read(checkoutRepositoryProvider);
-      final idempotencyKey = const Uuid().v4();
       final response = await repo.initiate(
-        addressId: addressId,
-        paymentMethod: state.paymentMethod,
+        buyerName: buyerName,
+        buyerSurname: buyerSurname,
         idempotencyKey: idempotencyKey,
       );
       state = state.copyWith(
         isInitiating: false,
         response: response,
+        invoiceId: idempotencyKey,
       );
     } on DioException catch (e) {
       final err = e.error;
