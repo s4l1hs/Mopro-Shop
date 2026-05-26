@@ -89,12 +89,25 @@ caddy-reload:
 # ── Production build + deploy ─────────────────────────────────────────────────
 
 # Build all three service images with VERSION tag.
+# BUILD_SHA defaults to VERSION (the git SHA or tag); BUILT_AT is captured at make-time.
+BUILD_SHA ?= $(VERSION)
+BUILT_AT  ?= $(shell date -u +%FT%TZ)
+
 docker-build:
-	docker build --platform=linux/amd64 --build-arg SERVICE=core-svc \
+	docker build --platform=linux/amd64 \
+	  --build-arg SERVICE=core-svc \
+	  --build-arg BUILD_SHA=$(BUILD_SHA) \
+	  --build-arg BUILT_AT=$(BUILT_AT) \
 	  -t mopro/core-svc:$(VERSION) -f build/Dockerfile .
-	docker build --platform=linux/amd64 --build-arg SERVICE=fin-svc \
+	docker build --platform=linux/amd64 \
+	  --build-arg SERVICE=fin-svc \
+	  --build-arg BUILD_SHA=$(BUILD_SHA) \
+	  --build-arg BUILT_AT=$(BUILT_AT) \
 	  -t mopro/fin-svc:$(VERSION) -f build/Dockerfile .
-	docker build --platform=linux/amd64 --build-arg SERVICE=jobs-svc \
+	docker build --platform=linux/amd64 \
+	  --build-arg SERVICE=jobs-svc \
+	  --build-arg BUILD_SHA=$(BUILD_SHA) \
+	  --build-arg BUILT_AT=$(BUILT_AT) \
 	  -t mopro/jobs-svc:$(VERSION) -f build/Dockerfile .
 
 # Save images as tarballs in bin/ ready for scp to VDS.

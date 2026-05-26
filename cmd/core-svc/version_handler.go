@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"runtime/debug"
+
+	"github.com/mopro/platform/internal/buildinfo"
 )
 
 type versionInfo struct {
@@ -14,9 +16,9 @@ type versionInfo struct {
 	BuiltAt   string `json:"built_at"`
 }
 
-// handleVersion returns a pre-computed JSON response built at startup from
-// runtime/debug VCS metadata (injected by go build via vcs.revision / vcs.time).
-// Falls back to "dev" when metadata is absent (local builds without git tag).
+// handleVersion returns a pre-computed JSON response built at startup.
+// Priority: ldflags-injected buildinfo (CI/tarball builds) > vcs.revision from
+// debug.ReadBuildInfo() (local git builds) > "dev" fallback.
 func handleVersion(service string) http.HandlerFunc {
 	v := versionInfo{
 		Service: service,
@@ -39,6 +41,20 @@ func handleVersion(service string) http.HandlerFunc {
 				v.BuiltAt = s.Value
 			}
 		}
+	}
+
+	// ldflags take precedence over VCS metadata — covers CI and tarball builds
+	// where .git is absent. buildinfo.SHA is the full 40-char commit hash.
+	if buildinfo.SHA != "" {
+		sha := buildinfo.SHA
+		if len(sha) > 12 {
+			sha = sha[:12]
+		}
+		v.SHA = sha
+		v.Version = sha
+	}
+	if buildinfo.BuiltAt != "" {
+		v.BuiltAt = buildinfo.BuiltAt
 	}
 
 	payload, _ := json.Marshal(v)
