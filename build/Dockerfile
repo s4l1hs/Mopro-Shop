@@ -29,7 +29,7 @@ COPY . .
 # Build the requested binary; CGO disabled for static binary + distroless.
 # BUILD_SHA and BUILT_AT are injected into internal/buildinfo via ldflags so
 # that /__version returns the real commit SHA even when .git is absent (tarball builds).
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+RUN GOWORK=off CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
     go build -trimpath \
     -ldflags="-s -w \
       -X github.com/mopro/platform/internal/buildinfo.SHA=${BUILD_SHA} \
