@@ -317,6 +317,7 @@ func main() {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+	mux.HandleFunc("GET /__version", handleVersion("core-svc"))
 
 	// Identity / auth routes
 	requireAuth := middleware.RequireAuth(jwtSigner)

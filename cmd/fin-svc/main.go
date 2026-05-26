@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -36,6 +38,10 @@ import (
 )
 
 func main() {
+	runOnce := flag.Bool("run-once", false, "Run a single cron job and exit (use with --cron)")
+	cronName := flag.String("cron", "", "Cron name for --run-once: cashback-monthly | seller-payout-daily | ledger-reconcile-weekly")
+	flag.Parse()
+
 	// Startup connections use plain Background; signal context begins after init.
 	initCtx := context.Background()
 
@@ -63,6 +69,7 @@ func main() {
 	ebM := metrics.NewEventBusMetrics(metricsReg)
 	outboxM := metrics.NewOutboxMetrics(metricsReg)
 	bizM := metrics.NewBusinessMetrics(metricsReg)
+	jobM := metrics.NewJobStatusMetrics(metricsReg)
 	_ = metrics.NewHTTPMetrics(metricsReg) // registered; fin-svc routes are minimal
 
 	// ── postgres-ledger pool ─────────────────────────────────────────────────
@@ -82,6 +89,7 @@ func main() {
 		slog.Error("fin-svc: postgres-ledger ping", "err", err)
 		os.Exit(1)
 	}
+	metrics.RegisterPgxPoolCollector(metricsReg, pool, "fin-svc", "ledger")
 
 	// ── Redis client ─────────────────────────────────────────────────────────
 	redisAddr := mustEnv("REDIS_ADDR")
@@ -234,20 +242,35 @@ func main() {
 	dryRun := os.Getenv("LEDGER_RECONCILE_DRY_RUN") == "true"
 	reconcileSvc := reconcile.NewService(reconcileRepo, pd, walletSvc, dryRun, slog.Default())
 
+	// ── Run-once mode: execute one cron job and exit (for manual ops / testing) ──
+	if *runOnce {
+		_ = otelShutdown(context.Background())
+		os.Exit(runOnceCron(initCtx, *cronName, cashbackSvc, payoutSvc, reconcileSvc, market, defaultCurrency, istanbulLoc))
+	}
+
 	cronMarkets := buildCronMarkets(market, cashbackCurrency)
-	hcPinger := healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_CASHBACK_CRON_UUID"), 5*time.Second, slog.Default())
+	hcPinger := newJobPinger(
+		healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_CASHBACK_CRON_UUID"), 5*time.Second, slog.Default()),
+		jobM, "fin-svc", "cashback-monthly",
+	)
 	monthlyCron := cashback.NewMonthlyCron(cashbackSvc, cronMarkets, istanbulLoc, hcPinger, slog.Default())
 	monthlyCron.Start()
 	defer monthlyCron.Stop()
 
 	// ── Seller payout daily cron (02:30 UTC) ───────────────────────────────────
-	payoutPinger := healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_SELLER_PAYOUT_CRON_UUID"), 5*time.Second, slog.Default())
+	payoutPinger := newJobPinger(
+		healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_SELLER_PAYOUT_CRON_UUID"), 5*time.Second, slog.Default()),
+		jobM, "fin-svc", "seller-payout-daily",
+	)
 	dailyCron := sellerpayout.NewDailyCron(payoutSvc, market, defaultCurrency, time.UTC, payoutPinger, slog.Default())
 	dailyCron.Start()
 	defer dailyCron.Stop()
 
 	// ── Reconcile cron (weekly Sunday 03:05 Europe/Istanbul) ────────────────────
-	reconcilePinger := healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_LEDGER_RECONCILE_UUID"), 5*time.Second, slog.Default())
+	reconcilePinger := newJobPinger(
+		healthcheck.NewFromUUID(os.Getenv("HEALTHCHECK_LEDGER_RECONCILE_UUID"), 5*time.Second, slog.Default()),
+		jobM, "fin-svc", "ledger-reconcile",
+	)
 	weeklyCron := reconcile.NewWeeklyCron(reconcileSvc, istanbulLoc, reconcilePinger, slog.Default())
 	weeklyCron.Start(ctx)
 	defer weeklyCron.Stop()
@@ -348,6 +371,98 @@ func extraMarkets() []string {
 		}
 	}
 	return markets
+}
+
+// ── jobPinger wraps healthcheck.Pinger and records mopro_job_last_run_status ─
+
+type jobPinger struct {
+	inner healthcheck.Pinger
+	jobM  *metrics.JobStatusMetrics
+	svc   string
+	job   string
+}
+
+func newJobPinger(inner healthcheck.Pinger, jobM *metrics.JobStatusMetrics, svc, job string) healthcheck.Pinger {
+	return &jobPinger{inner: inner, jobM: jobM, svc: svc, job: job}
+}
+
+func (p *jobPinger) Start(ctx context.Context)   { p.inner.Start(ctx) }
+func (p *jobPinger) Success(ctx context.Context) { p.inner.Success(ctx); p.jobM.SetSuccess(p.svc, p.job) }
+func (p *jobPinger) Fail(ctx context.Context, msg string) {
+	p.inner.Fail(ctx, msg)
+	p.jobM.SetFailure(p.svc, p.job)
+}
+
+// runOnceCron executes a single cron job and returns an exit code (0=ok, 1=fail).
+// Used with --run-once --cron=<name> for manual ops and restore drills.
+func runOnceCron(
+	ctx context.Context,
+	name string,
+	cashbackSvc cashback.Service,
+	payoutSvc sellerpayout.Service,
+	reconcileSvc reconcile.Service,
+	market, currency string,
+	loc *time.Location,
+) int {
+	switch name {
+	case "cashback-monthly":
+		now := time.Now().In(loc)
+		slog.Info("run-once: cashback-monthly", "run_date", now.Format("2006-01-02"))
+		summary, err := cashbackSvc.PayMonthlyInstallments(ctx, now)
+		if err != nil {
+			slog.Error("run-once: cashback-monthly failed", "err", err)
+			return 1
+		}
+		slog.Info("run-once: cashback-monthly done",
+			"processed", summary.Processed,
+			"skipped", summary.Skipped,
+			"failed", summary.Failed,
+			"retries", summary.Retries,
+		)
+		if summary.Failed > 0 {
+			slog.Error("run-once: cashback-monthly had failures", "failed", summary.Failed)
+			return 1
+		}
+		return 0
+
+	case "seller-payout-daily":
+		today := time.Now().In(time.UTC).Truncate(24 * time.Hour)
+		slog.Info("run-once: seller-payout-daily", "payout_date", today.Format("2006-01-02"))
+		res, err := payoutSvc.RunDailyPayouts(ctx, today, market, currency)
+		if err != nil {
+			slog.Error("run-once: seller-payout-daily failed", "err", err)
+			return 1
+		}
+		slog.Info("run-once: seller-payout-daily done",
+			"batched", res.Batched,
+			"paid", res.Paid,
+			"failed", res.Failed,
+			"skipped", res.Skipped,
+		)
+		if res.Failed > 0 || res.Ambiguous > 0 {
+			slog.Error("run-once: seller-payout-daily had failures", "failed", res.Failed, "ambiguous", res.Ambiguous)
+			return 1
+		}
+		return 0
+
+	case "ledger-reconcile-weekly":
+		asOf := time.Now().In(loc)
+		slog.Info("run-once: ledger-reconcile-weekly", "as_of", asOf.Format("2006-01-02"))
+		result, err := reconcileSvc.RunWeekly(ctx, asOf)
+		if err != nil {
+			slog.Error("run-once: ledger-reconcile-weekly failed", "err", err)
+			return 1
+		}
+		slog.Info("run-once: ledger-reconcile-weekly done", "result", fmt.Sprintf("%+v", result))
+		return 0
+
+	default:
+		slog.Error("run-once: unknown --cron value",
+			"name", name,
+			"choices", "cashback-monthly, seller-payout-daily, ledger-reconcile-weekly",
+		)
+		return 1
+	}
 }
 
 func mustEnv(key string) string {

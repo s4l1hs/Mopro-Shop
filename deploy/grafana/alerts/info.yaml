@@ -1,0 +1,29 @@
+groups:
+  - name: mopro-info
+    # Info rules produce Slack notifications only; no paging.
+    interval: 1m
+    rules:
+      - alert: DeploySucceeded
+        # mopro_build_info is a gauge-always-1 registered by pkg/metrics/registry.go.
+        # It carries version (git SHA), goversion, and buildtime labels.
+        # A changes() > 0 means a new version label appeared, indicating a deploy.
+        # This fires for ~ 5 min after each deploy (long enough for one notification).
+        expr: changes(mopro_build_info[5m]) > 0
+        labels:
+          severity: info
+          team: platform
+        annotations:
+          summary: "Deploy detected on {{ $labels.service }} — version {{ $labels.version }}"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/deploy-succeeded.md"
+
+      - alert: DailyCashbackPayoutComplete
+        # mopro_job_last_run_status{job="cashback-monthly"} == 1 means the monthly cron
+        # just completed successfully. Fires once per successful cron run.
+        # This rule has no `for:` so it fires immediately on the first matching sample.
+        expr: mopro_job_last_run_status{job="cashback-monthly"} == 1
+        labels:
+          severity: info
+          team: finance
+        annotations:
+          summary: "Cashback monthly cron completed successfully on {{ $labels.service }}"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/daily-cashback-payout-complete.md"

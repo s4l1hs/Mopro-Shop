@@ -1,0 +1,87 @@
+groups:
+  - name: mopro-warning
+    # Evaluated every minute. Warning rules route to Slack #mopro-alerts.
+    interval: 1m
+    rules:
+      - alert: ApiLatencyP95High
+        # p95 latency > 500ms for 10 min. SLO target is < 500ms.
+        # Uses histogram_quantile over the mopro_http_request_duration_seconds histogram.
+        # Threshold: 500ms is 10× the expected p95 at initial load. Tune after L9.
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le, service) (
+              rate(mopro_http_request_duration_seconds_bucket[5m])
+            )
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "{{ $labels.service }} p95 latency is {{ $value | humanizeDuration }} (threshold 500ms)"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/api-latency-p95-high.md"
+
+      - alert: SipayHandoffFailing
+        # Sipay API error rate > 10% over 15 min.
+        # sipay_request_total is registered by internal/payment/sipay/metrics.go.
+        # status label carries the HTTP status code or "error" for non-HTTP failures.
+        # Threshold: 10% to avoid noise from transient Sipay gateway timeouts.
+        expr: |
+          sum(rate(sipay_request_total{status!~"2.*"}[15m]))
+          / sum(rate(sipay_request_total[15m])) > 0.10
+        for: 15m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Sipay API error rate is {{ $value | humanizePercentage }} (threshold 10%)"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/sipay-handoff-failing.md"
+
+      - alert: CheckoutAbandonmentSpike
+        # Ratio of orders not reaching captured state > 40% over 30 min.
+        # Uses mopro_order_status_transitions_total which is recorded by BusinessMetrics.
+        # Threshold: 40% abandonment is 2× the expected steady-state (estimated 20%).
+        # NOTE: alert may not fire during off-peak hours with zero traffic; add
+        # `unless sum(rate(mopro_order_status_transitions_total[30m])) == 0` if noisy.
+        expr: |
+          (
+            1 - (
+              sum(rate(mopro_order_status_transitions_total{from="pending_payment",to="captured"}[30m]))
+              / sum(rate(mopro_order_status_transitions_total{from="created",to="pending_payment"}[30m]))
+            )
+          ) > 0.40
+        for: 30m
+        labels:
+          severity: warning
+          team: product
+        annotations:
+          summary: "Checkout abandonment rate is {{ $value | humanizePercentage }} (threshold 40%)"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/checkout-abandonment-spike.md"
+
+      - alert: DiskWarning
+        # < 15% free disk space. Acts as early warning before DiskCritical (< 8%).
+        # Allows 30 min for manual intervention before the more urgent level fires.
+        expr: |
+          node_filesystem_avail_bytes{mountpoint="/"}
+          / node_filesystem_size_bytes{mountpoint="/"} < 0.15
+        for: 10m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "VDS root filesystem at {{ $value | humanizePercentage }} free (< 15%)"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/disk-warning.md"
+
+      - alert: DlqGrowth
+        # Dead-letter queue receiving > 0.5 messages/sec over 15 min.
+        # DLQ growth means event consumers are failing to process Redis Streams messages.
+        # mopro_eventbus_dlq_messages_total is registered by pkg/metrics/eventbus.go.
+        # Threshold: 0.5/s = 30 DLQ messages per minute; adjust after observing baseline.
+        expr: rate(mopro_eventbus_dlq_messages_total[15m]) > 0.5
+        for: 15m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Event DLQ growing at {{ $value | humanize }}/s — consumers may be failing"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/dlq-growth.md"

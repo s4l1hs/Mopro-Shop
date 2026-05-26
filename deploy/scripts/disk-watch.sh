@@ -16,6 +16,7 @@ REDIS_PORT="${REDIS_PORT:-6379}"
 REDIS_PASSWORD="${REDIS_PASSWORD:-}"
 SLACK_WEBHOOK="${SLACK_PANIC_WEBHOOK:-}"
 PD_ROUTING_KEY="${PAGERDUTY_ROUTING_KEY:-}"
+HEALTHCHECK_DISK_HYGIENE_UUID="${HEALTHCHECK_DISK_HYGIENE_UUID:-}"
 HYSTERESIS_SECS=300   # 5 minutes between repeated alerts for the same threshold
 
 # ── Thresholds ────────────────────────────────────────────────────────────────
@@ -92,6 +93,14 @@ send_pagerduty() {
                 \"source\":\"mopro-disk-watch\"
             }
         }" || true
+}
+
+ping_hc() {
+    local endpoint="${1:-}"
+    [[ -z "${HEALTHCHECK_DISK_HYGIENE_UUID:-}" ]] && return 0
+    curl -fsS --max-time 10 \
+        "https://hc-ping.com/${HEALTHCHECK_DISK_HYGIENE_UUID}${endpoint}" \
+        -o /dev/null 2>/dev/null || true
 }
 
 resolve_pagerduty() {
@@ -197,4 +206,5 @@ elif (( DISK_PCT >= T_INFO )); then
 
 fi
 
+ping_hc ""
 exit 0

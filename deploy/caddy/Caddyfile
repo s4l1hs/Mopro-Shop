@@ -39,6 +39,36 @@
 	}
 }
 
+# ─── Staging: api-staging.moproshop.com ──────────────────────────────────────
+# Identical routing to production. DNS A record must point to the same VDS IP.
+# Staging-specific env vars are set via .env.staging (sourced before docker compose up).
+# OTP bypass: set DEV_OTP_ACCEPT_ANY=true in .env.staging for smoke test flows.
+api-staging.moproshop.com {
+	import healthz_native
+	import fin_routes
+	import jobs_routes
+
+	@psp_webhook path /payments/webhook/*
+	handle @psp_webhook {
+		reverse_proxy core-svc:8080
+	}
+
+	@shipping_webhook path /shipping/webhook/*
+	handle @shipping_webhook {
+		reverse_proxy core-svc:8080
+	}
+
+	handle {
+		reverse_proxy core-svc:8080
+	}
+}
+
+# ─── Staging: staging.moproshop.com ──────────────────────────────────────────
+staging.moproshop.com {
+	import healthz_native
+	respond "Staging — Çok yakında" 200
+}
+
 # ─── Production: api.moproshop.com ───────────────────────────────────────────
 api.moproshop.com {
 	# TODO(production): CloudFlare-only enforcer.

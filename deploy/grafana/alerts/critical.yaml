@@ -1,0 +1,87 @@
+groups:
+  - name: mopro-critical
+    # Evaluated every minute. Critical rules page PagerDuty + BetterStack.
+    interval: 1m
+    rules:
+      - alert: ApiErrorRateHigh
+        # 5xx rate above 5% over a 5-minute window for any service.
+        # Threshold: 5% chosen as 10× the steady-state error rate at launch.
+        # Tune down to 2% after the first 30-day production window.
+        expr: |
+          sum by (service) (rate(mopro_http_requests_total{status=~"5.."}[5m]))
+          / sum by (service) (rate(mopro_http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "{{ $labels.service }} 5xx error rate above 5% (current: {{ $value | humanizePercentage }})"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/api-error-rate.md"
+
+      - alert: ApiDown
+        # Service disappears from the scrape target — no metrics received.
+        # job labels match the scrape_configs job_name values in agent.yaml.
+        expr: up{job=~"core-svc|fin-svc|jobs-svc"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "{{ $labels.job }} is down — no metrics received for 2 min"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/api-down.md"
+
+      - alert: DbConnPoolExhausted
+        # Pool at 95%+ capacity for 3 min. New requests will queue/timeout.
+        # Metric provided by pkg/metrics/pool.go pgxPoolCollector.
+        expr: |
+          mopro_pgx_pool_acquired_conns
+          / mopro_pgx_pool_max_conns > 0.95
+        for: 3m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "DB pool {{ $labels.db }} on {{ $labels.service }} is {{ $value | humanizePercentage }} full"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/db-conn-pool-exhausted.md"
+
+      - alert: DiskCritical
+        # < 8% free disk space. Containers will OOM or fail writes at this point.
+        # Requires Grafana Agent node_exporter integration (agent.yaml).
+        expr: |
+          node_filesystem_avail_bytes{mountpoint="/"}
+          / node_filesystem_size_bytes{mountpoint="/"} < 0.08
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "VDS root filesystem at {{ $value | humanizePercentage }} free (< 8%)"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/disk-critical.md"
+
+      - alert: LedgerImbalanced
+        # The weekly reconcile cron set job status to 0 (failure / imbalance detected).
+        # mopro_job_last_run_status is set by the jobPinger wrapper in fin-svc/main.go.
+        # This alert fires only AFTER the first cron run completes post-startup.
+        expr: mopro_job_last_run_status{job="ledger-reconcile"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: finance
+          panic: "true"
+        annotations:
+          summary: "Ledger double-entry invariant violated — fin-svc reconcile cron reported failure"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/ledger-imbalanced.md"
+
+      - alert: BackupStale
+        # Last successful backup timestamp is more than 26 hours old.
+        # mopro_backup_last_success_timestamp_seconds is written by backup-postgres.sh
+        # to /var/lib/node_exporter/textfile_collector/mopro_backup.prom.
+        # 93600s = 26 hours (nightly backup window + 2h slack for retries).
+        expr: time() - mopro_backup_last_success_timestamp_seconds > 93600
+        for: 10m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Last successful backup is {{ $value | humanizeDuration }} old (threshold: 26h)"
+          runbook: "https://github.com/mopro/mopro/blob/main/docs/runbooks/backup-stale.md"

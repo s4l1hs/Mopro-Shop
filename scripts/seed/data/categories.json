@@ -1,0 +1,39 @@
+[
+  {"id": 101, "slug": "root-elektronik",    "name_tr": "Elektronik",               "name_en": "Electronics",            "parent_slug": null,          "commission_pct_bps": 700,  "kdv_pct_bps": 1800, "active": true},
+  {"id": 102, "slug": "root-moda",          "name_tr": "Giyim & Moda",             "name_en": "Fashion",                "parent_slug": null,          "commission_pct_bps": 2000, "kdv_pct_bps": 1800, "active": true},
+  {"id": 103, "slug": "root-ev-yasam",      "name_tr": "Ev & Yaşam",               "name_en": "Home & Living",          "parent_slug": null,          "commission_pct_bps": 1500, "kdv_pct_bps": 1800, "active": true},
+  {"id": 104, "slug": "root-spor",          "name_tr": "Spor & Outdoor",           "name_en": "Sports & Outdoor",       "parent_slug": null,          "commission_pct_bps": 1200, "kdv_pct_bps": 1800, "active": true},
+  {"id": 105, "slug": "root-kitap",         "name_tr": "Kitap & Kırtasiye",        "name_en": "Books & Stationery",     "parent_slug": null,          "commission_pct_bps": 500,  "kdv_pct_bps": 100,  "active": true},
+  {"id": 106, "slug": "root-kozmetik",      "name_tr": "Kozmetik & Kişisel Bakım", "name_en": "Beauty & Personal Care", "parent_slug": null,          "commission_pct_bps": 1800, "kdv_pct_bps": 1800, "active": true},
+
+  {"id": 107, "slug": "elektr-akilli-tel",  "name_tr": "Akıllı Telefon",           "name_en": "Smartphones",            "parent_slug": "root-elektronik", "commission_pct_bps": 700,  "kdv_pct_bps": 1800, "active": true},
+  {"id": 108, "slug": "elektr-kea",         "name_tr": "Küçük Ev Aletleri",        "name_en": "Small Home Appliances",  "parent_slug": "root-elektronik", "commission_pct_bps": 800,  "kdv_pct_bps": 1800, "active": true},
+  {"id": 109, "slug": "elektr-tablet",      "name_tr": "Tablet",                   "name_en": "Tablets",                "parent_slug": "root-elektronik", "commission_pct_bps": 750,  "kdv_pct_bps": 1800, "active": true},
+  {"id": 110, "slug": "elektr-kulaklik",    "name_tr": "Kulaklık & Ses",           "name_en": "Headphones & Audio",     "parent_slug": "root-elektronik", "commission_pct_bps": 900,  "kdv_pct_bps": 1800, "active": true},
+  {"id": 111, "slug": "elektr-kamera",      "name_tr": "Kamera & Fotoğraf",        "name_en": "Cameras & Photography",  "parent_slug": "root-elektronik", "commission_pct_bps": 700,  "kdv_pct_bps": 1800, "active": true},
+
+  {"id": 112, "slug": "moda-kadin-giyim",   "name_tr": "Kadın Giyim",              "name_en": "Women's Clothing",       "parent_slug": "root-moda",       "commission_pct_bps": 2000, "kdv_pct_bps": 1800, "active": true},
+  {"id": 113, "slug": "moda-erkek-giyim",   "name_tr": "Erkek Giyim",              "name_en": "Men's Clothing",         "parent_slug": "root-moda",       "commission_pct_bps": 2000, "kdv_pct_bps": 1800, "active": true},
+  {"id": 114, "slug": "moda-ayakkabi",      "name_tr": "Ayakkabı",                 "name_en": "Footwear",               "parent_slug": "root-moda",       "commission_pct_bps": 1800, "kdv_pct_bps": 1800, "active": true},
+  {"id": 115, "slug": "moda-canta",         "name_tr": "Çanta",                    "name_en": "Bags",                   "parent_slug": "root-moda",       "commission_pct_bps": 1500, "kdv_pct_bps": 1800, "active": true},
+  {"id": 116, "slug": "moda-aksesuar",      "name_tr": "Aksesuar",                 "name_en": "Accessories",            "parent_slug": "root-moda",       "commission_pct_bps": 1500, "kdv_pct_bps": 1800, "active": true},
+
+  {"id": 117, "slug": "ev-mobilya",         "name_tr": "Mobilya",                  "name_en": "Furniture",              "parent_slug": "root-ev-yasam",   "commission_pct_bps": 1500, "kdv_pct_bps": 1800, "active": true},
+  {"id": 118, "slug": "ev-mutfak",          "name_tr": "Mutfak Gereçleri",         "name_en": "Kitchen & Dining",       "parent_slug": "root-ev-yasam",   "commission_pct_bps": 1200, "kdv_pct_bps": 1800, "active": true},
+  {"id": 119, "slug": "ev-tekstil",         "name_tr": "Ev Tekstili",              "name_en": "Home Textiles",          "parent_slug": "root-ev-yasam",   "commission_pct_bps": 1800, "kdv_pct_bps": 1800, "active": true},
+  {"id": 120, "slug": "ev-aydinlatma",      "name_tr": "Aydınlatma",               "name_en": "Lighting",               "parent_slug": "root-ev-yasam",   "commission_pct_bps": 1200, "kdv_pct_bps": 1800, "active": true},
+  {"id": 121, "slug": "ev-dekorasyon",      "name_tr": "Dekorasyon",               "name_en": "Decor",                  "parent_slug": "root-ev-yasam",   "commission_pct_bps": 1500, "kdv_pct_bps": 1800, "active": true},
+
+  {"id": 122, "slug": "spor-fitness",       "name_tr": "Fitness Ekipmanı",         "name_en": "Fitness Equipment",      "parent_slug": "root-spor",       "commission_pct_bps": 1000, "kdv_pct_bps": 1800, "active": true},
+  {"id": 123, "slug": "spor-outdoor",       "name_tr": "Outdoor & Kamp",           "name_en": "Outdoor & Camping",      "parent_slug": "root-spor",       "commission_pct_bps": 1200, "kdv_pct_bps": 1800, "active": true},
+  {"id": 124, "slug": "spor-bisiklet",      "name_tr": "Bisiklet",                 "name_en": "Cycling",                "parent_slug": "root-spor",       "commission_pct_bps": 900,  "kdv_pct_bps": 1800, "active": true},
+  {"id": 125, "slug": "spor-giyim",         "name_tr": "Spor Giyim",               "name_en": "Sports Apparel",         "parent_slug": "root-spor",       "commission_pct_bps": 1500, "kdv_pct_bps": 1800, "active": true},
+  {"id": 126, "slug": "spor-topu",          "name_tr": "Top & Raket",              "name_en": "Balls & Rackets",        "parent_slug": "root-spor",       "commission_pct_bps": 1000, "kdv_pct_bps": 1800, "active": true},
+
+  {"id": 127, "slug": "kitap-roman",        "name_tr": "Roman & Şiir",             "name_en": "Fiction & Poetry",       "parent_slug": "root-kitap",      "commission_pct_bps": 500,  "kdv_pct_bps": 100,  "active": true},
+  {"id": 128, "slug": "kitap-egitim",       "name_tr": "Eğitim & Akademik",        "name_en": "Education & Academic",   "parent_slug": "root-kitap",      "commission_pct_bps": 500,  "kdv_pct_bps": 100,  "active": true},
+  {"id": 129, "slug": "kitap-kirtasiye",    "name_tr": "Kırtasiye",                "name_en": "Stationery",             "parent_slug": "root-kitap",      "commission_pct_bps": 700,  "kdv_pct_bps": 1800, "active": true},
+
+  {"id": 130, "slug": "kozmetik-cilt",      "name_tr": "Cilt Bakımı",              "name_en": "Skincare",               "parent_slug": "root-kozmetik",   "commission_pct_bps": 2000, "kdv_pct_bps": 1800, "active": true},
+  {"id": 131, "slug": "kozmetik-parfum",    "name_tr": "Parfüm & Deodorant",       "name_en": "Fragrance & Deodorant",  "parent_slug": "root-kozmetik",   "commission_pct_bps": 1800, "kdv_pct_bps": 1800, "active": true}
+]

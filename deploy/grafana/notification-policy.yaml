@@ -1,0 +1,112 @@
+# Grafana Cloud Alertmanager-compatible notification policy.
+# Push via provision.sh using:
+#   POST ${GRAFANA_API_URL}/api/alertmanager/grafana/config/api/v1/alerts
+#
+# Env vars referenced ($VAR) are resolved at push time by provision.sh.
+# send_resolved: true on all critical receivers so on-call knows when an incident clears.
+
+route:
+  group_by: [alertname, service]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: slack-default
+
+  routes:
+    # ── Critical: page PagerDuty AND BetterStack; continue so panic channel also fires ──
+    - matchers:
+        - severity = critical
+      receiver: pagerduty-critical
+      group_wait: 0s
+      repeat_interval: 1h
+      continue: true
+
+    - matchers:
+        - severity = critical
+      receiver: betterstack-incident
+      group_wait: 0s
+      continue: true
+
+    # ── Panic channel: ledger imbalanced and disk >92% go to a dedicated webhook ──
+    - matchers:
+        - panic = "true"
+      receiver: slack-panic
+      group_wait: 0s
+      continue: false
+
+    # ── Warning: Slack #mopro-alerts ──
+    - matchers:
+        - severity = warning
+      receiver: slack-warnings
+
+    # ── Info: Slack #mopro-info ──
+    - matchers:
+        - severity = info
+      receiver: slack-info
+
+receivers:
+  - name: pagerduty-critical
+    pagerduty_configs:
+      - routing_key: "${PAGERDUTY_ROUTING_KEY}"
+        severity: critical
+        send_resolved: true
+        description: "{{ .CommonLabels.alertname }}: {{ .CommonAnnotations.summary }}"
+        details:
+          runbook: "{{ .CommonAnnotations.runbook }}"
+          service: "{{ .CommonLabels.service }}"
+          team: "{{ .CommonLabels.team }}"
+
+  - name: betterstack-incident
+    webhook_configs:
+      - url: "${BETTERSTACK_INCIDENT_API}"
+        send_resolved: true
+        http_config:
+          authorization:
+            credentials: "${BETTERSTACK_API_TOKEN}"
+
+  - name: slack-panic
+    slack_configs:
+      - api_url: "${SLACK_PANIC_WEBHOOK}"
+        channel: "#mopro-panic"
+        send_resolved: true
+        title: ":rotating_light: PANIC: {{ .CommonLabels.alertname }}"
+        text: |
+          *Alert:* {{ .CommonLabels.alertname }}
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Runbook:* {{ .CommonAnnotations.runbook }}
+          *Severity:* {{ .CommonLabels.severity }}
+          *Team:* {{ .CommonLabels.team }}
+
+  - name: slack-warnings
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK}"
+        channel: "#mopro-alerts"
+        send_resolved: true
+        title: "[WARN] {{ .CommonLabels.alertname }}"
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Runbook:* {{ .CommonAnnotations.runbook }}
+          *Service:* {{ .CommonLabels.service }}
+
+  - name: slack-info
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK}"
+        channel: "#mopro-info"
+        send_resolved: false
+        title: "[INFO] {{ .CommonLabels.alertname }}"
+        text: "{{ .CommonAnnotations.summary }}"
+
+  - name: slack-default
+    slack_configs:
+      - api_url: "${SLACK_WEBHOOK}"
+        channel: "#mopro-alerts"
+        send_resolved: true
+        title: "[{{ .CommonLabels.severity | toUpper }}] {{ .CommonLabels.alertname }}"
+        text: "{{ .CommonAnnotations.summary }}"
+
+# ── Environment variables required in /opt/mopro/.env ──────────────────────────
+# PAGERDUTY_ROUTING_KEY=<integration key from PagerDuty service>
+# BETTERSTACK_INCIDENT_API=https://uptime.betterstack.com/api/v2/incidents
+# BETTERSTACK_API_TOKEN=<BetterStack API token>
+# SLACK_WEBHOOK=<incoming webhook URL for #mopro-alerts / #mopro-info>
+# SLACK_PANIC_WEBHOOK=<separate incoming webhook for #mopro-panic>

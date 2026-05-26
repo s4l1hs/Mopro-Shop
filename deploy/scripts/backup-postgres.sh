@@ -256,4 +256,18 @@ HETZNER_STATUS="${HETZNER_OK}"
 [[ "$HETZNER_ENABLED" == "false" ]] && HETZNER_STATUS="skipped"
 send_slack ":white_check_mark: *Mopro backup OK* — ecom: ${ECOM_SIZE}, ledger: ${LEDGER_SIZE}, snapshot: ${B2_SNAPSHOT_ID}, total: ${SNAPSHOT_COUNT}, ${ELAPSED}s | Hetzner: ${HETZNER_STATUS}"
 ping_hc ""
+
+# Write Prometheus textfile metric so Grafana Agent node_exporter integration
+# can expose backup_last_success_timestamp_seconds for the BackupStale alert.
+TEXTFILE_DIR="${NODE_EXPORTER_TEXTFILE_DIR:-/var/lib/node_exporter/textfile_collector}"
+if [[ -d "$TEXTFILE_DIR" ]]; then
+    printf '# HELP mopro_backup_last_success_timestamp_seconds Unix timestamp of the last successful backup.\n' \
+        > "${TEXTFILE_DIR}/mopro_backup.prom.$$"
+    printf '# TYPE mopro_backup_last_success_timestamp_seconds gauge\n' \
+        >> "${TEXTFILE_DIR}/mopro_backup.prom.$$"
+    printf 'mopro_backup_last_success_timestamp_seconds %d\n' "$(date +%s)" \
+        >> "${TEXTFILE_DIR}/mopro_backup.prom.$$"
+    mv "${TEXTFILE_DIR}/mopro_backup.prom.$$" "${TEXTFILE_DIR}/mopro_backup.prom"
+fi
+
 log "Done."
