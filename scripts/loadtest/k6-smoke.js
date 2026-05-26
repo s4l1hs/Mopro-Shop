@@ -22,10 +22,16 @@
 import http from 'k6/http';
 import { check, sleep, group } from 'k6';
 import { Counter, Rate } from 'k6/metrics';
+import exec from 'k6/execution';
 
 // ── Custom metrics ────────────────────────────────────────────────────────────
 const checkoutAttempts = new Counter('checkout_attempts_total');
 const checkoutErrors   = new Counter('checkout_errors_total');
+
+// Per-VU auth token cache (k6 VUs have isolated JS runtimes — this is VU-local state).
+// Authenticate once per VU at first iteration; reuse token for all subsequent iterations.
+// This avoids exhausting the per-phone OTP rate limit (3 req / 10 min).
+let vuToken = null;
 const authErrors       = new Rate('auth_error_rate');
 
 // ── Test configuration ────────────────────────────────────────────────────────
@@ -154,53 +160,71 @@ export function browseScenario() {
 
 // ── Checkout scenario (authenticated low-rate) ────────────────────────────────
 export function checkoutScenario() {
-  // Step 1: authenticate via OTP bypass
-  const otpReqRes = http.post(
-    `${BASE}/auth/otp/request`,
-    JSON.stringify({ phone: '+905551234567' }),
-    { headers: { 'Content-Type': 'application/json' }, tags: { type: 'auth' } }
-  );
+  // Step 1: authenticate via OTP bypass — once per VU lifetime.
+  // Each VU uses a unique phone (VU ID–derived) so no two VUs share a rate-limit
+  // bucket. Authenticate once and cache the JWT; subsequent iterations skip auth.
+  if (!vuToken) {
+    const vuPhone = `+9055512345${String(exec.vu.idInScenario).padStart(2, '0')}`;
 
-  check(otpReqRes, { 'otp/request 204': (r) => r.status === 204 });
-  if (otpReqRes.status !== 204) {
-    authErrors.add(1);
-    sleep(5);
-    return;
-  }
-  authErrors.add(0);
+    const otpReqRes = http.post(
+      `${BASE}/auth/otp/request`,
+      JSON.stringify({ phone: vuPhone }),
+      { headers: { 'Content-Type': 'application/json' }, tags: { type: 'auth' } }
+    );
 
-  const verifyRes = http.post(
-    `${BASE}/auth/otp/verify`,
-    JSON.stringify({ phone: '+905551234567', code: '123456' }),
-    { headers: { 'Content-Type': 'application/json' }, tags: { type: 'auth' } }
-  );
+    check(otpReqRes, { 'otp/request 204': (r) => r.status === 204 });
+    if (otpReqRes.status !== 204) {
+      authErrors.add(1);
+      sleep(5);
+      return;
+    }
+    authErrors.add(0);
 
-  let accessToken;
-  try {
-    accessToken = JSON.parse(verifyRes.body).access_token;
-  } catch { /* ignore */ }
+    const verifyRes = http.post(
+      `${BASE}/auth/otp/verify`,
+      JSON.stringify({ phone: vuPhone, code: '123456' }),
+      { headers: { 'Content-Type': 'application/json' }, tags: { type: 'auth' } }
+    );
 
-  if (!accessToken || verifyRes.status !== 200) {
-    authErrors.add(1);
-    sleep(5);
-    return;
+    let accessToken;
+    try {
+      accessToken = JSON.parse(verifyRes.body).access_token;
+    } catch { /* ignore */ }
+
+    if (!accessToken || verifyRes.status !== 200) {
+      authErrors.add(1);
+      sleep(5);
+      return;
+    }
+
+    vuToken = accessToken;
   }
 
   const authHeaders = {
-    'Authorization': `Bearer ${accessToken}`,
+    'Authorization': `Bearer ${vuToken}`,
     'Content-Type': 'application/json',
   };
 
-  // Step 2: fetch product catalog to get a real variant ID
+  // Step 2: fetch product catalog → PDP to get a real variant ID.
+  // The list endpoint does not include variants; a PDP call is required.
   const productsRes = http.get(
     `${BASE}/products?category_id=127&limit=5`,
     { tags: { type: 'browse' } }
   );
   let variantId;
   try {
-    const body = JSON.parse(productsRes.body);
-    const items = body.data || body.items || [];
-    variantId = items[0].variants[0].id;
+    const listBody = JSON.parse(productsRes.body);
+    const items = listBody.data || listBody.items || [];
+    if (items.length > 0) {
+      const productId = items[Math.floor(Math.random() * items.length)].id;
+      const pdpRes = http.get(
+        `${BASE}/products/${productId}`,
+        { tags: { type: 'browse', route: '/products/{id}' } }
+      );
+      const pdpBody = JSON.parse(pdpRes.body);
+      const variants = pdpBody.variants || [];
+      if (variants.length > 0) variantId = variants[0].id;
+    }
   } catch { /* ignore */ }
 
   if (!variantId) {
@@ -208,13 +232,26 @@ export function checkoutScenario() {
     return;
   }
 
-  // Step 3: add to cart
+  // Step 3a: clear any stale cart items from previous iterations to avoid
+  // cross-iteration stock contention (cart items survive even when reserve fails).
+  {
+    const cartRes = http.get(`${BASE}/cart`, { headers: authHeaders });
+    try {
+      const cartBody = JSON.parse(cartRes.body);
+      const items = cartBody.items || [];
+      for (const item of items) {
+        http.del(`${BASE}/cart/items/${item.variant_id}`, null, { headers: authHeaders });
+      }
+    } catch { /* ignore — stale cart keys are harmless if the GET failed */ }
+  }
+
+  // Step 3b: add to cart
   const cartAddRes = http.post(
     `${BASE}/cart/items`,
     JSON.stringify({ variant_id: variantId, qty: 1 }),
     { headers: authHeaders, tags: { type: 'browse', route: '/cart/items' } }
   );
-  check(cartAddRes, { 'cart add 200': (r) => r.status === 200 });
+  check(cartAddRes, { 'cart add 204': (r) => r.status === 204 });
 
   // Step 4: reserve cart
   const reserveRes = http.post(

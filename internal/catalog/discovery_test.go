@@ -11,6 +11,10 @@ import (
 
 // ── New repository method stubs (satisfies updated Repository interface) ───────
 
+func (m *mockRepo) ListAllVariantStocks(_ context.Context) ([]catalog.VariantStock, error) {
+	return nil, nil
+}
+
 func (m *mockRepo) ListCategories(_ context.Context, _ string) ([]catalog.CategoryRow, error) {
 	return []catalog.CategoryRow{}, nil
 }

@@ -226,3 +226,10 @@ func (r *redisRepository) SeedStock(ctx context.Context, variantID int64, stock 
 	}
 	return nil
 }
+
+func (r *redisRepository) SeedStockIfAbsent(ctx context.Context, variantID int64, stock int) error {
+	if err := r.rc.SetNX(ctx, stockKey(variantID), stock, 0).Err(); err != nil {
+		return fmt.Errorf("cart.repo: SeedStockIfAbsent SetNX: %w", err)
+	}
+	return nil
+}

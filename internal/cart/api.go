@@ -17,7 +17,8 @@ type Service interface {
 	Reserve(ctx context.Context, userID int64) (reservationID string, expiresAt time.Time, err error)
 	Release(ctx context.Context, reservationID string) error           // saga compensation; restores stock
 	CommitReservation(ctx context.Context, reservationID string) error // order paid; deletes manifest without restoring stock
-	SeedStock(ctx context.Context, variantID int64, stock int) error   // test/CLI; TODO(eventbus-wireup)
+	SeedStock(ctx context.Context, variantID int64, stock int) error        // test/CLI; unconditional SET
+	SeedStockIfAbsent(ctx context.Context, variantID int64, stock int) error // startup sync; SET NX
 }
 
 // Repository is the storage interface used only by service.go.
@@ -41,6 +42,10 @@ type Repository interface {
 	// Called after a successful payment: the stock was permanently consumed by the purchase.
 	CommitReservation(ctx context.Context, reservationID string) error
 
-	// SeedStock sets the Redis stock counter for a variant (test/CLI use only).
+	// SeedStock sets the Redis stock counter for a variant (test/CLI use only — unconditional).
 	SeedStock(ctx context.Context, variantID int64, stock int) error
+
+	// SeedStockIfAbsent sets the Redis stock counter only when the key does not yet exist.
+	// Used at startup to initialize from Postgres without overwriting a live decremented counter.
+	SeedStockIfAbsent(ctx context.Context, variantID int64, stock int) error
 }

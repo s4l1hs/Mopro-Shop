@@ -140,3 +140,7 @@ func (s *catalogService) SearchSummary(ctx context.Context, query, locale, marke
 	offset := (page - 1) * perPage
 	return s.repo.SearchProductsSummary(ctx, query, locale, offset, perPage)
 }
+
+func (s *catalogService) ListAllVariantStocks(ctx context.Context) ([]VariantStock, error) {
+	return s.repo.ListAllVariantStocks(ctx)
+}

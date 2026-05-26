@@ -112,6 +112,27 @@ func main() {
 	}
 	cartSvc := cart.NewService(cartRepo, catalogSvc)
 
+	// Seed Redis stock counters from Postgres on startup using SET NX.
+	// Redis stock keys are the authoritative reservation counter; they are not
+	// auto-populated by the seed tool. SET NX ensures restarts don't overwrite
+	// a live decremented counter from an in-flight reservation.
+	{
+		stocks, syncErr := catalogSvc.ListAllVariantStocks(initCtx)
+		if syncErr != nil {
+			slog.Warn("cart: stock sync skipped", "err", syncErr)
+		} else {
+			var seeded int
+			for _, vs := range stocks {
+				if err := cartSvc.SeedStockIfAbsent(initCtx, vs.VariantID, vs.Stock); err != nil {
+					slog.Warn("cart: stock sync failed", "variant_id", vs.VariantID, "err", err)
+				} else {
+					seeded++
+				}
+			}
+			slog.Info("cart: stock sync complete", "variants", seeded)
+		}
+	}
+
 	// ── Signal-aware context for goroutines + HTTP shutdown ─────────────────
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 

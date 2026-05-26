@@ -21,6 +21,10 @@ type Service interface {
 	ListCategories(ctx context.Context, locale string) ([]CategoryRow, error)
 	ListProductsByCategory(ctx context.Context, categoryID int64, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error)
 	SearchSummary(ctx context.Context, query, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error)
+
+	// ListAllVariantStocks returns (variantID, stock) for every variant with stock > 0.
+	// Used at core-svc startup to seed Redis stock counters.
+	ListAllVariantStocks(ctx context.Context) ([]VariantStock, error)
 }
 
 // Repository is the storage interface used only by service.go.
@@ -39,4 +43,6 @@ type Repository interface {
 	ListCategories(ctx context.Context, locale string) ([]CategoryRow, error)
 	ListProductsByCategory(ctx context.Context, categoryID int64, locale string, offset, limit int) ([]ProductSummaryRow, int, error)
 	SearchProductsSummary(ctx context.Context, query, locale string, offset, limit int) ([]ProductSummaryRow, int, error)
+
+	ListAllVariantStocks(ctx context.Context) ([]VariantStock, error)
 }

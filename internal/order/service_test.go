@@ -57,6 +57,9 @@ func (m *mockCatalogSvc) ListCategories(_ context.Context, _ string) ([]catalog.
 func (m *mockCatalogSvc) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
+func (m *mockCatalogSvc) ListAllVariantStocks(_ context.Context) ([]catalog.VariantStock, error) {
+	return nil, nil
+}
 func (m *mockCatalogSvc) SearchSummary(_ context.Context, _, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
@@ -86,7 +89,8 @@ func (m *mockCartSvc) Reserve(_ context.Context, _ int64) (string, time.Time, er
 	return "res-id", time.Now().Add(15 * time.Minute), nil
 }
 func (m *mockCartSvc) Release(_ context.Context, _ string) error         { return nil }
-func (m *mockCartSvc) SeedStock(_ context.Context, _ int64, _ int) error { return nil }
+func (m *mockCartSvc) SeedStock(_ context.Context, _ int64, _ int) error        { return nil }
+func (m *mockCartSvc) SeedStockIfAbsent(_ context.Context, _ int64, _ int) error { return nil }
 
 // ── repo mock ─────────────────────────────────────────────────────────────────
 

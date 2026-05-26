@@ -120,6 +120,10 @@ func (s *cartService) SeedStock(ctx context.Context, variantID int64, stock int)
 	return s.repo.SeedStock(ctx, variantID, stock)
 }
 
+func (s *cartService) SeedStockIfAbsent(ctx context.Context, variantID int64, stock int) error {
+	return s.repo.SeedStockIfAbsent(ctx, variantID, stock)
+}
+
 func newReservationID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {

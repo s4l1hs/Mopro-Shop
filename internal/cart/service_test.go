@@ -47,6 +47,9 @@ func (m *mockCatalogSvc) ListCategories(_ context.Context, _ string) ([]catalog.
 func (m *mockCatalogSvc) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
+func (m *mockCatalogSvc) ListAllVariantStocks(_ context.Context) ([]catalog.VariantStock, error) {
+	return nil, nil
+}
 func (m *mockCatalogSvc) SearchSummary(_ context.Context, _, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
@@ -112,6 +115,7 @@ func (m *mockRepo) SeedStock(ctx context.Context, variantID int64, stock int) er
 	}
 	return nil
 }
+func (m *mockRepo) SeedStockIfAbsent(_ context.Context, _ int64, _ int) error { return nil }
 
 // ── helper ────────────────────────────────────────────────────────────────────
 

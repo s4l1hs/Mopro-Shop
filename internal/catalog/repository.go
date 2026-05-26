@@ -373,6 +373,24 @@ func (r *pgxRepository) GetVariantByID(ctx context.Context, variantID int64) (Va
 	return v, nil
 }
 
+func (r *pgxRepository) ListAllVariantStocks(ctx context.Context) ([]VariantStock, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, stock FROM catalog_schema.variants WHERE stock > 0`)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: ListAllVariantStocks: %w", err)
+	}
+	defer rows.Close()
+	var out []VariantStock
+	for rows.Next() {
+		var vs VariantStock
+		if err := rows.Scan(&vs.VariantID, &vs.Stock); err != nil {
+			return nil, fmt.Errorf("catalog.repo: ListAllVariantStocks scan: %w", err)
+		}
+		out = append(out, vs)
+	}
+	return out, rows.Err()
+}
+
 func (r *pgxRepository) GetCommission(ctx context.Context, market string, categoryID int64) (CategoryCommission, error) {
 	var c CategoryCommission
 	err := r.pool.QueryRow(ctx,

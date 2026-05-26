@@ -2,6 +2,12 @@ package catalog
 
 import "time"
 
+// VariantStock is a minimal projection used to sync Redis stock counters at startup.
+type VariantStock struct {
+	VariantID int64
+	Stock     int
+}
+
 // Product is the aggregate root for a seller listing.
 type Product struct {
 	ID              int64     `json:"id"`
