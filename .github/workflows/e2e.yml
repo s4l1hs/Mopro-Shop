@@ -1,0 +1,68 @@
+name: E2E Tests (Playwright)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/e2e.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/**"
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Override E2E_BASE_URL (default: https://staging.moproshop.com)"
+        required: false
+        default: "https://staging.moproshop.com"
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: "10"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers (chromium only for CI)
+        run: pnpm exec playwright install chromium --with-deps
+
+      - name: Run E2E tests
+        run: pnpm test:e2e --project=chromium --reporter=list
+        env:
+          CI: "true"
+          E2E_BASE_URL: ${{ github.event.inputs.base_url || 'https://staging.moproshop.com' }}
+          NEXT_PUBLIC_API_BASE_URL: "https://api-staging.moproshop.com"
+          E2E_API_BASE: "https://api-staging.moproshop.com"
+
+      - name: Upload HTML report on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report/
+          retention-days: 7
