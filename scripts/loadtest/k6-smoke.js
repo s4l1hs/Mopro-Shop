@@ -77,14 +77,16 @@ export function browseScenario() {
     // Product list (most common: browsing catalog)
     group('product_list', () => {
       const res = http.get(
-        `${BASE}/products?sort=bestseller&limit=12`,
+        `${BASE}/products?category_id=127&sort=bestseller&limit=12`,
         { tags: { type: 'browse', route: '/products' } }
       );
       check(res, {
         'products list 200': (r) => r.status === 200,
         'products has items': (r) => {
           try {
-            return JSON.parse(r.body).items.length > 0;
+            const body = JSON.parse(r.body);
+            const items = body.data || body.items || [];
+            return items.length > 0;
           } catch { return false; }
         },
       });
@@ -116,12 +118,13 @@ export function browseScenario() {
     // Product detail (PDP) — get a product first then fetch detail
     group('pdp', () => {
       const listRes = http.get(
-        `${BASE}/products?limit=20`,
+        `${BASE}/products?category_id=127&limit=20`,
         { tags: { type: 'browse', route: '/products' } }
       );
       if (listRes.status === 200) {
         try {
-          const items = JSON.parse(listRes.body).items;
+          const body = JSON.parse(listRes.body);
+          const items = body.data || body.items || [];
           if (items && items.length > 0) {
             const id = items[Math.floor(Math.random() * items.length)].id;
             const detailRes = http.get(
@@ -190,12 +193,13 @@ export function checkoutScenario() {
 
   // Step 2: fetch product catalog to get a real variant ID
   const productsRes = http.get(
-    `${BASE}/products?limit=5`,
+    `${BASE}/products?category_id=127&limit=5`,
     { tags: { type: 'browse' } }
   );
   let variantId;
   try {
-    const items = JSON.parse(productsRes.body).items;
+    const body = JSON.parse(productsRes.body);
+    const items = body.data || body.items || [];
     variantId = items[0].variants[0].id;
   } catch { /* ignore */ }
 
@@ -284,7 +288,8 @@ export function handleSummary(data) {
   if (dur) {
     console.log(`  p50 : ${dur.values.med?.toFixed(0)}ms`);
     console.log(`  p95 : ${dur.values['p(95)']?.toFixed(0)}ms`);
-    console.log(`  p99 : ${dur.values['p(99)']?.toFixed(0)}ms`);
+    const p99 = dur.values['p(99)'] ?? dur.values['p99'];
+    console.log(`  p99 : ${p99 !== undefined ? p99.toFixed(0) : 'n/a'}ms`);
     console.log(`  max : ${dur.values.max?.toFixed(0)}ms`);
   }
   if (failed) {

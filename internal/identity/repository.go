@@ -117,15 +117,18 @@ func (r *PgxRepository) MarkOTPVerifiedAndCreateSession(
 	defer tx.Rollback(ctx) //nolint:errcheck
 
 	// 1. Mark OTP verified — fail if already verified (concurrent double-submit).
-	tag, err := tx.Exec(ctx,
-		`UPDATE identity_schema.otp_codes SET verified_at = now() WHERE id = $1 AND verified_at IS NULL`,
-		otpID,
-	)
-	if err != nil {
-		return User{}, fmt.Errorf("identity repo: mark otp verified: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return User{}, ErrOTPAlreadyUsed
+	// otpID=0 signals the DEV_OTP_ACCEPT_ANY bypass path; skip the update in that case.
+	if otpID != 0 {
+		tag, err := tx.Exec(ctx,
+			`UPDATE identity_schema.otp_codes SET verified_at = now() WHERE id = $1 AND verified_at IS NULL`,
+			otpID,
+		)
+		if err != nil {
+			return User{}, fmt.Errorf("identity repo: mark otp verified: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return User{}, ErrOTPAlreadyUsed
+		}
 	}
 
 	// 2. Upsert user (first-time login creates the row).
