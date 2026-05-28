@@ -12,6 +12,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"unicode"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -19,6 +20,7 @@ import (
 	pkgcrypto "github.com/mopro/platform/pkg/crypto"
 	"github.com/mopro/platform/pkg/metrics"
 
+	"github.com/mopro/platform/internal/identity/email"
 	"github.com/mopro/platform/internal/identity/jwt"
 	"github.com/mopro/platform/internal/identity/ratelimit"
 	"github.com/mopro/platform/internal/identity/sms"
@@ -34,6 +36,7 @@ const (
 type serviceImpl struct {
 	repo          Repository
 	sms           sms.Provider
+	emailProv     email.Provider
 	limiter       ratelimit.Limiter
 	signer        jwt.Signer
 	market        string
@@ -48,6 +51,7 @@ type serviceImpl struct {
 func NewService(
 	repo Repository,
 	smsProv sms.Provider,
+	emailProv email.Provider,
 	limiter ratelimit.Limiter,
 	signer jwt.Signer,
 	market string,
@@ -64,6 +68,7 @@ func NewService(
 	return &serviceImpl{
 		repo:          repo,
 		sms:           smsProv,
+		emailProv:     emailProv,
 		limiter:       limiter,
 		signer:        signer,
 		market:        market,
@@ -347,6 +352,28 @@ func validatePhone(phone string) error {
 	return nil
 }
 
+// validatePassword enforces: ≥8 chars, ≥1 uppercase, ≥1 lowercase, ≥1 special char.
+func validatePassword(p string) error {
+	if len(p) < minPasswordLen {
+		return ErrWeakPassword
+	}
+	var hasUpper, hasLower, hasSpecial bool
+	for _, r := range p {
+		switch {
+		case unicode.IsUpper(r):
+			hasUpper = true
+		case unicode.IsLower(r):
+			hasLower = true
+		case unicode.IsPunct(r) || unicode.IsSymbol(r):
+			hasSpecial = true
+		}
+	}
+	if !hasUpper || !hasLower || !hasSpecial {
+		return ErrWeakPassword
+	}
+	return nil
+}
+
 var localeRe = regexp.MustCompile(`^[a-z]{2,3}(-[A-Z]{2,4})?$`)
 
 func validateLocale(locale string) error {
@@ -365,7 +392,26 @@ func validateEmail(email string) error {
 	return nil
 }
 
-// generateOTPCode returns a cryptographically-random 6-digit code (zero-padded).
+// codeAlphabet is the character set for email verification codes.
+// Uppercase letters + digits; ambiguous chars (0,1,I,O,L) removed.
+const codeAlphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+
+// generateVerificationCode returns an 8-char uppercase alphanumeric code.
+// 31^8 ≈ 852 billion combinations — brute force infeasible.
+func generateVerificationCode() (string, error) {
+	b := make([]byte, 8)
+	alphabetLen := big.NewInt(int64(len(codeAlphabet)))
+	for i := range b {
+		n, err := rand.Int(rand.Reader, alphabetLen)
+		if err != nil {
+			return "", err
+		}
+		b[i] = codeAlphabet[n.Int64()]
+	}
+	return string(b), nil
+}
+
+// generateOTPCode returns a cryptographically-random 6-digit code (used for SMS OTP).
 func generateOTPCode() (string, error) {
 	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
 	if err != nil {
@@ -406,6 +452,324 @@ func newRefreshTokenCreation() refreshTokenCreation {
 			ExpiresAt:  time.Now().Add(refreshTokenTTL),
 		},
 	}
+}
+
+// ── Email auth ────────────────────────────────────────────────────────────────
+
+func (s *serviceImpl) Register(ctx context.Context, in RegisterInput) error {
+	if err := validateEmail(in.Email); err != nil {
+		return err
+	}
+	if err := validatePassword(in.Password); err != nil {
+		return err
+	}
+	if err := validateLocale(in.Locale); err != nil {
+		in.Locale = s.defaultLocale
+	}
+
+	emailHash, err := pkgcrypto.PhoneHash(in.Email) // same HMAC mechanism
+	if err != nil {
+		return fmt.Errorf("identity: hash email: %w", err)
+	}
+	if _, err := s.repo.FindUserByEmailHash(ctx, emailHash); err == nil {
+		return ErrEmailAlreadyExists
+	} else if !errors.Is(err, ErrUserNotFound) {
+		return fmt.Errorf("identity: check email: %w", err)
+	}
+
+	emailEnc, err := pkgcrypto.EncryptPII(strings.ToLower(strings.TrimSpace(in.Email)))
+	if err != nil {
+		return fmt.Errorf("identity: encrypt email: %w", err)
+	}
+	pwHash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcryptPasswordCost)
+	if err != nil {
+		return fmt.Errorf("identity: hash password: %w", err)
+	}
+
+	name := strings.TrimSpace(in.NameFirst + " " + in.NameLast)
+	user, err := s.repo.CreateEmailUser(ctx, emailHash, emailEnc, string(pwHash), name, in.Locale)
+	if err != nil {
+		return fmt.Errorf("identity: create user: %w", err)
+	}
+
+	return s.sendEmailVerification(ctx, user.ID, in.Email)
+}
+
+func (s *serviceImpl) LoginEmail(ctx context.Context, emailAddr, password, clientIP string) (LoginResult, error) {
+	if err := validateEmail(emailAddr); err != nil {
+		return LoginResult{}, ErrInvalidCredentials
+	}
+	emailHash, err := pkgcrypto.PhoneHash(strings.ToLower(strings.TrimSpace(emailAddr)))
+	if err != nil {
+		return LoginResult{}, fmt.Errorf("identity: hash email: %w", err)
+	}
+
+	user, err := s.repo.FindUserByEmailHash(ctx, emailHash)
+	if errors.Is(err, ErrUserNotFound) {
+		return LoginResult{}, ErrInvalidCredentials
+	}
+	if err != nil {
+		return LoginResult{}, fmt.Errorf("identity: find user: %w", err)
+	}
+	if user.Status == StatusSuspended {
+		return LoginResult{}, ErrUserSuspended
+	}
+	if user.Status == StatusDeleted {
+		return LoginResult{}, ErrUserDeleted
+	}
+	if user.PasswordHash == "" {
+		return LoginResult{}, ErrInvalidCredentials
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		if ferr := s.limiter.RecordVerifyFailure(ctx, emailHash); ferr != nil {
+			return LoginResult{}, mapRatelimitErr(ferr)
+		}
+		return LoginResult{}, ErrInvalidCredentials
+	}
+	_ = s.limiter.ResetVerifyFailures(ctx, emailHash)
+
+	if !user.EmailVerified {
+		return LoginResult{}, ErrEmailNotVerified
+	}
+
+	if user.MFAEnabled {
+		mfaPlain, err := pkgcrypto.DecryptPII(user.MFAPhoneEnc)
+		if err != nil {
+			return LoginResult{}, fmt.Errorf("identity: decrypt mfa phone: %w", err)
+		}
+		code, err := generateOTPCode()
+		if err != nil {
+			return LoginResult{}, err
+		}
+		codeHash, err := bcrypt.GenerateFromPassword([]byte(code), bcryptCost)
+		if err != nil {
+			return LoginResult{}, err
+		}
+		challengeRaw := generateOpaqueToken()
+		challengeHash := hashToken(challengeRaw)
+
+		if err := s.repo.CreateMFAChallenge(ctx, user.ID, challengeHash, string(codeHash),
+			time.Now().Add(mfaChallengeTTL)); err != nil {
+			return LoginResult{}, fmt.Errorf("identity: create mfa challenge: %w", err)
+		}
+		if err := s.sms.Send(ctx, mfaPlain, code); err != nil {
+			s.log.Error("identity: mfa sms send", "err", err)
+		}
+		return LoginResult{
+			MFAToken:    challengeRaw,
+			MaskedPhone: MaskPhone(mfaPlain),
+		}, nil
+	}
+
+	pair, err := s.issueTokensForUser(ctx, user.ID)
+	if err != nil {
+		return LoginResult{}, err
+	}
+	return LoginResult{Tokens: &pair}, nil
+}
+
+func (s *serviceImpl) VerifyEmail(ctx context.Context, emailAddr, code string) (TokenPair, error) {
+	emailHash, err := pkgcrypto.PhoneHash(strings.ToLower(strings.TrimSpace(emailAddr)))
+	if err != nil {
+		return TokenPair{}, fmt.Errorf("identity: hash email: %w", err)
+	}
+	user, err := s.repo.FindUserByEmailHash(ctx, emailHash)
+	if errors.Is(err, ErrUserNotFound) {
+		return TokenPair{}, ErrEmailTokenInvalid
+	}
+	if err != nil {
+		return TokenPair{}, fmt.Errorf("identity: find user: %w", err)
+	}
+	if user.EmailVerified {
+		// Already verified — just issue a new session.
+		return s.issueTokensForUser(ctx, user.ID)
+	}
+	v, err := s.repo.FindLatestEmailVerification(ctx, user.ID)
+	if err != nil {
+		return TokenPair{}, err
+	}
+	if time.Now().After(v.ExpiresAt) {
+		return TokenPair{}, ErrEmailTokenExpired
+	}
+	// Case-insensitive: codes are stored uppercase, accept any casing from user.
+	if err := bcrypt.CompareHashAndPassword([]byte(v.CodeHash), []byte(strings.ToUpper(code))); err != nil {
+		return TokenPair{}, ErrEmailTokenInvalid
+	}
+	if err := s.repo.MarkEmailVerificationUsed(ctx, v.ID); err != nil {
+		return TokenPair{}, err
+	}
+	if err := s.repo.MarkEmailVerified(ctx, user.ID); err != nil {
+		return TokenPair{}, fmt.Errorf("identity: mark email verified: %w", err)
+	}
+	return s.issueTokensForUser(ctx, user.ID)
+}
+
+func (s *serviceImpl) ResendVerification(ctx context.Context, emailAddr string) error {
+	emailHash, err := pkgcrypto.PhoneHash(strings.ToLower(strings.TrimSpace(emailAddr)))
+	if err != nil {
+		return nil // silent
+	}
+	user, err := s.repo.FindUserByEmailHash(ctx, emailHash)
+	if err != nil {
+		return nil // silent
+	}
+	if user.EmailVerified {
+		return nil
+	}
+	emailPlain, err := pkgcrypto.DecryptPII(user.EmailEnc)
+	if err != nil {
+		return fmt.Errorf("identity: decrypt email: %w", err)
+	}
+	return s.sendEmailVerification(ctx, user.ID, emailPlain)
+}
+
+func (s *serviceImpl) ForgotPassword(ctx context.Context, emailAddr string) error {
+	emailHash, err := pkgcrypto.PhoneHash(strings.ToLower(strings.TrimSpace(emailAddr)))
+	if err != nil {
+		return nil // silent
+	}
+	user, err := s.repo.FindUserByEmailHash(ctx, emailHash)
+	if err != nil {
+		return nil // silent — do not leak whether email exists
+	}
+	token := generateOpaqueToken()
+	tokenHash := hashToken(token)
+	if err := s.repo.CreatePasswordReset(ctx, user.ID, tokenHash, time.Now().Add(passwordResetTTL)); err != nil {
+		return fmt.Errorf("identity: create password reset: %w", err)
+	}
+	if err := s.emailProv.SendPasswordReset(ctx, emailAddr, token); err != nil {
+		s.log.Error("identity: send password reset email", "err", err)
+	}
+	return nil
+}
+
+func (s *serviceImpl) ResetPassword(ctx context.Context, token, newPassword string) error {
+	if err := validatePassword(newPassword); err != nil {
+		return err
+	}
+	tokenHash := hashToken(token)
+	reset, err := s.repo.FindPasswordReset(ctx, tokenHash)
+	if err != nil {
+		return err
+	}
+	if time.Now().After(reset.ExpiresAt) {
+		return ErrPasswordResetExpired
+	}
+	pwHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcryptPasswordCost)
+	if err != nil {
+		return fmt.Errorf("identity: hash new password: %w", err)
+	}
+	if err := s.repo.SetPasswordHash(ctx, reset.UserID, string(pwHash)); err != nil {
+		return fmt.Errorf("identity: set password: %w", err)
+	}
+	_ = s.repo.MarkPasswordResetUsed(ctx, reset.ID)
+	_ = s.repo.RevokeAllUserTokens(ctx, reset.UserID)
+	return nil
+}
+
+// ── MFA ───────────────────────────────────────────────────────────────────────
+
+func (s *serviceImpl) EnrollMFA(ctx context.Context, userID int64, phone, clientIP string) error {
+	if err := validatePhone(phone); err != nil {
+		return err
+	}
+	user, err := s.repo.GetUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user.MFAEnabled {
+		return ErrMFAAlreadyEnabled
+	}
+	return s.RequestOTP(ctx, phone, OTPPurposeMFAEnroll, clientIP)
+}
+
+func (s *serviceImpl) ConfirmMFAEnroll(ctx context.Context, userID int64, phone, code string) error {
+	if err := validatePhone(phone); err != nil {
+		return err
+	}
+	phoneHash, err := pkgcrypto.PhoneHash(phone)
+	if err != nil {
+		return err
+	}
+	otp, err := s.repo.FindLatestOTP(ctx, phoneHash, OTPPurposeMFAEnroll)
+	if errors.Is(err, ErrOTPNotFound) {
+		return ErrMFACodeInvalid
+	}
+	if err != nil {
+		return err
+	}
+	if time.Now().After(otp.ExpiresAt) {
+		return ErrMFAChallengeExpired
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(otp.CodeHash), []byte(code)); err != nil {
+		return ErrMFACodeInvalid
+	}
+	_ = s.repo.MarkOTPVerified(ctx, otp.ID)
+
+	phoneEnc, err := pkgcrypto.EncryptPII(phone)
+	if err != nil {
+		return fmt.Errorf("identity: encrypt mfa phone: %w", err)
+	}
+	return s.repo.UpdateMFAConfig(ctx, userID, true, phoneHash, phoneEnc)
+}
+
+func (s *serviceImpl) VerifyMFAChallenge(ctx context.Context, challengeToken, code string) (TokenPair, error) {
+	challengeHash := hashToken(challengeToken)
+	challenge, err := s.repo.FindMFAChallenge(ctx, challengeHash)
+	if err != nil {
+		return TokenPair{}, err
+	}
+	if time.Now().After(challenge.ExpiresAt) {
+		return TokenPair{}, ErrMFAChallengeExpired
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(challenge.CodeHash), []byte(code)); err != nil {
+		return TokenPair{}, ErrMFACodeInvalid
+	}
+	_ = s.repo.MarkMFAChallengeVerified(ctx, challenge.ID)
+	return s.issueTokensForUser(ctx, challenge.UserID)
+}
+
+func (s *serviceImpl) DisableMFA(ctx context.Context, userID int64) error {
+	return s.repo.UpdateMFAConfig(ctx, userID, false, nil, "")
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+func (s *serviceImpl) issueTokensForUser(ctx context.Context, userID int64) (TokenPair, error) {
+	rtc := newRefreshTokenCreation()
+	if err := s.repo.CreateSession(ctx, userID, rtc.token); err != nil {
+		return TokenPair{}, fmt.Errorf("identity: create session: %w", err)
+	}
+	accessToken, _, err := s.signer.IssueAccess(userID, s.market)
+	if err != nil {
+		return TokenPair{}, fmt.Errorf("identity: issue access token: %w", err)
+	}
+	return TokenPair{
+		AccessToken:      accessToken,
+		RefreshToken:     rtc.raw,
+		RefreshExpiresAt: rtc.token.ExpiresAt,
+	}, nil
+}
+
+func (s *serviceImpl) sendEmailVerification(ctx context.Context, userID int64, emailAddr string) error {
+	code, err := generateVerificationCode()
+	if err != nil {
+		return err
+	}
+	// Store and compare uppercase to allow case-insensitive user input.
+	code = strings.ToUpper(code)
+	codeHash, err := bcrypt.GenerateFromPassword([]byte(code), bcryptCost)
+	if err != nil {
+		return err
+	}
+	if err := s.repo.CreateEmailVerification(ctx, userID, string(codeHash), time.Now().Add(emailVerifyTTL)); err != nil {
+		return fmt.Errorf("identity: store verification: %w", err)
+	}
+	if err := s.emailProv.SendVerification(ctx, emailAddr, code); err != nil {
+		s.log.Error("identity: send verification email", "err", err)
+	}
+	return nil
 }
 
 // mapRatelimitErr converts ratelimit package errors to identity package sentinels.

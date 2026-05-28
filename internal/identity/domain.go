@@ -8,17 +8,81 @@ import (
 
 // User is the canonical domain representation of a registered user.
 type User struct {
-	ID        int64
-	PhoneHash []byte // HMAC-SHA256 of E.164 phone — stored in DB for indexed lookup
-	PhoneEnc  string // AES-GCM encrypted E.164 phone — stored in DB, decrypted for display
-	EmailEnc  string // AES-GCM encrypted email — empty string when absent
-	Name      string // full display name (not encrypted)
-	Locale    string // BCP 47, e.g. "tr-TR"
-	Status    string // "active" | "suspended" | "deleted"
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt *time.Time
+	ID            int64
+	PhoneHash     []byte     // HMAC-SHA256 of E.164 phone (legacy OTP login)
+	PhoneEnc      string     // AES-GCM encrypted E.164 phone
+	EmailHash     []byte     // HMAC-SHA256 of email — indexed lookup for email auth
+	EmailEnc      string     // AES-GCM encrypted email
+	PasswordHash  string     // bcrypt(cost=12) of plaintext password; empty for phone-only users
+	EmailVerified bool       // true after the user clicks the verification link/code
+	MFAEnabled    bool       // true when phone-based MFA is active
+	MFAPhoneHash  []byte     // HMAC-SHA256 of MFA phone
+	MFAPhoneEnc   string     // AES-GCM encrypted MFA phone
+	Name          string     // full display name (not encrypted)
+	Locale        string     // BCP 47, e.g. "tr-TR"
+	Status        string     // "active" | "suspended" | "deleted"
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	DeletedAt     *time.Time
 }
+
+// EmailVerification is a short-lived code sent to a user's email.
+type EmailVerification struct {
+	ID        int64
+	UserID    int64
+	CodeHash  string // bcrypt of 6-digit code
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	CreatedAt time.Time
+}
+
+// PasswordReset is a short-lived opaque token sent by email for password recovery.
+type PasswordReset struct {
+	ID        int64
+	UserID    int64
+	TokenHash string // SHA-256 hex of the opaque token
+	ExpiresAt time.Time
+	UsedAt    *time.Time
+	CreatedAt time.Time
+}
+
+// MFAChallenge is an in-flight MFA step created when the user logs in with MFA enabled.
+type MFAChallenge struct {
+	ID            int64
+	UserID        int64
+	ChallengeHash string // SHA-256 hex of the opaque challenge token given to the client
+	CodeHash      string // bcrypt of OTP sent to MFA phone
+	ExpiresAt     time.Time
+	VerifiedAt    *time.Time
+	CreatedAt     time.Time
+}
+
+// LoginResult is the return value of LoginEmail.
+// Exactly one branch is populated.
+type LoginResult struct {
+	Tokens      *TokenPair // non-nil when authentication succeeded with no MFA
+	MFAToken    string     // non-empty when MFA is required; client sends this back to /auth/mfa/verify
+	MaskedPhone string     // display-only masked phone when MFA is required
+}
+
+// RegisterInput carries the fields required to create a new email-based account.
+type RegisterInput struct {
+	Email     string
+	Password  string
+	NameFirst string
+	NameLast  string
+	Locale    string
+}
+
+const (
+	OTPPurposeMFAEnroll = "mfa_enroll"
+
+	emailVerifyTTL     = 15 * time.Minute
+	passwordResetTTL   = 1 * time.Hour
+	mfaChallengeTTL    = 5 * time.Minute
+	bcryptPasswordCost = 12 // permanent credential — higher cost than OTP hashes
+	minPasswordLen     = 8
+)
 
 // OTP is a one-time password code record.
 type OTP struct {

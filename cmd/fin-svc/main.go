@@ -12,7 +12,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
@@ -79,6 +81,7 @@ func main() {
 		slog.Error("fin-svc: parse ledger DSN", "err", err)
 		os.Exit(1)
 	}
+	ledgerCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 	dbM.WirePool(ledgerCfg, "fin-svc")
 	pool, err := pgxpool.NewWithConfig(initCtx, ledgerCfg)
 	if err != nil {

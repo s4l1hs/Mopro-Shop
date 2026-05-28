@@ -1,7 +1,10 @@
 // Package identity manages user authentication, OTP verification, JWT issuance, and device registration.
 package identity
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Service is the public interface of the identity module.
 // All callers (HTTP handlers) use only this interface — never the struct directly.
@@ -57,6 +60,45 @@ type Service interface {
 	// DeleteAddress permanently removes the address.
 	// Returns ErrAddressNotFound when the address doesn't exist or belongs to another user.
 	DeleteAddress(ctx context.Context, userID, addressID int64) error
+
+	// ── Email auth ────────────────────────────────────────────────────────────
+
+	// Register creates a new email+password account and sends a verification email.
+	Register(ctx context.Context, in RegisterInput) error
+
+	// LoginEmail authenticates with email and password.
+	// Returns LoginResult.Tokens when MFA is not required.
+	// Returns LoginResult.MFAToken when MFA is enabled (client must call VerifyMFAChallenge).
+	LoginEmail(ctx context.Context, email, password, clientIP string) (LoginResult, error)
+
+	// VerifyEmail confirms the 6-digit code for the given email address.
+	// On success the user's email_verified flag is set and a full token pair is returned.
+	// This is a public endpoint — the user has no access token yet at this stage.
+	VerifyEmail(ctx context.Context, email, code string) (TokenPair, error)
+
+	// ResendVerification sends a new verification email for the given email address (public).
+	ResendVerification(ctx context.Context, email string) error
+
+	// ForgotPassword sends a password-reset email. Silently no-ops if email is not found.
+	ForgotPassword(ctx context.Context, email string) error
+
+	// ResetPassword applies a new password using a reset token.
+	// On success all existing refresh tokens are revoked (force logout everywhere).
+	ResetPassword(ctx context.Context, token, newPassword string) error
+
+	// ── MFA ───────────────────────────────────────────────────────────────────
+
+	// EnrollMFA sends an OTP to phone for MFA setup. User must confirm with ConfirmMFAEnroll.
+	EnrollMFA(ctx context.Context, userID int64, phone, clientIP string) error
+
+	// ConfirmMFAEnroll verifies the OTP and enables MFA on the account.
+	ConfirmMFAEnroll(ctx context.Context, userID int64, phone, code string) error
+
+	// VerifyMFAChallenge validates the MFA OTP and issues a token pair.
+	VerifyMFAChallenge(ctx context.Context, challengeToken, code string) (TokenPair, error)
+
+	// DisableMFA disables MFA for the user. The caller must have step-up auth.
+	DisableMFA(ctx context.Context, userID int64) error
 }
 
 // Repository is the storage interface of the identity module.
@@ -138,4 +180,33 @@ type Repository interface {
 
 	// DeleteAddress hard-deletes the address.
 	DeleteAddress(ctx context.Context, userID, addressID int64) error
+
+	// ── Email auth ────────────────────────────────────────────────────────────
+
+	FindUserByEmailHash(ctx context.Context, emailHash []byte) (User, error)
+	CreateEmailUser(ctx context.Context, emailHash []byte, emailEnc, passwordHash, name, locale string) (User, error)
+	SetPasswordHash(ctx context.Context, userID int64, passwordHash string) error
+	MarkEmailVerified(ctx context.Context, userID int64) error
+
+	CreateEmailVerification(ctx context.Context, userID int64, codeHash string, expiresAt time.Time) error
+	FindLatestEmailVerification(ctx context.Context, userID int64) (EmailVerification, error)
+	MarkEmailVerificationUsed(ctx context.Context, id int64) error
+
+	CreatePasswordReset(ctx context.Context, userID int64, tokenHash string, expiresAt time.Time) error
+	FindPasswordReset(ctx context.Context, tokenHash string) (PasswordReset, error)
+	MarkPasswordResetUsed(ctx context.Context, id int64) error
+
+	// CreateSession inserts a refresh token for an existing user.
+	// Used for email login (unlike MarkOTPVerifiedAndCreateSession which also upserts the user).
+	CreateSession(ctx context.Context, userID int64, token RefreshToken) error
+
+	// RevokeAllUserTokens revokes every active refresh token belonging to userID.
+	RevokeAllUserTokens(ctx context.Context, userID int64) error
+
+	// ── MFA ───────────────────────────────────────────────────────────────────
+
+	UpdateMFAConfig(ctx context.Context, userID int64, enabled bool, phoneHash []byte, phoneEnc string) error
+	CreateMFAChallenge(ctx context.Context, userID int64, challengeHash, codeHash string, expiresAt time.Time) error
+	FindMFAChallenge(ctx context.Context, challengeHash string) (MFAChallenge, error)
+	MarkMFAChallengeVerified(ctx context.Context, id int64) error
 }

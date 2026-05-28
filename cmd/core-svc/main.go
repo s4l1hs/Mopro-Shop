@@ -24,6 +24,8 @@ import (
 	"github.com/mopro/platform/internal/idempotency"
 	"github.com/mopro/platform/internal/identity"
 	"github.com/mopro/platform/internal/identity/cleanup"
+	identityemail "github.com/mopro/platform/internal/identity/email"
+	emailmock "github.com/mopro/platform/internal/identity/email/mock"
 	identityjwt "github.com/mopro/platform/internal/identity/jwt"
 	"github.com/mopro/platform/internal/identity/middleware"
 	"github.com/mopro/platform/internal/identity/ratelimit"
@@ -85,6 +87,8 @@ func main() {
 		slog.Error("catalog: failed to parse DB DSN", "err", err)
 		os.Exit(1)
 	}
+	// PgBouncer transaction-pool mode requires simple query protocol (no prepared statements).
+	poolCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 	dbM.WirePool(poolCfg, "core-svc")
 	pool, err := pgxpool.NewWithConfig(initCtx, poolCfg)
 	if err != nil {
@@ -313,6 +317,10 @@ func main() {
 	}
 	identityRepo := identity.NewRepository(pool)
 	identityLimiter := ratelimit.New(rc)
+	// Email provider — always mock in local dev; SMTP in production.
+	mockEmail := emailmock.New(slog.Default())
+	var emailProv identityemail.Provider = mockEmail
+
 	var smsProv sms.Provider
 	switch os.Getenv("SMS_PROVIDER") {
 	case "netgsm":
@@ -326,7 +334,7 @@ func main() {
 		smsProv = mock.New(slog.Default())
 	}
 	identitySvc := identity.NewService(
-		identityRepo, smsProv, identityLimiter, jwtSigner,
+		identityRepo, smsProv, emailProv, identityLimiter, jwtSigner,
 		market, defaultLocale, slog.Default(),
 		bizM,
 	)
@@ -344,6 +352,24 @@ func main() {
 	requireAuth := middleware.RequireAuth(jwtSigner)
 	auth := &authHandlers{svc: identitySvc, log: slog.Default()}
 	auth.registerRoutes(mux, requireAuth)
+
+	// ── Dev-only endpoint — returns last verification code for an email ───────
+	// Active only when ENV != production. Safe to expose in local dev.
+	if os.Getenv("ENV") != "production" {
+		mux.HandleFunc("GET /dev/email-code", func(w http.ResponseWriter, r *http.Request) {
+			email := r.URL.Query().Get("email")
+			if email == "" {
+				jsonError(w, "email query param required", http.StatusBadRequest)
+				return
+			}
+			code := mockEmail.LastVerificationCode(email)
+			if code == "" {
+				jsonError(w, "no code found for this email", http.StatusNotFound)
+				return
+			}
+			jsonOK(w, http.StatusOK, map[string]string{"email": email, "code": code})
+		})
+	}
 
 	// Catalog routes
 	mux.Handle("POST /products",
@@ -375,6 +401,51 @@ func main() {
 	)
 	mux.Handle("GET /recommendations",
 		httpTrace(http.HandlerFunc(handleListRecommendations())),
+	)
+
+	// ── Home composition + batch ──────────────────────────────────────────────
+	mux.Handle("GET /home/banners",
+		httpTrace(http.HandlerFunc(handleHomeBanners(catalogSvc))),
+	)
+	mux.Handle("GET /home/rails",
+		httpTrace(http.HandlerFunc(handleHomeRails(catalogSvc, defaultLocale))),
+	)
+	mux.Handle("POST /products/batch",
+		httpTrace(http.HandlerFunc(handleProductsBatch(catalogSvc, defaultLocale, market, cashbackCurrency))),
+	)
+	mux.Handle("GET /products/{id}/reviews",
+		httpTrace(http.HandlerFunc(handleProductReviews(catalogSvc))),
+	)
+	mux.Handle("GET /search/trending",
+		httpTrace(http.HandlerFunc(handleSearchTrending())),
+	)
+	mux.Handle("POST /favorites/sync",
+		httpTrace(requireAuth(http.HandlerFunc(handleFavoritesSync(pool)))),
+	)
+	// Cart merge — guest items added to server cart on login
+	mux.Handle("POST /cart/merge",
+		httpTrace(requireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			userID := middleware.UserIDFromCtx(r.Context())
+			var req struct {
+				Items []struct {
+					VariantID int64 `json:"variant_id"`
+					Qty       int   `json:"qty"`
+				} `json:"items"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				jsonError(w, "invalid JSON", http.StatusBadRequest)
+				return
+			}
+			for _, item := range req.Items {
+				if item.Qty <= 0 || item.VariantID <= 0 {
+					continue
+				}
+				if err := cartSvc.AddItem(r.Context(), userID, item.VariantID, item.Qty); err != nil {
+					slog.Warn("cart merge: add item", "user_id", userID, "variant_id", item.VariantID, "err", err)
+				}
+			}
+			jsonOK(w, http.StatusOK, map[string]any{"merged": len(req.Items)})
+		}))),
 	)
 
 	// Address routes — require JWT authentication (IDOR-safe: user_id from JWT)

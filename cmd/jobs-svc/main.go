@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
@@ -52,6 +53,7 @@ func main() {
 		slog.Error("jobs-svc: parse ecom DSN", "err", err)
 		os.Exit(1)
 	}
+	ecomCfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
 	dbM.WirePool(ecomCfg, "jobs-svc")
 	pool, err := pgxpool.NewWithConfig(initCtx, ecomCfg)
 	if err != nil {

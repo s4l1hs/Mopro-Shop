@@ -97,3 +97,31 @@ type AddVariantRequest struct {
 	Stock         int      `json:"stock"`
 	ImageKeys     []string `json:"image_keys"`
 }
+
+// HomeRailRow is a named product rail for server-driven home composition.
+type HomeRailRow struct {
+	RailKey   string
+	TitleTR   string
+	TitleEN   string
+	SortOrder int
+}
+
+// HomeBannerRow is a single banner in the home carousel.
+type HomeBannerRow struct {
+	ID        int64
+	ImageURL  string
+	DeepLink  string
+	SortOrder int
+}
+
+// ProductReviewRow is a single user review on a product.
+type ProductReviewRow struct {
+	ID           int64
+	ProductID    int64
+	UserID       int64
+	Rating       int
+	Title        string
+	Body         string
+	HelpfulCount int
+	CreatedAt    string
+}

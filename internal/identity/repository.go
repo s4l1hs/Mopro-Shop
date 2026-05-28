@@ -10,6 +10,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// userSelectCols is the canonical column list for scanning a User row.
+// phone_hash, email_hash, mfa_phone_hash are bytea (may be NULL).
+const userSelectCols = `
+	id,
+	phone_hash, COALESCE(phone_enc, ''),
+	email_hash, COALESCE(email_enc, ''),
+	COALESCE(password_hash, ''),
+	email_verified, mfa_enabled,
+	mfa_phone_hash, COALESCE(mfa_phone_enc, ''),
+	COALESCE(name, ''), locale, status,
+	created_at, updated_at, deleted_at`
+
 // PgxRepository is the pgx/v5 implementation of Repository.
 type PgxRepository struct {
 	pool *pgxpool.Pool
@@ -23,34 +35,191 @@ func NewRepository(pool *pgxpool.Pool) *PgxRepository {
 // ── User reads ────────────────────────────────────────────────────────────────
 
 func (r *PgxRepository) FindUserByPhoneHash(ctx context.Context, phoneHash []byte) (User, error) {
-	const q = `
-		SELECT id, phone_hash, phone_enc, COALESCE(email_enc,''), name, locale, status,
-		       created_at, updated_at, deleted_at
-		FROM identity_schema.users
-		WHERE phone_hash = $1`
-	return r.scanUser(r.pool.QueryRow(ctx, q, phoneHash))
+	return r.scanUser(r.pool.QueryRow(ctx,
+		`SELECT `+userSelectCols+` FROM identity_schema.users WHERE phone_hash = $1`,
+		phoneHash))
 }
 
 func (r *PgxRepository) GetUser(ctx context.Context, id int64) (User, error) {
-	const q = `
-		SELECT id, phone_hash, phone_enc, COALESCE(email_enc,''), name, locale, status,
-		       created_at, updated_at, deleted_at
-		FROM identity_schema.users
-		WHERE id = $1`
-	return r.scanUser(r.pool.QueryRow(ctx, q, id))
+	return r.scanUser(r.pool.QueryRow(ctx,
+		`SELECT `+userSelectCols+` FROM identity_schema.users WHERE id = $1`,
+		id))
+}
+
+func (r *PgxRepository) FindUserByEmailHash(ctx context.Context, emailHash []byte) (User, error) {
+	return r.scanUser(r.pool.QueryRow(ctx,
+		`SELECT `+userSelectCols+` FROM identity_schema.users WHERE email_hash = $1`,
+		emailHash))
 }
 
 func (r *PgxRepository) scanUser(row pgx.Row) (User, error) {
 	var u User
+	// nullable bytea columns scanned via pointers; nil → empty slice.
+	var phoneHash, emailHash, mfaPhoneHash *[]byte
 	err := row.Scan(
-		&u.ID, &u.PhoneHash, &u.PhoneEnc, &u.EmailEnc,
+		&u.ID,
+		&phoneHash, &u.PhoneEnc,
+		&emailHash, &u.EmailEnc,
+		&u.PasswordHash,
+		&u.EmailVerified, &u.MFAEnabled,
+		&mfaPhoneHash, &u.MFAPhoneEnc,
 		&u.Name, &u.Locale, &u.Status,
 		&u.CreatedAt, &u.UpdatedAt, &u.DeletedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return User{}, ErrUserNotFound
 	}
+	if phoneHash != nil {
+		u.PhoneHash = *phoneHash
+	}
+	if emailHash != nil {
+		u.EmailHash = *emailHash
+	}
+	if mfaPhoneHash != nil {
+		u.MFAPhoneHash = *mfaPhoneHash
+	}
 	return u, err
+}
+
+// ── Email auth repository ─────────────────────────────────────────────────────
+
+func (r *PgxRepository) CreateEmailUser(ctx context.Context, emailHash []byte, emailEnc, passwordHash, name, locale string) (User, error) {
+	return r.scanUser(r.pool.QueryRow(ctx,
+		`INSERT INTO identity_schema.users (email_hash, email_enc, password_hash, name, locale)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING `+userSelectCols,
+		emailHash, emailEnc, passwordHash, name, locale))
+}
+
+func (r *PgxRepository) SetPasswordHash(ctx context.Context, userID int64, passwordHash string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE identity_schema.users SET password_hash = $2, updated_at = now() WHERE id = $1`,
+		userID, passwordHash)
+	return err
+}
+
+func (r *PgxRepository) MarkEmailVerified(ctx context.Context, userID int64) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE identity_schema.users SET email_verified = TRUE, updated_at = now() WHERE id = $1`,
+		userID)
+	return err
+}
+
+func (r *PgxRepository) CreateEmailVerification(ctx context.Context, userID int64, codeHash string, expiresAt time.Time) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO identity_schema.email_verifications (user_id, code_hash, expires_at) VALUES ($1, $2, $3)`,
+		userID, codeHash, expiresAt)
+	return err
+}
+
+func (r *PgxRepository) FindLatestEmailVerification(ctx context.Context, userID int64) (EmailVerification, error) {
+	var v EmailVerification
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, user_id, code_hash, expires_at, used_at, created_at
+		 FROM identity_schema.email_verifications
+		 WHERE user_id = $1 AND used_at IS NULL
+		 ORDER BY expires_at DESC LIMIT 1`,
+		userID,
+	).Scan(&v.ID, &v.UserID, &v.CodeHash, &v.ExpiresAt, &v.UsedAt, &v.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return EmailVerification{}, ErrEmailTokenInvalid
+	}
+	return v, err
+}
+
+func (r *PgxRepository) MarkEmailVerificationUsed(ctx context.Context, id int64) error {
+	tag, err := r.pool.Exec(ctx,
+		`UPDATE identity_schema.email_verifications SET used_at = now() WHERE id = $1 AND used_at IS NULL`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrEmailTokenUsed
+	}
+	return nil
+}
+
+func (r *PgxRepository) CreatePasswordReset(ctx context.Context, userID int64, tokenHash string, expiresAt time.Time) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO identity_schema.password_resets (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+		userID, tokenHash, expiresAt)
+	return err
+}
+
+func (r *PgxRepository) FindPasswordReset(ctx context.Context, tokenHash string) (PasswordReset, error) {
+	var p PasswordReset
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, user_id, token_hash, expires_at, used_at, created_at
+		 FROM identity_schema.password_resets
+		 WHERE token_hash = $1 AND used_at IS NULL`,
+		tokenHash,
+	).Scan(&p.ID, &p.UserID, &p.TokenHash, &p.ExpiresAt, &p.UsedAt, &p.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return PasswordReset{}, ErrPasswordResetInvalid
+	}
+	return p, err
+}
+
+func (r *PgxRepository) MarkPasswordResetUsed(ctx context.Context, id int64) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE identity_schema.password_resets SET used_at = now() WHERE id = $1`, id)
+	return err
+}
+
+func (r *PgxRepository) CreateSession(ctx context.Context, userID int64, token RefreshToken) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO identity_schema.refresh_tokens (user_id, token_hash, family_root, expires_at)
+		 VALUES ($1, $2, $3, $4)`,
+		userID, token.TokenHash, token.FamilyRoot, token.ExpiresAt)
+	return err
+}
+
+func (r *PgxRepository) RevokeAllUserTokens(ctx context.Context, userID int64) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE identity_schema.refresh_tokens
+		 SET revoked_at = now(), revoked_reason = 'password_reset'
+		 WHERE user_id = $1 AND revoked_at IS NULL`,
+		userID)
+	return err
+}
+
+// ── MFA repository ────────────────────────────────────────────────────────────
+
+func (r *PgxRepository) UpdateMFAConfig(ctx context.Context, userID int64, enabled bool, phoneHash []byte, phoneEnc string) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE identity_schema.users
+		 SET mfa_enabled = $2, mfa_phone_hash = $3, mfa_phone_enc = $4, updated_at = now()
+		 WHERE id = $1`,
+		userID, enabled, phoneHash, phoneEnc)
+	return err
+}
+
+func (r *PgxRepository) CreateMFAChallenge(ctx context.Context, userID int64, challengeHash, codeHash string, expiresAt time.Time) error {
+	_, err := r.pool.Exec(ctx,
+		`INSERT INTO identity_schema.mfa_challenges (user_id, challenge_hash, code_hash, expires_at)
+		 VALUES ($1, $2, $3, $4)`,
+		userID, challengeHash, codeHash, expiresAt)
+	return err
+}
+
+func (r *PgxRepository) FindMFAChallenge(ctx context.Context, challengeHash string) (MFAChallenge, error) {
+	var c MFAChallenge
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, user_id, challenge_hash, code_hash, expires_at, verified_at, created_at
+		 FROM identity_schema.mfa_challenges
+		 WHERE challenge_hash = $1 AND verified_at IS NULL`,
+		challengeHash,
+	).Scan(&c.ID, &c.UserID, &c.ChallengeHash, &c.CodeHash, &c.ExpiresAt, &c.VerifiedAt, &c.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return MFAChallenge{}, ErrMFAChallengeInvalid
+	}
+	return c, err
+}
+
+func (r *PgxRepository) MarkMFAChallengeVerified(ctx context.Context, id int64) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE identity_schema.mfa_challenges SET verified_at = now() WHERE id = $1`, id)
+	return err
 }
 
 // ── OTP ───────────────────────────────────────────────────────────────────────
@@ -133,16 +302,19 @@ func (r *PgxRepository) MarkOTPVerifiedAndCreateSession(
 
 	// 2. Upsert user (first-time login creates the row).
 	var u User
-	err = tx.QueryRow(ctx, `
-		INSERT INTO identity_schema.users (phone_hash, phone_enc, locale)
-		VALUES ($1, $2, $3)
-		ON CONFLICT (phone_hash) DO UPDATE
-		  SET updated_at = now()
-		RETURNING id, phone_hash, phone_enc, COALESCE(email_enc,''), name, locale, status,
-		          created_at, updated_at, deleted_at`,
+	err = tx.QueryRow(ctx,
+		`INSERT INTO identity_schema.users (phone_hash, phone_enc, locale)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (phone_hash) DO UPDATE SET updated_at = now()
+		 RETURNING `+userSelectCols,
 		phoneHash, phoneEnc, defaultLocale,
 	).Scan(
-		&u.ID, &u.PhoneHash, &u.PhoneEnc, &u.EmailEnc,
+		&u.ID,
+		&u.PhoneHash, &u.PhoneEnc,
+		&u.EmailHash, &u.EmailEnc,
+		&u.PasswordHash,
+		&u.EmailVerified, &u.MFAEnabled,
+		&u.MFAPhoneHash, &u.MFAPhoneEnc,
 		&u.Name, &u.Locale, &u.Status,
 		&u.CreatedAt, &u.UpdatedAt, &u.DeletedAt,
 	)
@@ -261,17 +433,8 @@ func (r *PgxRepository) RotateRefreshToken(
 	}
 
 	// Fetch user.
-	var u User
-	err = tx.QueryRow(ctx, `
-		SELECT id, phone_hash, phone_enc, COALESCE(email_enc,''), name, locale, status,
-		       created_at, updated_at, deleted_at
-		FROM identity_schema.users WHERE id = $1`,
-		cur.UserID,
-	).Scan(
-		&u.ID, &u.PhoneHash, &u.PhoneEnc, &u.EmailEnc,
-		&u.Name, &u.Locale, &u.Status,
-		&u.CreatedAt, &u.UpdatedAt, &u.DeletedAt,
-	)
+	u, err := r.scanUser(tx.QueryRow(ctx,
+		`SELECT `+userSelectCols+` FROM identity_schema.users WHERE id = $1`, cur.UserID))
 	if err != nil {
 		return User{}, RefreshToken{}, fmt.Errorf("identity repo: fetch user: %w", err)
 	}
@@ -341,23 +504,9 @@ func (r *PgxRepository) UpdateUser(ctx context.Context, id int64, updates UserUp
 		set += c
 	}
 
-	q := fmt.Sprintf(`
-		UPDATE identity_schema.users
-		SET %s
-		WHERE id = $1
-		RETURNING id, phone_hash, phone_enc, COALESCE(email_enc,''), name, locale, status,
-		          created_at, updated_at, deleted_at`, set)
-
-	var u User
-	err := r.pool.QueryRow(ctx, q, args...).Scan(
-		&u.ID, &u.PhoneHash, &u.PhoneEnc, &u.EmailEnc,
-		&u.Name, &u.Locale, &u.Status,
-		&u.CreatedAt, &u.UpdatedAt, &u.DeletedAt,
-	)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return User{}, ErrUserNotFound
-	}
-	return u, err
+	q := fmt.Sprintf(
+		`UPDATE identity_schema.users SET %s WHERE id = $1 RETURNING `+userSelectCols, set)
+	return r.scanUser(r.pool.QueryRow(ctx, q, args...))
 }
 
 // SoftDeleteWithRevoke atomically soft-deletes the user and revokes all active refresh tokens.
