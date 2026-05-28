@@ -219,3 +219,187 @@ What works end-to-end **right now**:
 - Account screen swaps between logged-out / logged-in headers based on auth state.
 - Security screen offers real password change + MFA enroll flows.
 - Theme toggle persists across sessions for guests too.
+
+---
+
+# Session 2 — Test Suite, Lints, and Partial Pixel Parity
+
+Branch: `feat/trendyol-tests-and-polish` (off `main` after the previous PR
+was merged as `9d4b7cb`). 5 commits on top of the merged base.
+
+## Summary — 10 bullets
+
+1. **Widget tests for the trio in §2 of the original prompt** — `ProductCard`,
+   `BottomNavBar` (AppShell), and `LoginRequiredSheet` — 16 tests with 6
+   golden baselines (light + dark per widget). New `test/_support/test_harness.dart`
+   wraps `ProviderScope + MaterialApp + buildLight/DarkTheme()` and disables
+   Google Fonts runtime fetching for deterministic goldens.
+2. **Router tests** — extracted the redirect logic into a pure top-level
+   `computeAuthRedirect({auth, location})` in `app_router.dart` and wrote 30
+   unit tests covering 8 public routes, 12 hard-gated routes, profile-incomplete
+   forcing, authenticated bouncing off `/auth/*`, and 5 public auth routes.
+3. **Integration tests for the 3 flows requested** — `test/integration/guest_merge_test.dart`
+   (Flow A: favorites→login→merge POST /favorites/sync; Flow B: cart→login→merge
+   POST /cart/merge; merge-failure isolation addendum) and
+   `test/integration/mfa_flow_test.dart` (Flow C: enroll → login challenge →
+   verify → logout). Uses a custom Dio request-capturing interceptor (no new
+   packages).
+4. **Fixed 4 latent provider bugs** — `cart_provider`, `addresses_provider`,
+   `categories_provider`, `product_detail_provider` all had `unawaited(_load())`
+   running synchronously inside `Notifier.build()`, which threw
+   "uninitialized provider" the moment `_load` touched `state`. Switched all
+   to `Future<void>.microtask(_load)` so `build()` returns first.
+5. **Fixed the entire pre-existing test suite** — 24 tests were red on
+   `main` before this session (EasyLocalization missing init, wrong mock
+   stub path in `auth_interceptor_test`, overflowing test surfaces in
+   `order_status_chip_test`, RepaintBoundary-finds-3-widgets in the cart
+   line card golden, `cart_line_card_test` needed SharedPreferences mock).
+   All 223 tests now green.
+6. **Lints in new files driven to zero** — `dart fix --apply` for 143
+   auto-fixes (const, trailing commas, sort_constructors_first, etc.) plus
+   manual fixes for the harder lints: 3 `use_build_context_synchronously`
+   issues in SecurityScreen, 5 `cascade_invocations` + 1 `avoid_dynamic_calls`
+   in guest_merge_test, deleted the dead `_SubmitButton` subclass in
+   SignInScreen, made `_Tile.trailing` an optional parameter instead of a
+   `const` field initializer, fixed a `[Logo]` comment_reference, and
+   broke 15 over-long lines.
+7. **Pixel parity — discount % + star rating on ProductCard** — migration
+   `0065_product_display_fields` adds `rating_avg`, `rating_count` to
+   `products` and `original_price_minor` to `variants`. `ProductSummaryRow`,
+   all 3 catalog SELECT queries, `productSummaryJSON`, and
+   `buildProductListResponse` updated to surface the new fields and a
+   server-computed `discount_pct`. ProductCard takes 4 new optional named
+   params and renders strikethrough original + red %-badge + amber-star
+   rating chip when present.
+8. **Pixel parity — PDP reviews tab wired** — new `productReviewsProvider`
+   (`FutureProvider.autoDispose.family<int>`) hits the existing
+   `GET /products/{id}/reviews` endpoint. New `_ReviewsTab` + `_ReviewItem`
+   render the list with 5-star row, date, optional title/body, helpful count,
+   plus an illustrated empty state. Replaces the second `_StubTab()` in the
+   PDP TabBarView.
+9. **Production-quality CashbackChip fix** — wrapped its Text in
+   `Flexible` + `overflow: ellipsis, maxLines: 1` to prevent horizontal
+   overflow in narrow card layouts (was crashing tests at 200 px width and
+   would have shown an overflow stripe in production at small breakpoints).
+10. **Branch hygiene** — initial 10 commits landed via PR #1
+    (`feat/trendyol-ui-and-guest-mode` → main), this session's 5 commits
+    live on `feat/trendyol-tests-and-polish` ready for PR.
+
+## Final test results
+
+```
+Flutter (mobile/):
+  flutter test:    223 passed, 0 failed, 0 skipped
+  flutter analyze: 247 info-level lints (0 errors, 0 warnings)
+                   0 info-level lints in files authored this branch
+  Golden baselines committed:
+    test/core/widgets/goldens/login_required_sheet_{light,dark}.png
+    test/features/catalog/widgets/goldens/product_card_{light,dark}.png
+    test/shell/goldens/bottom_nav_{light,dark}.png
+    test/features/cart/widgets/goldens/cart_line_card.png  (regenerated)
+
+Backend (project root):
+  GOWORK=off go test ./...:  all 29 packages pass
+  go build ./cmd/{core,fin,jobs}-svc: success
+  docker compose: 11/11 containers healthy after migration 0065 applied
+```
+
+## New tests added (this session)
+
+| File | Tests | What it proves |
+|---|---|---|
+| `test/_support/test_harness.dart` | (helper) | Shared `pumpTrendyolApp` + Google Fonts disable + SharedPreferences mock |
+| `test/features/catalog/widgets/product_card_test.dart` | 5 (3 struct + 2 golden) | Brand/title rendering, placeholder icon, heart toggles `favoritesProvider`, light + dark goldens |
+| `test/shell/app_shell_test.dart` | 4 (2 struct + 2 golden) | 5 tab labels render, tap switches active icon, light + dark goldens |
+| `test/core/widgets/login_required_sheet_test.dart` | 7 (5 behaviour + 2 golden) | Sheet open, two CTA destinations, dismiss, auto-close on auth flip, light + dark goldens |
+| `test/core/router/app_router_test.dart` | 30 | Guest reaches every public route, gets redirected from every hard-gated route, profile-incomplete + auth state transitions |
+| `test/integration/guest_merge_test.dart` | 4 | Flow A favorites merge POST contract, Flow B cart merge POST contract + local cart cleared, addendum: merge failure leaves guest cart intact |
+| `test/integration/mfa_flow_test.dart` | 5 | Flow C: enroll POST, confirm POST, login returning mfa_required parks the user, verify flips auth, logout clears tokens |
+
+Total session adds: **55 new tests**. Total suite: 223 passing.
+
+## Pixel parity — what shipped vs what's deferred
+
+| Trendyol pattern | Status |
+|---|---|
+| Strikethrough original price + red discount % badge on cards | ✅ shipped |
+| Star + rating + (count) chip on cards | ✅ shipped |
+| PDP reviews tab wired to GET /products/{id}/reviews | ✅ shipped |
+| MoodStoriesStrip on home | ⏳ deferred — needs `/home/stories` endpoint |
+| FlashDealsRail with live countdown | ⏳ deferred — needs `/home/flash-deals` endpoint + countdown widget |
+| Full PDP rebuild (image pager + variant selector + seller card + sticky CTA) | ⏳ deferred — too big for one turn; existing PDP works but doesn't yet split into the 4 named components |
+| Generated `ProductSummary` DTO regenerated to include new fields | ⏳ deferred — backend already emits them; ProductCard uses optional named params so callers with raw JSON (favorites batch) can pass them today, generated-DTO call sites (rails, PLP) will pick them up after `make api-gen-dart` |
+| POST /products/{id}/reviews/{id}/helpful vote (auth-gated) | ⏳ deferred — backend endpoint not yet implemented; UI placeholder shows helpful count read-only |
+| Reviews pagination + sort | ⏳ deferred — current tab loads first 20 only |
+
+## Files changed (this session)
+
+**Tests added:**
+- `mobile/test/_support/test_harness.dart`
+- `mobile/test/core/widgets/login_required_sheet_test.dart`
+- `mobile/test/shell/app_shell_test.dart`
+- `mobile/test/core/router/app_router_test.dart`
+- `mobile/test/integration/guest_merge_test.dart`
+- `mobile/test/integration/mfa_flow_test.dart`
+
+**Goldens added:** 6 PNGs across the test files above + 1 regenerated.
+
+**Code fixes / new code:**
+- `mobile/lib/core/router/app_router.dart` — extracted `computeAuthRedirect`
+- `mobile/lib/features/cart/application/cart_provider.dart`,
+  `mobile/lib/features/address/providers/addresses_provider.dart`,
+  `mobile/lib/features/catalog/providers/categories_provider.dart`,
+  `mobile/lib/features/catalog/providers/product_detail_provider.dart` —
+  microtask deferral
+- `mobile/lib/features/catalog/widgets/cashback_chip.dart` —
+  Flexible + ellipsis
+- `mobile/lib/features/catalog/widgets/product_card.dart` —
+  4 new optional params + strikethrough/discount/rating UI + `_RatingChip`
+- `mobile/lib/features/catalog/providers/product_reviews_provider.dart` (new)
+- `mobile/lib/features/catalog/screens/product_detail_screen.dart` —
+  reviews tab + `_ReviewsTab` + `_ReviewItem`
+- `mobile/lib/features/account/security_screen.dart` —
+  3 `context.mounted` fixes
+- Various small lint fixes across the auth/account/cart files
+
+**Backend:**
+- `migrations/ecom/0065_product_display_fields.{up,down}.sql`
+- `internal/catalog/domain.go` — `ProductSummaryRow` gains 3 fields
+- `internal/catalog/repository.go` — 3 SELECT queries + Scan calls updated
+- `cmd/core-svc/catalog_handlers.go` — `productSummaryJSON` gains 4 fields,
+  `buildProductListResponse` computes `discount_pct` server-side
+
+**Test mocks patched to keep pre-existing tests green:**
+- `mobile/integration_test/wallet_flow_test.dart` (AppTheme → buildLightTheme)
+- `mobile/test/core/network/interceptors/auth_interceptor_test.dart`
+  (`/v1/auth/token/refresh` → `/auth/token/refresh`)
+- `mobile/test/features/cart/widgets/cart_line_card_test.dart`,
+  `cart_line_card_golden_test.dart`,
+  `mobile/test/features/order/widgets/order_status_chip_test.dart` —
+  `setUpAll` with `SharedPreferences.setMockInitialValues({})` +
+  `await EasyLocalization.ensureInitialized()`
+- `cart_line_card_golden_test.dart` — `find.byType(CartLineCard)`
+  instead of `RepaintBoundary` (latter now matches 3)
+- `order_status_chip_test.dart` — `tester.binding.setSurfaceSize(1200,600)`
+  for the OrderStatusTimeline tests
+
+## Follow-up TODOs (post this branch)
+
+**Highest leverage:**
+1. `make api-gen-dart` to regenerate `mopro_api` so `ProductSummary`
+   surfaces `original_price_minor`, `discount_pct`, `rating_avg`,
+   `rating_count` natively — then every call site (rails, PLP, search)
+   gets discount + rating UI for free.
+2. Backend `POST /me/password` for in-session password change (SecurityScreen
+   already has the UI and shows a graceful 404 fallback today).
+3. `MoodStoriesStrip` + `GET /home/stories` endpoint.
+4. `FlashDealsRail` + `GET /home/flash-deals` + countdown widget.
+
+**Smaller scope:**
+5. `POST /products/{id}/reviews/{reviewId}/helpful` vote endpoint +
+   tap target on `_ReviewItem`.
+6. Reviews tab pagination + sort options.
+7. Full PDP rebuild — extract `PdpImagePager`, `PdpVariantSelector`,
+   `PdpSellerCard`, `PdpStickyCta` from the current 600-line file.
+8. CardsScreen — list / add / delete saved cards.
+9. Enable bank-transfer + cashback payment paths in CheckoutPaymentScreen.
