@@ -9,9 +9,12 @@ import 'package:mopro/features/account/profile_screen.dart';
 import 'package:mopro/features/account/security_screen.dart';
 import 'package:mopro/features/address/screens/address_form_screen.dart';
 import 'package:mopro/features/address/screens/address_list_screen.dart';
-import 'package:mopro/features/auth/login_screen.dart';
-import 'package:mopro/features/auth/otp_screen.dart';
+import 'package:mopro/features/auth/email_verify_screen.dart';
+import 'package:mopro/features/auth/forgot_password_screen.dart';
+import 'package:mopro/features/auth/mfa_challenge_screen.dart';
 import 'package:mopro/features/auth/profile_screen.dart';
+import 'package:mopro/features/auth/sign_in_screen.dart';
+import 'package:mopro/features/auth/sign_up_screen.dart';
 import 'package:mopro/features/auth/splash_screen.dart';
 import 'package:mopro/features/cart/presentation/cart_screen.dart';
 import 'package:mopro/features/catalog/screens/category_products_screen.dart';
@@ -54,19 +57,25 @@ final routerProvider = Provider<GoRouter>((ref) {
       final loc = state.matchedLocation;
       final isAuthRoute = loc.startsWith('/auth');
 
-      // Guard: /checkout and /account/* require authentication
-      final needsAuth = loc.startsWith('/checkout') ||
-          loc.startsWith('/account') ||
+      // Hard-gated routes: guests are redirected to login WITH a ?next= param
+      // so they land back after authenticating. All other routes are public.
+      // Cart (/cart) is public — guest can view/add locally.
+      // Account tab (/account) is public — shows logged-out header for guests.
+      final hardGated = loc.startsWith('/checkout') ||
           loc == '/wallet' ||
           loc.startsWith('/wallet/') ||
-          loc.startsWith('/orders');
+          loc.startsWith('/orders') ||
+          loc.startsWith('/profile/addresses') ||
+          loc.startsWith('/account/profile') ||
+          loc.startsWith('/account/security') ||
+          loc.startsWith('/account/cards');
 
       return switch (auth) {
         null || AuthUnauthenticated() => isAuthRoute
             ? null
-            : needsAuth
-                ? '/auth/phone?next=${Uri.encodeComponent(loc)}'
-                : '/auth/phone',
+            : hardGated
+                ? '/auth/login?next=${Uri.encodeComponent(loc)}'
+                : null, // guest can browse everything else
         AuthProfileIncomplete() =>
           loc == '/auth/profile' ? null : '/auth/profile',
         AuthAuthenticated() => isAuthRoute ? '/' : null,
@@ -77,18 +86,34 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/splash',
         builder: (_, __) => const SplashScreen(),
       ),
+      // ── New email auth routes ──────────────────────────────────────────────
       GoRoute(
         path: '/auth/login',
-        builder: (_, __) => const LoginScreen(),
+        builder: (_, __) => const SignInScreen(),
       ),
       GoRoute(
-        path: '/auth/phone',
-        builder: (_, __) => const LoginScreen(),
+        path: '/auth/register',
+        builder: (_, __) => const SignUpScreen(),
       ),
       GoRoute(
-        path: '/auth/otp',
-        builder: (_, state) =>
-            OtpScreen(phone: (state.extra as String?) ?? ''),
+        path: '/auth/verify-email',
+        builder: (_, state) => EmailVerifyScreen(
+          email: (state.extra as String?) ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '/auth/forgot-password',
+        builder: (_, __) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/auth/mfa',
+        builder: (_, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return MFAChallengeScreen(
+            mfaToken: extra['mfa_token'] as String? ?? '',
+            maskedPhone: extra['masked_phone'] as String? ?? '',
+          );
+        },
       ),
       GoRoute(
         path: '/auth/profile',
