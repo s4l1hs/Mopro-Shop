@@ -2,7 +2,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/features/order/application/order_detail_provider.dart';
@@ -220,7 +219,7 @@ class _OrderDetailBody extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed == true && context.mounted) {
+    if ((confirmed ?? false) && context.mounted) {
       await ref.read(orderDetailProvider(orderId).notifier).cancelOrder();
     }
   }
@@ -270,7 +269,7 @@ class _OrderItemRow extends StatelessWidget {
                   'order.qty_x_price'.tr(namedArgs: {
                     'qty': '${item.qty}',
                     'price': moneyFmt.format(item.priceMinor / 100.0),
-                  }),
+                  },),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),

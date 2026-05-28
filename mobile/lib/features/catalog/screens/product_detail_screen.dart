@@ -8,12 +8,12 @@ import 'package:mopro/core/utils/coin_formatter.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/catalog/providers/product_detail_provider.dart';
+import 'package:mopro/features/catalog/providers/product_reviews_provider.dart';
 import 'package:mopro/features/catalog/providers/products_rail_provider.dart';
 import 'package:mopro/features/catalog/widgets/pdp_image_gallery.dart';
 import 'package:mopro/features/catalog/widgets/product_card.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
 import 'package:mopro/utils/money.dart';
-import 'package:mopro/widgets/skeleton_box.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 class ProductDetailScreen extends ConsumerWidget {
@@ -149,7 +149,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
               productId: product.id,
             ),
             const _StubTab(),
-            const _StubTab(),
+            _ReviewsTab(productId: product.id),
             const _StubTab(),
           ],
         ),
@@ -376,7 +376,6 @@ class _CashbackCard extends StatelessWidget {
                 'monthly': formatCoin(
                   preview.monthlyCoinMinor,
                   preview.currency,
-                  compact: true,
                 ),
               },
             ),
@@ -573,6 +572,136 @@ class _StickyBuyBar extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ReviewsTab extends ConsumerWidget {
+  const _ReviewsTab({required this.productId});
+  final int productId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reviewsAsync = ref.watch(productReviewsProvider(productId));
+    final cs = Theme.of(context).colorScheme;
+
+    return reviewsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Yorumlar yüklenemedi.',
+            style: TextStyle(color: cs.onSurfaceVariant),
+          ),
+        ),
+      ),
+      data: (reviews) {
+        if (reviews.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.rate_review_outlined,
+                  size: 48,
+                  color: cs.outlineVariant,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Henüz yorum yok.',
+                  style: TextStyle(color: cs.onSurfaceVariant),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'İlk yorumu sen yaz!',
+                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                ),
+              ],
+            ),
+          );
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          itemCount: reviews.length,
+          separatorBuilder: (_, __) => const Divider(height: 24),
+          itemBuilder: (_, i) => _ReviewItem(review: reviews[i]),
+        );
+      },
+    );
+  }
+}
+
+class _ReviewItem extends StatelessWidget {
+  const _ReviewItem({required this.review});
+  final ProductReview review;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            // Star row
+            Row(
+              children: List.generate(5, (i) {
+                final filled = i < review.rating;
+                return Icon(
+                  filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                  size: 16,
+                  color: filled
+                      ? const Color(0xFFFFB400)
+                      : cs.outlineVariant,
+                );
+              }),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              review.createdAt.split('T').first,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
+        if (review.title.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            review.title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
+        if (review.body.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            review.body,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
+        if (review.helpfulCount > 0) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                Icons.thumb_up_outlined,
+                size: 14,
+                color: cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '${review.helpfulCount} kişi faydalı buldu',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+        ],
+      ],
     );
   }
 }

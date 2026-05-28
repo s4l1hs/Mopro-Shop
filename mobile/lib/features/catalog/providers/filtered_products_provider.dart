@@ -56,7 +56,6 @@ class FilteredProductsNotifier
       final resp = await api.listProducts(
         categoryId: arg.categoryId,
         page: page,
-        perPage: _perPage,
         sort: arg.sort,
       );
       final incoming = resp.data?.data ?? [];

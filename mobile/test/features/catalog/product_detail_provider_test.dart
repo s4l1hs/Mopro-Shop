@@ -69,7 +69,6 @@ class _FakeCatalogApiNotFound extends CatalogApi {
     ProgressCallback? onReceiveProgress,
   }) async =>
       Response(
-        data: null,
         requestOptions: RequestOptions(),
         statusCode: 200,
       );

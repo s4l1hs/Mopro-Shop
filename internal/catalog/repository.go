@@ -251,12 +251,14 @@ func (r *pgxRepository) ListProductsByCategory(ctx context.Context, categoryID i
 		        v.price_minor, v.price_currency,
 		        COALESCE(v.image_keys[1], '') AS cover_image_key,
 		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
+		        v.original_price_minor,
+		        p.rating_avg, p.rating_count,
 		        count(*) OVER() AS total_count
 		FROM catalog_schema.products p
 		JOIN catalog_schema.product_translations t
 		     ON t.product_id = p.id AND t.locale = $2
 		JOIN LATERAL (
-		    SELECT price_minor, price_currency, image_keys
+		    SELECT price_minor, price_currency, image_keys, original_price_minor
 		    FROM catalog_schema.variants
 		    WHERE product_id = p.id
 		    ORDER BY price_minor ASC
@@ -284,7 +286,8 @@ func (r *pgxRepository) ListProductsByCategory(ctx context.Context, categoryID i
 		if err := rows.Scan(
 			&s.ID, &s.SellerID, &s.CategoryID, &s.Brand, &s.Status,
 			&s.Title, &s.PriceMinor, &s.PriceCurrency,
-			&s.CoverImageKey, &s.CommissionPctBps, &total,
+			&s.CoverImageKey, &s.CommissionPctBps,
+			&s.OriginalPriceMinor, &s.RatingAvg, &s.RatingCount, &total,
 		); err != nil {
 			return nil, 0, fmt.Errorf("catalog.repo: scan product summary: %w", err)
 		}
@@ -303,12 +306,14 @@ func (r *pgxRepository) SearchProductsSummary(ctx context.Context, query, locale
 		        v.price_minor, v.price_currency,
 		        COALESCE(v.image_keys[1], '') AS cover_image_key,
 		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
+		        v.original_price_minor,
+		        p.rating_avg, p.rating_count,
 		        count(*) OVER() AS total_count
 		FROM catalog_schema.products p
 		JOIN catalog_schema.product_translations t
 		     ON t.product_id = p.id AND t.locale = $2
 		JOIN LATERAL (
-		    SELECT price_minor, price_currency, image_keys
+		    SELECT price_minor, price_currency, image_keys, original_price_minor
 		    FROM catalog_schema.variants
 		    WHERE product_id = p.id
 		    ORDER BY price_minor ASC
@@ -337,7 +342,8 @@ func (r *pgxRepository) SearchProductsSummary(ctx context.Context, query, locale
 		if err := rows.Scan(
 			&s.ID, &s.SellerID, &s.CategoryID, &s.Brand, &s.Status,
 			&s.Title, &s.PriceMinor, &s.PriceCurrency,
-			&s.CoverImageKey, &s.CommissionPctBps, &total,
+			&s.CoverImageKey, &s.CommissionPctBps,
+			&s.OriginalPriceMinor, &s.RatingAvg, &s.RatingCount, &total,
 		); err != nil {
 			return nil, 0, fmt.Errorf("catalog.repo: scan search summary: %w", err)
 		}
@@ -429,7 +435,7 @@ func (r *pgxRepository) ListProductsByIDs(ctx context.Context, ids []int64, loca
 		JOIN catalog_schema.product_translations t
 		     ON t.product_id = p.id AND t.locale = $2
 		JOIN LATERAL (
-		    SELECT price_minor, price_currency, image_keys
+		    SELECT price_minor, price_currency, image_keys, original_price_minor
 		    FROM catalog_schema.variants
 		    WHERE product_id = p.id
 		    ORDER BY price_minor ASC LIMIT 1
@@ -454,6 +460,7 @@ func (r *pgxRepository) ListProductsByIDs(ctx context.Context, ids []int64, loca
 			&s.ID, &s.SellerID, &s.CategoryID, &s.Brand, &s.Status,
 			&s.Title, &s.PriceMinor, &s.PriceCurrency,
 			&s.CoverImageKey, &s.CommissionPctBps,
+			&s.OriginalPriceMinor, &s.RatingAvg, &s.RatingCount,
 		); err != nil {
 			return nil, fmt.Errorf("catalog.repo: scan product: %w", err)
 		}

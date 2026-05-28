@@ -52,7 +52,6 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               child: ErrorBanner(
                 error: formState.error!,
-                onRetry: null,
               ),
             ),
           Expanded(child: AddressFormWidget(editId: _editId)),

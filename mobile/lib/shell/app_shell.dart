@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/cart/application/cart_count_provider.dart';
-import 'package:mopro/widgets/mopro_badge.dart';
 
 class AppShell extends ConsumerWidget {
   const AppShell({required this.navigationShell, super.key});

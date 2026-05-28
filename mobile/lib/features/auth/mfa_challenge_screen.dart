@@ -9,9 +9,7 @@ import 'package:mopro/features/auth/auth_widgets.dart';
 
 class MFAChallengeScreen extends ConsumerStatefulWidget {
   const MFAChallengeScreen({
-    super.key,
-    required this.mfaToken,
-    required this.maskedPhone,
+    required this.mfaToken, required this.maskedPhone, super.key,
   });
   final String mfaToken;
   final String maskedPhone;
@@ -45,10 +43,10 @@ class _MFAChallengeScreenState extends ConsumerState<MFAChallengeScreen> {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: Color.fromARGB(26, 202, 78, 0),
+                color: const Color.fromARGB(26, 202, 78, 0),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.phone_android_outlined,
                 color: MoproTokens.primaryLight,
                 size: 32,
@@ -104,7 +102,7 @@ class _MFAChallengeScreenState extends ConsumerState<MFAChallengeScreen> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    BorderSide(color: MoproTokens.primaryLight, width: 2),
+                    const BorderSide(color: MoproTokens.primaryLight, width: 2),
               ),
             ),
             onChanged: (v) {

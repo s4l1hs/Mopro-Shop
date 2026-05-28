@@ -97,7 +97,7 @@ class AddressListScreen extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed == true) {
+    if (confirmed ?? false) {
       await ref.read(addressesProvider.notifier).deleteAddress(id);
     }
   }

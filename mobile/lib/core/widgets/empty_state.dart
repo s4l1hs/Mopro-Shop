@@ -7,9 +7,8 @@ class EmptyState extends StatelessWidget {
   const EmptyState._({
     required _EmptyStateVariant variant,
     this.onAction,
-    Key? key,
-  })  : _variant = variant,
-        super(key: key);
+    super.key,
+  })  : _variant = variant;
 
   factory EmptyState.empty({VoidCallback? onAction, Key? key}) =>
       EmptyState._(variant: _EmptyStateVariant.empty, onAction: onAction, key: key);

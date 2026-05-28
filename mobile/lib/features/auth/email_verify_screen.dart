@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/di/providers.dart';
 import 'package:mopro/core/layout/auth_layout.dart';
@@ -81,10 +80,10 @@ class _EmailVerifyScreenState extends ConsumerState<EmailVerifyScreen> {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: Color.fromARGB(26, 202, 78, 0),
+                color: const Color.fromARGB(26, 202, 78, 0),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.mark_email_unread_outlined,
                 color: MoproTokens.primaryLight,
                 size: 32,
@@ -141,7 +140,7 @@ class _EmailVerifyScreenState extends ConsumerState<EmailVerifyScreen> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide:
-                    BorderSide(color: MoproTokens.primaryLight, width: 2),
+                    const BorderSide(color: MoproTokens.primaryLight, width: 2),
               ),
               errorText: _error != null ? _errorText() : null,
             ),

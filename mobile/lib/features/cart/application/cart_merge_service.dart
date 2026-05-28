@@ -15,12 +15,12 @@ Future<void> mergeGuestCart(Ref ref) async {
       'items': guestItems
           .map((i) => {'variant_id': i.variantId, 'qty': i.qty})
           .toList(),
-    });
+    },);
     // Clear guest cart after successful merge.
     ref.read(guestCartProvider.notifier).clear();
   } on DioException catch (e) {
     // Non-fatal — server cart is the source of truth after login.
-    // Log and continue; guest items will remain locally until next merge attempt.
+    // Log and continue; guest items remain locally until next merge attempt.
     // ignore: avoid_print
     print('cart merge failed: ${e.message}');
   }

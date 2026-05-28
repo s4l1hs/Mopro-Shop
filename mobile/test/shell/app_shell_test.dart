@@ -91,7 +91,7 @@ void main() {
   group('BottomNavBar structure', () {
     testWidgets('renders all 5 tab labels', (tester) async {
       await _pumpShell(tester);
-      // Bottom nav labels (Turkish defaults via easy_localization fallback keys)
+      // Bottom nav labels (Turkish defaults via easy_localization fallback)
       // easy_localization isn't initialized in tests so it returns the key.
       // Match by partial label text or fallback to icon presence.
       expect(find.byIcon(Icons.home), findsOneWidget); // active home

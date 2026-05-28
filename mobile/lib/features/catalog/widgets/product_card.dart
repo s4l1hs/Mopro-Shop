@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mopro/core/widgets/login_required_sheet.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/catalog/widgets/cashback_chip.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
@@ -10,16 +9,31 @@ import 'package:mopro/widgets/skeleton_box.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 /// Canonical Trendyol-style product card.
-/// Square image · heart top-right · brand · title · price · cashback chip.
+/// Square image · heart top-right · brand · title · price + optional
+/// strikethrough original price + discount % badge · optional rating chip ·
+/// cashback chip.
+///
+/// [originalPriceMinor], [discountPct], [ratingAvg], and [ratingCount] come
+/// from the backend's enriched JSON (POST /products/batch, GET /products);
+/// when the generated DTO doesn't surface them, callers may pass them via
+/// these optional named params.
 class ProductCard extends ConsumerWidget {
   const ProductCard({
     required this.product,
     required this.onTap,
     super.key,
+    this.originalPriceMinor,
+    this.discountPct,
+    this.ratingAvg,
+    this.ratingCount = 0,
   });
 
   final ProductSummary product;
   final VoidCallback onTap;
+  final int? originalPriceMinor;
+  final int? discountPct;
+  final double? ratingAvg;
+  final int ratingCount;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -27,6 +41,10 @@ class ProductCard extends ConsumerWidget {
     final cs = theme.colorScheme;
     final isFav = ref.watch(isFavoriteProvider(product.id));
     final priceStr = MoneyUtils.formatMinor(product.priceMinor);
+    final hasDiscount = originalPriceMinor != null &&
+        originalPriceMinor! > product.priceMinor &&
+        (discountPct ?? 0) > 0;
+    final hasRating = ratingCount > 0 && ratingAvg != null;
 
     return GestureDetector(
       onTap: onTap,
@@ -92,7 +110,46 @@ class ProductCard extends ConsumerWidget {
                       height: 1.3,
                     ),
                   ),
+                  if (hasRating) ...[
+                    const SizedBox(height: 4),
+                    _RatingChip(avg: ratingAvg!, count: ratingCount),
+                  ],
                   const SizedBox(height: 6),
+                  // Price block: optional strikethrough original + discount %
+                  // badge above the current price.
+                  if (hasDiscount) ...[
+                    Row(
+                      children: [
+                        Text(
+                          MoneyUtils.formatMinor(originalPriceMinor!),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 1,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE53935), // discount red
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '%$discountPct',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                  ],
                   Text(
                     priceStr,
                     style: theme.textTheme.labelLarge?.copyWith(
@@ -166,7 +223,7 @@ class _ProductImage extends StatelessWidget {
     );
   }
 
-  Widget get _placeholder => Container(
+  Widget get _placeholder => ColoredBox(
         color: cs.surfaceContainerHighest,
         child: Icon(Icons.image_outlined, size: 40, color: cs.outlineVariant),
       );
@@ -212,6 +269,40 @@ class SkeletonProductCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RatingChip extends StatelessWidget {
+  const _RatingChip({required this.avg, required this.count});
+  final double avg;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.star_rounded, size: 13, color: Color(0xFFFFB400)),
+        const SizedBox(width: 2),
+        Text(
+          avg.toStringAsFixed(1),
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: cs.onSurface,
+          ),
+        ),
+        const SizedBox(width: 3),
+        Text(
+          '($count)',
+          style: TextStyle(
+            fontSize: 11,
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }

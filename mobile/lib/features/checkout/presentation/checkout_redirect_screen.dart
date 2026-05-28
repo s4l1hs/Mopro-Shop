@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/core/di/providers.dart';
 import 'package:mopro/features/checkout/application/checkout_controller.dart';
 import 'package:mopro/features/payments/sipay_error_map.dart';
-import 'package:mopro/core/di/providers.dart';
 
 const _pollIntervalMs = 1500;
 const _timeoutMs = 30000;

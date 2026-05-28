@@ -7,11 +7,11 @@ import 'package:mopro/features/cart/data/cart_line_dto.dart';
 import 'package:mopro/features/cart/data/cart_repository.dart';
 import 'package:mopro/features/cart/data/cart_totals_dto.dart';
 
-CartDto _emptyCart() => CartDto(
+CartDto _emptyCart() => const CartDto(
       id: 'c-1',
       userId: 1,
-      lines: const [],
-      totalsBySeller: const [],
+      lines: [],
+      totalsBySeller: [],
       grandTotalMinor: 0,
       kdvIncludedMinor: 0,
     );

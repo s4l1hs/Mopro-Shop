@@ -22,7 +22,7 @@ InputDecoration authInputDecoration(
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: MoproTokens.primaryLight, width: 2),
+      borderSide: const BorderSide(color: MoproTokens.primaryLight, width: 2),
     ),
     contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
   );
@@ -44,7 +44,7 @@ class AuthFieldLabel extends StatelessWidget {
 }
 
 class AuthErrorBanner extends StatelessWidget {
-  const AuthErrorBanner({super.key, required this.message});
+  const AuthErrorBanner({required this.message, super.key});
   final String message;
 
   @override
@@ -80,10 +80,10 @@ class AuthErrorBanner extends StatelessWidget {
 
 class AuthSubmitButton extends StatelessWidget {
   const AuthSubmitButton({
-    super.key,
     required this.isLoading,
     required this.label,
     required this.onPressed,
+    super.key,
   });
   final bool isLoading;
   final String label;
@@ -131,8 +131,8 @@ class PasswordStrengthIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final has8 = password.length >= 8;
-    final hasUpper = password.contains(RegExp(r'[A-Z]'));
-    final hasLower = password.contains(RegExp(r'[a-z]'));
+    final hasUpper = password.contains(RegExp('[A-Z]'));
+    final hasLower = password.contains(RegExp('[a-z]'));
     final hasSpecial = password.contains(RegExp(r'[!@#$%^&*()\-_=+\[\]{}|;:,.<>?]'));
 
     return Column(
@@ -151,8 +151,8 @@ class PasswordStrengthIndicator extends StatelessWidget {
 
   static bool isStrong(String password) {
     return password.length >= 8 &&
-        password.contains(RegExp(r'[A-Z]')) &&
-        password.contains(RegExp(r'[a-z]')) &&
+        password.contains(RegExp('[A-Z]')) &&
+        password.contains(RegExp('[a-z]')) &&
         password.contains(RegExp(r'[!@#$%^&*()\-_=+\[\]{}|;:,.<>?]'));
   }
 }

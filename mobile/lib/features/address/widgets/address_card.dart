@@ -40,7 +40,7 @@ class AddressCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                              horizontal: 6, vertical: 2,),
                           decoration: BoxDecoration(
                             color: colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(8),
@@ -63,7 +63,7 @@ class AddressCard extends StatelessWidget {
                 ),
                 IconButton(
                   icon: Icon(Icons.delete_outline,
-                      color: colorScheme.error),
+                      color: colorScheme.error,),
                   onPressed: onDelete,
                   iconSize: 18,
                 ),

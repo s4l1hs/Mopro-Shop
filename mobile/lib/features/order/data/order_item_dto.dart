@@ -11,18 +11,6 @@ class OrderItemDto {
     this.coverImageUrl,
   });
 
-  final int id;
-  final int orderId;
-  final int productId;
-  final int variantId;
-  final String title;
-  final int priceMinor;
-  final int qty;
-  final int commissionPctBps;
-  final String? coverImageUrl;
-
-  int get lineTotalMinor => priceMinor * qty;
-
   factory OrderItemDto.fromJson(Map<String, dynamic> json) => OrderItemDto(
         id: (json['id'] as num).toInt(),
         orderId: (json['order_id'] as num?)?.toInt() ?? 0,
@@ -36,6 +24,18 @@ class OrderItemDto {
         commissionPctBps: (json['commission_pct_bps'] as num?)?.toInt() ?? 0,
         coverImageUrl: json['cover_image_url'] as String?,
       );
+
+  final int id;
+  final int orderId;
+  final int productId;
+  final int variantId;
+  final String title;
+  final int priceMinor;
+  final int qty;
+  final int commissionPctBps;
+  final String? coverImageUrl;
+
+  int get lineTotalMinor => priceMinor * qty;
 
   Map<String, dynamic> toJson() => {
         'id': id,

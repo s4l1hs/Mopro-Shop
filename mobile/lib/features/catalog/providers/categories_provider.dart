@@ -1,4 +1,3 @@
-import 'dart:async' show unawaited;
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,12 +18,12 @@ class CategoriesState {
 
 final categoriesProvider =
     NotifierProvider<CategoriesNotifier, CategoriesState>(
-        CategoriesNotifier.new);
+        CategoriesNotifier.new,);
 
 class CategoriesNotifier extends Notifier<CategoriesState> {
   @override
   CategoriesState build() {
-    unawaited(_load());
+    Future<void>.microtask(_load);
     return const CategoriesState();
   }
 

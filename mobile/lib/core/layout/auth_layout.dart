@@ -7,8 +7,7 @@ import 'package:mopro/design/tokens.dart';
 /// - Wide (≥720 px): two-column split — brand panel left, form right.
 class AuthLayout extends StatelessWidget {
   const AuthLayout({
-    super.key,
-    required this.child,
+    required this.child, super.key,
     this.showBackButton = false,
   });
 
@@ -21,13 +20,13 @@ class AuthLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     if (width >= _breakpoint) {
-      return _WideLayout(child: child, showBackButton: showBackButton);
+      return _WideLayout(showBackButton: showBackButton, child: child);
     }
-    return _NarrowLayout(child: child, showBackButton: showBackButton);
+    return _NarrowLayout(showBackButton: showBackButton, child: child);
   }
 }
 
-// ── Narrow (mobile) ───────────────────────────────────────────────────────────
+// ── Narrow (mobile) ──────────────────────────────────────────────────
 
 class _NarrowLayout extends StatelessWidget {
   const _NarrowLayout({required this.child, required this.showBackButton});
@@ -55,7 +54,7 @@ class _NarrowLayout extends StatelessWidget {
                         alignment: Alignment.centerLeft,
                       )
                     else
-                      Center(
+                      const Center(
                         child: MoproLogo(
                           variant: MoproLogoVariant.fullBrand,
                           height: 72,
@@ -75,7 +74,7 @@ class _NarrowLayout extends StatelessWidget {
   }
 }
 
-// ── Wide (web / desktop) ──────────────────────────────────────────────────────
+// ── Wide (web / desktop) ────────────────────────────────────────────────
 
 class _WideLayout extends StatelessWidget {
   const _WideLayout({required this.child, required this.showBackButton});
@@ -127,7 +126,7 @@ class _WideLayout extends StatelessWidget {
   }
 }
 
-// ── Brand panel ───────────────────────────────────────────────────────────────
+// ── Brand panel ──────────────────────────────────────────────────────
 
 class _BrandPanel extends StatelessWidget {
   @override

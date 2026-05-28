@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/features/order/widgets/order_status_chip.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 Widget _wrap(Widget child) => EasyLocalization(
       supportedLocales: const [Locale('tr', 'TR')],
@@ -12,6 +13,12 @@ Widget _wrap(Widget child) => EasyLocalization(
     );
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await EasyLocalization.ensureInitialized();
+  });
+
   group('OrderStatusChip', () {
     for (final status in [
       OrderStatus.pendingPayment,
@@ -46,10 +53,12 @@ void main() {
 
   group('OrderStatusTimeline', () {
     testWidgets('renders all 4 steps for delivered status', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1200, 600));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         _wrap(
           const SizedBox(
-            width: 400,
+            width: 1100,
             child: OrderStatusTimeline(status: OrderStatus.delivered),
           ),
         ),
@@ -63,7 +72,7 @@ void main() {
       await tester.pumpWidget(
         _wrap(
           const SizedBox(
-            width: 400,
+            width: 1100,
             child: OrderStatusTimeline(status: OrderStatus.cancelled),
           ),
         ),

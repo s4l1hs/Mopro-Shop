@@ -57,16 +57,19 @@ type CategoryRow struct {
 // ProductSummaryRow is a lightweight product record for list / search results.
 // Includes the lowest-priced variant's price, cover image key, and commission rate.
 type ProductSummaryRow struct {
-	ID               int64
-	SellerID         int64
-	CategoryID       int64
-	Brand            string
-	Status           string
-	Title            string // locale-resolved
-	PriceMinor       int64
-	PriceCurrency    string
-	CoverImageKey    string // raw storage key; handler calls mediaurl.CDNUrl()
-	CommissionPctBps int
+	ID                 int64
+	SellerID           int64
+	CategoryID         int64
+	Brand              string
+	Status             string
+	Title              string // locale-resolved
+	PriceMinor         int64
+	PriceCurrency      string
+	CoverImageKey      string // raw storage key; handler calls mediaurl.CDNUrl()
+	CommissionPctBps   int
+	OriginalPriceMinor *int64   // null when no discount; render strikethrough on UI
+	RatingAvg          *float64 // null when no reviews
+	RatingCount        int
 }
 
 // CategoryCommission holds the currently active commission + KDV rates for a

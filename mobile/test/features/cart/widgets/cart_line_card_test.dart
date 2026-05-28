@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mopro/features/cart/data/cart_line_dto.dart';
 import 'package:mopro/features/cart/widgets/cart_line_card.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 CartLineDto _line() => const CartLineDto(
       id: 'line-1',
@@ -22,6 +23,12 @@ Widget _wrap(Widget child) => EasyLocalization(
     );
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await EasyLocalization.ensureInitialized();
+  });
+
   testWidgets('renders product title', (tester) async {
     await tester.pumpWidget(
       _wrap(
@@ -40,7 +47,7 @@ void main() {
   });
 
   testWidgets('onRemove called on swipe', (tester) async {
-    bool removeCalled = false;
+    var removeCalled = false;
 
     await tester.pumpWidget(
       _wrap(
@@ -65,7 +72,7 @@ void main() {
   });
 
   testWidgets('onIncrement called on + tap', (tester) async {
-    bool incrementCalled = false;
+    var incrementCalled = false;
 
     await tester.pumpWidget(
       _wrap(
@@ -85,7 +92,7 @@ void main() {
   });
 
   testWidgets('onDecrement called on - tap', (tester) async {
-    bool decrementCalled = false;
+    var decrementCalled = false;
 
     await tester.pumpWidget(
       _wrap(

@@ -1,9 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 import 'package:mopro/design/theme_controller.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _kGuestCartKey = 'mopro_guest_cart';
 
@@ -15,6 +14,12 @@ class GuestCartItem {
     required this.qty,
   });
 
+  factory GuestCartItem.fromJson(Map<String, dynamic> j) => GuestCartItem(
+        variantId: j['variant_id'] as int,
+        productId: j['product_id'] as int,
+        qty: j['qty'] as int,
+      );
+
   final int variantId;
   final int productId;
   final int qty;
@@ -24,12 +29,6 @@ class GuestCartItem {
         'product_id': productId,
         'qty': qty,
       };
-
-  factory GuestCartItem.fromJson(Map<String, dynamic> j) => GuestCartItem(
-        variantId: j['variant_id'] as int,
-        productId: j['product_id'] as int,
-        qty: j['qty'] as int,
-      );
 }
 
 class GuestCartNotifier extends StateNotifier<List<GuestCartItem>> {

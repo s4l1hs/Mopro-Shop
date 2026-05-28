@@ -54,22 +54,6 @@ class OrderDto {
     this.items = const [],
   });
 
-  final int id;
-  final int userId;
-  final int? sellerId;
-  final String status;
-  final int totalMinor;
-  final int? itemsMinor;
-  final int? shippingMinor;
-  final int? commissionMinor;
-  final int? kdvMinor;
-  final String currency;
-  final DateTime createdAt;
-  final DateTime? updatedAt;
-  final DateTime? shippedAt;
-  final DateTime? deliveredAt;
-  final List<OrderItemDto> items;
-
   factory OrderDto.fromJson(Map<String, dynamic> json) => OrderDto(
         id: (json['id'] as num).toInt(),
         userId: (json['user_id'] as num).toInt(),
@@ -95,6 +79,22 @@ class OrderDto {
             .map((e) => OrderItemDto.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
+
+  final int id;
+  final int userId;
+  final int? sellerId;
+  final String status;
+  final int totalMinor;
+  final int? itemsMinor;
+  final int? shippingMinor;
+  final int? commissionMinor;
+  final int? kdvMinor;
+  final String currency;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
+  final DateTime? shippedAt;
+  final DateTime? deliveredAt;
+  final List<OrderItemDto> items;
 
   Map<String, dynamic> toJson() => {
         'id': id,

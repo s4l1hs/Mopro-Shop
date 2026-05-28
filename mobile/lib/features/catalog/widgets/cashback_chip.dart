@@ -37,7 +37,7 @@ class CashbackChip extends StatelessWidget {
               'cashback.monthly_coin'.tr(
                 namedArgs: {
                   'amount':
-                      formatCoin(monthlyCoinMinor, currency, compact: true),
+                      formatCoin(monthlyCoinMinor, currency),
                 },
               ),
               overflow: TextOverflow.ellipsis,

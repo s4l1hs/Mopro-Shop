@@ -162,7 +162,7 @@ class AccountScreen extends ConsumerWidget {
   }
 }
 
-// ── Orange header ─────────────────────────────────────────────────────────────
+// ── Orange header ───────────────────────────────────────────────────────
 
 class _AccountHeader extends StatelessWidget {
   const _AccountHeader({
@@ -204,11 +204,11 @@ class _AccountHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 14),
-              Expanded(
+              const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Merhaba! 👋',
                       style: TextStyle(
                         color: Colors.white,
@@ -216,7 +216,7 @@ class _AccountHeader extends StatelessWidget {
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Hesabım',
                       style: TextStyle(
                         color: Colors.white,
@@ -306,7 +306,7 @@ class _HeaderDivider extends StatelessWidget {
   }
 }
 
-// ── Tile group (white card) ───────────────────────────────────────────────────
+// ── Tile group (white card) ─────────────────────────────────────────────
 
 class _TileGroup extends StatelessWidget {
   const _TileGroup({required this.children, this.header});
@@ -317,7 +317,7 @@ class _TileGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Container(
+    return ColoredBox(
       color: theme.colorScheme.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -406,7 +406,7 @@ class _Tile extends StatelessWidget {
   }
 }
 
-// ── Theme tile ────────────────────────────────────────────────────────────────
+// ── Theme tile ──────────────────────────────────────────────────────────
 
 class _ThemeTile extends ConsumerWidget {
   const _ThemeTile({required this.themeMode});
@@ -532,7 +532,7 @@ class _ModeChip extends StatelessWidget {
   }
 }
 
-// ── Logged-out header (guest mode) ───────────────────────────────────────────
+// ── Logged-out header (guest mode) ─────────────────────────────────────
 
 class _AccountLoggedOutHeader extends StatelessWidget {
   const _AccountLoggedOutHeader();
@@ -651,7 +651,7 @@ class _GuestMenu extends ConsumerWidget {
       showLoginRequiredSheet(context, reason: reason);
     }
 
-    return Container(
+    return ColoredBox(
       color: cs.surface,
       child: Column(
         children: [

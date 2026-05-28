@@ -35,14 +35,14 @@ void main() {
   });
 
   testWidgets('AddressCard calls onEdit callback', (tester) async {
-    bool edited = false;
+    var edited = false;
     await tester.pumpWidget(_wrap(_addr(), onEdit: () => edited = true));
     await tester.tap(find.byIcon(Icons.edit_outlined));
     expect(edited, isTrue);
   });
 
   testWidgets('AddressCard calls onDelete callback', (tester) async {
-    bool deleted = false;
+    var deleted = false;
     await tester.pumpWidget(_wrap(_addr(), onDelete: () => deleted = true));
     await tester.tap(find.byIcon(Icons.delete_outline));
     expect(deleted, isTrue);

@@ -154,7 +154,7 @@ class CartScreen extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed == true) {
+    if (confirmed ?? false) {
       await ref.read(cartProvider.notifier).clear();
     }
   }

@@ -1,7 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/features/order/widgets/order_status_chip.dart';
 
