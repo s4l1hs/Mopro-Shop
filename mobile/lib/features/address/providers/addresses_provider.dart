@@ -23,7 +23,7 @@ final addressesProvider =
 class AddressesNotifier extends Notifier<AddressesState> {
   @override
   AddressesState build() {
-    unawaited(_load());
+    Future<void>.microtask(_load);
     return const AddressesState();
   }
 

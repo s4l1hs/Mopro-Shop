@@ -64,7 +64,9 @@ final cartProvider =
 class CartNotifier extends Notifier<CartState> {
   @override
   CartState build() {
-    unawaited(_load());
+    // Defer to microtask so build() returns and notifier is initialised
+    // before _load tries to write to state.
+    Future<void>.microtask(_load);
     return const CartState();
   }
 

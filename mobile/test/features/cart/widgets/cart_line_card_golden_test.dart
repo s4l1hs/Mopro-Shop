@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mopro/features/cart/data/cart_line_dto.dart';
 import 'package:mopro/features/cart/widgets/cart_line_card.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 CartLineDto _line() => const CartLineDto(
       id: 'g-1',
@@ -15,6 +16,12 @@ CartLineDto _line() => const CartLineDto(
     );
 
 void main() {
+  setUpAll(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await EasyLocalization.ensureInitialized();
+  });
+
   testWidgets('CartLineCard golden', (tester) async {
     await tester.pumpWidget(
       EasyLocalization(
@@ -43,7 +50,7 @@ void main() {
     await tester.pump();
 
     await expectLater(
-      find.byType(RepaintBoundary),
+      find.byType(CartLineCard),
       matchesGoldenFile('goldens/cart_line_card.png'),
     );
   });

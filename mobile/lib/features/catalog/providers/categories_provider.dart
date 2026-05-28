@@ -24,7 +24,7 @@ final categoriesProvider =
 class CategoriesNotifier extends Notifier<CategoriesState> {
   @override
   CategoriesState build() {
-    unawaited(_load());
+    Future<void>.microtask(_load);
     return const CategoriesState();
   }
 

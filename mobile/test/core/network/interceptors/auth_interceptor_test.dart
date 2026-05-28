@@ -100,7 +100,7 @@ void main() {
       final refreshCompleter = Completer<Response<Map<String, dynamic>>>();
       when(
         mockRefreshDio.post<Map<String, dynamic>>(
-          '/v1/auth/token/refresh',
+          '/auth/token/refresh',
           data: anyNamed('data'),
         ),
       ).thenAnswer((_) => refreshCompleter.future);
@@ -138,7 +138,7 @@ void main() {
             'refresh_token': 'new-refresh-tok',
             'expires_in': 900,
           },
-          requestOptions: RequestOptions(path: '/v1/auth/token/refresh'),
+          requestOptions: RequestOptions(path: '/auth/token/refresh'),
         ),
       );
 
@@ -147,7 +147,7 @@ void main() {
       // refreshDio.post must have been called EXACTLY ONCE.
       verify(
         mockRefreshDio.post<Map<String, dynamic>>(
-          '/v1/auth/token/refresh',
+          '/auth/token/refresh',
           data: anyNamed('data'),
         ),
       ).called(1);

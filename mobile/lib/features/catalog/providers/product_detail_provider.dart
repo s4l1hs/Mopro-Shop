@@ -13,7 +13,7 @@ class ProductDetailNotifier
     extends FamilyNotifier<AsyncValue<Product>, int> {
   @override
   AsyncValue<Product> build(int arg) {
-    _load();
+    Future<void>.microtask(_load);
     return const AsyncLoading();
   }
 
