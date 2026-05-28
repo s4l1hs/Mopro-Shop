@@ -12,6 +12,7 @@ import 'package:mopro/features/catalog/providers/products_rail_provider.dart';
 import 'package:mopro/features/catalog/widgets/home_category_grid.dart';
 import 'package:mopro/features/catalog/widgets/product_rail.dart';
 import 'package:mopro/features/catalog/widgets/trust_bar.dart';
+// ignore: lines_longer_than_80_chars
 import 'package:mopro/features/home/providers/home_wallet_summary_provider.dart';
 import 'package:mopro/features/wallet/widgets/coin_balance_pill.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
@@ -48,15 +49,15 @@ class CatalogHomeScreen extends ConsumerWidget {
             const SliverToBoxAdapter(child: _BannerCarousel()),
             const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-            // ── Category puck grid ────────────────────────────────────────────
+            // ── Category puck grid ─────────────────────────────────────
             const SliverToBoxAdapter(child: HomeCategoryGrid()),
             const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-            // ── Trust bar ─────────────────────────────────────────────────────
+            // ── Trust bar ──────────────────────────────────────────────
             const SliverToBoxAdapter(child: TrustBar()),
             const SliverToBoxAdapter(child: SizedBox(height: 4)),
 
-            // ── Server-driven product rails ───────────────────────────────────
+            // ── Server-driven product rails ────────────────────────────
             ...railsAsync.when(
               loading: () => [
                 SliverToBoxAdapter(
@@ -75,7 +76,7 @@ class CatalogHomeScreen extends ConsumerWidget {
                           sort: rail.key,
                           seeAllRoute: '/categories',
                         ),
-                      ))
+                      ),)
                   .toList(),
             ),
 
@@ -87,7 +88,7 @@ class CatalogHomeScreen extends ConsumerWidget {
   }
 }
 
-// ── Top bar (search pill + coin pill) ────────────────────────────────────────
+// ── Top bar (search pill + coin pill) ──────────────────────────────────
 
 class _HomeTopBar extends ConsumerWidget {
   @override
@@ -189,7 +190,9 @@ class _AnimatedSearchPillState extends ConsumerState<_AnimatedSearchPill> {
                   ),
                 ),
                 child: Text(
-                  _hints.isEmpty ? _defaultHints[0] : _hints[_index % _hints.length],
+                  _hints.isEmpty
+                      ? _defaultHints[0]
+                      : _hints[_index % _hints.length],
                   key: ValueKey(_index),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
@@ -227,7 +230,7 @@ class _CoinBalanceAction extends ConsumerWidget {
   }
 }
 
-// ── Server-driven banner carousel ────────────────────────────────────────────
+// ── Server-driven banner carousel ──────────────────────────────────────
 
 class _BannerCarousel extends ConsumerStatefulWidget {
   const _BannerCarousel();

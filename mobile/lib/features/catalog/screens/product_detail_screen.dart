@@ -13,7 +13,6 @@ import 'package:mopro/features/catalog/widgets/pdp_image_gallery.dart';
 import 'package:mopro/features/catalog/widgets/product_card.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
 import 'package:mopro/utils/money.dart';
-import 'package:mopro/widgets/skeleton_box.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 class ProductDetailScreen extends ConsumerWidget {
@@ -376,7 +375,6 @@ class _CashbackCard extends StatelessWidget {
                 'monthly': formatCoin(
                   preview.monthlyCoinMinor,
                   preview.currency,
-                  compact: true,
                 ),
               },
             ),

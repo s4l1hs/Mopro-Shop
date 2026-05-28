@@ -180,9 +180,9 @@ class _ProvinceDropdowns extends StatelessWidget {
     return Column(
       children: [
         DropdownButtonFormField<String>(
-          value: selectedCity.isEmpty ? null : selectedCity,
+          initialValue: selectedCity.isEmpty ? null : selectedCity,
           decoration: InputDecoration(
-            labelText: 'address.city'.tr() + ' *',
+            labelText: '${'address.city'.tr()} *',
             border: const OutlineInputBorder(),
           ),
           items: provinces
@@ -194,9 +194,9 @@ class _ProvinceDropdowns extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<String>(
-          value: selectedDistrict.isEmpty ? null : selectedDistrict,
+          initialValue: selectedDistrict.isEmpty ? null : selectedDistrict,
           decoration: InputDecoration(
-            labelText: 'address.district'.tr() + ' *',
+            labelText: '${'address.district'.tr()} *',
             border: const OutlineInputBorder(),
           ),
           items: districts

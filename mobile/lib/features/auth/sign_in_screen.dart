@@ -37,7 +37,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         context.go('/auth/mfa', extra: {
           'mfa_token': next.mfaToken,
           'masked_phone': next.maskedPhone ?? '',
-        });
+        },);
       }
     });
 
@@ -90,7 +90,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: Text(
+                  child: const Text(
                     'Şifremi unuttum',
                     style: TextStyle(
                       color: MoproTokens.primaryLight,
@@ -155,7 +155,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: Text(
+                    child: const Text(
                       'Kayıt ol',
                       style: TextStyle(
                         color: MoproTokens.primaryLight,
@@ -191,45 +191,3 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       };
 }
 
-// Kept in this file only; real shared version is AuthSubmitButton in auth_widgets.dart.
-// TODO: remove after full migration
-class _SubmitButton extends AuthSubmitButton {
-  const _SubmitButton({
-    required super.isLoading,
-    required super.label,
-    required super.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: FilledButton(
-        onPressed: isLoading ? null : onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: MoproTokens.primaryLight,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: isLoading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator.adaptive(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(Colors.white),
-                ),
-              )
-            : Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-      ),
-    );
-  }
-}

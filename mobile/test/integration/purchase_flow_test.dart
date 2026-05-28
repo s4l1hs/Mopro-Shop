@@ -17,11 +17,11 @@ import 'package:mopro_api/mopro_api.dart';
 // ── Fakes ─────────────────────────────────────────────────────────────────────
 
 class _FakeCartRepo implements CartRepository {
-  CartDto _cart = CartDto(
+  CartDto _cart = const CartDto(
     id: 'c-1',
     userId: 1,
-    lines: const [],
-    totalsBySeller: const [],
+    lines: [],
+    totalsBySeller: [],
     grandTotalMinor: 0,
     kdvIncludedMinor: 0,
   );
@@ -71,11 +71,11 @@ class _FakeCartRepo implements CartRepository {
 
   @override
   Future<void> removeLine({required String lineId}) async {
-    _cart = CartDto(
+    _cart = const CartDto(
       id: 'c-1',
       userId: 1,
-      lines: const [],
-      totalsBySeller: const [],
+      lines: [],
+      totalsBySeller: [],
       grandTotalMinor: 0,
       kdvIncludedMinor: 0,
     );
@@ -83,11 +83,11 @@ class _FakeCartRepo implements CartRepository {
 
   @override
   Future<void> clear() async {
-    _cart = CartDto(
+    _cart = const CartDto(
       id: 'c-1',
       userId: 1,
-      lines: const [],
-      totalsBySeller: const [],
+      lines: [],
+      totalsBySeller: [],
       grandTotalMinor: 0,
       kdvIncludedMinor: 0,
     );
@@ -198,7 +198,7 @@ void main() {
     // Step 3: Select address and place order
     container
         .read(checkoutControllerProvider.notifier)
-        .selectAddress(_fakeAddress(id: 5));
+        .selectAddress(_fakeAddress());
     expect(container.read(checkoutControllerProvider).canProceed, true);
 
     await container.read(checkoutControllerProvider.notifier).placeOrder();

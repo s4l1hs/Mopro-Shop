@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/checkout/application/checkout_controller.dart';
@@ -166,9 +165,8 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
       case SipayResultCancelled():
         // User closed — clear the pending response so they can retry
         ref.read(checkoutControllerProvider.notifier)
-          ..clearPaymentError();
+          .clearPaymentError();
         // Invalidate the response so the ref.listen trigger can fire again on retry
-        break;
       case SipayResultFailed(:final reason):
         ref.read(checkoutControllerProvider.notifier).setPaymentError(
           SipayErrorMap.get(reason),
@@ -266,7 +264,7 @@ class _PaymentErrorBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: cs.errorContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cs.error.withOpacity(0.4)),
+        border: Border.all(color: cs.error.withValues(alpha: 0.4)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -13,12 +13,6 @@ class CheckoutResponseDto {
     required this.orders,
   });
 
-  final String sessionId;
-  final String sipayThreeDsUrl;
-  final List<OrderDto> orders;
-
-  bool get requires3ds => sipayThreeDsUrl.isNotEmpty;
-
   factory CheckoutResponseDto.fromJson(Map<String, dynamic> json) =>
       CheckoutResponseDto(
         sessionId: (json['session_id'] ?? '') as String,
@@ -27,4 +21,10 @@ class CheckoutResponseDto {
             .map((e) => OrderDto.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
+
+  final String sessionId;
+  final String sipayThreeDsUrl;
+  final List<OrderDto> orders;
+
+  bool get requires3ds => sipayThreeDsUrl.isNotEmpty;
 }

@@ -222,7 +222,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: Text(
+                    child: const Text(
                       'Giriş yap',
                       style: TextStyle(
                         color: MoproTokens.primaryLight,

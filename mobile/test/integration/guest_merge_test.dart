@@ -70,7 +70,10 @@ class _RecordingHandler {
               Response(
                 requestOptions: options,
                 statusCode: 200,
-                data: {'merged': (options.data as Map?)?['items']?.length ?? 0},
+                data: {
+                  'merged':
+                      ((options.data as Map?)?['items'] as List?)?.length ?? 0,
+                },
               ),
             );
           }
@@ -131,10 +134,10 @@ void main() {
       addTearDown(container.dispose);
 
       // Guest adds three favorites locally.
-      final favs = container.read(favoritesProvider.notifier);
-      favs.toggle(11);
-      favs.toggle(22);
-      favs.toggle(33);
+      container.read(favoritesProvider.notifier)
+        ..toggle(11)
+        ..toggle(22)
+        ..toggle(33);
       expect(container.read(favoritesProvider), {11, 22, 33});
 
       // User authenticates.
@@ -186,9 +189,9 @@ void main() {
       addTearDown(container.dispose);
 
       // Guest adds items to local cart.
-      final guestCart = container.read(guestCartProvider.notifier);
-      guestCart.addItem(productId: 1001, variantId: 5001, qty: 2);
-      guestCart.addItem(productId: 1002, variantId: 5002);
+      container.read(guestCartProvider.notifier)
+        ..addItem(productId: 1001, variantId: 5001, qty: 2)
+        ..addItem(productId: 1002, variantId: 5002);
       expect(container.read(guestCartProvider).length, 2);
 
       await container.read(authNotifierProvider.notifier).setAuthenticated(
@@ -228,21 +231,21 @@ void main() {
             return handler.reject(DioException(
               requestOptions: options,
               response: Response(requestOptions: options, statusCode: 500),
-            ));
+            ),);
           }
           return handler.resolve(Response(
             requestOptions: options,
             statusCode: 204,
-          ));
+          ),);
         },
-      ));
+      ),);
       SharedPreferences.setMockInitialValues(<String, Object>{});
       final prefs = await SharedPreferences.getInstance();
       final container = ProviderContainer(overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         tokenStorageProvider.overrideWithValue(storage),
         dioProvider.overrideWithValue(dio),
-      ]);
+      ],);
       addTearDown(container.dispose);
 
       container.read(guestCartProvider.notifier).addItem(

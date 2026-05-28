@@ -83,7 +83,7 @@ class SearchNotifier extends Notifier<SearchState> {
     if (query.isEmpty) return;
     try {
       final api = ref.read(searchApiProvider);
-      final resp = await api.search(q: query, page: page, perPage: _perPage);
+      final resp = await api.search(q: query, page: page);
       final incoming = resp.data?.data ?? [];
       final meta = resp.data?.pagination;
       final existing =

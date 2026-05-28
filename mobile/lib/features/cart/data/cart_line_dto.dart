@@ -11,18 +11,6 @@ class CartLineDto {
     this.reservedUntil,
   });
 
-  final String id;
-  final int productId;
-  final int variantId;
-  final int sellerId;
-  final String title;
-  final int priceMinor;
-  final int qty;
-  final String? coverImageUrl;
-  final DateTime? reservedUntil;
-
-  int get lineTotalMinor => priceMinor * qty;
-
   factory CartLineDto.fromJson(Map<String, dynamic> json) => CartLineDto(
         id: json['id'] as String,
         productId: (json['product_id'] as num).toInt(),
@@ -36,6 +24,18 @@ class CartLineDto {
             ? DateTime.tryParse(json['reserved_until'] as String)
             : null,
       );
+
+  final String id;
+  final int productId;
+  final int variantId;
+  final int sellerId;
+  final String title;
+  final int priceMinor;
+  final int qty;
+  final String? coverImageUrl;
+  final DateTime? reservedUntil;
+
+  int get lineTotalMinor => priceMinor * qty;
 
   Map<String, dynamic> toJson() => {
         'id': id,

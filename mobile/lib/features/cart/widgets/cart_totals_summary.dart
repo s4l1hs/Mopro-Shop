@@ -1,6 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:mopro/features/cart/data/cart_dto.dart';
 import 'package:mopro/utils/money.dart';
 
@@ -116,8 +115,8 @@ class _CashbackSummaryBox extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: colorScheme.primary.withOpacity(0.05),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.20)),
+        color: colorScheme.primary.withValues(alpha: 0.05),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.20)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(

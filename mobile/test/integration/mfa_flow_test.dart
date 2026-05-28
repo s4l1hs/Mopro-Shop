@@ -3,7 +3,8 @@
 /// Verifies the contract between SignInNotifier and AuthApiExt:
 ///   1. enrollMFA POSTs phone to /auth/mfa/enroll
 ///   2. confirmMFAEnroll POSTs phone+code to /auth/mfa/confirm
-///   3. login that returns {"mfa_required":true, "mfa_token":..., "masked_phone":...}
+///   3. login that returns
+///      {"mfa_required":true,"mfa_token":...,"masked_phone":...}
 ///      lands SignInState.requiresMFA == true (no auth flip)
 ///   4. verifyMFA POSTs mfa_token+code to /auth/mfa/verify and returns tokens
 library;
@@ -11,7 +12,6 @@ library;
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mopro/api/auth_api_ext.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/core/di/providers.dart';
@@ -23,7 +23,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../_support/test_harness.dart';
 
 class _FakeTokenStorage implements TokenStorage {
-  String? _access, _refresh;
+  String? _access;
+  String? _refresh;
   DateTime? _exp;
   @override
   Future<void> save({
@@ -66,9 +67,9 @@ class _Router {
         return handler.reject(DioException(
           requestOptions: options,
           response: Response(requestOptions: options, statusCode: 404),
-        ));
+        ),);
       },
-    ));
+    ),);
     return dio;
   }
 
@@ -87,7 +88,7 @@ Future<ProviderContainer> _makeContainer(_Router router) async {
     sharedPreferencesProvider.overrideWithValue(prefs),
     tokenStorageProvider.overrideWithValue(_FakeTokenStorage()),
     dioProvider.overrideWithValue(router.build()),
-  ]);
+  ],);
 }
 
 void main() {
@@ -137,7 +138,8 @@ void main() {
   });
 
   group('Flow C — login challenge after MFA enabled', () {
-    test('login that returns mfa_required parks user at challenge state', () async {
+    test('login that returns mfa_required parks user at challenge state',
+        () async {
       final router = _Router({
         'POST /auth/login': (req) => Response(
               requestOptions: req,

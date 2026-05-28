@@ -26,9 +26,7 @@ class CheckoutResultScreen extends ConsumerWidget {
 
     // Compute cashback activation date: first order created_at + 3 business days (approx 5 calendar days)
     final firstOrder = orders.isNotEmpty ? orders.first : null;
-    final cashbackDate = firstOrder != null
-        ? firstOrder.createdAt.add(const Duration(days: 5))
-        : null;
+    final cashbackDate = firstOrder?.createdAt.add(const Duration(days: 5));
 
     return PopScope(
       canPop: false,
@@ -150,9 +148,9 @@ class _CashbackActivationBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: cs.primary.withOpacity(0.08),
+        color: cs.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.primary.withOpacity(0.20)),
+        border: Border.all(color: cs.primary.withValues(alpha: 0.20)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

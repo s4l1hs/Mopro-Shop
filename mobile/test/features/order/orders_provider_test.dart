@@ -14,8 +14,8 @@ OrderDto _order(int id) => OrderDto(
     );
 
 class _FakeOrderRepo implements OrderRepository {
-  final int totalPages;
   _FakeOrderRepo({this.totalPages = 1});
+  final int totalPages;
 
   @override
   Future<OrderListResult> listOrders({int page = 1, int perPage = 20}) async =>
@@ -97,7 +97,7 @@ void main() {
   });
 
   test('loadNextPage is no-op when no more pages', () async {
-    final c = _container(_FakeOrderRepo(totalPages: 1));
+    final c = _container(_FakeOrderRepo());
     addTearDown(c.dispose);
     c.read(ordersProvider);
     await Future<void>.delayed(const Duration(milliseconds: 50));

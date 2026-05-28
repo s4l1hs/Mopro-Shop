@@ -69,7 +69,6 @@ class ProductsByCategoryNotifier
       final resp = await api.listProducts(
         categoryId: arg,
         page: page,
-        perPage: _perPage,
       );
       final incoming = resp.data?.data ?? [];
       final meta = resp.data?.pagination;

@@ -2,11 +2,6 @@ import 'package:dio/dio.dart';
 
 // LoginResult mirrors the server's login response.
 class LoginResult {
-  final String? accessToken;
-  final String? refreshToken;
-  final int? expiresIn;
-  final String? mfaToken;
-  final String? maskedPhone;
 
   const LoginResult({
     this.accessToken,
@@ -15,6 +10,11 @@ class LoginResult {
     this.mfaToken,
     this.maskedPhone,
   });
+  final String? accessToken;
+  final String? refreshToken;
+  final int? expiresIn;
+  final String? mfaToken;
+  final String? maskedPhone;
 
   bool get requiresMFA => mfaToken != null && mfaToken!.isNotEmpty;
 }
@@ -22,8 +22,8 @@ class LoginResult {
 /// Handwritten Dio-based client for the email-auth + MFA endpoints.
 /// These endpoints were added after the OpenAPI codegen snapshot.
 class AuthApiExt {
-  final Dio _dio;
   AuthApiExt(this._dio);
+  final Dio _dio;
 
   Future<void> register({
     required String email,
@@ -38,7 +38,7 @@ class AuthApiExt {
       'name_first': nameFirst,
       'name_last': nameLast,
       'locale': locale,
-    });
+    },);
   }
 
   Future<LoginResult> login({
@@ -48,7 +48,7 @@ class AuthApiExt {
     final resp = await _dio.post('/auth/login', data: {
       'email': email,
       'password': password,
-    });
+    },);
     final data = resp.data as Map<String, dynamic>;
     if (data['mfa_required'] == true) {
       return LoginResult(
@@ -97,7 +97,7 @@ class AuthApiExt {
     await _dio.post('/auth/reset-password', data: {
       'token': token,
       'new_password': newPassword,
-    });
+    },);
   }
 
   Future<LoginResult> verifyMFA({
@@ -107,7 +107,7 @@ class AuthApiExt {
     final resp = await _dio.post('/auth/mfa/verify', data: {
       'mfa_token': mfaToken,
       'code': code,
-    });
+    },);
     final data = resp.data as Map<String, dynamic>;
     return LoginResult(
       accessToken: data['access_token'] as String?,

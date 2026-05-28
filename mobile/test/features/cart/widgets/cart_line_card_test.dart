@@ -47,7 +47,7 @@ void main() {
   });
 
   testWidgets('onRemove called on swipe', (tester) async {
-    bool removeCalled = false;
+    var removeCalled = false;
 
     await tester.pumpWidget(
       _wrap(
@@ -72,7 +72,7 @@ void main() {
   });
 
   testWidgets('onIncrement called on + tap', (tester) async {
-    bool incrementCalled = false;
+    var incrementCalled = false;
 
     await tester.pumpWidget(
       _wrap(
@@ -92,7 +92,7 @@ void main() {
   });
 
   testWidgets('onDecrement called on - tap', (tester) async {
-    bool decrementCalled = false;
+    var decrementCalled = false;
 
     await tester.pumpWidget(
       _wrap(

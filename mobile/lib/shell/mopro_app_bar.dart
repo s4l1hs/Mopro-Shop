@@ -9,8 +9,8 @@ import 'package:mopro/widgets/mopro_badge.dart';
 /// Trendyol-style app bar.
 ///
 /// Layout:
-///   Row 1: [Logo]  ───────────────  [🔔] [🛒{n}]
-///   Row 2: [───────── search pill ─────────────]
+///   Row 1: logo on the left, notifications + cart icons on the right
+///   Row 2: full-width animated search pill
 class MoproAppBar extends ConsumerWidget implements PreferredSizeWidget {
   const MoproAppBar({
     this.showSearch = true,
@@ -20,7 +20,7 @@ class MoproAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final bool showSearch;
 
   static const double _toolbarH = kToolbarHeight;
-  static const double _searchH = 52.0;
+  static const double _searchH = 52;
 
   @override
   Size get preferredSize =>
@@ -31,7 +31,7 @@ class MoproAppBar extends ConsumerWidget implements PreferredSizeWidget {
     final theme = Theme.of(context);
     final cartCount = ref.watch(cartCountProvider);
 
-    return Container(
+    return ColoredBox(
       color: theme.colorScheme.surface,
       child: SafeArea(
         bottom: false,
@@ -46,7 +46,6 @@ class MoproAppBar extends ConsumerWidget implements PreferredSizeWidget {
                 child: Row(
                   children: [
                     const MoproLogo(
-                      variant: MoproLogoVariant.withText,
                       height: 34,
                     ),
                     const Spacer(),

@@ -11,17 +11,6 @@ class CartDto {
     required this.kdvIncludedMinor,
   });
 
-  final String id;
-  final int userId;
-  final List<CartLineDto> lines;
-  final List<SellerTotalDto> totalsBySeller;
-  final int grandTotalMinor;
-  final int kdvIncludedMinor;
-
-  bool get isEmpty => lines.isEmpty;
-  bool get isAboveTotalLimit => grandTotalMinor >= 5000000; // ₺50,000 in minor units
-  bool get isAtItemLimit => lines.length >= 50;
-
   factory CartDto.fromJson(Map<String, dynamic> json) => CartDto(
         id: (json['id'] ?? '') as String,
         userId: (json['user_id'] as num).toInt(),
@@ -48,6 +37,17 @@ class CartDto {
         grandTotalMinor: 0,
         kdvIncludedMinor: 0,
       );
+
+  final String id;
+  final int userId;
+  final List<CartLineDto> lines;
+  final List<SellerTotalDto> totalsBySeller;
+  final int grandTotalMinor;
+  final int kdvIncludedMinor;
+
+  bool get isEmpty => lines.isEmpty;
+  bool get isAboveTotalLimit => grandTotalMinor >= 5000000; // ₺50,000 in minor units
+  bool get isAtItemLimit => lines.length >= 50;
 
   Map<String, dynamic> toJson() => {
         'id': id,

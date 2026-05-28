@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/features/catalog/providers/products_rail_provider.dart';
 import 'package:mopro/features/catalog/widgets/product_card.dart';
-import 'package:mopro/widgets/skeleton_box.dart';
 
 class ProductRail extends ConsumerWidget {
   const ProductRail({
@@ -49,7 +48,7 @@ class ProductRail extends ConsumerWidget {
         SizedBox(
           height: 258,
           child: async.when(
-            loading: () => _SkeletonRail(),
+            loading: _SkeletonRail.new,
             error: (_, __) => const SizedBox.shrink(),
             data: (products) {
               if (products.isEmpty) return const SizedBox.shrink();

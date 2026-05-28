@@ -54,7 +54,7 @@ class SignUpNotifier extends Notifier<SignUpState> {
     } on DioException catch (e) {
       state = SignUpState(
         error: e.error is AppError
-            ? e.error as AppError
+            ? e.error! as AppError
             : UnknownError(statusCode: 0, message: e.message ?? ''),
       );
     } catch (e) {

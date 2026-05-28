@@ -40,10 +40,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: Color.fromARGB(26, 202, 78, 0),
+                  color: const Color.fromARGB(26, 202, 78, 0),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.check_circle_outline,
                   color: MoproTokens.primaryLight,
                   size: 32,
@@ -91,7 +91,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'E-posta adresinizi girin, şifre sıfırlama bağlantısı gönderelim.',
+              'E-posta adresinizi girin, '
+              'şifre sıfırlama bağlantısı gönderelim.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),

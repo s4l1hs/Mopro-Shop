@@ -67,7 +67,8 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                   title: _mfaEnabled ? 'MFA Aktif' : "MFA'yı Etkinleştir",
                   subtitle: _mfaEnabled
                       ? 'Hesabın SMS doğrulamasıyla korunuyor.'
-                      : 'Giriş yaparken SMS kodu istenir; hesabın daha güvenli olur.',
+                      : 'Giriş yaparken SMS kodu istenir; '
+                          'hesabın daha güvenli olur.',
                   iconColor: _mfaEnabled ? Colors.green : cs.primary,
                   onTap: () => _mfaEnabled
                       ? _showDisableMfa(context)
@@ -98,8 +99,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
       ),
       builder: (_) => const _EnrollMfaSheet(),
     );
-    if (ok == true && mounted) {
+    if ((ok ?? false) && mounted) {
       setState(() => _mfaEnabled = true);
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('MFA başarıyla etkinleştirildi.')),
       );
@@ -133,16 +135,16 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
       await dio.delete<void>('/auth/mfa');
       if (mounted) {
         setState(() => _mfaEnabled = false);
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('MFA kapatıldı.')),
         );
       }
     } on DioException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Hata: ${e.message ?? "bilinmeyen"}')),
-        );
-      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Hata: ${e.message ?? "bilinmeyen"}')),
+      );
     }
   }
 }
@@ -184,7 +186,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
       await dio.post<void>('/me/password', data: {
         'old_password': _oldCtrl.text,
         'new_password': _newCtrl.text,
-      });
+      },);
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -202,7 +204,8 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
           _error = 'Yeni parola güvenlik kurallarını karşılamıyor.';
         } else if (e.response?.statusCode == 404) {
           _error =
-              'Parola değiştirme henüz aktif değil. Lütfen "Şifremi Unuttum" akışını kullan.';
+              'Parola değiştirme henüz aktif değil. '
+              'Lütfen "Şifremi Unuttum" akışını kullan.';
         } else {
           _error = 'Bir hata oluştu. Lütfen tekrar dene.';
         }
@@ -215,7 +218,9 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
@@ -255,7 +260,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
                     suffixIcon: IconButton(
                       icon: Icon(_obscureOld
                           ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined),
+                          : Icons.visibility_off_outlined,),
                       onPressed: () =>
                           setState(() => _obscureOld = !_obscureOld),
                     ),
@@ -276,7 +281,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
                     suffixIcon: IconButton(
                       icon: Icon(_obscureNew
                           ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined),
+                          : Icons.visibility_off_outlined,),
                       onPressed: () =>
                           setState(() => _obscureNew = !_obscureNew),
                     ),
@@ -347,7 +352,7 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
     final phone = _phoneCtrl.text.trim();
     if (!RegExp(r'^\+\d{8,15}$').hasMatch(phone)) {
       setState(() => _error =
-          'Telefon E.164 formatında olmalı (örn. +905551234567).');
+          'Telefon E.164 formatında olmalı (örn. +905551234567).',);
       return;
     }
     setState(() {
@@ -360,7 +365,7 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
       setState(() => _codeSent = true);
     } on DioException catch (e) {
       setState(() => _error =
-          'Kod gönderilemedi: ${e.response?.statusCode ?? "bağlantı hatası"}');
+          'Kod gönderilemedi: ${e.response?.statusCode ?? "bağlantı hatası"}',);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -379,7 +384,7 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
     try {
       final dio = ref.read(dioProvider);
       await dio.post<void>('/auth/mfa/confirm',
-          data: {'phone': _phoneCtrl.text.trim(), 'code': code});
+          data: {'phone': _phoneCtrl.text.trim(), 'code': code},);
       if (mounted) Navigator.pop(context, true);
     } on DioException catch (e) {
       final body = e.response?.data;
@@ -401,7 +406,9 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
@@ -422,8 +429,8 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  Icon(Icons.shield_outlined,
-                      color: MoproTokens.primaryLight, size: 24),
+                  const Icon(Icons.shield_outlined,
+                      color: MoproTokens.primaryLight, size: 24,),
                   const SizedBox(width: 8),
                   Text(
                     "MFA'yı Etkinleştir",
@@ -450,7 +457,7 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
                   controller: _phoneCtrl,
                   keyboardType: TextInputType.phone,
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
+                    FilteringTextInputFormatter.allow(RegExp('[0-9+]')),
                   ],
                   decoration: authInputDecoration(
                     context,
@@ -541,7 +548,7 @@ class _RowCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Container(
+    return ColoredBox(
       color: cs.surface,
       child: ListTile(
         contentPadding:

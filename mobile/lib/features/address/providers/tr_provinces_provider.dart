@@ -17,6 +17,6 @@ final trProvincesProvider = FutureProvider<List<Province>>((ref) async {
       .map((e) => Province(
             name: e['il'] as String,
             districts: List<String>.from(e['ilceler'] as List),
-          ))
+          ),)
       .toList();
 });

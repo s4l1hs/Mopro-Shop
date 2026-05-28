@@ -1,7 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mopro/core/widgets/login_required_sheet.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/catalog/widgets/cashback_chip.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
@@ -166,7 +165,7 @@ class _ProductImage extends StatelessWidget {
     );
   }
 
-  Widget get _placeholder => Container(
+  Widget get _placeholder => ColoredBox(
         color: cs.surfaceContainerHighest,
         child: Icon(Icons.image_outlined, size: 40, color: cs.outlineVariant),
       );

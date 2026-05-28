@@ -78,7 +78,7 @@ class _LoginRequiredSheet extends ConsumerWidget {
             Container(
               width: 72,
               height: 72,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: MoproTokens.primaryLight,
                 shape: BoxShape.circle,
               ),
@@ -145,12 +145,12 @@ class _LoginRequiredSheet extends ConsumerWidget {
                   context.push('/auth/register');
                 },
                 style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: MoproTokens.primaryLight),
+                  side: const BorderSide(color: MoproTokens.primaryLight),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: Text(
+                child: const Text(
                   'Üye Ol',
                   style: TextStyle(
                     fontSize: 16,

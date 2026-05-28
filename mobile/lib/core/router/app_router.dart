@@ -175,7 +175,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'new',
             builder: (_, __) =>
-                const AddressFormScreen(editAddress: null),
+                const AddressFormScreen(),
           ),
           GoRoute(
             path: ':id/edit',
@@ -210,7 +210,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // ── Checkout overlay (full-screen above nav shell) ──────────────────────
+      // ── Checkout overlay (full-screen above nav shell) ─────────────────
       GoRoute(
         path: '/checkout',
         parentNavigatorKey: rootNavigatorKey,

@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/checkout/application/checkout_controller.dart';
 import 'package:mopro/features/checkout/widgets/checkout_stepper.dart';
@@ -105,9 +104,9 @@ class _SaqANotice extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withOpacity(0.5),
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cs.outline.withOpacity(0.4)),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,7 +160,7 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: cs.primaryContainer.withOpacity(0.6),
+        color: cs.primaryContainer.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
