@@ -71,3 +71,27 @@ final class PhoneLockedError extends AppError {
 final class SessionRevokedError extends AppError {
   const SessionRevokedError();
 }
+
+final class EmailAlreadyExistsError extends AppError {
+  const EmailAlreadyExistsError();
+}
+
+final class InvalidCredentialsError extends AppError {
+  const InvalidCredentialsError();
+}
+
+final class EmailNotVerifiedError extends AppError {
+  const EmailNotVerifiedError();
+}
+
+final class WeakPasswordError extends AppError {
+  const WeakPasswordError();
+}
+
+final class InvalidCodeError extends AppError {
+  const InvalidCodeError();
+}
+
+final class MFAChallengeExpiredError extends AppError {
+  const MFAChallengeExpiredError();
+}

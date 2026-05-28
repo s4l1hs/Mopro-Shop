@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
+import 'package:mopro/core/widgets/login_required_sheet.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/cart/data/cart_line_dto.dart';
 import 'package:mopro/features/cart/widgets/cart_line_card.dart';
@@ -62,7 +63,12 @@ class CartScreen extends ConsumerWidget {
               ),
               CartTotalsSummary(
                 cart: cart,
-                onCheckout: () => context.push('/checkout'),
+                onCheckout: () => requireAuth(
+                  context,
+                  ref,
+                  reason: 'Siparişi tamamlamak için giriş yap.',
+                  onAuthed: () => context.push('/checkout'),
+                ),
                 cashbackMonthlyMinor: cashbackAsync.valueOrNull,
               ),
             ],

@@ -22,6 +22,18 @@ type Service interface {
 	ListProductsByCategory(ctx context.Context, categoryID int64, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error)
 	SearchSummary(ctx context.Context, query, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error)
 
+	// ListProductsByIDs fetches product summaries for the given IDs (guest favorites, batch hydration).
+	ListProductsByIDs(ctx context.Context, ids []int64, locale, market string) ([]ProductSummaryRow, error)
+
+	// HomeRails returns the ordered list of rail keys and their localized titles.
+	HomeRails(ctx context.Context, locale string) ([]HomeRailRow, error)
+
+	// HomeBanners returns active banners ordered by sort_order.
+	HomeBanners(ctx context.Context) ([]HomeBannerRow, error)
+
+	// ListReviews returns paginated reviews for a product.
+	ListReviews(ctx context.Context, productID int64, page, perPage int) ([]ProductReviewRow, int, error)
+
 	// ListAllVariantStocks returns (variantID, stock) for every variant with stock > 0.
 	// Used at core-svc startup to seed Redis stock counters.
 	ListAllVariantStocks(ctx context.Context) ([]VariantStock, error)
@@ -43,6 +55,11 @@ type Repository interface {
 	ListCategories(ctx context.Context, locale string) ([]CategoryRow, error)
 	ListProductsByCategory(ctx context.Context, categoryID int64, locale string, offset, limit int) ([]ProductSummaryRow, int, error)
 	SearchProductsSummary(ctx context.Context, query, locale string, offset, limit int) ([]ProductSummaryRow, int, error)
+
+	ListProductsByIDs(ctx context.Context, ids []int64, locale string) ([]ProductSummaryRow, error)
+	HomeRails(ctx context.Context) ([]HomeRailRow, error)
+	HomeBanners(ctx context.Context) ([]HomeBannerRow, error)
+	ListReviews(ctx context.Context, productID int64, offset, limit int) ([]ProductReviewRow, int, error)
 
 	ListAllVariantStocks(ctx context.Context) ([]VariantStock, error)
 }

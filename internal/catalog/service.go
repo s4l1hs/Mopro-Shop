@@ -144,3 +144,26 @@ func (s *catalogService) SearchSummary(ctx context.Context, query, locale, marke
 func (s *catalogService) ListAllVariantStocks(ctx context.Context) ([]VariantStock, error) {
 	return s.repo.ListAllVariantStocks(ctx)
 }
+
+func (s *catalogService) ListProductsByIDs(ctx context.Context, ids []int64, locale, _ string) ([]ProductSummaryRow, error) {
+	if locale == "" {
+		locale = s.defaultLocale
+	}
+	return s.repo.ListProductsByIDs(ctx, ids, locale)
+}
+
+func (s *catalogService) HomeRails(ctx context.Context, locale string) ([]HomeRailRow, error) {
+	return s.repo.HomeRails(ctx)
+}
+
+func (s *catalogService) HomeBanners(ctx context.Context) ([]HomeBannerRow, error) {
+	return s.repo.HomeBanners(ctx)
+}
+
+func (s *catalogService) ListReviews(ctx context.Context, productID int64, page, perPage int) ([]ProductReviewRow, int, error) {
+	if perPage <= 0 {
+		perPage = 20
+	}
+	offset := (page - 1) * perPage
+	return s.repo.ListReviews(ctx, productID, offset, perPage)
+}

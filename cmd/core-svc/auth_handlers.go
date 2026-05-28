@@ -24,6 +24,29 @@ type authHandlers struct {
 // Routes that require JWT auth are wrapped with the RequireAuth middleware.
 func (a *authHandlers) registerRoutes(mux *http.ServeMux, requireAuth func(http.Handler) http.Handler) {
 	// ── Public auth routes (no JWT required) ─────────────────────────────────
+	mux.Handle("POST /auth/register",
+		httpTrace(http.HandlerFunc(a.handleRegister)),
+	)
+	mux.Handle("POST /auth/login",
+		httpTrace(http.HandlerFunc(a.handleLoginEmail)),
+	)
+	// verify-email and resend are public — user has no token yet
+	mux.Handle("POST /auth/verify-email",
+		httpTrace(http.HandlerFunc(a.handleVerifyEmail)),
+	)
+	mux.Handle("POST /auth/resend-verification",
+		httpTrace(http.HandlerFunc(a.handleResendVerification)),
+	)
+	mux.Handle("POST /auth/forgot-password",
+		httpTrace(http.HandlerFunc(a.handleForgotPassword)),
+	)
+	mux.Handle("POST /auth/reset-password",
+		httpTrace(http.HandlerFunc(a.handleResetPassword)),
+	)
+	mux.Handle("POST /auth/mfa/verify",
+		httpTrace(http.HandlerFunc(a.handleVerifyMFA)),
+	)
+	// Legacy phone OTP routes (kept for backward compatibility)
 	mux.Handle("POST /auth/otp/request",
 		httpTrace(http.HandlerFunc(a.handleRequestOTP)),
 	)
@@ -37,6 +60,15 @@ func (a *authHandlers) registerRoutes(mux *http.ServeMux, requireAuth func(http.
 	// ── Authenticated routes ──────────────────────────────────────────────────
 	mux.Handle("POST /auth/logout",
 		httpTrace(requireAuth(http.HandlerFunc(a.handleLogout))),
+	)
+	mux.Handle("POST /auth/mfa/enroll",
+		httpTrace(requireAuth(http.HandlerFunc(a.handleEnrollMFA))),
+	)
+	mux.Handle("POST /auth/mfa/confirm",
+		httpTrace(requireAuth(http.HandlerFunc(a.handleConfirmMFAEnroll))),
+	)
+	mux.Handle("DELETE /auth/mfa",
+		httpTrace(requireAuth(http.HandlerFunc(a.handleDisableMFA))),
 	)
 	mux.Handle("GET /me",
 		httpTrace(requireAuth(http.HandlerFunc(a.handleGetMe))),
@@ -268,6 +300,181 @@ func (a *authHandlers) handleRegisterDevice(w http.ResponseWriter, r *http.Reque
 	})
 }
 
+// ── Email auth handlers ───────────────────────────────────────────────────────
+
+func (a *authHandlers) handleRegister(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email     string `json:"email"`
+		Password  string `json:"password"`
+		NameFirst string `json:"name_first"`
+		NameLast  string `json:"name_last"`
+		Locale    string `json:"locale"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.Email == "" || req.Password == "" {
+		jsonError(w, "email and password required", http.StatusBadRequest)
+		return
+	}
+	if err := a.svc.Register(r.Context(), identity.RegisterInput{
+		Email:     req.Email,
+		Password:  req.Password,
+		NameFirst: req.NameFirst,
+		NameLast:  req.NameLast,
+		Locale:    req.Locale,
+	}); err != nil {
+		a.writeIdentityError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (a *authHandlers) handleLoginEmail(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" || req.Password == "" {
+		jsonError(w, "email and password required", http.StatusBadRequest)
+		return
+	}
+	result, err := a.svc.LoginEmail(r.Context(), req.Email, req.Password, extractClientIP(r))
+	if err != nil {
+		a.writeIdentityError(w, err)
+		return
+	}
+	if result.MFAToken != "" {
+		jsonOK(w, http.StatusOK, map[string]any{
+			"mfa_required":    true,
+			"mfa_token":       result.MFAToken,
+			"masked_phone":    result.MaskedPhone,
+		})
+		return
+	}
+	jsonOK(w, http.StatusOK, tokenPairResponse(*result.Tokens))
+}
+
+func (a *authHandlers) handleVerifyEmail(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+		Code  string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" || req.Code == "" {
+		jsonError(w, "email and code required", http.StatusBadRequest)
+		return
+	}
+	pair, err := a.svc.VerifyEmail(r.Context(), req.Email, req.Code)
+	if err != nil {
+		a.writeIdentityError(w, err)
+		return
+	}
+	jsonOK(w, http.StatusOK, tokenPairResponse(pair))
+}
+
+func (a *authHandlers) handleResendVerification(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Email == "" {
+		jsonError(w, "email required", http.StatusBadRequest)
+		return
+	}
+	if err := a.svc.ResendVerification(r.Context(), req.Email); err != nil {
+		a.writeIdentityError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *authHandlers) handleForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonError(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	_ = a.svc.ForgotPassword(r.Context(), req.Email)
+	w.WriteHeader(http.StatusNoContent) // always 204 — do not leak email existence
+}
+
+func (a *authHandlers) handleResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Token       string `json:"token"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Token == "" || req.NewPassword == "" {
+		jsonError(w, "token and new_password required", http.StatusBadRequest)
+		return
+	}
+	if err := a.svc.ResetPassword(r.Context(), req.Token, req.NewPassword); err != nil {
+		a.writeIdentityError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *authHandlers) handleVerifyMFA(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		MFAToken string `json:"mfa_token"`
+		Code     string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.MFAToken == "" || req.Code == "" {
+		jsonError(w, "mfa_token and code required", http.StatusBadRequest)
+		return
+	}
+	pair, err := a.svc.VerifyMFAChallenge(r.Context(), req.MFAToken, req.Code)
+	if err != nil {
+		a.writeIdentityError(w, err)
+		return
+	}
+	jsonOK(w, http.StatusOK, tokenPairResponse(pair))
+}
+
+func (a *authHandlers) handleEnrollMFA(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.UserIDFromCtx(r.Context())
+	var req struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Phone == "" {
+		jsonError(w, "phone required", http.StatusBadRequest)
+		return
+	}
+	if err := a.svc.EnrollMFA(r.Context(), userID, req.Phone, extractClientIP(r)); err != nil {
+		a.writeIdentityError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (a *authHandlers) handleConfirmMFAEnroll(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.UserIDFromCtx(r.Context())
+	var req struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Phone == "" || req.Code == "" {
+		jsonError(w, "phone and code required", http.StatusBadRequest)
+		return
+	}
+	if err := a.svc.ConfirmMFAEnroll(r.Context(), userID, req.Phone, req.Code); err != nil {
+		a.writeIdentityError(w, err)
+		return
+	}
+	jsonOK(w, http.StatusOK, map[string]any{"mfa_enabled": true})
+}
+
+func (a *authHandlers) handleDisableMFA(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.UserIDFromCtx(r.Context())
+	if err := a.svc.DisableMFA(r.Context(), userID); err != nil {
+		a.writeIdentityError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ── Response helpers ──────────────────────────────────────────────────────────
 
 func tokenPairResponse(p identity.TokenPair) map[string]any {
@@ -282,19 +489,29 @@ func tokenPairResponse(p identity.TokenPair) map[string]any {
 
 func userResponse(u identity.User) map[string]any {
 	first, last := splitName(u.Name)
-	// Decrypt phone for masking; on error, show generic mask.
-	maskedPhone := "***"
-	if plain, err := pkgcrypto.DecryptPII(u.PhoneEnc); err == nil {
-		maskedPhone = identity.MaskPhone(plain)
+	maskedPhone := ""
+	if u.PhoneEnc != "" {
+		if plain, err := pkgcrypto.DecryptPII(u.PhoneEnc); err == nil {
+			maskedPhone = identity.MaskPhone(plain)
+		}
+	}
+	email := ""
+	if u.EmailEnc != "" {
+		if plain, err := pkgcrypto.DecryptPII(u.EmailEnc); err == nil {
+			email = plain
+		}
 	}
 	return map[string]any{
-		"id":         u.ID,
-		"phone":      maskedPhone,
-		"name_first": first,
-		"name_last":  last,
-		"locale":     u.Locale,
-		"created_at": u.CreatedAt,
-		"updated_at": u.UpdatedAt,
+		"id":             u.ID,
+		"email":          email,
+		"email_verified": u.EmailVerified,
+		"phone":          maskedPhone,
+		"name_first":     first,
+		"name_last":      last,
+		"locale":         u.Locale,
+		"mfa_enabled":    u.MFAEnabled,
+		"created_at":     u.CreatedAt,
+		"updated_at":     u.UpdatedAt,
 	}
 }
 
@@ -349,6 +566,29 @@ func (a *authHandlers) writeIdentityError(w http.ResponseWriter, err error) {
 		jsonError(w, "invalid_locale", http.StatusBadRequest)
 	case errors.Is(err, identity.ErrSMSSendFailed):
 		jsonError(w, "sms_send_failed", http.StatusServiceUnavailable)
+	case errors.Is(err, identity.ErrEmailAlreadyExists):
+		jsonError(w, "email_already_exists", http.StatusConflict)
+	case errors.Is(err, identity.ErrInvalidCredentials):
+		jsonError(w, "invalid_credentials", http.StatusUnauthorized)
+	case errors.Is(err, identity.ErrEmailNotVerified):
+		jsonError(w, "email_not_verified", http.StatusForbidden)
+	case errors.Is(err, identity.ErrEmailTokenExpired):
+		jsonError(w, "email_token_expired", http.StatusUnprocessableEntity)
+	case errors.Is(err, identity.ErrEmailTokenInvalid),
+		errors.Is(err, identity.ErrEmailTokenUsed):
+		jsonError(w, "email_token_invalid", http.StatusUnprocessableEntity)
+	case errors.Is(err, identity.ErrPasswordResetExpired),
+		errors.Is(err, identity.ErrPasswordResetInvalid):
+		jsonError(w, "reset_token_invalid", http.StatusUnprocessableEntity)
+	case errors.Is(err, identity.ErrWeakPassword):
+		jsonError(w, "weak_password", http.StatusUnprocessableEntity)
+	case errors.Is(err, identity.ErrMFAChallengeExpired):
+		jsonError(w, "mfa_challenge_expired", http.StatusUnprocessableEntity)
+	case errors.Is(err, identity.ErrMFAChallengeInvalid),
+		errors.Is(err, identity.ErrMFACodeInvalid):
+		jsonError(w, "mfa_invalid", http.StatusUnprocessableEntity)
+	case errors.Is(err, identity.ErrMFAAlreadyEnabled):
+		jsonError(w, "mfa_already_enabled", http.StatusConflict)
 	default:
 		a.log.Error("auth: unhandled error", "err", err)
 		jsonError(w, "internal_error", http.StatusInternalServerError)

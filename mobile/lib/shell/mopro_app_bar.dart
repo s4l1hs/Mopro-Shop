@@ -1,85 +1,87 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/core/widgets/mopro_logo.dart';
+import 'package:mopro/features/cart/application/cart_count_provider.dart';
 import 'package:mopro/shell/header_search_bar.dart';
-import 'package:mopro/widgets/theme_toggle.dart';
+import 'package:mopro/widgets/mopro_badge.dart';
 
-/// Standard Mopro app bar with logo, search pill, and theme toggle.
-/// Use as `appBar: MoproAppBar()` — it implements [PreferredSizeWidget].
-class MoproAppBar extends StatelessWidget implements PreferredSizeWidget {
+/// Trendyol-style app bar.
+///
+/// Layout:
+///   Row 1: [Logo]  ───────────────  [🔔] [🛒{n}]
+///   Row 2: [───────── search pill ─────────────]
+class MoproAppBar extends ConsumerWidget implements PreferredSizeWidget {
   const MoproAppBar({
     this.showSearch = true,
-    this.showThemeToggle = true,
     super.key,
   });
 
   final bool showSearch;
-  final bool showThemeToggle;
+
+  static const double _toolbarH = kToolbarHeight;
+  static const double _searchH = 52.0;
 
   @override
   Size get preferredSize =>
-      Size.fromHeight(showSearch ? kToolbarHeight + 56 : kToolbarHeight);
+      Size.fromHeight(showSearch ? _toolbarH + _searchH : _toolbarH);
 
   @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final cartCount = ref.watch(cartCountProvider);
 
-    return AppBar(
-      titleSpacing: 16,
-      title: _MoproLogo(theme: theme),
-      actions: [
-        if (showThemeToggle) const ThemeToggle(),
-        const SizedBox(width: 8),
-      ],
-      bottom: showSearch
-          ? PreferredSize(
-              preferredSize: const Size.fromHeight(56),
+    return Container(
+      color: theme.colorScheme.surface,
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Row 1: Logo + actions ───────────────────────────────────
+            SizedBox(
+              height: _toolbarH,
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Row(
+                  children: [
+                    const MoproLogo(
+                      variant: MoproLogoVariant.withText,
+                      height: 34,
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.notifications_outlined, size: 24),
+                      onPressed: () {},
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    const SizedBox(width: 2),
+                    MoproBadge(
+                      count: cartCount,
+                      child: IconButton(
+                        icon: const Icon(
+                          Icons.shopping_bag_outlined,
+                          size: 24,
+                        ),
+                        onPressed: () => context.go('/cart'),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            // ── Row 2: Search pill ──────────────────────────────────────
+            if (showSearch)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                 child: HeaderSearchBar(
                   onTap: () => context.push('/search'),
                 ),
               ),
-            )
-          : null,
-      surfaceTintColor: Colors.transparent,
-      backgroundColor: cs.surface,
-    );
-  }
-}
-
-class _MoproLogo extends StatelessWidget {
-  const _MoproLogo({required this.theme});
-  final ThemeData theme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primary,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Icon(
-            Icons.shopping_bag,
-            size: 16,
-            color: theme.colorScheme.onPrimary,
-          ),
+          ],
         ),
-        const SizedBox(width: 8),
-        Text(
-          'Mopro',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: theme.colorScheme.primary,
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

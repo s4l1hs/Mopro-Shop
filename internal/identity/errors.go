@@ -68,3 +68,22 @@ var (
 	ErrAddressNotFound     = errors.New("identity: address not found")
 	ErrAddressInvalidPhone = errors.New("identity: address phone must be E.164 format")
 )
+
+// ── Email auth errors ─────────────────────────────────────────────────────────
+
+var (
+	ErrEmailAlreadyExists  = errors.New("identity: email already registered")
+	ErrInvalidCredentials  = errors.New("identity: invalid email or password")
+	ErrEmailNotVerified    = errors.New("identity: email address not yet verified")
+	ErrEmailTokenExpired   = errors.New("identity: email verification code expired")
+	ErrEmailTokenInvalid   = errors.New("identity: email verification code invalid")
+	ErrEmailTokenUsed      = errors.New("identity: email verification code already used")
+	ErrPasswordResetExpired = errors.New("identity: password reset token expired")
+	ErrPasswordResetInvalid = errors.New("identity: password reset token invalid or used")
+	ErrWeakPassword        = errors.New("identity: password must be at least 8 characters")
+	ErrMFANotEnabled       = errors.New("identity: MFA is not enabled on this account")
+	ErrMFAChallengeExpired = errors.New("identity: MFA challenge expired")
+	ErrMFAChallengeInvalid = errors.New("identity: MFA challenge token invalid")
+	ErrMFACodeInvalid      = errors.New("identity: MFA OTP code invalid")
+	ErrMFAAlreadyEnabled   = errors.New("identity: MFA is already enabled")
+)

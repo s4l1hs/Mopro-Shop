@@ -412,3 +412,133 @@ func (r *pgxRepository) GetCommission(ctx context.Context, market string, catego
 	}
 	return c, nil
 }
+
+// ── Batch + home + reviews ────────────────────────────────────────────────────
+
+func (r *pgxRepository) ListProductsByIDs(ctx context.Context, ids []int64, locale string) ([]ProductSummaryRow, error) {
+	if len(ids) == 0 {
+		return []ProductSummaryRow{}, nil
+	}
+	rows, err := r.pool.Query(ctx,
+		`SELECT p.id, p.seller_id, p.category_id, p.brand, p.status,
+		        COALESCE(t.title, '') AS title,
+		        v.price_minor, v.price_currency,
+		        COALESCE(v.image_keys[1], '') AS cover_image_key,
+		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps
+		FROM catalog_schema.products p
+		JOIN catalog_schema.product_translations t
+		     ON t.product_id = p.id AND t.locale = $2
+		JOIN LATERAL (
+		    SELECT price_minor, price_currency, image_keys
+		    FROM catalog_schema.variants
+		    WHERE product_id = p.id
+		    ORDER BY price_minor ASC LIMIT 1
+		) v ON TRUE
+		LEFT JOIN ref_schema.commission_rules cr
+		       ON cr.category_id = p.category_id
+		      AND cr.active = TRUE
+		      AND (cr.effective_to IS NULL OR cr.effective_to > now())
+		WHERE p.id = ANY($1) AND p.status = 'active'
+		ORDER BY p.id`,
+		ids, locale,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: ListProductsByIDs: %w", err)
+	}
+	defer rows.Close()
+
+	var results []ProductSummaryRow
+	for rows.Next() {
+		var s ProductSummaryRow
+		if err := rows.Scan(
+			&s.ID, &s.SellerID, &s.CategoryID, &s.Brand, &s.Status,
+			&s.Title, &s.PriceMinor, &s.PriceCurrency,
+			&s.CoverImageKey, &s.CommissionPctBps,
+		); err != nil {
+			return nil, fmt.Errorf("catalog.repo: scan product: %w", err)
+		}
+		results = append(results, s)
+	}
+	if results == nil {
+		results = []ProductSummaryRow{}
+	}
+	return results, rows.Err()
+}
+
+func (r *pgxRepository) HomeRails(ctx context.Context) ([]HomeRailRow, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT rail_key, title_tr, title_en, sort_order
+		FROM catalog_schema.home_rails WHERE active = TRUE ORDER BY sort_order`)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: HomeRails: %w", err)
+	}
+	defer rows.Close()
+	var out []HomeRailRow
+	for rows.Next() {
+		var h HomeRailRow
+		if err := rows.Scan(&h.RailKey, &h.TitleTR, &h.TitleEN, &h.SortOrder); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	if out == nil {
+		out = []HomeRailRow{}
+	}
+	return out, rows.Err()
+}
+
+func (r *pgxRepository) HomeBanners(ctx context.Context) ([]HomeBannerRow, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, image_url, deep_link, sort_order
+		FROM catalog_schema.home_banners WHERE active = TRUE ORDER BY sort_order`)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: HomeBanners: %w", err)
+	}
+	defer rows.Close()
+	var out []HomeBannerRow
+	for rows.Next() {
+		var b HomeBannerRow
+		if err := rows.Scan(&b.ID, &b.ImageURL, &b.DeepLink, &b.SortOrder); err != nil {
+			return nil, err
+		}
+		out = append(out, b)
+	}
+	if out == nil {
+		out = []HomeBannerRow{}
+	}
+	return out, rows.Err()
+}
+
+func (r *pgxRepository) ListReviews(ctx context.Context, productID int64, offset, limit int) ([]ProductReviewRow, int, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, product_id, user_id, rating,
+		        COALESCE(title,''), COALESCE(body,''),
+		        helpful_count, created_at::text,
+		        count(*) OVER() AS total_count
+		FROM catalog_schema.product_reviews
+		WHERE product_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2 OFFSET $3`,
+		productID, limit, offset,
+	)
+	if err != nil {
+		return nil, 0, fmt.Errorf("catalog.repo: ListReviews: %w", err)
+	}
+	defer rows.Close()
+	var out []ProductReviewRow
+	var total int
+	for rows.Next() {
+		var rv ProductReviewRow
+		if err := rows.Scan(
+			&rv.ID, &rv.ProductID, &rv.UserID, &rv.Rating,
+			&rv.Title, &rv.Body, &rv.HelpfulCount, &rv.CreatedAt, &total,
+		); err != nil {
+			return nil, 0, err
+		}
+		out = append(out, rv)
+	}
+	if out == nil {
+		out = []ProductReviewRow{}
+	}
+	return out, total, rows.Err()
+}

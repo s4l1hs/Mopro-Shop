@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:mopro/api/client.dart';
 import 'package:mopro/core/router/app_router.dart';
-import 'package:mopro/core/theme/app_theme.dart';
+import 'package:mopro/design/theme.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 // ── Minimal stubs
@@ -124,7 +124,7 @@ Widget _app() => ProviderScope(
         builder: (context, ref, _) {
           final router = ref.watch(routerProvider);
           return MaterialApp.router(
-            theme: AppTheme.light,
+            theme: buildLightTheme(),
             routerConfig: router,
           );
         },

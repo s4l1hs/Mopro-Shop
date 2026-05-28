@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/core/di/providers.dart';
+import 'package:mopro/features/cart/application/cart_merge_service.dart';
+import 'package:mopro/features/favorites/favorites_provider.dart';
 
 final authNotifierProvider =
     AsyncNotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
@@ -38,6 +40,10 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
           ? const AuthAuthenticated()
           : const AuthProfileIncomplete(),
     );
+    // Merge guest cart and favorites into server state on login.
+    final guestFavIds = ref.read(favoritesProvider);
+    await mergeGuestCart(ref);
+    await mergeGuestFavorites(ref, guestFavIds);
   }
 
   Future<void> setLoggedOut() async {

@@ -346,3 +346,18 @@ func TestGetCommissionForCategory_NotFound(t *testing.T) {
 		t.Fatalf("expected ErrCommissionNotFound, got %v", err)
 	}
 }
+
+// ── Stubs for new Repository methods (added in Trendyol home work) ───────────
+
+func (m *mockRepo) ListProductsByIDs(_ context.Context, _ []int64, _ string) ([]catalog.ProductSummaryRow, error) {
+	return nil, nil
+}
+func (m *mockRepo) HomeRails(_ context.Context) ([]catalog.HomeRailRow, error) {
+	return nil, nil
+}
+func (m *mockRepo) HomeBanners(_ context.Context) ([]catalog.HomeBannerRow, error) {
+	return nil, nil
+}
+func (m *mockRepo) ListReviews(_ context.Context, _ int64, _, _ int) ([]catalog.ProductReviewRow, int, error) {
+	return nil, 0, nil
+}

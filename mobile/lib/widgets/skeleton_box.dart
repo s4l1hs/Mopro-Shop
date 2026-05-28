@@ -32,36 +32,5 @@ class SkeletonBox extends StatelessWidget {
   }
 }
 
-class SkeletonProductCard extends StatelessWidget {
-  const SkeletonProductCard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const AspectRatio(
-            aspectRatio: 3 / 4,
-            child: SkeletonBox(width: double.infinity, height: double.infinity),
-          ),
-          const Padding(
-            padding: EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SkeletonBox(width: double.infinity, height: 12),
-                SizedBox(height: 4),
-                SkeletonBox(width: 120, height: 12),
-                SizedBox(height: 6),
-                SkeletonBox(width: 80, height: 18),
-                SizedBox(height: 4),
-                SkeletonBox(width: 100, height: 22),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// SkeletonProductCard moved to features/catalog/widgets/product_card.dart
+// to live alongside the canonical ProductCard. Re-export via that import.
