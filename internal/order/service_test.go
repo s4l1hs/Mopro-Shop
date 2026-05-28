@@ -465,3 +465,18 @@ func TestCheckout_CommitReservationCalledBestEffort(t *testing.T) {
 		t.Error("CommitReservation must be called when ReservationID is set")
 	}
 }
+
+// ── Stubs for new catalog.Service methods (Trendyol home work) ──────────────
+
+func (m *mockCatalogSvc) ListProductsByIDs(_ context.Context, _ []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {
+	return nil, nil
+}
+func (m *mockCatalogSvc) HomeRails(_ context.Context, _ string) ([]catalog.HomeRailRow, error) {
+	return nil, nil
+}
+func (m *mockCatalogSvc) HomeBanners(_ context.Context) ([]catalog.HomeBannerRow, error) {
+	return nil, nil
+}
+func (m *mockCatalogSvc) ListReviews(_ context.Context, _ int64, _, _ int) ([]catalog.ProductReviewRow, int, error) {
+	return nil, 0, nil
+}

@@ -246,7 +246,7 @@ func newTestSigner(t *testing.T) identityjwt.Signer {
 func newTestService(repo identity.Repository, sms *mockSMS, limiter *mockLimiter, t *testing.T) identity.Service {
 	t.Helper()
 	return identity.NewService(
-		repo, sms, limiter, newTestSigner(t),
+		repo, sms, &mockEmail{}, limiter, newTestSigner(t),
 		"TR", "tr-TR", nil, nil,
 	)
 }
@@ -418,7 +418,7 @@ func TestDevOTPAcceptAny_PanicsOnProduction(t *testing.T) {
 		}
 	}()
 	identity.NewService(
-		newMockRepo(), &mockSMS{}, &mockLimiter{}, newTestSigner(t),
+		newMockRepo(), &mockSMS{}, &mockEmail{}, &mockLimiter{}, newTestSigner(t),
 		"TR", "tr-TR", nil, nil,
 	)
 }
@@ -535,3 +535,48 @@ func TestMaskPhone_NoPlus(t *testing.T) {
 		t.Errorf("expected ***, got %q", got)
 	}
 }
+
+// ── Stubs for new Repository methods (email auth + MFA, this turn) ──────────
+
+func (m *mockRepo) FindUserByEmailHash(_ context.Context, _ []byte) (identity.User, error) {
+	return identity.User{}, identity.ErrUserNotFound
+}
+func (m *mockRepo) CreateEmailUser(_ context.Context, _ []byte, _, _, _, _ string) (identity.User, error) {
+	return identity.User{ID: 1}, nil
+}
+func (m *mockRepo) SetPasswordHash(_ context.Context, _ int64, _ string) error { return nil }
+func (m *mockRepo) MarkEmailVerified(_ context.Context, _ int64) error         { return nil }
+func (m *mockRepo) CreateEmailVerification(_ context.Context, _ int64, _ string, _ time.Time) error {
+	return nil
+}
+func (m *mockRepo) FindLatestEmailVerification(_ context.Context, _ int64) (identity.EmailVerification, error) {
+	return identity.EmailVerification{}, identity.ErrEmailTokenInvalid
+}
+func (m *mockRepo) MarkEmailVerificationUsed(_ context.Context, _ int64) error { return nil }
+func (m *mockRepo) CreatePasswordReset(_ context.Context, _ int64, _ string, _ time.Time) error {
+	return nil
+}
+func (m *mockRepo) FindPasswordReset(_ context.Context, _ string) (identity.PasswordReset, error) {
+	return identity.PasswordReset{}, identity.ErrPasswordResetInvalid
+}
+func (m *mockRepo) MarkPasswordResetUsed(_ context.Context, _ int64) error             { return nil }
+func (m *mockRepo) CreateSession(_ context.Context, _ int64, _ identity.RefreshToken) error {
+	return nil
+}
+func (m *mockRepo) RevokeAllUserTokens(_ context.Context, _ int64) error { return nil }
+func (m *mockRepo) UpdateMFAConfig(_ context.Context, _ int64, _ bool, _ []byte, _ string) error {
+	return nil
+}
+func (m *mockRepo) CreateMFAChallenge(_ context.Context, _ int64, _, _ string, _ time.Time) error {
+	return nil
+}
+func (m *mockRepo) FindMFAChallenge(_ context.Context, _ string) (identity.MFAChallenge, error) {
+	return identity.MFAChallenge{}, identity.ErrMFAChallengeInvalid
+}
+func (m *mockRepo) MarkMFAChallengeVerified(_ context.Context, _ int64) error { return nil }
+
+// mockEmail is a no-op email provider for tests.
+type mockEmail struct{}
+
+func (m *mockEmail) SendVerification(_ context.Context, _, _ string) error  { return nil }
+func (m *mockEmail) SendPasswordReset(_ context.Context, _, _ string) error { return nil }
