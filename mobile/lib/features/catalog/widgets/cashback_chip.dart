@@ -32,15 +32,20 @@ class CashbackChip extends StatelessWidget {
             color: colorScheme.onPrimaryContainer,
           ),
           const SizedBox(width: 4),
-          Text(
-            'cashback.monthly_coin'.tr(
-              namedArgs: {
-                'amount': formatCoin(monthlyCoinMinor, currency, compact: true),
-              },
-            ),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: colorScheme.onPrimaryContainer,
-              fontWeight: FontWeight.w600,
+          Flexible(
+            child: Text(
+              'cashback.monthly_coin'.tr(
+                namedArgs: {
+                  'amount':
+                      formatCoin(monthlyCoinMinor, currency, compact: true),
+                },
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
