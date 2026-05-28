@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/widgets/empty_state.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
+import 'package:mopro/features/catalog/widgets/product_card.dart';
 import 'package:mopro/features/catalog/widgets/product_grid.dart';
 import 'package:mopro/widgets/skeleton_box.dart';
 import 'package:mopro_api/mopro_api.dart';
