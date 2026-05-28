@@ -213,6 +213,16 @@ type productSummaryJSON struct {
 	CoverImageURL    string `json:"cover_image_url,omitempty"`
 	CommissionPctBps int    `json:"commission_pct_bps"`
 
+	// Trendyol-style display fields (all optional / zero when absent):
+	// - OriginalPriceMinor: when > PriceMinor, render the original with a
+	//   strikethrough and compute the discount %.
+	// - RatingAvg / RatingCount: drive the star-rating chip; hidden when
+	//   RatingCount == 0.
+	OriginalPriceMinor *int64   `json:"original_price_minor,omitempty"`
+	DiscountPct        *int     `json:"discount_pct,omitempty"`
+	RatingAvg          *float64 `json:"rating_avg,omitempty"`
+	RatingCount        int      `json:"rating_count"`
+
 	CashbackPreview cashbackPreviewJSON `json:"cashback_preview"`
 }
 
@@ -222,17 +232,29 @@ func buildProductListResponse(rows []catalog.ProductSummaryRow, total, page, per
 		commMinor := r.PriceMinor * int64(r.CommissionPctBps) / 10000
 		yearlyYield := commMinor * referenceInterestRateBps / 10000
 		monthlyMinor := yearlyYield / 12
+		// Compute discount % when a usable original price is present.
+		var discountPct *int
+		if r.OriginalPriceMinor != nil && *r.OriginalPriceMinor > r.PriceMinor && *r.OriginalPriceMinor > 0 {
+			pct := int(((*r.OriginalPriceMinor - r.PriceMinor) * 100) / *r.OriginalPriceMinor)
+			if pct > 0 {
+				discountPct = &pct
+			}
+		}
 		out[i] = productSummaryJSON{
-			ID:               r.ID,
-			SellerID:         r.SellerID,
-			CategoryID:       r.CategoryID,
-			Brand:            r.Brand,
-			Status:           r.Status,
-			Title:            r.Title,
-			PriceMinor:       r.PriceMinor,
-			PriceCurrency:    r.PriceCurrency,
-			CoverImageURL:    mediaurl.CDNUrl(r.CoverImageKey),
-			CommissionPctBps: r.CommissionPctBps,
+			ID:                 r.ID,
+			SellerID:           r.SellerID,
+			CategoryID:         r.CategoryID,
+			Brand:              r.Brand,
+			Status:             r.Status,
+			Title:              r.Title,
+			PriceMinor:         r.PriceMinor,
+			PriceCurrency:      r.PriceCurrency,
+			CoverImageURL:      mediaurl.CDNUrl(r.CoverImageKey),
+			CommissionPctBps:   r.CommissionPctBps,
+			OriginalPriceMinor: r.OriginalPriceMinor,
+			DiscountPct:        discountPct,
+			RatingAvg:          r.RatingAvg,
+			RatingCount:        r.RatingCount,
 
 			CashbackPreview: cashbackPreviewJSON{
 
