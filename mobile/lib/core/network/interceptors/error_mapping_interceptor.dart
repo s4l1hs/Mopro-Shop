@@ -37,11 +37,21 @@ class ErrorMappingInterceptor extends Interceptor {
 
     return switch (statusCode) {
       401 when code == 'token_family_revoked' => const SessionRevokedError(),
+      401 when code == 'invalid_credentials' => const InvalidCredentialsError(),
       401 => const UnauthorizedError(),
+      403 when code == 'email_not_verified' => const EmailNotVerifiedError(),
       404 => NotFoundError(resource: message),
+      409 when code == 'email_already_exists' => const EmailAlreadyExistsError(),
       409 => ConflictError(message: message),
       422 when code == 'otp_invalid' => const OtpInvalidError(),
       422 when code == 'otp_expired' => const OtpExpiredError(),
+      422 when code == 'email_token_invalid' ||
+          code == 'email_token_expired' ||
+          code == 'mfa_invalid' ||
+          code == 'reset_token_invalid' =>
+        const InvalidCodeError(),
+      422 when code == 'weak_password' => const WeakPasswordError(),
+      422 when code == 'mfa_challenge_expired' => const MFAChallengeExpiredError(),
       422 => ValidationError(
           message: message,
           fields: _extractFields(body),

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:mopro/api/auth_api_ext.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/network/dio_client.dart';
 import 'package:mopro/core/network/interceptors/auth_interceptor.dart';
@@ -67,6 +68,10 @@ final sessionRevokedProvider = StateProvider<bool>((_) => false);
 
 final authApiProvider = Provider<AuthApi>((ref) {
   return AuthApi(ref.watch(dioProvider));
+});
+
+final authApiExtProvider = Provider<AuthApiExt>((ref) {
+  return AuthApiExt(ref.watch(dioProvider));
 });
 
 final meApiProvider = Provider<MeApi>((ref) {
