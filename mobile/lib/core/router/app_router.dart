@@ -35,6 +35,42 @@ import 'package:mopro/features/wallet/wallet_screen.dart';
 import 'package:mopro/shell/app_shell.dart';
 import 'package:mopro_api/mopro_api.dart';
 
+/// Pure function exposing the auth-aware redirect rules.
+/// Returns the redirect target, or null if the user may stay at [location].
+///
+/// Rules:
+///   - Unauthenticated guests can browse public routes (home, categories,
+///     PDP, search, favorites, cart, account tab).
+///   - Hard-gated routes (checkout, orders, wallet, addresses, account
+///     sub-pages) redirect to `/auth/login?next=<location>` for guests.
+///   - Profile-incomplete users are forced to `/auth/profile`.
+///   - Fully authenticated users on /auth/* are redirected back to `/`.
+String? computeAuthRedirect({
+  required AuthState? auth,
+  required String location,
+}) {
+  final isAuthRoute = location.startsWith('/auth');
+  final hardGated = location.startsWith('/checkout') ||
+      location == '/wallet' ||
+      location.startsWith('/wallet/') ||
+      location.startsWith('/orders') ||
+      location.startsWith('/profile/addresses') ||
+      location.startsWith('/account/profile') ||
+      location.startsWith('/account/security') ||
+      location.startsWith('/account/cards');
+
+  return switch (auth) {
+    null || AuthUnauthenticated() => isAuthRoute
+        ? null
+        : hardGated
+            ? '/auth/login?next=${Uri.encodeComponent(location)}'
+            : null,
+    AuthProfileIncomplete() =>
+      location == '/auth/profile' ? null : '/auth/profile',
+    AuthAuthenticated() => isAuthRoute ? '/' : null,
+  };
+}
+
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 final _homeNavKey = GlobalKey<NavigatorState>(debugLabel: 'homeNav');
 final _categoriesNavKey =
@@ -52,34 +88,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final authAsync = ref.read(authNotifierProvider);
       if (authAsync.isLoading) return null;
-
-      final auth = authAsync.valueOrNull;
-      final loc = state.matchedLocation;
-      final isAuthRoute = loc.startsWith('/auth');
-
-      // Hard-gated routes: guests are redirected to login WITH a ?next= param
-      // so they land back after authenticating. All other routes are public.
-      // Cart (/cart) is public — guest can view/add locally.
-      // Account tab (/account) is public — shows logged-out header for guests.
-      final hardGated = loc.startsWith('/checkout') ||
-          loc == '/wallet' ||
-          loc.startsWith('/wallet/') ||
-          loc.startsWith('/orders') ||
-          loc.startsWith('/profile/addresses') ||
-          loc.startsWith('/account/profile') ||
-          loc.startsWith('/account/security') ||
-          loc.startsWith('/account/cards');
-
-      return switch (auth) {
-        null || AuthUnauthenticated() => isAuthRoute
-            ? null
-            : hardGated
-                ? '/auth/login?next=${Uri.encodeComponent(loc)}'
-                : null, // guest can browse everything else
-        AuthProfileIncomplete() =>
-          loc == '/auth/profile' ? null : '/auth/profile',
-        AuthAuthenticated() => isAuthRoute ? '/' : null,
-      };
+      return computeAuthRedirect(
+        auth: authAsync.valueOrNull,
+        location: state.matchedLocation,
+      );
     },
     routes: [
       GoRoute(
