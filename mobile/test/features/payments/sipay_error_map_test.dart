@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mopro/features/payments/sipay_error_map.dart';
 
 void main() {
-  const _fallback =
+  const fallback =
       'Ödeme tamamlanamadı. Lütfen tekrar deneyin veya başka bir kart kullanın.';
 
   group('SipayErrorMap.get — known codes', () {
@@ -30,19 +30,19 @@ void main() {
 
   group('SipayErrorMap.get — fallback behaviour', () {
     test('returns fallback for unknown code', () {
-      expect(SipayErrorMap.get('totally_unknown_xyz'), _fallback);
+      expect(SipayErrorMap.get('totally_unknown_xyz'), fallback);
     });
 
     test('returns fallback for null', () {
-      expect(SipayErrorMap.get(null), _fallback);
+      expect(SipayErrorMap.get(null), fallback);
     });
 
     test('returns fallback for empty string', () {
-      expect(SipayErrorMap.get(''), _fallback);
+      expect(SipayErrorMap.get(''), fallback);
     });
 
     test("explicit 'unknown' code returns the fallback message", () {
-      expect(SipayErrorMap.get('unknown'), _fallback);
+      expect(SipayErrorMap.get('unknown'), fallback);
     });
   });
 }
