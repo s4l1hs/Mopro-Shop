@@ -6,17 +6,21 @@ class ProductGrid extends StatelessWidget {
   const ProductGrid({
     required this.products,
     required this.onProductTap,
+    this.crossAxisCount = 2,
     super.key,
   });
 
   final List<ProductSummary> products;
   final void Function(ProductSummary) onProductTap;
 
+  /// Columns; 2 on mobile (default), 3/5 in the tablet/desktop two-column PLP.
+  final int crossAxisCount;
+
   @override
   Widget build(BuildContext context) {
     return SliverGrid.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
         childAspectRatio: 0.68,

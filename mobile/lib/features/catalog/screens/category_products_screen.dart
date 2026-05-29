@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,13 +6,17 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/utils/debouncer.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
+import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/features/catalog/plp/plp_filters.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_codec.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
+import 'package:mopro/features/catalog/plp/widgets/filter_panel.dart';
+import 'package:mopro/features/catalog/plp/widgets/plp_filter_chips.dart';
 import 'package:mopro/features/catalog/providers/filtered_products_provider.dart';
 import 'package:mopro/features/catalog/widgets/filter_sheet.dart';
 import 'package:mopro/features/catalog/widgets/sort_sheet.dart';
 import 'package:mopro/widgets/catalog/catalog_shell.dart';
+import 'package:mopro_api/mopro_api.dart';
 
 class CategoryProductsScreen extends ConsumerStatefulWidget {
   const CategoryProductsScreen({
@@ -105,22 +110,110 @@ class _CategoryProductsScreenState
       );
     }
 
+    final shell = CatalogShell(
+      products: products,
+      isLoading: isLoading,
+      hasMore: state.hasMore,
+      loadingMore: state.loadingMore,
+      loadMoreError: state.loadMoreError,
+      onLoadMore: () =>
+          ref.read(filteredProductsProvider(_key).notifier).loadMore(),
+      currentSort: filters.sort.token,
+      // Mobile shows the sticky sort/filter bar + bottom sheets; the wide
+      // layout replaces them with the sidebar + chip row + sort dropdown, so
+      // null these out there to hide CatalogShell's own bar.
+      onSort: context.isMobile ? _showSortSheet : null,
+      onFilter: context.isMobile ? _showFilterSheet : null,
+      activeFilterCount: filters.activeChipCount,
+      gridCrossAxisCount: context.isMobile ? 2 : (context.isDesktop ? 5 : 3),
+      onRefresh: () async =>
+          ref.read(filteredProductsProvider(_key).notifier).refresh(),
+    );
+
     return Scaffold(
       appBar: AppBar(title: Text(widget.categoryName)),
-      body: CatalogShell(
-        products: products,
-        isLoading: isLoading,
-        hasMore: state.hasMore,
-        loadingMore: state.loadingMore,
-        loadMoreError: state.loadMoreError,
-        onLoadMore: () =>
-            ref.read(filteredProductsProvider(_key).notifier).loadMore(),
-        currentSort: filters.sort.token,
-        onSort: _showSortSheet,
-        onFilter: _showFilterSheet,
-        activeFilterCount: filters.activeChipCount,
-        onRefresh: () async =>
-            ref.read(filteredProductsProvider(_key).notifier).refresh(),
+      body: context.isMobile ? shell : _buildWide(context, products, shell),
+    );
+  }
+
+  // Tablet/desktop: sticky sidebar filter panel + (chip row + sort dropdown +
+  // grid) (§2.1). The sidebar pins while the grid scrolls because it sits in a
+  // separate, non-scrolling column.
+  Widget _buildWide(
+    BuildContext context,
+    List<ProductSummary> products,
+    Widget shell,
+  ) {
+    final sidebarW = context.isDesktop ? 280.0 : 260.0;
+    final pad = context.isDesktop ? 32.0 : 24.0;
+    final brands = products.map((p) => p.brand).toSet().toList()..sort();
+
+    return LayoutBuilder(
+      builder: (ctx, c) {
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1240),
+            child: SizedBox(
+              height: c.maxHeight,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: pad),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: sidebarW,
+                      child: FilterPanel(
+                        plpKey: _key,
+                        currentCategoryId: widget.categoryId,
+                        brands: brands,
+                      ),
+                    ),
+                    const VerticalDivider(width: 1),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(child: PlpFilterChips(plpKey: _key)),
+                              _sortDropdown(),
+                            ],
+                          ),
+                          Expanded(child: shell),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _sortDropdown() {
+    final current = ref.watch(plpFiltersProvider(_key)).sort;
+    return PopupMenuButton<PlpSort>(
+      initialValue: current,
+      onSelected: (s) =>
+          ref.read(plpFiltersProvider(_key).notifier).setSort(s),
+      itemBuilder: (_) => [
+        for (final s in PlpSort.values)
+          PopupMenuItem<PlpSort>(
+            value: s,
+            child: Text('catalog.sort_${s.token}'.tr()),
+          ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('catalog.sort_${current.token}'.tr()),
+            const Icon(Icons.arrow_drop_down),
+          ],
+        ),
       ),
     );
   }

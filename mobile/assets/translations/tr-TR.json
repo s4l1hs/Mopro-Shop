@@ -84,6 +84,25 @@
     "trust_perpetual_cashback": "Sürekli Cashback",
     "flash_deals_ended": "Fırsat sona erdi"
   },
+  "plp": {
+    "filter_category": "Kategori",
+    "filter_brand": "Marka",
+    "filter_price": "Fiyat",
+    "filter_rating": "Değerlendirme",
+    "filter_shipping": "Kargo",
+    "clear_all": "Tümünü Temizle",
+    "apply": "Uygula",
+    "brand_search": "Marka ara",
+    "show_more": "Daha fazla göster",
+    "price_min": "Min ₺",
+    "price_max": "Max ₺",
+    "and_up": "ve üzeri",
+    "rating_all": "Tümü",
+    "free_shipping": "Ücretsiz Kargo",
+    "chip_brand": "Marka: {brand}",
+    "chip_price": "Fiyat: {min}–{max}",
+    "chip_rating": "{rating}★ ve üzeri"
+  },
   "catalog": {
     "categories": "Kategoriler",
     "search_hint": "Ürün ara...",
