@@ -1430,3 +1430,72 @@ replace: true)` set `state = AsyncLoading()` as its first statement). Fixed with
 `Future.microtask`, guarded by `products_by_category_provider_test.dart` (first
 read returns normally + resolves to data; verified to throw the
 "uninitialized provider" `StateError` when the fix is reverted).
+
+---
+
+# Session 5b — PLP sidebar, PDP two-column, Cart two-column, Favorites desktop, 5a leftovers
+
+> Base: `main` @ ebbe06bb (PR #14 Session 5a + PR #15 notifier sweep both merged).
+> Branch: `feat/plp-pdp-cart-favorites-desktop`.
+
+## Baseline (pre-flight)
+
+| Metric | Baseline |
+|---|---|
+| `flutter analyze` | 0 issues |
+| `flutter test` | 359 pass / 26 fail — **all 26 golden platform-guard** (Linux-baselined, run on macOS); 0 real failures |
+| `flutter test integration_test` | device-only; not runnable headless on macOS. Interaction flows live in `test/integration/` (run under `flutter test`) |
+| `flutter build web --release` | success; `build/web/main.dart.js` = **4,461,269 B** (+10% budget ⇒ ~4,907,396 B ceiling) |
+| `go test ./...` | all pass (0 FAIL) |
+| containers | not running locally |
+
+## Scope note (this turn)
+
+This session's full spec spans five large UI deliverables plus leftovers, docs,
+goldens, and integration flows. Landed this turn as complete, green,
+analyze-clean commits, in execution order by value×certainty:
+
+- §6.4 — catalog `-tags=integration` build-tag fix (real correctness; 5a blocker).
+- §7 — `CONTRIBUTING.md`: "Adding a Notifier" (three shapes + synchronous-reachability rule) and "Writing a Regression Test" (revert-must-fail standard).
+
+_Remaining sections (§2 PLP sidebar, §3 PDP two-column + hover-zoom + extraction,
+§4 Cart two-column, §5 Favorites desktop, §6.1–§6.3 home leftovers) and the
+Session 5b REPORT subsections are tracked for the 5b continuation; see "Carried
+to 5b-continuation" below._
+
+## §6.4 — integration build-tag fix (Drive-by / correctness)
+
+`mockRepo` (untagged `service_test.go`) had four method stubs in
+`discovery_test.go` (`//go:build !integration`); under `-tags=integration` the
+catalog test binary failed to compile (`*mockRepo does not implement
+catalog.Repository`). Moved the four stubs to `service_test.go` so the mock is
+complete in both builds. `go test -tags=integration ./internal/catalog/...` now
+compiles; non-integration tests still pass. Note: `make verify` uses the
+untagged build (always worked); this unblocks the integration-tagged build used
+by `make test-integration-catalog` / CI's integration job.
+
+## Backlog (carried + new)
+
+- `sellerpayout_schema` split out of `commission_schema` — still backlog.
+- Radio→RadioGroup migration — deferred.
+- **Notifier-shapes lint:** a `tool/check-notifier-shapes.sh` or `custom_lint`
+  rule that classifies every `Notifier` subclass into one of the three
+  `CONTRIBUTING.md` shapes. Must be **AST-based, not regex** (to handle wrapped
+  `extends` declarations like the 5 the 5a sweep's first grep missed).
+- Brand product-count aggregation endpoint (needed if PLP brand list shows `(N)`
+  counts — falls back to no count until it exists).
+- CDN `?w=` re-verification once `cdn.moproshop.com` is provisioned (from 5a).
+
+## Carried to 5b-continuation
+
+§2 PLP sidebar filter panel + chip row + sort dropdown; §3 PDP two-column +
+hover-zoom + component extraction; §4 Cart two-column + `OrderSummaryCard` +
+empty state; §5 Favorites desktop grid + empty state; §6.1 Editor's picks /
+Recently viewed home sub-section; §6.2 mood/category 8/12 column counts; §6.3
+`?layout=desktop` rails hint + §2.5 fixture; new integration flows O/P/Q; new
+goldens + Linux re-baseline.
+
+## Deferred to Session 5c (out of 5b scope)
+
+Account two-pane layout; `LoginRequiredDialog` web presenter; reviews
+helpful-vote / sort / pagination; full a11y sweep beyond this turn's screens.
