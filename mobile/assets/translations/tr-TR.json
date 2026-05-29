@@ -423,5 +423,12 @@
     "not_found_title": "Aradığınız sayfayı bulamadık",
     "not_found_subtitle": "Sayfa silinmiş, taşınmış veya hiç var olmamış olabilir.",
     "not_found_cta": "Ana sayfaya dön"
+  },
+  "footer": {
+    "about": "Hakkımızda",
+    "help": "Yardım",
+    "privacy": "Gizlilik",
+    "terms": "Koşullar",
+    "language": "Dil"
   }
 }

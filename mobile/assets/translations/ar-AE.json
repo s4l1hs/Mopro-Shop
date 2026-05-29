@@ -40,5 +40,12 @@
   },
   "home": {
     "flash_deals_ended": "انتهى العرض"
+  },
+  "footer": {
+    "about": "معلومات عنا",
+    "help": "مساعدة",
+    "privacy": "الخصوصية",
+    "terms": "الشروط",
+    "language": "اللغة"
   }
 }

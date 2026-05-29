@@ -40,5 +40,12 @@
   },
   "home": {
     "flash_deals_ended": "Angebot beendet"
+  },
+  "footer": {
+    "about": "Über uns",
+    "help": "Hilfe",
+    "privacy": "Datenschutz",
+    "terms": "AGB",
+    "language": "Sprache"
   }
 }
