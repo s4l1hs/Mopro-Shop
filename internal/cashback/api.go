@@ -104,12 +104,14 @@ type Repository interface {
 	// Called inside the same tx after PostInTx returns successfully.
 	MarkPaymentPaid(ctx context.Context, tx pgx.Tx, paymentID int64, ledgerTxnID int64, paidDate time.Time) error
 
-	// IncrPaymentsMade atomically increments payments_made by 1 within tx.
-	// Returns the new counter and whether the plan is now completed (>= total_months).
-	// NOTE (commit 2 of this PR will replace this with a COUNT-derived
-	// RefreshPaymentsMadeCache; for commit 1 the counter still wins because
-	// ClaimPaymentPeriod above ensures at most one winner per (plan, period)).
-	IncrPaymentsMade(ctx context.Context, tx pgx.Tx, planID int64) (newCount int, completed bool, err error)
+	// RefreshPaymentsMadeCache rewrites plans.payments_made to match
+	//   COUNT(*) FROM cashback_schema.payments WHERE plan_id = $1 AND status = 'paid'
+	// and flips plans.status to 'completed' once the count reaches total_months.
+	// Replaces the old read-modify-write IncrPaymentsMade, which over-counted
+	// on PostInTx idempotent-replay races (see REPORT.md Session 4d follow-up).
+	// payments_made is now a denormalized cache; the payments table is the
+	// source of truth.
+	RefreshPaymentsMadeCache(ctx context.Context, tx pgx.Tx, planID int64) (newCount int, completed bool, err error)
 
 	// HTTP read path — safe for direct repository calls per CLAUDE.md §3.1 exception.
 	GetPlan(ctx context.Context, userID, planID int64) (Plan, error)

@@ -252,24 +252,32 @@ func (r *pgxCashbackRepository) MarkPaymentPaid(ctx context.Context, tx pgx.Tx, 
 	return nil
 }
 
-// IncrPaymentsMade atomically increments payments_made by 1 within tx.
-// Sets status='completed' when the new count equals total_months.
-// Returns (newCount, completed, nil) on success.
-// NOTE: commit 2 of this PR replaces this with COUNT-derived RefreshPaymentsMadeCache.
-func (r *pgxCashbackRepository) IncrPaymentsMade(ctx context.Context, tx pgx.Tx, planID int64) (int, bool, error) {
+// RefreshPaymentsMadeCache rewrites plans.payments_made to match
+// COUNT(*) FROM cashback_schema.payments WHERE plan_id=$1 AND status='paid'
+// and flips plans.status to 'completed' once the count reaches total_months.
+// payments_made is a denormalized cache; the payments table is authoritative.
+// Replaces the old read-modify-write IncrPaymentsMade, which over-counted on
+// PostInTx idempotent-replay races (see REPORT.md Session 4d follow-up).
+func (r *pgxCashbackRepository) RefreshPaymentsMadeCache(ctx context.Context, tx pgx.Tx, planID int64) (int, bool, error) {
 	const q = `
-		UPDATE cashback_schema.plans
-		SET payments_made = payments_made + 1,
-		    status        = CASE WHEN payments_made + 1 >= total_months THEN 'completed' ELSE status END,
+		WITH paid AS (
+		    SELECT COUNT(*)::int AS n
+		    FROM cashback_schema.payments
+		    WHERE plan_id = $1 AND status = 'paid'
+		)
+		UPDATE cashback_schema.plans p
+		SET payments_made = paid.n,
+		    status        = CASE WHEN paid.n >= p.total_months THEN 'completed' ELSE p.status END,
 		    updated_at    = now()
-		WHERE id = $1
-		RETURNING payments_made, (payments_made >= total_months) AS completed`
+		FROM paid
+		WHERE p.id = $1
+		RETURNING p.payments_made, (p.payments_made >= p.total_months) AS completed`
 
 	var newCount int
 	var completed bool
 	err := tx.QueryRow(ctx, q, planID).Scan(&newCount, &completed)
 	if err != nil {
-		return 0, false, fmt.Errorf("cashback: IncrPaymentsMade plan=%d: %w", planID, err)
+		return 0, false, fmt.Errorf("cashback: RefreshPaymentsMadeCache plan=%d: %w", planID, err)
 	}
 	return newCount, completed, nil
 }

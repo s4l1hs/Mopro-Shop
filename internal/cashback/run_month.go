@@ -210,11 +210,12 @@ func (s *cashbackService) payOnePlanInTx(ctx context.Context, plan Plan, equityA
 			return markErr
 		}
 
-		// Step 4: bump the payments_made counter. Safe to use the
-		// read-modify-write IncrPaymentsMade here because ClaimPaymentPeriod
-		// guarantees at most one winner per (plan, period) — commit 2 of this
-		// PR replaces this with COUNT-derived RefreshPaymentsMadeCache.
-		newCount, completed, refreshErr := s.repo.IncrPaymentsMade(ctx, tx, plan.ID)
+		// Step 4: refresh the denormalized payments_made cache from
+		// COUNT(*) FROM payments WHERE plan_id=X AND status='paid'.
+		// The payments table is now the source of truth; plans.payments_made
+		// is a cache. Refreshing inside the same tx as MarkPaymentPaid keeps
+		// the cache consistent at commit time.
+		newCount, completed, refreshErr := s.repo.RefreshPaymentsMadeCache(ctx, tx, plan.ID)
 		if refreshErr != nil {
 			return refreshErr
 		}

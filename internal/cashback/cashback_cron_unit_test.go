@@ -24,12 +24,12 @@ type mockCashbackRepo struct {
 	claimOK     bool
 	claimErr    error
 	markPaidErr error
-	// Increment path
-	incrCountRet  int
-	incrCompleted bool
-	incrErr       error
-	withTxErr     error
-	getPlans      []Plan
+	// Refresh path (COUNT-derived cache)
+	refreshCountRet int
+	refreshDone     bool
+	refreshErr      error
+	withTxErr       error
+	getPlans        []Plan
 }
 
 func (m *mockCashbackRepo) InsertPlanIfAbsent(_ context.Context, _ pgx.Tx, p Plan) (Plan, bool, error) {
@@ -70,8 +70,8 @@ func (m *mockCashbackRepo) MarkPaymentPaid(_ context.Context, _ pgx.Tx, _ int64,
 	return m.markPaidErr
 }
 
-func (m *mockCashbackRepo) IncrPaymentsMade(_ context.Context, _ pgx.Tx, _ int64) (int, bool, error) {
-	return m.incrCountRet, m.incrCompleted, m.incrErr
+func (m *mockCashbackRepo) RefreshPaymentsMadeCache(_ context.Context, _ pgx.Tx, _ int64) (int, bool, error) {
+	return m.refreshCountRet, m.refreshDone, m.refreshErr
 }
 
 func (m *mockCashbackRepo) WithTx(_ context.Context, _ pgx.TxIsoLevel, fn func(pgx.Tx) error) error {
@@ -178,9 +178,9 @@ func TestPayMonthlyInstallments_NoPlansDue(t *testing.T) {
 func TestPayMonthlyInstallments_HappyPath(t *testing.T) {
 	plan := activePlan(1, 100)
 	repo := &mockCashbackRepo{
-		duePlans:      []Plan{plan},
-		incrCountRet:  1,
-		incrCompleted: false,
+		duePlans:        []Plan{plan},
+		refreshCountRet: 1,
+		refreshDone:     false,
 	}
 	wp := &mockWalletPoster{findAccountID: 10, openWalletID: 20, postTxnID: 99}
 	svc := newCronSvc(repo, wp)
@@ -201,9 +201,9 @@ func TestPayMonthlyInstallments_FinalInstallment_Completed(t *testing.T) {
 	plan := activePlan(1, 100)
 	plan.PaymentsMade = plan.TotalMonths - 1 // next payment is the last one
 	repo := &mockCashbackRepo{
-		duePlans:      []Plan{plan},
-		incrCountRet:  plan.TotalMonths,
-		incrCompleted: true,
+		duePlans:        []Plan{plan},
+		refreshCountRet: plan.TotalMonths,
+		refreshDone:     true,
 	}
 	wp := &mockWalletPoster{findAccountID: 10, openWalletID: 20, postTxnID: 99}
 	svc := newCronSvc(repo, wp)
@@ -243,9 +243,9 @@ func TestPayMonthlyInstallments_WalletFrozen_Skipped(t *testing.T) {
 func TestPayMonthlyInstallments_WalletDoesNotExist_LazilyCreated(t *testing.T) {
 	plan := activePlan(1, 100)
 	repo := &mockCashbackRepo{
-		duePlans:      []Plan{plan},
-		incrCountRet:  1,
-		incrCompleted: false,
+		duePlans:        []Plan{plan},
+		refreshCountRet: 1,
+		refreshDone:     false,
 	}
 	wp := &mockWalletPoster{
 		findAccountID:      10,
@@ -322,9 +322,9 @@ func TestPayMonthlyInstallments_FindEquityAccountError_ReturnsError(t *testing.T
 func TestPayMonthlyInstallments_MultiplePlans(t *testing.T) {
 	plans := []Plan{activePlan(1, 101), activePlan(2, 102), activePlan(3, 103)}
 	repo := &mockCashbackRepo{
-		duePlans:      plans,
-		incrCountRet:  1,
-		incrCompleted: false,
+		duePlans:        plans,
+		refreshCountRet: 1,
+		refreshDone:     false,
 	}
 	wp := &mockWalletPoster{findAccountID: 10, openWalletID: 20, postTxnID: 99}
 	svc := newCronSvc(repo, wp)
