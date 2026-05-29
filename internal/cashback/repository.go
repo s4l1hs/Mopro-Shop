@@ -255,7 +255,12 @@ func (r *pgxCashbackRepository) MarkPaymentPaid(ctx context.Context, tx pgx.Tx, 
 // RefreshPaymentsMadeCache rewrites plans.payments_made to match
 // COUNT(*) FROM cashback_schema.payments WHERE plan_id=$1 AND status='paid'
 // and flips plans.status to 'completed' once the count reaches total_months.
-// payments_made is a denormalized cache; the payments table is authoritative.
+// cashback_schema.payments is the authoritative source of truth for how many
+// installments have been paid. plans.payments_made is only a denormalized cache
+// derived from COUNT(*); never treat it as authoritative, and always refresh it
+// via this function inside the same SERIALIZABLE transaction as any write that
+// affects the payments table (e.g. MarkPaymentPaid), so the cache and the source
+// of truth move atomically.
 // Replaces the old read-modify-write IncrPaymentsMade, which over-counted on
 // PostInTx idempotent-replay races (see REPORT.md Session 4d follow-up).
 func (r *pgxCashbackRepository) RefreshPaymentsMadeCache(ctx context.Context, tx pgx.Tx, planID int64) (int, bool, error) {
