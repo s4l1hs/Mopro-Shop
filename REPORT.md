@@ -1252,3 +1252,21 @@ Adaptive home composition; `PlpFilters` codec + URL wiring; PLP sidebar filter U
 - The sidecar guard is **inert until sidecars exist**; the first workflow run creates them. After that, any golden regenerated off-CI (e.g., macOS) will fail CI with the platform-mismatch message — intended.
 - Locale: the System-chip strings were hardcoded Turkish (not locale keys), so no orphan keys to sweep.
 - Semantics labels are currently English structural strings (`Top-level categories`, `Category submenu for …`) mixed with Turkish hints; a future pass should route them through easy_localization for screen-reader localization.
+
+---
+
+# Session 5a — adaptive home, PlpFilters substrate, FlashDealsRail, responsive images
+
+## Baseline (pre-flight, branch `feat/responsive-home-and-plp-substrate` off `main`@8c757cae)
+
+| Metric | Baseline |
+|---|---|
+| `flutter analyze` | 0 issues |
+| `flutter test` | non-golden green; ~20 golden tests fail locally on macOS by the platform guard (linux-baselined). CI (ubuntu) is green — main's Flutter CI passed on the PR #13 merge. |
+| `flutter test integration_test` | device-only; not runnable headless on macOS. Interaction flows live in `test/integration/` (run under `flutter test`). |
+| `flutter build web --release` | success; `build/web/main.dart.js` = 4,416,174 B |
+| image bytes / home render | not automatable from this environment (needs Chrome DevTools Network against `flutter run -d chrome`); §5.4 CDN curl used as the byte-size evidence instead. |
+| `go test ./...` | all pass (0 FAIL) |
+| containers | compose lives under `deploy/`; not running locally (unset env warnings) |
+
+_Remaining §8 subsections appended at session end._
