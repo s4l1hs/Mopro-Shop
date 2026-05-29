@@ -10,10 +10,12 @@ import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/catalog/providers/product_detail_provider.dart';
 import 'package:mopro/features/catalog/providers/product_reviews_provider.dart';
 import 'package:mopro/features/catalog/providers/products_rail_provider.dart';
+import 'package:mopro/features/catalog/widgets/pdp/pdp_price_block.dart';
+import 'package:mopro/features/catalog/widgets/pdp/pdp_sticky_cta.dart';
+import 'package:mopro/features/catalog/widgets/pdp/pdp_variant_selector.dart';
 import 'package:mopro/features/catalog/widgets/pdp_image_gallery.dart';
 import 'package:mopro/features/catalog/widgets/product_card.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
-import 'package:mopro/utils/money.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 class ProductDetailScreen extends ConsumerWidget {
@@ -154,7 +156,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
           ],
         ),
       ),
-      bottomNavigationBar: _StickyBuyBar(
+      bottomNavigationBar: PdpStickyCta(
         selectedVariant: _selectedVariant,
         isMutating: isMutating,
         onAddToCart: () => _addToCart(context),
@@ -224,13 +226,7 @@ class _BuyBox extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (selectedVariant != null) ...[
-            Text(
-              MoneyUtils.formatMinor(selectedVariant!.priceMinor),
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.primary,
-              ),
-            ),
+            PdpPriceBlock(priceMinor: selectedVariant!.priceMinor),
             const SizedBox(height: 6),
             _StockPill(stock: selectedVariant!.stock),
           ],
@@ -238,34 +234,15 @@ class _BuyBox extends StatelessWidget {
           _CashbackCard(preview: product.cashbackPreview),
           if (product.variants.length > 1) ...[
             const SizedBox(height: 16),
-            Text(
-              'product.select_variant'.tr(),
-              style: theme.textTheme.titleSmall,
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: product.variants.map((v) {
-                final selected = selectedVariant?.id == v.id;
-                return FilterChip(
-                  label: Text(_variantLabel(v)),
-                  selected: selected,
-                  onSelected: (_) => onVariantChanged(v),
-                );
-              }).toList(),
+            PdpVariantSelector(
+              variants: product.variants,
+              selected: selectedVariant,
+              onChanged: onVariantChanged,
             ),
           ],
         ],
       ),
     );
-  }
-
-  String _variantLabel(Variant v) {
-    final parts = <String>[];
-    if (v.color != null && v.color!.isNotEmpty) parts.add(v.color!);
-    if (v.size != null && v.size!.isNotEmpty) parts.add(v.size!);
-    return parts.isEmpty ? v.sku : parts.join(' / ');
   }
 }
 
@@ -514,63 +491,6 @@ class _StubTab extends StatelessWidget {
             .textTheme
             .bodyMedium
             ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-      ),
-    );
-  }
-}
-
-// ── Sticky buy bar ────────────────────────────────────────────────────────────
-
-class _StickyBuyBar extends StatelessWidget {
-  const _StickyBuyBar({
-    required this.selectedVariant,
-    required this.isMutating,
-    required this.onAddToCart,
-  });
-
-  final Variant? selectedVariant;
-  final bool isMutating;
-  final VoidCallback onAddToCart;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: Row(
-          children: [
-            if (selectedVariant != null) ...[
-              Text(
-                MoneyUtils.formatMinor(selectedVariant!.priceMinor),
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 12),
-            ],
-            Expanded(
-              child: FilledButton(
-                onPressed:
-                    selectedVariant != null && !isMutating ? onAddToCart : null,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                ),
-                child: isMutating
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text('product.add_to_cart'.tr()),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

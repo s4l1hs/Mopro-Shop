@@ -179,6 +179,8 @@
     "add_to_cart": "Sepete Ekle",
     "buy_now": "Hemen Al",
     "sold_by": "{seller} tarafından satılmaktadır",
+    "go_to_store": "Mağazaya git",
+    "lowest_30d": "Son 30 günün en düşük fiyatı: {price}",
     "stock_left": "Son {count} ürün",
     "select_variant": "Seçenek",
     "added_to_cart": "Sepete eklendi",
