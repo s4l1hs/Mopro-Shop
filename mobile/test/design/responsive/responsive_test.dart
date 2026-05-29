@@ -34,13 +34,15 @@ void main() {
         child: Builder(builder: (ctx) {
           onBuild(ctx);
           return const SizedBox.shrink();
-        }),
+        },),
       );
     }
 
     testWidgets('mobile-only value used at all breakpoints', (tester) async {
       const v = AdaptiveValue<int>(mobile: 1);
-      late int m, t, d;
+      late int m;
+      late int t;
+      late int d;
       await tester.pumpWidget(wrap(const Size(375, 800), (c) => m = v.resolve(c)));
       await tester.pumpWidget(wrap(const Size(768, 800), (c) => t = v.resolve(c)));
       await tester.pumpWidget(wrap(const Size(1440, 800), (c) => d = v.resolve(c)));
@@ -52,7 +54,9 @@ void main() {
     testWidgets('tablet overrides mobile; desktop falls through to tablet',
         (tester) async {
       const v = AdaptiveValue<int>(mobile: 1, tablet: 2);
-      late int m, t, d;
+      late int m;
+      late int t;
+      late int d;
       await tester.pumpWidget(wrap(const Size(375, 800), (c) => m = v.resolve(c)));
       await tester.pumpWidget(wrap(const Size(768, 800), (c) => t = v.resolve(c)));
       await tester.pumpWidget(wrap(const Size(1440, 800), (c) => d = v.resolve(c)));
@@ -64,7 +68,9 @@ void main() {
     testWidgets('desktop overrides; tablet null falls back to mobile',
         (tester) async {
       const v = AdaptiveValue<int>(mobile: 1, desktop: 3);
-      late int m, t, d;
+      late int m;
+      late int t;
+      late int d;
       await tester.pumpWidget(wrap(const Size(375, 800), (c) => m = v.resolve(c)));
       await tester.pumpWidget(wrap(const Size(768, 800), (c) => t = v.resolve(c)));
       await tester.pumpWidget(wrap(const Size(1440, 800), (c) => d = v.resolve(c)));
@@ -75,7 +81,9 @@ void main() {
 
     testWidgets('all three set — each breakpoint picks its own', (tester) async {
       const v = AdaptiveValue<int>(mobile: 1, tablet: 2, desktop: 3);
-      late int m, t, d;
+      late int m;
+      late int t;
+      late int d;
       await tester.pumpWidget(wrap(const Size(375, 800), (c) => m = v.resolve(c)));
       await tester.pumpWidget(wrap(const Size(768, 800), (c) => t = v.resolve(c)));
       await tester.pumpWidget(wrap(const Size(1440, 800), (c) => d = v.resolve(c)));
@@ -89,7 +97,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(body: SizedBox.expand(child: child)),
-      ));
+      ),);
     }
 
     testWidgets('mobile size selects mobile branch', (tester) async {
@@ -176,7 +184,7 @@ void main() {
         ),
       );
       expect(find.byKey(const Key('im')), findsOneWidget,
-          reason: 'inner panel at 400px should resolve mobile');
+          reason: 'inner panel at 400px should resolve mobile',);
     });
   });
 
@@ -190,15 +198,15 @@ void main() {
             body: CenteredContentColumn(
               child: Builder(builder: (ctx) {
                 // Walk up to find the Padding wrapper.
-                captured = (ctx
-                        .findAncestorWidgetOfExactType<Padding>())!
+                captured = ctx
+                        .findAncestorWidgetOfExactType<Padding>()!
                     .padding as EdgeInsets;
                 return const SizedBox.shrink();
-              }),
+              },),
             ),
           ),
         ),
-      ));
+      ),);
       return captured;
     }
 
@@ -227,7 +235,7 @@ void main() {
             return const SizedBox(width: 100, height: 100);
           },
         ),
-      ));
+      ),);
       expect(seenHovering, isFalse);
     });
 
@@ -238,13 +246,12 @@ void main() {
       await tester.pumpWidget(MaterialApp(
         home: HoverRegion(
           focusNode: node,
-          openDelay: Duration.zero,
           builder: (ctx, hovering) {
             lastHover = hovering;
             return const SizedBox(width: 100, height: 100);
           },
         ),
-      ));
+      ),);
       node.requestFocus();
       await tester.pump();
       expect(lastHover, isTrue);

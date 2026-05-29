@@ -360,8 +360,8 @@ class _Tile extends StatelessWidget {
     this.iconColor,
     this.labelColor,
     this.showChevron = true,
-    this.trailing,
-  });
+    // ignore: avoid_field_initializers_in_const_classes — fixed null for this variant
+  }) : trailing = null;
 
   final IconData icon;
   final String label;

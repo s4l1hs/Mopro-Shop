@@ -118,6 +118,15 @@ class MockTokenStorage extends _i1.Mock implements _i8.TokenStorage {
       ) as _i9.Future<String?>);
 
   @override
+  _i9.Future<DateTime?> readAccessExpiresAt() => (super.noSuchMethod(
+        Invocation.method(
+          #readAccessExpiresAt,
+          [],
+        ),
+        returnValue: _i9.Future<DateTime?>.value(),
+      ) as _i9.Future<DateTime?>);
+
+  @override
   _i9.Future<void> save({
     required String? accessToken,
     required String? refreshToken,

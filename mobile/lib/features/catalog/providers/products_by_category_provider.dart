@@ -44,8 +44,6 @@ final productsByCategoryProvider = NotifierProviderFamily<
 
 class ProductsByCategoryNotifier
     extends FamilyNotifier<ProductsState, int> {
-  static const _perPage = 20;
-
   @override
   ProductsState build(int arg) {
     _load(1, replace: true);

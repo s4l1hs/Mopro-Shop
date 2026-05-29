@@ -54,11 +54,13 @@ class SortSheet extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           ..._sortOptions.map(
+            // TODO(4e): migrate to RadioGroup (Radio API deprecated Flutter 3.32)
             (opt) => RadioListTile<String>(
               title: Text(opt.$2.tr()),
               value: opt.$1,
-              groupValue: current,
-              onChanged: (v) => Navigator.of(context).pop(v),
+              groupValue: current, // ignore: deprecated_member_use
+              onChanged: (v) => // ignore: deprecated_member_use
+                  Navigator.of(context).pop(v),
             ),
           ),
           const SizedBox(height: 8),

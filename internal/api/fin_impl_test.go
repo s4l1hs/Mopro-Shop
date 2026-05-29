@@ -80,10 +80,19 @@ type stubCashbackRepo struct {
 func (r *stubCashbackRepo) InsertPlanIfAbsent(_ context.Context, _ pgx.Tx, _ cashback.Plan) (cashback.Plan, bool, error) {
 	panic("not expected in unit test")
 }
-func (r *stubCashbackRepo) ListDuePlans(_ context.Context, _ time.Time, _ int) ([]cashback.Plan, error) {
+func (r *stubCashbackRepo) ListDuePlans(_ context.Context, _ time.Time, _ int, _ int) ([]cashback.Plan, error) {
 	panic("not expected in unit test")
 }
-func (r *stubCashbackRepo) IncrPaymentsMade(_ context.Context, _ pgx.Tx, _ int64) (int, bool, error) {
+func (r *stubCashbackRepo) PaymentExistsForPeriod(_ context.Context, _ int64, _ int) (bool, error) {
+	panic("not expected in unit test")
+}
+func (r *stubCashbackRepo) ClaimPaymentPeriod(_ context.Context, _ pgx.Tx, _ cashback.ClaimPaymentInput) (int64, bool, error) {
+	panic("not expected in unit test")
+}
+func (r *stubCashbackRepo) MarkPaymentPaid(_ context.Context, _ pgx.Tx, _ int64, _ int64, _ time.Time) error {
+	panic("not expected in unit test")
+}
+func (r *stubCashbackRepo) RefreshPaymentsMadeCache(_ context.Context, _ pgx.Tx, _ int64) (int, bool, error) {
 	panic("not expected in unit test")
 }
 func (r *stubCashbackRepo) WithTx(_ context.Context, _ pgx.TxIsoLevel, _ func(pgx.Tx) error) error {

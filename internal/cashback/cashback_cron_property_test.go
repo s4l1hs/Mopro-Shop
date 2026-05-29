@@ -238,26 +238,12 @@ func TestCronProperty_MonotonicBalance(t *testing.T) {
 // ── Property 4: concurrent PayMonthlyInstallments → exactly 1 payment per plan ──
 
 func TestCronProperty_ConcurrentIdempotency(t *testing.T) {
-	// TODO(cashback): re-enable after the v6 perpetual concurrency contract
-	// for PayMonthlyInstallments is verified. Skipping with explicit reason
-	// (Session 4d) — when 4+ goroutines call PayMonthlyInstallments
-	// concurrently for the same plan + asOf, payments_made on the plan ends
-	// up > 1 (observed 2 and 4 in repeated runs).
-	//
-	// Two possible root causes — both worth investigating in a focused PR:
-	//   1. Race in PayMonthlyInstallments around the increment-or-insert of
-	//      payments_made; UNIQUE(plan_id, period_yyyymm) on
-	//      cashback_schema.payments should serialize concurrent inserts but
-	//      the plan-row counter may not be updated atomically with it.
-	//   2. Test design assumption stale for v6 perpetual: the cron may now
-	//      treat each call as legitimately separate idempotent attempts and
-	//      the counter semantics may have shifted.
-	//
-	// The other 3 cron property tests (D=C invariant, sequential
-	// idempotency, monotonic balance) pass cleanly — this is an isolated
-	// concurrency-path concern, not a general cashback regression.
-	t.Skip("Session 4d: pre-existing concurrency invariant failure; see TODO above")
-
+	// Verifies the storage-layer idempotency guard added in this PR:
+	// UNIQUE(plan_id, period_yyyymm) on cashback_schema.payments serializes
+	// concurrent cron racers, and payments_made (now a COUNT-derived cache
+	// refreshed from the payments table) tracks reality precisely — including
+	// under N concurrent PayMonthlyInstallments calls for the same plan and
+	// run period.
 	pool := propCronPool(t)
 	ctx := context.Background()
 
@@ -307,6 +293,72 @@ func TestCronProperty_ConcurrentIdempotency(t *testing.T) {
 			return true
 		},
 		gen.UInt8Range(2, 8),
+	))
+
+	properties.TestingRun(t, gopter.ConsoleReporter(false))
+}
+
+// ── Property 5: payments_made cache stays in sync with COUNT(payments WHERE paid) ──
+// Verifies the post-fix invariant that plans.payments_made is a faithful
+// denormalized cache of the payments table across N consecutive monthly cron
+// runs. Catches regressions in RefreshPaymentsMadeCache and in any code that
+// might write payments_made without refreshing it from the source of truth.
+
+func TestCronProperty_PaymentsMadeMatchesCount(t *testing.T) {
+	pool := propCronPool(t)
+	ctx := context.Background()
+
+	properties := gopter.NewProperties(func() *gopter.TestParameters {
+		p := gopter.DefaultTestParameters()
+		p.MinSuccessfulTests = 50
+		return p
+	}())
+
+	properties.Property("plans.payments_made == count(payments WHERE paid) after N monthly runs", prop.ForAll(
+		func(months uint8) bool {
+			if months < 1 {
+				months = 1
+			}
+			if months > 6 {
+				months = 6
+			}
+
+			userID := propUniqueID()
+			startDate := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+			planID := seedPropPlan(t, pool, userID, "TRY_COIN", startDate)
+
+			for i := 0; i < int(months); i++ {
+				month := time.Month(i + 1)
+				asOf := time.Date(2026, month, 28, 23, 59, 0, 0, time.UTC)
+				svc := propCronSvc(pool)
+				if _, err := svc.PayMonthlyInstallments(ctx, asOf); err != nil {
+					t.Logf("PayMonthlyInstallments month=%d: %v", i+1, err)
+					return false
+				}
+			}
+
+			var madeCache int
+			var paidCount int
+			if err := pool.QueryRow(ctx,
+				`SELECT payments_made FROM cashback_schema.plans WHERE id=$1`,
+				planID).Scan(&madeCache); err != nil {
+				t.Logf("read payments_made cache: %v", err)
+				return false
+			}
+			if err := pool.QueryRow(ctx,
+				`SELECT COUNT(*) FROM cashback_schema.payments WHERE plan_id=$1 AND status='paid'`,
+				planID).Scan(&paidCount); err != nil {
+				t.Logf("read paid count: %v", err)
+				return false
+			}
+			if madeCache != paidCount {
+				t.Logf("cache divergence: plan=%d payments_made=%d count(paid)=%d",
+					planID, madeCache, paidCount)
+				return false
+			}
+			return true
+		},
+		gen.UInt8Range(1, 6),
 	))
 
 	properties.TestingRun(t, gopter.ConsoleReporter(false))

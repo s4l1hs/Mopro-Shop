@@ -116,6 +116,7 @@ class AddressFormController
       state = state.copyWith(fullAddress: v, clearError: true);
   void setPostalCode(String v) =>
       state = state.copyWith(postalCode: v, clearError: true);
+  // ignore: avoid_positional_boolean_parameters — simple setter mirrors copyWith
   void setIsDefault(bool v) => state = state.copyWith(isDefault: v);
 
   Future<Address?> submit() async {

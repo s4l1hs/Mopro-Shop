@@ -31,8 +31,6 @@ final filteredProductsProvider =
 
 class FilteredProductsNotifier
     extends FamilyNotifier<ProductsState, ProductFilter> {
-  static const _perPage = 20;
-
   @override
   ProductsState build(ProductFilter arg) {
     _load(1, replace: true);

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 @Deprecated('Use SipayWebViewScreen instead')
 class Checkout3dsWebviewScreen extends StatelessWidget {
+  @Deprecated('Use SipayWebViewScreen instead')
   const Checkout3dsWebviewScreen({super.key});
 
   @override

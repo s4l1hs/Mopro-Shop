@@ -26,7 +26,14 @@ type Plan struct {
 	TotalMonths            int    // frozen at creation via ComputePlanTerms
 	MonthlyAmountMinor     int64  // regular installment; paid in months 1..TotalMonths-1
 	MonthlyAmountLastMinor int64  // balloon payment in month TotalMonths; >= MonthlyAmountMinor
-	PaymentsMade           int    // monotonic counter; incremented per paid installment
+	// PaymentsMade is a DENORMALIZED CACHE of
+	//   COUNT(*) FROM cashback_schema.payments WHERE plan_id=Plan.ID AND status='paid'.
+	// The payments table is the source of truth (UNIQUE(plan_id, period_yyyymm) is the
+	// cron's idempotency guard). The cache is refreshed atomically by
+	// RefreshPaymentsMadeCache inside the SERIALIZABLE tx that flips each payment
+	// row to 'paid'. Do NOT treat as authoritative for audit / reconcile /
+	// partial-refund flows — count the payments table directly.
+	PaymentsMade int
 	// ReferenceInterestRateBps is a v6 legacy field kept for backward compat with the HTTP API;
 	// always 0 for v8 plans. Do not use in business logic.
 	ReferenceInterestRateBps int
