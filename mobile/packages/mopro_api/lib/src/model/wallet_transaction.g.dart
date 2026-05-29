@@ -58,9 +58,10 @@ Map<String, dynamic> _$WalletTransactionToJson(WalletTransaction instance) =>
       'type': _$WalletTransactionTypeEnumEnumMap[instance.type]!,
       'amount_minor': instance.amountMinor,
       'currency': instance.currency,
-      if (instance.description != null) 'description': instance.description,
-      if (instance.referenceId != null) 'reference_id': instance.referenceId,
-      if (instance.referenceType != null) 'reference_type': _$WalletTransactionReferenceTypeEnumEnumMap[instance.referenceType],
+      'description': ?instance.description,
+      'reference_id': ?instance.referenceId,
+      'reference_type':
+          ?_$WalletTransactionReferenceTypeEnumEnumMap[instance.referenceType],
       'occurred_at': instance.occurredAt.toIso8601String(),
     };
 

@@ -73,9 +73,9 @@ Map<String, dynamic> _$OrderToJson(Order instance) => <String, dynamic>{
   'items': instance.items.map((e) => e.toJson()).toList(),
   'total_minor': instance.totalMinor,
   'currency': instance.currency,
-  if (_$OrderCargoOptionEnumEnumMap[instance.cargoOption] != null) 'cargo_option': _$OrderCargoOptionEnumEnumMap[instance.cargoOption],
-  if (instance.cashbackUnlockAt?.toIso8601String() != null) 'cashback_unlock_at': instance.cashbackUnlockAt?.toIso8601String(),
-  if (instance.deliveredAt?.toIso8601String() != null) 'delivered_at': instance.deliveredAt?.toIso8601String(),
+  'cargo_option': ?_$OrderCargoOptionEnumEnumMap[instance.cargoOption],
+  'cashback_unlock_at': ?instance.cashbackUnlockAt?.toIso8601String(),
+  'delivered_at': ?instance.deliveredAt?.toIso8601String(),
   'created_at': instance.createdAt.toIso8601String(),
 };
 

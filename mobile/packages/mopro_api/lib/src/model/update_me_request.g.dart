@@ -24,8 +24,8 @@ UpdateMeRequest _$UpdateMeRequestFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$UpdateMeRequestToJson(UpdateMeRequest instance) =>
     <String, dynamic>{
-      if (instance.nameFirst != null) 'name_first': instance.nameFirst,
-      if (instance.nameLast != null) 'name_last': instance.nameLast,
-      if (instance.email != null) 'email': instance.email,
-      if (instance.locale != null) 'locale': instance.locale,
+      'name_first': ?instance.nameFirst,
+      'name_last': ?instance.nameLast,
+      'email': ?instance.email,
+      'locale': ?instance.locale,
     };

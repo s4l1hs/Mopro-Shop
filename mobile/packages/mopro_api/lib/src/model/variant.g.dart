@@ -46,8 +46,8 @@ Variant _$VariantFromJson(Map<String, dynamic> json) => $checkedCreate(
 Map<String, dynamic> _$VariantToJson(Variant instance) => <String, dynamic>{
   'id': instance.id,
   'sku': instance.sku,
-  if (instance.color != null) 'color': instance.color,
-  if (instance.size != null) 'size': instance.size,
+  'color': ?instance.color,
+  'size': ?instance.size,
   'price_minor': instance.priceMinor,
   'price_currency': instance.priceCurrency,
   'stock': instance.stock,

@@ -124,12 +124,12 @@ paths:
                 purpose:
                   type: string
                   enum: [login, step_up]
-                  default: login
                   description: |
-                    OTP purpose. Use `login` for initial authentication (default).
+                    OTP purpose. Omit (or send `login`) for initial authentication —
+                    the server treats an absent value as `login`.
                     Use `step_up` only if you need a step-up OTP outside the authenticated
                     step-up flow (`POST /auth/step-up/request`). Most clients should omit
-                    this field and rely on the default.
+                    this field and rely on the server's `login` default.
       responses:
         '204':
           description: OTP dispatched
@@ -169,8 +169,7 @@ paths:
                 purpose:
                   type: string
                   enum: [login, step_up]
-                  default: login
-                  description: "Must match the purpose used in the corresponding /otp/request call. Defaults to `login`."
+                  description: "Must match the purpose used in the corresponding /otp/request call. Omit (or send `login`) for login — the server treats an absent value as `login`."
       responses:
         '200':
           description: Token pair issued

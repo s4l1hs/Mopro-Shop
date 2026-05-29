@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'package:mopro_api/src/deserialize.dart';
 import 'package:dio/dio.dart';
 
+import 'package:mopro_api/src/model/change_password_request.dart';
 import 'package:mopro_api/src/model/delete_me_request.dart';
 import 'package:mopro_api/src/model/device.dart';
 import 'package:mopro_api/src/model/error_envelope.dart';
@@ -21,6 +22,83 @@ class MeApi {
   final Dio _dio;
 
   const MeApi(this._dio);
+
+  /// Change the authenticated user&#39;s password
+  /// Requires the current password in the body for verification. On success, all existing refresh tokens for the user are revoked (forces re-login on every other device). Rate limited by IP. Returns 401 &#x60;invalid_credentials&#x60; if old_password does not match; 422 &#x60;weak_password&#x60; if new_password fails strength rules. 
+  ///
+  /// Parameters:
+  /// * [xIdempotencyKey] - UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation. 
+  /// * [changePasswordRequest] 
+  /// * [xTraceId] - Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future]
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<void>> changePassword({ 
+    required String xIdempotencyKey,
+    required ChangePasswordRequest changePasswordRequest,
+    String? xTraceId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/me/password';
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{
+        if (xTraceId != null) r'X-Trace-Id': xTraceId,
+        r'X-Idempotency-Key': xIdempotencyKey,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+        ],
+        ...?extra,
+      },
+      contentType: 'application/json',
+      validateStatus: validateStatus,
+    );
+
+    dynamic _bodyData;
+
+    try {
+_bodyData=jsonEncode(changePasswordRequest);
+    } catch(error, stackTrace) {
+      throw DioException(
+         requestOptions: _options.compose(
+          _dio.options,
+          _path,
+        ),
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    final _response = await _dio.request<Object>(
+      _path,
+      data: _bodyData,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    return _response;
+  }
 
   /// Soft-delete the authenticated user account (KVKK / GDPR)
   /// Requires step-up authentication (&#x60;stepUpAuth&#x60; security scheme). Account enters a 30-day grace period before permanent deletion. All active cashback plans are cancelled on confirmation. 

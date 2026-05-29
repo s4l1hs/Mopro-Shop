@@ -51,8 +51,8 @@ Map<String, dynamic> _$AddressToJson(Address instance) => <String, dynamic>{
   'phone': instance.phone,
   'city': instance.city,
   'district': instance.district,
-  if (instance.neighborhood != null) 'neighborhood': instance.neighborhood,
+  'neighborhood': ?instance.neighborhood,
   'full_address': instance.fullAddress,
-  if (instance.postalCode != null) 'postal_code': instance.postalCode,
+  'postal_code': ?instance.postalCode,
   'is_default': instance.isDefault,
 };

@@ -20,7 +20,7 @@ class RequestOtpRequest {
 
     required  this.phone,
 
-     this.purpose = RequestOtpRequestPurposeEnum.login,
+     this.purpose,
   });
 
       /// Turkish mobile number in E.164 format. Must start with +905.
@@ -36,9 +36,9 @@ class RequestOtpRequest {
 
 
 
-      /// OTP purpose. Use `login` for initial authentication (default). Use `step_up` only if you need a step-up OTP outside the authenticated step-up flow (`POST /auth/step-up/request`). Most clients should omit this field and rely on the default. 
+      /// OTP purpose. Omit (or send `login`) for initial authentication — the server treats an absent value as `login`. Use `step_up` only if you need a step-up OTP outside the authenticated step-up flow (`POST /auth/step-up/request`). Most clients should omit this field and rely on the server's `login` default. 
   @JsonKey(
-    defaultValue: 'login',
+    
     name: r'purpose',
     required: false,
     includeIfNull: false,
@@ -72,12 +72,12 @@ class RequestOtpRequest {
 
 }
 
-/// OTP purpose. Use `login` for initial authentication (default). Use `step_up` only if you need a step-up OTP outside the authenticated step-up flow (`POST /auth/step-up/request`). Most clients should omit this field and rely on the default. 
+/// OTP purpose. Omit (or send `login`) for initial authentication — the server treats an absent value as `login`. Use `step_up` only if you need a step-up OTP outside the authenticated step-up flow (`POST /auth/step-up/request`). Most clients should omit this field and rely on the server's `login` default. 
 enum RequestOtpRequestPurposeEnum {
-    /// OTP purpose. Use `login` for initial authentication (default). Use `step_up` only if you need a step-up OTP outside the authenticated step-up flow (`POST /auth/step-up/request`). Most clients should omit this field and rely on the default. 
+    /// OTP purpose. Omit (or send `login`) for initial authentication — the server treats an absent value as `login`. Use `step_up` only if you need a step-up OTP outside the authenticated step-up flow (`POST /auth/step-up/request`). Most clients should omit this field and rely on the server's `login` default. 
 @JsonValue(r'login')
 login(r'login'),
-    /// OTP purpose. Use `login` for initial authentication (default). Use `step_up` only if you need a step-up OTP outside the authenticated step-up flow (`POST /auth/step-up/request`). Most clients should omit this field and rely on the default. 
+    /// OTP purpose. Omit (or send `login`) for initial authentication — the server treats an absent value as `login`. Use `step_up` only if you need a step-up OTP outside the authenticated step-up flow (`POST /auth/step-up/request`). Most clients should omit this field and rely on the server's `login` default. 
 @JsonValue(r'step_up')
 stepUp(r'step_up');
 

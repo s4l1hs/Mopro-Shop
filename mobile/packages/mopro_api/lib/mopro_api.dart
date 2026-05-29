@@ -34,6 +34,7 @@ export 'package:mopro_api/src/model/cashback_plan.dart';
 export 'package:mopro_api/src/model/cashback_preview.dart';
 export 'package:mopro_api/src/model/category.dart';
 export 'package:mopro_api/src/model/category_commission.dart';
+export 'package:mopro_api/src/model/change_password_request.dart';
 export 'package:mopro_api/src/model/checkout_request.dart';
 export 'package:mopro_api/src/model/checkout_request_payment_method.dart';
 export 'package:mopro_api/src/model/checkout_response.dart';

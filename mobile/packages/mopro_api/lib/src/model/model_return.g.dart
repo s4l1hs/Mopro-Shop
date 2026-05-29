@@ -39,7 +39,7 @@ Map<String, dynamic> _$ModelReturnToJson(ModelReturn instance) =>
       'order_id': instance.orderId,
       'status': _$ModelReturnStatusEnumEnumMap[instance.status]!,
       'reason': instance.reason,
-      if (instance.description != null) 'description': instance.description,
+      'description': ?instance.description,
       'created_at': instance.createdAt.toIso8601String(),
     };
 

@@ -9,12 +9,59 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
+[**changePassword**](MeApi.md#changepassword) | **POST** /me/password | Change the authenticated user&#39;s password
 [**deleteMe**](MeApi.md#deleteme) | **DELETE** /me | Soft-delete the authenticated user account (KVKK / GDPR)
 [**getMe**](MeApi.md#getme) | **GET** /me | Get authenticated user profile
 [**registerDevice**](MeApi.md#registerdevice) | **POST** /me/devices | Register a device FCM token for push notifications
 [**unregisterDevice**](MeApi.md#unregisterdevice) | **DELETE** /me/devices/{id} | Remove a registered device (deregister push notifications)
 [**updateMe**](MeApi.md#updateme) | **PATCH** /me | Update user profile fields
 
+
+# **changePassword**
+> changePassword(xIdempotencyKey, changePasswordRequest, xTraceId)
+
+Change the authenticated user's password
+
+Requires the current password in the body for verification. On success, all existing refresh tokens for the user are revoked (forces re-login on every other device). Rate limited by IP. Returns 401 `invalid_credentials` if old_password does not match; 422 `weak_password` if new_password fails strength rules. 
+
+### Example
+```dart
+import 'package:mopro_api/api.dart';
+
+final api = MoproApi().getMeApi();
+final String xIdempotencyKey = 01926b7f-1234-7abc-8def-0123456789ab; // String | UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation. 
+final ChangePasswordRequest changePasswordRequest = ; // ChangePasswordRequest | 
+final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+
+try {
+    api.changePassword(xIdempotencyKey, changePasswordRequest, xTraceId);
+} catch on DioException (e) {
+    print('Exception when calling MeApi->changePassword: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **xIdempotencyKey** | **String**| UUIDv7 generated client-side. Server caches the response for 24 hours keyed on this value. Duplicate requests within that window return the cached response without re-executing the operation.  | 
+ **changePasswordRequest** | [**ChangePasswordRequest**](ChangePasswordRequest.md)|  | 
+ **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **deleteMe**
 > deleteMe(xIdempotencyKey, deleteMeRequest, xTraceId)

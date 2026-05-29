@@ -21,6 +21,6 @@ Recommendation _$RecommendationFromJson(Map<String, dynamic> json) =>
 
 Map<String, dynamic> _$RecommendationToJson(Recommendation instance) =>
     <String, dynamic>{
-      if (instance.score != null) 'score': instance.score,
+      'score': ?instance.score,
       'product': instance.product.toJson(),
     };
