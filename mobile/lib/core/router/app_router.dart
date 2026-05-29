@@ -16,7 +16,9 @@ import 'package:mopro/features/auth/profile_screen.dart';
 import 'package:mopro/features/auth/sign_in_screen.dart';
 import 'package:mopro/features/auth/sign_up_screen.dart';
 import 'package:mopro/features/auth/splash_screen.dart';
+import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/cart/presentation/cart_screen.dart';
+import 'package:mopro/features/not_found/not_found_screen.dart';
 import 'package:mopro/features/catalog/screens/category_products_screen.dart';
 import 'package:mopro/features/catalog/screens/category_screen.dart';
 import 'package:mopro/features/catalog/screens/home_screen.dart';
@@ -34,6 +36,15 @@ import 'package:mopro/features/wallet/plan_detail_screen.dart';
 import 'package:mopro/features/wallet/wallet_screen.dart';
 import 'package:mopro/shell/app_shell.dart';
 import 'package:mopro_api/mopro_api.dart';
+
+/// Wraps a screen in [Title] so the browser tab shows "Mopro · <page>".
+/// Per-route deep-link titles (e.g. "Mopro · Ürün #123") deferred to
+/// Session 4 — those need state.params and aren't always const.
+Widget _titled(String page, Widget child) => Title(
+      title: 'Mopro · $page',
+      color: MoproTokens.primaryLight,
+      child: child,
+    );
 
 /// Pure function exposing the auth-aware redirect rules.
 /// Returns the redirect target, or null if the user may stay at [location].
@@ -85,6 +96,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     refreshListenable: _AuthStateListenable(ref),
+    errorBuilder: (context, state) =>
+        NotFoundScreen(attemptedPath: state.uri.toString()),
     redirect: (context, state) {
       final authAsync = ref.read(authNotifierProvider);
       if (authAsync.isLoading) return null;
@@ -288,7 +301,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/',
-                builder: (_, __) => const CatalogHomeScreen(),
+                builder: (_, __) =>
+                    _titled('Ana Sayfa', const CatalogHomeScreen()),
               ),
             ],
           ),
@@ -297,7 +311,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/categories',
-                builder: (_, __) => const CategoryScreen(),
+                builder: (_, __) =>
+                    _titled('Kategoriler', const CategoryScreen()),
               ),
             ],
           ),
@@ -306,7 +321,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/favorites',
-                builder: (_, __) => const FavoritesScreen(),
+                builder: (_, __) =>
+                    _titled('Favorilerim', const FavoritesScreen()),
               ),
             ],
           ),
@@ -315,7 +331,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/cart',
-                builder: (_, __) => const CartScreen(),
+                builder: (_, __) =>
+                    _titled('Sepetim', const CartScreen()),
               ),
             ],
           ),
@@ -324,7 +341,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/account',
-                builder: (_, __) => const AccountScreen(),
+                builder: (_, __) =>
+                    _titled('Hesabım', const AccountScreen()),
               ),
             ],
           ),

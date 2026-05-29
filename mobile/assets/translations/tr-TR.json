@@ -405,5 +405,10 @@
     "rate_limited": "Çok fazla istek gönderildi. Lütfen bekleyin.",
     "system_read_only": "Sistem şu anda bakımdadır. Lütfen daha sonra tekrar deneyin.",
     "validation": "Lütfen girdiğiniz bilgileri kontrol edin."
+  },
+  "errors": {
+    "not_found_title": "Aradığınız sayfayı bulamadık",
+    "not_found_subtitle": "Sayfa silinmiş, taşınmış veya hiç var olmamış olabilir.",
+    "not_found_cta": "Ana sayfaya dön"
   }
 }
