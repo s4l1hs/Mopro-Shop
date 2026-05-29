@@ -1476,6 +1476,7 @@ Per §3.2, the PDP buy-box pieces and sticky CTA are now standalone widgets unde
 | `PdpVariantSelector` | `widgets/pdp/pdp_variant_selector.dart` | ″ |
 | `PdpSellerCard` | `widgets/pdp/pdp_seller_card.dart` | ″ |
 | `PdpStickyCta` | `widgets/pdp/pdp_sticky_cta.dart` | ″ |
+| `PdpImagePager` (+ §3.3 hover-zoom) | `widgets/pdp/pdp_image_pager.dart` | `pdp_image_pager_test.dart` |
 
 **Contract adapted to the real generated model** (the spec's contracts assume
 types the API doesn't expose): `Variant` is flat (color/size/sku), so
@@ -1484,8 +1485,20 @@ types the API doesn't expose): `Variant` is flat (color/size/sku), so
 `PdpPriceBlock` accepts optional `originalPriceMinor`/`lowestIn30DaysMinor`
 (strikethrough + %-pill + "lowest 30d" hint) for forward use, both null today.
 The mobile PDP composition is output-identical (no golden/test regression).
-`PdpImagePager` + hover-zoom (§3.3) and the two-column layout (§3.1/§3.4) remain
-carried (they introduce goldens needing a Linux re-baseline).
+
+**Hover-zoom (§3.3) — implemented in `PdpImagePager`, mouse-only.** Gated by
+`enableHoverZoom` (the screen sets it only at >=1024 AND
+`PointerKindObserver.lastKind == mouse`). **Deviation, documented per §12:** the
+spec's separate 480dp preview pane to the right would overflow into / collide
+with the buy-box column and routing it through a top-level Overlay is brittle, so
+the lens zooms **in place** (`Transform.scale` about the cursor, clipped) — same
+magnification, no collision. Tested via a mouse gesture (lens appears) vs. the
+disabled case (no lens).
+
+**Carried:** only the two-column **screen composition** (§3.1/§3.4) that wires
+`PdpImagePager` into a sticky gallery column + the desktop buy-box (brand/title/
+rating/price/variants/seller/quantity/CTAs/trust badges) — it adds PDP goldens at
+1024/1440 needing a Linux re-baseline.
 
 New locale keys: `product.go_to_store`, `product.lowest_30d` (tr-TR + en-US;
 de-DE/ar-AE lack the `product` block and fall back to tr-TR).
