@@ -8,38 +8,46 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/mopro/platform/internal/commission"
 	"github.com/mopro/platform/internal/ledger"
 	"github.com/mopro/platform/pkg/metrics"
 )
 
 type captureService struct {
-	repo   Repository
-	wallet WalletPoster
-	log    *slog.Logger
-	biz    *metrics.BusinessMetrics // nil disables business KPI counters
+	repo     Repository
+	recorder commission.CaptureRecorder
+	wallet   WalletPoster
+	log      *slog.Logger
+	biz      *metrics.BusinessMetrics // nil disables business KPI counters
 }
 
 // NewService constructs a Service.
-// wallet is satisfied by wallet.Service (injected from fin-svc/main.go).
-// biz is optional (nil disables business KPI metrics).
-func NewService(repo Repository, wallet WalletPoster, log *slog.Logger, biz *metrics.BusinessMetrics) Service {
+//
+// `recorder` is the commission-owned seam for persisting capture_postings
+// audit rows — orderledger no longer reaches into commission_schema
+// directly. wallet is satisfied by wallet.Service (injected from
+// fin-svc/main.go). biz is optional (nil disables business KPI metrics).
+func NewService(repo Repository, recorder commission.CaptureRecorder, wallet WalletPoster, log *slog.Logger, biz *metrics.BusinessMetrics) Service {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &captureService{repo: repo, wallet: wallet, log: log, biz: biz}
+	return &captureService{repo: repo, recorder: recorder, wallet: wallet, log: log, biz: biz}
 }
 
 // PostCapture posts the 4-or-5-entry balanced ledger transaction for a PSP
-// capture and writes the commission_schema.capture_postings audit row
-// atomically in a SERIALIZABLE transaction.
+// capture and writes the capture_postings audit row (owned by the
+// commission package via commission.CaptureRecorder) atomically in a
+// SERIALIZABLE transaction.
 //
 // Idempotency layers:
-//  1. Pre-check: FindPostingByOrderID returns early if the audit row exists.
-//  2. UNIQUE(order_id) on capture_postings: ErrAlreadyPosted on concurrent retry.
+//  1. Pre-check: recorder.FindCapturePostingByOrderID returns early if the
+//     audit row exists.
+//  2. UNIQUE(order_id) on capture_postings: commission.ErrAlreadyPosted on
+//     concurrent retry.
 //  3. wallet.PostInTx idempotency key: UNIQUE transactions.idempotency_key.
 func (s *captureService) PostCapture(ctx context.Context, ev OrderPaidEvent) error { //nolint:gocyclo // double-entry capture with idempotency; complexity is inherent
 	// Fast idempotency check before starting an expensive SERIALIZABLE tx.
-	existing, err := s.repo.FindPostingByOrderID(ctx, ev.OrderID)
+	existing, err := s.recorder.FindCapturePostingByOrderID(ctx, ev.OrderID)
 	if err != nil {
 		return fmt.Errorf("orderledger: idempotency check order=%d: %w", ev.OrderID, err)
 	}
@@ -137,7 +145,7 @@ func (s *captureService) PostCapture(ctx context.Context, ev OrderPaidEvent) err
 			return fmt.Errorf("orderledger: PostInTx order=%d: %w", ev.OrderID, innerErr)
 		}
 
-		posting := CapturePosting{
+		posting := commission.CapturePosting{
 			OrderID:         ev.OrderID,
 			TransactionID:   txnID,
 			IdempotencyKey:  idemKey,
@@ -149,8 +157,8 @@ func (s *captureService) PostCapture(ctx context.Context, ev OrderPaidEvent) err
 			Currency:        ev.Currency,
 			Market:          ev.Market,
 		}
-		if insertErr := s.repo.InsertPosting(ctx, tx, posting); insertErr != nil {
-			if errors.Is(insertErr, ErrAlreadyPosted) {
+		if insertErr := s.recorder.InsertCapturePosting(ctx, tx, posting); insertErr != nil {
+			if errors.Is(insertErr, commission.ErrAlreadyPosted) {
 				// Concurrent retry committed before us — the ledger tx above also
 				// hit its idempotency guard, so returning nil is safe.
 				return nil

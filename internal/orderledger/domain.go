@@ -30,6 +30,12 @@ type OrderPaidEvent struct {
 
 // CaptureInputs is the normalized, aggregated input to Compute().
 // Derived from OrderPaidEvent by summing item-level frozen snapshots.
+//
+// The CommissionMinor / KdvMinor / SellerNetMinor / ShippingMinor fields
+// flow into commission.CapturePosting via the commission.CaptureRecorder
+// seam — none of these are recomputed from live commission rates. The
+// snapshot story stays on the input side; orderledger is pure persistence
+// orchestration.
 type CaptureInputs struct {
 	OrderID         int64
 	SellerID        int64
@@ -57,20 +63,7 @@ type CaptureEntries struct {
 	Lines []LedgerLine
 }
 
-// CapturePosting is the audit row in commission_schema.capture_postings.
-// One row per order; UNIQUE(order_id) enforces idempotency.
-type CapturePosting struct {
-	ID              int64
-	OrderID         int64
-	TransactionID   int64
-	IdempotencyKey  string
-	GrossMinor      int64
-	SellerNetMinor  int64
-	CommissionMinor int64
-	KdvMinor        int64
-	ShippingMinor   int64
-	Currency        string
-	Market          string
-	Status          string // 'posted'
-	CreatedAt       time.Time
-}
+// The CapturePosting audit-row struct moved to internal/commission as part
+// of the commission-owns-capture-postings refactor. orderledger.Service
+// now persists postings through the commission.CaptureRecorder seam;
+// callers wanting the struct should import commission.CapturePosting.

@@ -48,7 +48,7 @@ func propCronSvc(pool *pgxpool.Pool) cashback.Service {
 	walletRepo := wallet.NewRepository(pool)
 	walletOutbox := outbox.NewRepository("wallet_schema.outbox")
 	walletSvc := wallet.NewService(walletRepo, walletOutbox, slog.Default())
-	return cashback.NewService(repo, ob, nil, "TRY_COIN", walletSvc, slog.Default())
+	return cashback.NewService(repo, ob, nil, "TRY_COIN", walletSvc, slog.Default(), nil)
 }
 
 // seedPropPlan inserts a v8 cashback plan for property tests.

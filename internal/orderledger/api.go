@@ -1,8 +1,13 @@
 // Package orderledger consumes ecom.order.paid.v1 and posts the balanced
 // ledger entry (DR psp_receivable / CR seller_payable + commission +
 // kdv_payable [+ shipping_payable]) to wallet_schema for each paid order.
-// One CapturePosting audit row per order is written atomically in the same
-// SERIALIZABLE transaction as the wallet PostInTx call.
+//
+// One commission.CapturePosting audit row per order is written atomically
+// in the same SERIALIZABLE transaction as the wallet PostInTx call. The
+// audit row is persisted through the commission.CaptureRecorder seam
+// (injected via NewService) — orderledger does not reach into
+// commission_schema directly. See internal/commission/capture_recorder.go
+// for the schema-owning implementation.
 package orderledger
 
 import (

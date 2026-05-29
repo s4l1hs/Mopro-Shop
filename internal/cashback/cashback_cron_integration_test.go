@@ -50,7 +50,7 @@ func newCronTestSvc(t *testing.T, pool *pgxpool.Pool) cashback.Service {
 	walletRepo := wallet.NewRepository(pool)
 	walletOutbox := outbox.NewRepository("wallet_schema.outbox")
 	walletSvc := wallet.NewService(walletRepo, walletOutbox, slog.Default())
-	return cashback.NewService(repo, outboxRepo, nil, "TRY_COIN", walletSvc, slog.Default())
+	return cashback.NewService(repo, outboxRepo, nil, "TRY_COIN", walletSvc, slog.Default(), nil)
 }
 
 // seedCronPlan inserts a v8 cashback plan directly into the test DB.
@@ -241,7 +241,7 @@ func TestCronIntegration_WalletFrozen_Skipped(t *testing.T) {
 		t.Fatalf("freeze wallet: %v", err)
 	}
 
-	svc := cashback.NewService(repo, outboxRepo, nil, "TRY_COIN", walletSvc, slog.Default())
+	svc := cashback.NewService(repo, outboxRepo, nil, "TRY_COIN", walletSvc, slog.Default(), nil)
 	res, err := svc.PayMonthlyInstallments(ctx, testAsOf())
 	if err != nil {
 		t.Fatalf("PayMonthlyInstallments: %v", err)
@@ -357,7 +357,7 @@ func TestCronIntegration_WalletFrozenAfterCreation_Skipped(t *testing.T) {
 
 	repo := cashback.NewRepository(pool)
 	obRepo := outbox.NewRepository("wallet_schema.outbox")
-	svc := cashback.NewService(repo, obRepo, nil, "TRY_COIN", walletSvc, slog.Default())
+	svc := cashback.NewService(repo, obRepo, nil, "TRY_COIN", walletSvc, slog.Default(), nil)
 
 	res, err := svc.PayMonthlyInstallments(ctx, testAsOf())
 	if err != nil {
