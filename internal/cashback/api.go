@@ -58,19 +58,57 @@ type WalletPoster interface {
 	FindAccountByOwnerAnyStatus(ctx context.Context, ownerType string, ownerID int64, currency string) (int64, string, error)
 }
 
+// ClaimPaymentInput is the per-installment payload for ClaimPaymentPeriod.
+type ClaimPaymentInput struct {
+	PlanID         int64
+	PeriodYYYYMM   int       // derived from the cron's runDate, not the installment's scheduled month
+	ScheduledDate  time.Time // start_date + (installmentN-1) months — audit value only
+	AmountMinor    int64
+	IdempotencyKey string // 'cashback:plan_<id>:period_<yyyymm>'
+}
+
 // Repository is the storage interface of the cashback engine (fin-svc only).
 type Repository interface {
 	// Plan creation — idempotent via UNIQUE INDEX on order_id.
 	// Returns (plan, true, nil) when newly inserted; (plan, false, nil) when already existed.
 	InsertPlanIfAbsent(ctx context.Context, tx pgx.Tx, p Plan) (Plan, bool, error)
 
-	// Payout cron: select active plans whose next installment is due by runDate.
-	// Uses start_date + payments_made*interval'1 month' <= runDate to determine due date.
-	// Caller holds the result for the duration of per-plan processing.
-	ListDuePlans(ctx context.Context, runDate time.Time, limit int) ([]Plan, error)
+	// Payout cron: select active plans whose next installment is due by runDate
+	// AND have NO payment row for runPeriodYYYYMM yet. The period filter (via
+	// NOT EXISTS against cashback_schema.payments) is what keeps the cron's
+	// per-call cost bounded when many plans exist — without it, every active
+	// plan re-enters the SERIALIZABLE tx loop and is rejected by ClaimPaymentPeriod's
+	// UNIQUE, which is correct but quadratic.
+	ListDuePlans(ctx context.Context, runDate time.Time, runPeriodYYYYMM int, limit int) ([]Plan, error)
 
-	// Payout cron: within a SERIALIZABLE tx, increment payments_made by 1.
-	// Returns the new payments_made counter and whether the plan is now completed.
+	// PaymentExistsForPeriod is a cheap (pool-read) pre-check the cron uses
+	// to skip plans already paid for the current run period without entering a
+	// SERIALIZABLE tx. Correctness still flows from ClaimPaymentPeriod's
+	// UNIQUE(plan_id, period_yyyymm) — this is purely an optimization to keep
+	// the hot path fast as the payments table grows.
+	PaymentExistsForPeriod(ctx context.Context, planID int64, periodYYYYMM int) (bool, error)
+
+	// ClaimPaymentPeriod INSERTs a 'scheduled' payment row inside tx as the
+	// first step of an installment payment. The UNIQUE(plan_id, period_yyyymm)
+	// constraint is the v6 storage-layer idempotency guard: concurrent racers
+	// for the same plan+period both attempt to INSERT, one succeeds and the
+	// others skip the rest of the payment flow.
+	// Returns (paymentID, true, nil) when the caller won the race; the caller
+	// MUST proceed to PostInTx and MarkPaymentPaid inside the same tx.
+	// Returns (0, false, nil) when another worker already claimed this period;
+	// the caller MUST NOT call PostInTx or RefreshPaymentsMadeCache.
+	ClaimPaymentPeriod(ctx context.Context, tx pgx.Tx, in ClaimPaymentInput) (int64, bool, error)
+
+	// MarkPaymentPaid flips the row inserted by ClaimPaymentPeriod from
+	// 'scheduled' to 'paid' and records the ledger transaction id + paid_date.
+	// Called inside the same tx after PostInTx returns successfully.
+	MarkPaymentPaid(ctx context.Context, tx pgx.Tx, paymentID int64, ledgerTxnID int64, paidDate time.Time) error
+
+	// IncrPaymentsMade atomically increments payments_made by 1 within tx.
+	// Returns the new counter and whether the plan is now completed (>= total_months).
+	// NOTE (commit 2 of this PR will replace this with a COUNT-derived
+	// RefreshPaymentsMadeCache; for commit 1 the counter still wins because
+	// ClaimPaymentPeriod above ensures at most one winner per (plan, period)).
 	IncrPaymentsMade(ctx context.Context, tx pgx.Tx, planID int64) (newCount int, completed bool, err error)
 
 	// HTTP read path — safe for direct repository calls per CLAUDE.md §3.1 exception.

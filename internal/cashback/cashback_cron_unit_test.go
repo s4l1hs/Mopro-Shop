@@ -19,11 +19,17 @@ type mockCashbackRepo struct {
 	insertPlanRet   Plan
 	insertPlanIsNew bool
 	insertPlanErr   error
-	incrCountRet    int
-	incrCompleted   bool
-	incrErr         error
-	withTxErr       error
-	getPlans        []Plan
+	// Claim path
+	claimID     int64
+	claimOK     bool
+	claimErr    error
+	markPaidErr error
+	// Increment path
+	incrCountRet  int
+	incrCompleted bool
+	incrErr       error
+	withTxErr     error
+	getPlans      []Plan
 }
 
 func (m *mockCashbackRepo) InsertPlanIfAbsent(_ context.Context, _ pgx.Tx, p Plan) (Plan, bool, error) {
@@ -37,9 +43,31 @@ func (m *mockCashbackRepo) InsertPlanIfAbsent(_ context.Context, _ pgx.Tx, p Pla
 	return p, true, nil
 }
 
-func (m *mockCashbackRepo) ListDuePlans(_ context.Context, _ time.Time, _ int) ([]Plan, error) {
+func (m *mockCashbackRepo) ListDuePlans(_ context.Context, _ time.Time, _ int, _ int) ([]Plan, error) {
 	defer func() { m.duePlans = nil }() // return once then empty
 	return m.duePlans, nil
+}
+
+func (m *mockCashbackRepo) PaymentExistsForPeriod(_ context.Context, _ int64, _ int) (bool, error) {
+	// Default false (no fast-path skip) so existing tests exercise the full flow.
+	return false, nil
+}
+
+func (m *mockCashbackRepo) ClaimPaymentPeriod(_ context.Context, _ pgx.Tx, _ ClaimPaymentInput) (int64, bool, error) {
+	// Default to "won the race" so existing tests that don't set fields keep
+	// exercising the happy path. Tests can override claimOK=false to simulate
+	// the race-lost branch.
+	if m.claimErr != nil {
+		return 0, false, m.claimErr
+	}
+	if m.claimID == 0 && !m.claimOK {
+		return 1, true, nil
+	}
+	return m.claimID, m.claimOK, nil
+}
+
+func (m *mockCashbackRepo) MarkPaymentPaid(_ context.Context, _ pgx.Tx, _ int64, _ int64, _ time.Time) error {
+	return m.markPaidErr
 }
 
 func (m *mockCashbackRepo) IncrPaymentsMade(_ context.Context, _ pgx.Tx, _ int64) (int, bool, error) {
