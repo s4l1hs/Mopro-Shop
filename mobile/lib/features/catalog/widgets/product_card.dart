@@ -26,6 +26,7 @@ class ProductCard extends ConsumerWidget {
     this.discountPct,
     this.ratingAvg,
     this.ratingCount = 0,
+    this.priceOverride,
   });
 
   final ProductSummary product;
@@ -35,15 +36,31 @@ class ProductCard extends ConsumerWidget {
   final double? ratingAvg;
   final int ratingCount;
 
+  /// Flash-deal override: when set, this is shown as the (brand-orange) price
+  /// and the product's regular `priceMinor` becomes the strikethrough original
+  /// (discount % is recomputed from the two). Used by FlashDealsRail.
+  final int? priceOverride;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isFav = ref.watch(isFavoriteProvider(product.id));
-    final priceStr = MoneyUtils.formatMinor(product.priceMinor);
-    final hasDiscount = originalPriceMinor != null &&
-        originalPriceMinor! > product.priceMinor &&
-        (discountPct ?? 0) > 0;
+    // Flash override substitutes the flash price for the main price and uses
+    // the regular price as the strikethrough original.
+    final effectivePrice = priceOverride ?? product.priceMinor;
+    final effectiveOriginal =
+        priceOverride != null ? product.priceMinor : originalPriceMinor;
+    final effectiveDiscountPct = (priceOverride != null &&
+            effectiveOriginal != null &&
+            effectiveOriginal > effectivePrice &&
+            effectiveOriginal > 0)
+        ? ((effectiveOriginal - effectivePrice) * 100) ~/ effectiveOriginal
+        : discountPct;
+    final priceStr = MoneyUtils.formatMinor(effectivePrice);
+    final hasDiscount = effectiveOriginal != null &&
+        effectiveOriginal > effectivePrice &&
+        (effectiveDiscountPct ?? 0) > 0;
     final hasRating = ratingCount > 0 && ratingAvg != null;
 
     return GestureDetector(
@@ -121,7 +138,7 @@ class ProductCard extends ConsumerWidget {
                     Row(
                       children: [
                         Text(
-                          MoneyUtils.formatMinor(originalPriceMinor!),
+                          MoneyUtils.formatMinor(effectiveOriginal),
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: cs.onSurfaceVariant,
                             decoration: TextDecoration.lineThrough,
@@ -138,7 +155,7 @@ class ProductCard extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
-                            '%$discountPct',
+                            '%$effectiveDiscountPct',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 10,

@@ -37,5 +37,8 @@
       "cta": "Entdecken",
       "image_unavailable": "Bild nicht verfügbar."
     }
+  },
+  "home": {
+    "flash_deals_ended": "Angebot beendet"
   }
 }
