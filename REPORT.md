@@ -1153,3 +1153,22 @@ so losers are detected and skipped before touching the ledger or the counter.
 - No `--no-verify` push.
 
 
+
+---
+
+# Session 4e — a11y, image hygiene, force-light theme, linux goldens
+
+## Baseline (pre-flight, captured on branch `feat/a11y-images-and-theme-default` off `main`@3f8d7a27)
+
+| Metric | Baseline |
+|---|---|
+| `flutter analyze` | 0 issues |
+| `flutter test` | 306 passed |
+| `flutter test integration_test` | not runnable headless on macOS (no device; web unsupported). Interaction "flows" live in `mobile/test/integration/` and run under `flutter test` (within the 306). `integration_test/wallet_flow_test.dart` is device-only. |
+| `flutter build web --release` | success; `build/web/main.dart.js` = 4,408,747 B |
+| `assets/images/` PNGs | 6 files (Mopro logo variants), 3,309,303 B total |
+| `go test ./...` | all pass (0 FAIL) |
+| container health | no compose at repo root (lives under `deploy/`); none running locally |
+| CI on WIP push | branch pushed; path-filtered workflows inherit `main`'s green state until first commit lands |
+
+_Remaining §9 subsections appended at end of session._
