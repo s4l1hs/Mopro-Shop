@@ -21,6 +21,7 @@ import (
 	finapi "github.com/mopro/platform/internal/api"
 	genfin "github.com/mopro/platform/internal/api/gen/fin"
 	"github.com/mopro/platform/internal/cashback"
+	"github.com/mopro/platform/internal/commission"
 	"github.com/mopro/platform/internal/eventbus"
 	identityjwt "github.com/mopro/platform/internal/identity/jwt"
 	identitymw "github.com/mopro/platform/internal/identity/middleware"
@@ -177,7 +178,11 @@ func main() {
 
 	// ── Order capture ledger consumer ─────────────────────────────��──────────
 	orderledgerRepo := orderledger.NewRepository(pool)
-	orderledgerSvc := orderledger.NewService(orderledgerRepo, walletSvc, slog.Default(), bizM)
+	// commission.CaptureRecorder owns commission_schema.capture_postings;
+	// orderledger persists postings through this seam instead of reaching
+	// across the schema boundary directly.
+	captureRecorder := commission.NewCaptureRecorder(pool)
+	orderledgerSvc := orderledger.NewService(orderledgerRepo, captureRecorder, walletSvc, slog.Default(), bizM)
 	go func() {
 		if err := orderledger.StartConsumer(ctx, bus, orderledgerSvc); err != nil && !errors.Is(err, context.Canceled) {
 			slog.Error("fin-svc: orderledger consumer exited unexpectedly", "err", err)
