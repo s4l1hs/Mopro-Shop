@@ -199,3 +199,17 @@ Example: `mobile/test/features/catalog/products_by_category_provider_test.dart`
 was verified to throw the "uninitialized provider" `StateError` when the
 `Future.microtask` deferral is reverted — proving it guards the build-time
 state-mutation bug rather than passing vacuously.
+
+## URL state
+
+When mirroring widget state into the URL, **do not clear query parameters with
+`Uri.replace(queryParameters: null)` — it is a no-op in Dart** (a null
+`queryParameters` means "leave unchanged", so the existing query is kept). This
+shipped as a real bug in Session 5b: clearing all PLP filters never cleared the
+URL.
+
+To clear the query, navigate to the bare path (`context.go(uri.path)`) or use the
+safe helper `uri.clearQueryParameters()` from `lib/core/utils/uri_ext.dart`
+(`Uri.replace(queryParameters: const {})`). The extension prevents the recurrence
+by API shape; `test/core/utils/uri_ext_test.dart` includes a contrast test
+asserting the `null` form does NOT clear.
