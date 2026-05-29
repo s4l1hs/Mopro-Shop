@@ -5,11 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/core/widgets/login_required_sheet.dart';
+import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
+import 'package:mopro/features/cart/data/cart_dto.dart';
 import 'package:mopro/features/cart/data/cart_line_dto.dart';
 import 'package:mopro/features/cart/widgets/cart_line_card.dart';
 import 'package:mopro/features/cart/widgets/cart_totals_summary.dart';
 import 'package:mopro/features/cart/widgets/empty_cart.dart';
+import 'package:mopro/features/cart/widgets/order_summary_card.dart';
 import 'package:mopro/shared/molecules/section_divider.dart';
 
 class CartScreen extends ConsumerWidget {
@@ -48,6 +51,7 @@ class CartScreen extends ConsumerWidget {
         },
         data: (cart) {
           if (cart.isEmpty) return const EmptyCart();
+          if (!context.isMobile) return _buildWide(context, ref, cart);
 
           return Column(
             children: [
@@ -63,18 +67,68 @@ class CartScreen extends ConsumerWidget {
               ),
               CartTotalsSummary(
                 cart: cart,
-                onCheckout: () => requireAuth(
-                  context,
-                  ref,
-                  reason: 'Siparişi tamamlamak için giriş yap.',
-                  onAuthed: () => context.push('/checkout'),
-                ),
+                onCheckout: () => _checkout(context, ref),
                 cashbackMonthlyMinor: cashbackAsync.valueOrNull,
               ),
             ],
           );
         },
       ),
+    );
+  }
+
+  void _checkout(BuildContext context, WidgetRef ref) => requireAuth(
+        context,
+        ref,
+        reason: 'Siparişi tamamlamak için giriş yap.',
+        onAuthed: () => context.push('/checkout'),
+      );
+
+  // Tablet/desktop: seller-grouped items scroll on the left; the order summary
+  // is fixed on the right (it sits outside the scrolling list, so it stays
+  // pinned while the items scroll).
+  Widget _buildWide(BuildContext context, WidgetRef ref, CartDto cart) {
+    final pad = context.isDesktop ? 32.0 : 24.0;
+    final summaryW = context.isDesktop ? 360.0 : 320.0;
+
+    return LayoutBuilder(
+      builder: (ctx, constraints) {
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1240),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: pad, vertical: 16),
+              child: SizedBox(
+                height: constraints.maxHeight - 32,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: () =>
+                            ref.read(cartProvider.notifier).refresh(),
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          children: _buildGroupedLines(context, ref, cart.lines),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    SizedBox(
+                      width: summaryW,
+                      child: SingleChildScrollView(
+                        child: OrderSummaryCard(
+                          onCheckout: () => _checkout(context, ref),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

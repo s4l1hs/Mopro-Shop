@@ -243,7 +243,17 @@
     "added_to_cart": "Sepete eklendi",
     "add_failed": "Sepete eklenemedi",
     "cashback_monthly": "Aylık {amount} Cashback",
-    "cashback_perpetual": "Plan süresiz devam eder"
+    "cashback_perpetual": "Plan süresiz devam eder",
+    "order_summary": "Sipariş Özeti",
+    "subtotal": "Ara Toplam",
+    "shipping": "Kargo",
+    "shipping_free": "Ücretsiz",
+    "estimated_earnings": "Tahmini Kazanç",
+    "total": "Toplam",
+    "coupon_code": "Kupon kodu",
+    "apply": "Uygula",
+    "confirm_cart": "Sepeti Onayla",
+    "summary_helper": "Vergi ve kargo dahil değildir."
   },
   "checkout": {
     "step_address": "Adres",

@@ -210,7 +210,17 @@
     "swipe_hint": "Swipe to delete",
     "qty_label": "{qty} pcs",
     "added_to_cart": "Added to cart",
-    "add_failed": "Failed to add to cart"
+    "add_failed": "Failed to add to cart",
+    "order_summary": "Order Summary",
+    "subtotal": "Subtotal",
+    "shipping": "Shipping",
+    "shipping_free": "Free",
+    "estimated_earnings": "Estimated Earnings",
+    "total": "Total",
+    "coupon_code": "Coupon code",
+    "apply": "Apply",
+    "confirm_cart": "Confirm Cart",
+    "summary_helper": "Taxes and shipping not included."
   },
   "checkout": {
     "address_title": "Delivery Address",
