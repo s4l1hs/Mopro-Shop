@@ -1,7 +1,7 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/design/widgets/responsive_network_image.dart';
 import 'package:mopro/features/catalog/widgets/cashback_chip.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
 import 'package:mopro/utils/money.dart';
@@ -215,9 +215,8 @@ class _ProductImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (imageUrl == null || imageUrl!.isEmpty) return _placeholder;
-    return CachedNetworkImage(
+    return ResponsiveNetworkImage(
       imageUrl: imageUrl!,
-      fit: BoxFit.cover,
       placeholder: (_, __) => _placeholder,
       errorWidget: (_, __, ___) => _placeholder,
     );
