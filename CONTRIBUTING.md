@@ -149,3 +149,53 @@ To (re-)baseline goldens:
 
 Do **not** commit macOS-generated goldens. New golden tests are added without a
 baseline; trigger the workflow to produce it.
+
+## Adding a Notifier (Riverpod)
+
+A `Notifier` / `AsyncNotifier` / `FamilyNotifier`'s `build()` runs **before the
+notifier is mounted**, so mutating `state` from inside `build()` — directly or
+via a helper — throws `Bad state: Tried to read the state of an uninitialized
+provider` on the very first read. Every notifier `build()` must match one of
+these three safe shapes:
+
+1. **Return a const/default state; mutate only in event handlers.**
+   ```dart
+   SearchState build() => const SearchState();
+   void setQuery(String q) => state = state.copyWith(query: q); // later, fine
+   ```
+2. **Defer the initial fetch with `Future.microtask`** (runs after `build()`
+   returns and the notifier is mounted).
+   ```dart
+   CartState build() { Future.microtask(_load); return const CartState(); }
+   ```
+3. **Touch `state` only after the first `await`** in the loader you call.
+   ```dart
+   Future<void> _load() async {
+     final api = ref.read(apiProvider);   // no state write yet
+     final r = await api.fetch();          // first await
+     state = AsyncData(r.data);            // safe — mounted by now
+   }
+   ```
+
+**Synchronous-reachability rule:** no `state` mutation may be reachable
+*synchronously* from `build()` before its first `await` — **including via helpers
+called with `unawaited(...)` or inside `Future.wait([...])`. Both invoke the
+function synchronously up to its first `await`**, so a pre-`await` `state =` in
+that helper still runs during `build()`. Only `Future.microtask` (shape 2) or
+returning state and waiting for an event (shape 1) actually defers.
+
+The full audit that produced this taxonomy is recorded in `REPORT.md` §8.8
+(Session 5a notifier sweep).
+
+## Writing a Regression Test
+
+**A regression test must fail when the original buggy code is restored.** If you
+revert the fix and the test still passes, the test isn't guarding the
+regression — it's documenting some unrelated behavior. Always confirm by
+reverting the fix locally and watching the test go red before you commit.
+
+Example: `mobile/test/features/catalog/products_by_category_provider_test.dart`
+(PR #15) asserts the first read builds without throwing and resolves to data; it
+was verified to throw the "uninitialized provider" `StateError` when the
+`Future.microtask` deferral is reverted — proving it guards the build-time
+state-mutation bug rather than passing vacuously.

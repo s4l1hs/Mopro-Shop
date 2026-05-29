@@ -50,12 +50,20 @@ final homeBannersProvider = FutureProvider.autoDispose<List<HomeBanner>>(
   },
 );
 
-/// Fetches server-driven rail order from GET /home/rails.
-final homeRailsProvider = FutureProvider.autoDispose<List<HomeRail>>(
-  (ref) async {
+/// Fetches server-driven rail order from `GET /home/rails?layout=<layout>`.
+///
+/// The `layout` hint (`'desktop'` or `'mobile'`) is computed at the screen from
+/// the breakpoint and passed into the family key (§6.3). The backend surfaces up
+/// to 6 rails for `desktop` and up to 3 otherwise.
+final homeRailsProvider =
+    FutureProvider.autoDispose.family<List<HomeRail>, String>(
+  (ref, layout) async {
     final dio = ref.watch(dioProvider);
     try {
-      final resp = await dio.get<Map<String, dynamic>>('/home/rails');
+      final resp = await dio.get<Map<String, dynamic>>(
+        '/home/rails',
+        queryParameters: {'layout': layout},
+      );
       final data = (resp.data?['data'] as List<dynamic>?) ?? [];
       return data.map((e) {
         final m = e as Map<String, dynamic>;
@@ -63,11 +71,12 @@ final homeRailsProvider = FutureProvider.autoDispose<List<HomeRail>>(
       }).toList();
     } on DioException catch (_) {
       // Fallback to default order if endpoint fails.
-      return const [
+      const fallback = [
         HomeRail(key: 'recommended', title: 'Sizin için seçtiklerimiz'),
         HomeRail(key: 'bestseller', title: 'Çok satanlar'),
         HomeRail(key: 'newest', title: 'Yeni gelenler'),
       ];
+      return fallback;
     }
   },
 );

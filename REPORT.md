@@ -1430,3 +1430,222 @@ replace: true)` set `state = AsyncLoading()` as its first statement). Fixed with
 `Future.microtask`, guarded by `products_by_category_provider_test.dart` (first
 read returns normally + resolves to data; verified to throw the
 "uninitialized provider" `StateError` when the fix is reverted).
+
+---
+
+# Session 5b — PLP sidebar, PDP two-column, Cart two-column, Favorites desktop, 5a leftovers
+
+> Base: `main` @ ebbe06bb (PR #14 Session 5a + PR #15 notifier sweep both merged).
+> Branch: `feat/plp-pdp-cart-favorites-desktop`.
+
+## Baseline (pre-flight)
+
+| Metric | Baseline |
+|---|---|
+| `flutter analyze` | 0 issues |
+| `flutter test` | 359 pass / 26 fail — **all 26 golden platform-guard** (Linux-baselined, run on macOS); 0 real failures |
+| `flutter test integration_test` | device-only; not runnable headless on macOS. Interaction flows live in `test/integration/` (run under `flutter test`) |
+| `flutter build web --release` | success; `build/web/main.dart.js` = **4,461,269 B** (+10% budget ⇒ ~4,907,396 B ceiling) |
+| `go test ./...` | all pass (0 FAIL) |
+| containers | not running locally |
+
+## Scope note (this turn)
+
+This session's full spec spans five large UI deliverables plus leftovers, docs,
+goldens, and integration flows. Landed this turn as complete, green,
+analyze-clean commits, in execution order by value×certainty:
+
+- §6.4 — catalog `-tags=integration` build-tag fix (real correctness; 5a blocker).
+- §7 — `CONTRIBUTING.md`: "Adding a Notifier" (three shapes + synchronous-reachability rule) and "Writing a Regression Test" (revert-must-fail standard).
+- §5 — Favorites desktop grid (2/4/5 columns; mobile byte-identical; skeleton matches result columns).
+- §3 (extraction half) — `PdpPriceBlock`, `PdpVariantSelector`, `PdpSellerCard`, `PdpStickyCta` extracted; PDP refactored to consume them (output-identical mobile path).
+
+_Remaining sections (§2 PLP sidebar, §3 PDP **two-column + hover-zoom** layout,
+§4 Cart two-column, §6.1–§6.3 home leftovers) and their goldens/integration
+flows are tracked for the 5b continuation; see "Carried to 5b-continuation"
+below._
+
+## §3 — PDP component extraction (refactor before desktop layout)
+
+Per §3.2, the PDP buy-box pieces and sticky CTA are now standalone widgets under
+`lib/features/catalog/widgets/pdp/`, each with its own test:
+
+| Component | File | Test |
+|---|---|---|
+| `PdpPriceBlock` | `widgets/pdp/pdp_price_block.dart` | `pdp_components_test.dart` |
+| `PdpVariantSelector` | `widgets/pdp/pdp_variant_selector.dart` | ″ |
+| `PdpSellerCard` | `widgets/pdp/pdp_seller_card.dart` | ″ |
+| `PdpStickyCta` | `widgets/pdp/pdp_sticky_cta.dart` | ″ |
+| `PdpImagePager` (+ §3.3 hover-zoom) | `widgets/pdp/pdp_image_pager.dart` | `pdp_image_pager_test.dart` |
+
+**Contract adapted to the real generated model** (the spec's contracts assume
+types the API doesn't expose): `Variant` is flat (color/size/sku), so
+`PdpVariantSelector` takes `List<Variant>` not `VariantGroup`; `Product` exposes
+`sellerName` (string) not a `Seller`, so `PdpSellerCard` takes the name + `onTap`;
+`PdpPriceBlock` accepts optional `originalPriceMinor`/`lowestIn30DaysMinor`
+(strikethrough + %-pill + "lowest 30d" hint) for forward use, both null today.
+The mobile PDP composition is output-identical (no golden/test regression).
+
+**Hover-zoom (§3.3) — implemented in `PdpImagePager`, mouse-only.** Gated by
+`enableHoverZoom` (the screen sets it only at >=1024 AND
+`PointerKindObserver.lastKind == mouse`). **Deviation, documented per §12:** the
+spec's separate 480dp preview pane to the right would overflow into / collide
+with the buy-box column and routing it through a top-level Overlay is brittle, so
+the lens zooms **in place** (`Transform.scale` about the cursor, clipped) — same
+magnification, no collision. Tested via a mouse gesture (lens appears) vs. the
+disabled case (no lens).
+
+New locale keys: `product.go_to_store`, `product.lowest_30d` (tr-TR + en-US;
+de-DE/ar-AE lack the `product` block and fall back to tr-TR).
+
+### §3 (cont.) — PDP two-column screen composition (§3.1/§3.4)
+
+`ProductDetailScreen` branches by breakpoint: mobile keeps the existing
+`NestedScrollView` + `PdpStickyCta` unchanged; tablet/desktop render the two-column
+layout in `CenteredContentColumn`.
+
+- **Sticky gallery (left):** a `Stack` whose gallery child's `top` tracks the page
+  scroll offset, clamped to `[0, contentH - galleryH]` (per §11's documented-
+  alternative allowance — a `SliverPersistentHeader` can't host a side-by-side
+  column, and `IntrinsicHeight` throws on the buy-box's `Wrap`). `contentH` = the
+  buy-box's natural height, **measured unconstrained** via a post-frame
+  `GlobalKey` read — a bug found while writing the sticky test was that wrapping
+  the row in `SizedBox(height: contentH)` capped the buy-box at the gallery height
+  so `maxTop` was always 0 and the gallery never pinned.
+- **Hover-zoom** gated to desktop × mouse via `ValueListenableBuilder` on
+  `PointerKindObserver.lastKind`.
+- **Buy-box (right, 480/360dp):** brand → title → rating (shown only when reviews
+  exist — `Product` has no rating field) → `PdpPriceBlock` → stock → cashback →
+  `PdpVariantSelector` → `PdpSellerCard` → quantity stepper → Sepete Ekle (56dp) →
+  Favorilere Ekle outline (48dp) → trust badges. Components reused, no duplication.
+- **Below-fold:** tab bar + inline tab content (rendered inline, not `TabBarView`,
+  to avoid nested unbounded scroll) + "Benzer ürünler" grid rail (6/3 col).
+  "Son baktıkların" omitted — no `recentlyViewedProvider` exists ⇒ hide-when-empty
+  makes it always hidden.
+
+**Sticky scroll test** (`pdp_screen_sticky_gallery_test.dart`): (1) small forward
+scroll → gallery origin unchanged (pinned); (2) large scroll → origin moves up
+(released) + tab bar crosses toward top; (3) scroll back → re-pins at origin;
+(4) variant change → gallery height unchanged (it's height-locked by the
+`Positioned(height: galleryH)`). All pass.
+
+**Integration flow P** (`test/integration/flow_p_desktop_pdp_test.dart`, runs under
+`flutter test` like flows M/N): two-column present → mouse-hover shows zoom lens /
+move-out hides it → "Mavi" variant selects → Sepete Ekle increments
+`cartCountProvider` 0→1 → large scroll releases the gallery. **Pass.**
+
+**PDP goldens** (8, baselined on ubuntu via `golden-rebaseline` run
+[26657231005](https://github.com/s4l1hs/Mopro-Shop/actions/runs/26657231005)):
+`pdp_two_col_{variants,simple}_{1024,1440}_{light,dark}.png`. (The spec's
+"discount" fixture can't render a discount — the model exposes no original price;
+`PdpPriceBlock`'s discount path is unit-tested separately.)
+
+New locale keys (this cycle): `product.add_to_favorites`, `product.review_count`
+(tr-TR + en-US).
+
+### Updated Session 5b remaining scope
+
+- [x] ~~§3 PDP two-column + hover-zoom + component extraction~~ (done)
+- [x] ~~§5 Favorites desktop grid~~ (done)
+- [x] ~~§6.4 integration build-tag fix~~ · [x] ~~§7 contributor docs~~
+- [ ] §2 PLP sidebar filter panel + chip row + sort dropdown (+ flow O, goldens)
+- [ ] §4 Cart desktop two-column + `OrderSummaryCard` + empty state (+ flow Q, goldens)
+- [ ] §6.1 Editor's picks / Recently viewed home sub-section
+- [ ] §6.2 mood/category 8/12 column counts
+- [ ] §6.3 `?layout=desktop` rails hint + §2.5 fixture
+- [ ] Final golden-rebaseline covering PLP / Cart / Home
+
+## §5 — Favorites desktop grid
+
+`FavoritesScreen` grid columns adapt **2 / 4 / 5** at mobile / tablet / desktop.
+Mobile is byte-identical to before (full-width, 12dp pad, 2-col, same skeleton
+count) so its golden does not regress. Tablet/desktop center + clamp via
+`CenteredContentColumn`; the loading skeleton renders at the same column count as
+the results (§5.1). The existing locale-key empty state and the guest
+batch-fetch (POST `/products/batch`) are unchanged. Tests: empty state renders no
+grid; populated columns assert 2/4/5 at 375/768/1440 (fake Dio batch adapter from
+real `ProductSummary.toJson()`). Desktop goldens are part of the carried golden
+batch (mobile unchanged ⇒ no existing-golden regression).
+
+## §6.4 — integration build-tag fix (Drive-by / correctness)
+
+`mockRepo` (untagged `service_test.go`) had four method stubs in
+`discovery_test.go` (`//go:build !integration`); under `-tags=integration` the
+catalog test binary failed to compile (`*mockRepo does not implement
+catalog.Repository`). Moved the four stubs to `service_test.go` so the mock is
+complete in both builds. `go test -tags=integration ./internal/catalog/...` now
+compiles; non-integration tests still pass. Note: `make verify` uses the
+untagged build (always worked); this unblocks the integration-tagged build used
+by `make test-integration-catalog` / CI's integration job.
+
+## Backlog (carried + new)
+
+- `sellerpayout_schema` split out of `commission_schema` — still backlog.
+- Radio→RadioGroup migration — deferred.
+- **Notifier-shapes lint:** a `tool/check-notifier-shapes.sh` or `custom_lint`
+  rule that classifies every `Notifier` subclass into one of the three
+  `CONTRIBUTING.md` shapes. Must be **AST-based, not regex** (to handle wrapped
+  `extends` declarations like the 5 the 5a sweep's first grep missed).
+- Brand product-count aggregation endpoint (needed if PLP brand list shows `(N)`
+  counts — falls back to no count until it exists).
+- CDN `?w=` re-verification once `cdn.moproshop.com` is provisioned (from 5a).
+
+## §4 — Cart desktop two-column
+
+`CartScreen` renders a two-column layout at ≥600 (left seller-grouped items, right
+fixed `OrderSummaryCard` 320/360dp); the summary is pinned simply by sitting
+outside the scrolling items list. Mobile keeps the bottom `CartTotalsSummary`;
+empty cart is full-width `EmptyCart` on all breakpoints. `OrderSummaryCard` reads
+`cartProvider` + `cartMonthlyCashbackProvider` (no new providers): subtotal /
+shipping (Ücretsiz when 0) / cashback / total / coupon input (Uygula inert — no
+coupon backend, backlog) / Sepeti Onayla. Tests: composition, sticky-while-
+scroll, mobile fallback, empty full-width; **flow Q** (two-column → sticky →
+clear → empty). 4 goldens (1440 × light/dark × filled/empty).
+
+## §2 — PLP desktop sidebar
+
+Two-column at ≥768 consuming the 5a `plpFiltersProvider` substrate. `FilterPanel`
+(category tree / searchable brand list / dual-thumb RangeSlider + Min·Max inputs /
+rating radios / free-shipping switch / Temizle·Uygula footer); `PlpFilterChips`
+row; sort `PopupMenuButton`. `ProductGrid`/`CatalogShell` gained an optional
+`crossAxisCount` (default 2 — mobile unchanged) → 3/5 cols in the two-column grid.
+Tests: sidebar ≥768 only, brand search, brand-check→chip, clear-all; **flow O**
+(brand check → URL `brand=`; chip × → cleared). 4 goldens (1440 × light/dark ×
+{no filters, with filters}).
+
+**Drive-by fix:** `_writeUrl` cleared filters with
+`Uri.replace(queryParameters: null)`, which Dart treats as "unchanged" and KEEPS
+the existing query — clearing all filters never cleared the URL. Now navigates to
+the bare path when the encoded query is empty (5a latent bug).
+
+Deviations (documented): sort uses `PopupMenuButton` (not `AnchoredOverlayPanel`);
+rating uses a custom icon radio (avoids the deprecated `Radio` API — RadioGroup
+migration stays a separate backlog); brand counts omitted (no aggregation
+endpoint); PLP goldens at 1440 only (1024 covered by the same responsive logic).
+`SearchScreen` sidebar carried to 5c (same wiring; CategoryProductsScreen shipped).
+
+## §6.1/§6.2/§6.3 — home leftovers
+
+Editor's-picks desktop sub-section (3×2 grid; recently-viewed hidden — no
+provider); 8/12 mood + category columns on tablet/desktop; `?layout=desktop` rails
+hint (homeRailsProvider family + backend cap, Go + Dart fixture tests). Home
+768/1440 goldens regenerated.
+
+## Goldens & rebaseline
+
+All new/changed goldens baselined on ubuntu via the `golden-rebaseline` workflow
+(run [26660077848](https://github.com/s4l1hs/Mopro-Shop/actions/runs/26660077848)):
+PDP (8), cart (4), favorites (4), PLP (4), + regenerated home 768/1440. CI
+`flutter test` green. New integration flows: M, N (5a) + **O, P, Q** (5b).
+
+## Carried to 5b-continuation
+
+None — Session 5b is complete (PLP sidebar, PDP two-column, Cart two-column,
+Favorites desktop, home leftovers, flows O/P/Q, goldens). Minor follow-ups folded
+into Backlog: `SearchScreen` sidebar; PLP 1024 goldens; brand-count aggregation;
+coupon backend; AnchoredOverlayPanel sort; RadioGroup migration.
+
+## Deferred to Session 5c (out of 5b scope)
+
+Account two-pane layout; `LoginRequiredDialog` web presenter; reviews
+helpful-vote / sort / pagination; full a11y sweep beyond this turn's screens.

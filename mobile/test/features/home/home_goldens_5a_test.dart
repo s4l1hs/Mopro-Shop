@@ -61,11 +61,14 @@ List<Override> _overrides() => [
       homeMoodStoriesProvider.overrideWith((ref) async => const []),
       trendingSearchesProvider.overrideWith((ref) async => const <String>[]),
       homeRailsProvider.overrideWith(
-        (ref) async =>
+        (ref, layout) async =>
             const [HomeRail(key: 'recommended', title: 'Sizin için seçtiklerimiz')],
       ),
-      productsRailProvider('recommended')
-          .overrideWith((ref) async => [for (var i = 0; i < 8; i++) _p(i + 1)]),
+      // Override the whole family (any sort key, incl. the editor's-picks
+      // 'bestseller' rail) so no rail hits Dio and leaves a pending timer.
+      productsRailProvider.overrideWith(
+        (ref, key) async => [for (var i = 0; i < 8; i++) _p(i + 1)],
+      ),
     ];
 
 GoRouter _router() => GoRouter(

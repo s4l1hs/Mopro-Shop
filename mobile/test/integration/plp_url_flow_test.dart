@@ -105,8 +105,14 @@ Future<void> _pump(
   };
   addTearDown(() => FlutterError.onError = original);
 
-  await tester.binding.setSurfaceSize(const Size(390, 900));
-  addTearDown(() => tester.binding.setSurfaceSize(null));
+  // Size via tester.view (dpr=1) so 390 resolves to mobile reliably — this
+  // suite exercises the bottom-sheet URL substrate, not the desktop sidebar.
+  // (setSurfaceSize(390) resolves to tablet and would mount the FilterPanel,
+  // whose categoriesProvider hits Dio and leaves a pending timer.)
+  tester.view.physicalSize = const Size(390, 900);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final prefs = await SharedPreferences.getInstance();
   _router = _build(initial);

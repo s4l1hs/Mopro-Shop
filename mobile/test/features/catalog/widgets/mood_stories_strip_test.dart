@@ -11,8 +11,12 @@ Future<void> _pump(
   WidgetTester tester, {
   required AsyncValue<List<HomeMoodStory>> state,
 }) async {
-  await tester.binding.setSurfaceSize(const Size(390, 200));
-  addTearDown(() => tester.binding.setSurfaceSize(null));
+  // Size via tester.view (dpr=1) so the breakpoint resolves reliably to mobile
+  // — setSurfaceSize(390) resolves to tablet here and would hit the grid branch.
+  tester.view.physicalSize = const Size(390, 800);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [

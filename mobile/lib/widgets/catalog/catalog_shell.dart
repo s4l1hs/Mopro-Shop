@@ -21,6 +21,7 @@ class CatalogShell extends StatelessWidget {
     this.onFilter,
     this.activeFilterCount = 0,
     this.onRefresh,
+    this.gridCrossAxisCount = 2,
     super.key,
   });
 
@@ -35,6 +36,7 @@ class CatalogShell extends StatelessWidget {
   final VoidCallback? onFilter;
   final int activeFilterCount;
   final Future<void> Function()? onRefresh;
+  final int gridCrossAxisCount;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +64,7 @@ class CatalogShell extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             sliver: ProductGrid(
               products: products,
+              crossAxisCount: gridCrossAxisCount,
               onProductTap: (p) => context.push('/products/${p.id}'),
             ),
           ),

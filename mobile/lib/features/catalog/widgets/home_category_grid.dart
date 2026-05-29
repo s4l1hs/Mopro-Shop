@@ -3,9 +3,9 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/features/catalog/providers/categories_provider.dart';
 import 'package:mopro/widgets/skeleton_box.dart';
-import 'package:mopro_api/mopro_api.dart';
 
 class HomeCategoryGrid extends ConsumerWidget {
   const HomeCategoryGrid({super.key});
@@ -28,9 +28,14 @@ class HomeCategoryGrid extends ConsumerWidget {
   static IconData _iconFor(String slug) =>
       _slugIcons[slug] ?? Icons.category_outlined;
 
+  /// Pucks per row: 4 mobile / 8 tablet / 12 desktop (§6.2).
+  static int columnsFor(BuildContext context) =>
+      context.isDesktop ? 12 : (context.isMobile ? 4 : 8);
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final categoriesState = ref.watch(categoriesProvider);
+    final perRow = columnsFor(context);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -45,13 +50,30 @@ class HomeCategoryGrid extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           categoriesState.categories.when(
-            loading: _buildSkeleton,
+            loading: () => _buildGridShell(
+              perRow,
+              perRow,
+              (_) => const SkeletonBox(width: double.infinity, height: 72),
+            ),
             error: (_, __) => const SizedBox.shrink(),
             data: (cats) {
               final roots =
-                  cats.where((c) => c.parentId == null).take(8).toList();
+                  cats.where((c) => c.parentId == null).take(perRow).toList();
               if (roots.isEmpty) return const SizedBox.shrink();
-              return _buildGrid(context, roots);
+              return _buildGridShell(
+                perRow,
+                roots.length,
+                (i) {
+                  final cat = roots[i];
+                  return _CategoryCell(
+                    name: cat.name,
+                    iconUrl: cat.iconUrl,
+                    icon: _iconFor(cat.slug),
+                    onTap: () =>
+                        context.push('/categories/${cat.id}', extra: cat.name),
+                  );
+                },
+              );
             },
           ),
         ],
@@ -59,41 +81,22 @@ class HomeCategoryGrid extends ConsumerWidget {
     );
   }
 
-  Widget _buildGrid(BuildContext context, List<Category> cats) {
+  Widget _buildGridShell(
+    int perRow,
+    int count,
+    Widget Function(int) itemBuilder,
+  ) {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: perRow,
         childAspectRatio: 0.8,
         mainAxisSpacing: 8,
         crossAxisSpacing: 8,
       ),
-      itemCount: cats.length,
-      itemBuilder: (context, i) {
-        final cat = cats[i];
-        return _CategoryCell(
-          name: cat.name,
-          iconUrl: cat.iconUrl,
-          icon: _iconFor(cat.slug),
-          onTap: () => context.push('/categories/${cat.id}', extra: cat.name),
-        );
-      },
-    );
-  }
-
-  Widget _buildSkeleton() {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        childAspectRatio: 0.8,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-      ),
-      itemCount: 8,
-      itemBuilder: (_, __) => const SkeletonBox(width: double.infinity, height: 72),
+      itemCount: count,
+      itemBuilder: (_, i) => itemBuilder(i),
     );
   }
 }

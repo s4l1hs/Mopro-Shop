@@ -368,3 +368,35 @@ func (m *mockRepo) HomeFlashDeals(_ context.Context, _ *int64) (*catalog.FlashDe
 func (m *mockRepo) ListReviews(_ context.Context, _ int64, _, _ int) ([]catalog.ProductReviewRow, int, error) {
 	return nil, 0, nil
 }
+
+// ── Discovery repository method stubs ─────────────────────────────────────────
+// These live here (untagged) rather than in discovery_test.go (//go:build
+// !integration) so *mockRepo satisfies catalog.Repository under BOTH the
+// default and -tags=integration builds. See REPORT.md Session 5b §6.4.
+
+func (m *mockRepo) ListAllVariantStocks(_ context.Context) ([]catalog.VariantStock, error) {
+	return nil, nil
+}
+
+func (m *mockRepo) ListCategories(_ context.Context, _ string, _ int) ([]catalog.CategoryRow, error) {
+	return []catalog.CategoryRow{}, nil
+}
+
+func (m *mockRepo) ListProductsByCategory(_ context.Context, _ int64, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return []catalog.ProductSummaryRow{}, 0, nil
+}
+
+func (m *mockRepo) SearchProductsSummary(_ context.Context, query, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	// Return a matching row when query matches the hard-coded test title "elbise".
+	if query == "elbise" {
+		return []catalog.ProductSummaryRow{
+			{
+				ID:            1,
+				Title:         "Kırmızı Elbise",
+				PriceMinor:    10000,
+				PriceCurrency: "TRY",
+			},
+		}, 1, nil
+	}
+	return []catalog.ProductSummaryRow{}, 0, nil
+}

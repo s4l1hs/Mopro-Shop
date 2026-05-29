@@ -59,7 +59,8 @@ List<Override> _overrides() => [
       homeMoodStoriesProvider.overrideWith((ref) async => const []),
       trendingSearchesProvider.overrideWith((ref) async => const <String>[]),
       homeRailsProvider.overrideWith(
-        (ref) async => const [HomeRail(key: 'recommended', title: 'Önerilenler')],
+        (ref, layout) async =>
+            const [HomeRail(key: 'recommended', title: 'Önerilenler')],
       ),
       productsRailProvider('recommended')
           .overrideWith((ref) async => [for (var i = 0; i < 8; i++) _p(i + 1)]),
@@ -113,7 +114,13 @@ void main() {
     // Banner prev/next chevrons are present on desktop.
     expect(find.byIcon(Icons.chevron_left), findsOneWidget);
     expect(find.byIcon(Icons.chevron_right), findsOneWidget);
-    // The thin desktop-only footer is mounted.
+    // The thin desktop-only footer is mounted (scroll to it — the editor's
+    // picks section pushes it below the fold in the lazy CustomScrollView).
+    await tester.scrollUntilVisible(
+      find.byType(HomeFooter),
+      400,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.byType(HomeFooter), findsOneWidget);
   });
 
