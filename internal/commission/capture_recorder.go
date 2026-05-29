@@ -50,10 +50,15 @@ type pgRecorder struct {
 	pool *pgxpool.Pool
 }
 
-// NewCaptureRecorder constructs the concrete pgx-backed recorder.
-func NewCaptureRecorder(pool *pgxpool.Pool) *pgRecorder {
+// NewCaptureRecorder constructs the pgx-backed recorder. Returns the
+// CaptureRecorder interface so callers depend on the seam, not the
+// concrete type.
+func NewCaptureRecorder(pool *pgxpool.Pool) CaptureRecorder {
 	return &pgRecorder{pool: pool}
 }
+
+// Compile-time interface check.
+var _ CaptureRecorder = (*pgRecorder)(nil)
 
 // InsertCapturePosting writes a capture_postings audit row within tx.
 // Returns ErrAlreadyPosted on UNIQUE(order_id) conflict (idempotent
