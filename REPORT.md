@@ -1590,13 +1590,60 @@ by `make test-integration-catalog` / CI's integration job.
   counts — falls back to no count until it exists).
 - CDN `?w=` re-verification once `cdn.moproshop.com` is provisioned (from 5a).
 
+## §4 — Cart desktop two-column
+
+`CartScreen` renders a two-column layout at ≥600 (left seller-grouped items, right
+fixed `OrderSummaryCard` 320/360dp); the summary is pinned simply by sitting
+outside the scrolling items list. Mobile keeps the bottom `CartTotalsSummary`;
+empty cart is full-width `EmptyCart` on all breakpoints. `OrderSummaryCard` reads
+`cartProvider` + `cartMonthlyCashbackProvider` (no new providers): subtotal /
+shipping (Ücretsiz when 0) / cashback / total / coupon input (Uygula inert — no
+coupon backend, backlog) / Sepeti Onayla. Tests: composition, sticky-while-
+scroll, mobile fallback, empty full-width; **flow Q** (two-column → sticky →
+clear → empty). 4 goldens (1440 × light/dark × filled/empty).
+
+## §2 — PLP desktop sidebar
+
+Two-column at ≥768 consuming the 5a `plpFiltersProvider` substrate. `FilterPanel`
+(category tree / searchable brand list / dual-thumb RangeSlider + Min·Max inputs /
+rating radios / free-shipping switch / Temizle·Uygula footer); `PlpFilterChips`
+row; sort `PopupMenuButton`. `ProductGrid`/`CatalogShell` gained an optional
+`crossAxisCount` (default 2 — mobile unchanged) → 3/5 cols in the two-column grid.
+Tests: sidebar ≥768 only, brand search, brand-check→chip, clear-all; **flow O**
+(brand check → URL `brand=`; chip × → cleared). 4 goldens (1440 × light/dark ×
+{no filters, with filters}).
+
+**Drive-by fix:** `_writeUrl` cleared filters with
+`Uri.replace(queryParameters: null)`, which Dart treats as "unchanged" and KEEPS
+the existing query — clearing all filters never cleared the URL. Now navigates to
+the bare path when the encoded query is empty (5a latent bug).
+
+Deviations (documented): sort uses `PopupMenuButton` (not `AnchoredOverlayPanel`);
+rating uses a custom icon radio (avoids the deprecated `Radio` API — RadioGroup
+migration stays a separate backlog); brand counts omitted (no aggregation
+endpoint); PLP goldens at 1440 only (1024 covered by the same responsive logic).
+`SearchScreen` sidebar carried to 5c (same wiring; CategoryProductsScreen shipped).
+
+## §6.1/§6.2/§6.3 — home leftovers
+
+Editor's-picks desktop sub-section (3×2 grid; recently-viewed hidden — no
+provider); 8/12 mood + category columns on tablet/desktop; `?layout=desktop` rails
+hint (homeRailsProvider family + backend cap, Go + Dart fixture tests). Home
+768/1440 goldens regenerated.
+
+## Goldens & rebaseline
+
+All new/changed goldens baselined on ubuntu via the `golden-rebaseline` workflow
+(run [26660077848](https://github.com/s4l1hs/Mopro-Shop/actions/runs/26660077848)):
+PDP (8), cart (4), favorites (4), PLP (4), + regenerated home 768/1440. CI
+`flutter test` green. New integration flows: M, N (5a) + **O, P, Q** (5b).
+
 ## Carried to 5b-continuation
 
-§2 PLP sidebar filter panel + chip row + sort dropdown; §4 Cart two-column +
-`OrderSummaryCard` + empty state; §6.1 Editor's picks /
-Recently viewed home sub-section; §6.2 mood/category 8/12 column counts; §6.3
-`?layout=desktop` rails hint + §2.5 fixture; new integration flows O/P/Q; new
-goldens + Linux re-baseline.
+None — Session 5b is complete (PLP sidebar, PDP two-column, Cart two-column,
+Favorites desktop, home leftovers, flows O/P/Q, goldens). Minor follow-ups folded
+into Backlog: `SearchScreen` sidebar; PLP 1024 goldens; brand-count aggregation;
+coupon backend; AnchoredOverlayPanel sort; RadioGroup migration.
 
 ## Deferred to Session 5c (out of 5b scope)
 
