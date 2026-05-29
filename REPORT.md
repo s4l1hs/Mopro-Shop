@@ -1458,11 +1458,37 @@ analyze-clean commits, in execution order by value×certainty:
 - §6.4 — catalog `-tags=integration` build-tag fix (real correctness; 5a blocker).
 - §7 — `CONTRIBUTING.md`: "Adding a Notifier" (three shapes + synchronous-reachability rule) and "Writing a Regression Test" (revert-must-fail standard).
 - §5 — Favorites desktop grid (2/4/5 columns; mobile byte-identical; skeleton matches result columns).
+- §3 (extraction half) — `PdpPriceBlock`, `PdpVariantSelector`, `PdpSellerCard`, `PdpStickyCta` extracted; PDP refactored to consume them (output-identical mobile path).
 
-_Remaining sections (§2 PLP sidebar, §3 PDP two-column + hover-zoom + extraction,
+_Remaining sections (§2 PLP sidebar, §3 PDP **two-column + hover-zoom** layout,
 §4 Cart two-column, §6.1–§6.3 home leftovers) and their goldens/integration
 flows are tracked for the 5b continuation; see "Carried to 5b-continuation"
 below._
+
+## §3 — PDP component extraction (refactor before desktop layout)
+
+Per §3.2, the PDP buy-box pieces and sticky CTA are now standalone widgets under
+`lib/features/catalog/widgets/pdp/`, each with its own test:
+
+| Component | File | Test |
+|---|---|---|
+| `PdpPriceBlock` | `widgets/pdp/pdp_price_block.dart` | `pdp_components_test.dart` |
+| `PdpVariantSelector` | `widgets/pdp/pdp_variant_selector.dart` | ″ |
+| `PdpSellerCard` | `widgets/pdp/pdp_seller_card.dart` | ″ |
+| `PdpStickyCta` | `widgets/pdp/pdp_sticky_cta.dart` | ″ |
+
+**Contract adapted to the real generated model** (the spec's contracts assume
+types the API doesn't expose): `Variant` is flat (color/size/sku), so
+`PdpVariantSelector` takes `List<Variant>` not `VariantGroup`; `Product` exposes
+`sellerName` (string) not a `Seller`, so `PdpSellerCard` takes the name + `onTap`;
+`PdpPriceBlock` accepts optional `originalPriceMinor`/`lowestIn30DaysMinor`
+(strikethrough + %-pill + "lowest 30d" hint) for forward use, both null today.
+The mobile PDP composition is output-identical (no golden/test regression).
+`PdpImagePager` + hover-zoom (§3.3) and the two-column layout (§3.1/§3.4) remain
+carried (they introduce goldens needing a Linux re-baseline).
+
+New locale keys: `product.go_to_store`, `product.lowest_30d` (tr-TR + en-US;
+de-DE/ar-AE lack the `product` block and fall back to tr-TR).
 
 ## §5 — Favorites desktop grid
 
@@ -1502,8 +1528,8 @@ by `make test-integration-catalog` / CI's integration job.
 ## Carried to 5b-continuation
 
 §2 PLP sidebar filter panel + chip row + sort dropdown; §3 PDP two-column +
-hover-zoom + component extraction; §4 Cart two-column + `OrderSummaryCard` +
-empty state; §6.1 Editor's picks /
+hover-zoom layout (component extraction DONE); §4 Cart two-column +
+`OrderSummaryCard` + empty state; §6.1 Editor's picks /
 Recently viewed home sub-section; §6.2 mood/category 8/12 column counts; §6.3
 `?layout=desktop` rails hint + §2.5 fixture; new integration flows O/P/Q; new
 goldens + Linux re-baseline.
