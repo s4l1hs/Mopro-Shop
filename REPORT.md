@@ -1091,4 +1091,65 @@ Per the user-approved scope. §4.3 keyboard nav (arrows / Tab / Space / Enter / 
 - Existing Session 4a/4b/4c goldens — unchanged.
 - Pre-push hook will pass without `--no-verify` (verified via `make verify` above).
 
+# Session 4d follow-up — cashback storage-layer idempotency
+
+PR title: `fix(cashback): restore v6 storage-layer idempotency via cashback_schema.payments`
+
+## Triage classification
+
+Reopens the (C) Missing idempotency key finding from the Session 4d concurrency
+investigation. Root cause: when N goroutines called `PayMonthlyInstallments`
+concurrently for the same plan + asOf, the wallet `PostInTx` idempotent-replay
+path returned `nil` for losers without an `ErrDuplicateIdempotency` signal —
+then `payOnePlanInTx` unconditionally called `IncrPaymentsMade`, over-counting
+`plans.payments_made`. The fix moves the idempotency guard down to the
+storage layer (`UNIQUE(plan_id, period_yyyymm)` on `cashback_schema.payments`)
+so losers are detected and skipped before touching the ledger or the counter.
+
+## Drive-by fixes (rolled in as commit #1 per §1.1 inverted-gate policy)
+
+- **`chore(ledger)`** — Migration `0078` drops the stale
+  `plans_reference_interest_rate_bps_check (BETWEEN 1 AND 20000)` constraint
+  left by `0076_cashback_accelerated_v8` after it relaxed the column DEFAULT
+  to 0. The surviving CHECK was rejecting every v8 seed INSERT and blocking
+  the entire cashback integration + property test suite on `main`.
+
+## Six commits
+
+| # | Subject |
+|---|---|
+| 1 | `chore(ledger)` — drop stale `reference_interest_rate_bps` CHECK |
+| 2 | `fix(cashback)` — `payOnePlanInTx` INSERT-first into `cashback_schema.payments` (adds `ClaimPaymentPeriod`, `MarkPaymentPaid`, `PaymentExistsForPeriod`; threads `runPeriodYYYYMM` through `ListDuePlans`) |
+| 3 | `fix(cashback)` — convert `payments_made` to COUNT-derived cache via `RefreshPaymentsMadeCache` |
+| 4 | `test(cashback)` — un-skip `TestCronProperty_ConcurrentIdempotency` + add `TestCronProperty_PaymentsMadeMatchesCount` |
+| 5 | `docs(cashback)` — migration `0079` + Go doc flag `payments_made` as a cache |
+| 6 | `docs(report)` — this entry |
+
+## Design notes
+
+- `period_yyyymm = run month` (from `runDate`), not the installment's scheduled
+  month. Keeps periods within the schema's `BETWEEN 202600 AND 209912` CHECK
+  even for plans whose `start_date` predates 2026; aligns with the schema
+  comment "prevents double-payment for any given month" (read: cron run month).
+- `ListDuePlans` now takes `runPeriodYYYYMM` and filters via `NOT EXISTS` on
+  `cashback_schema.payments`. Without this filter, post-fix cron cost grew
+  quadratically with the test's plan accumulation (old code "graduated" plans
+  to `completed` quickly via the racy counter bump — the bug masked the
+  scaling cost). With the filter, all three previously-passing property tests
+  (`DoubleEntryInvariant`, `Idempotency`, `MonotonicBalance`) stay green in
+  ~12s on a clean DB.
+- `PaymentExistsForPeriod` pool-read pre-check in `payOnePlanInTx` is
+  defense-in-depth against the rare race between `ListDuePlans` and the
+  `SERIALIZABLE` tx. Cheap and keeps the hot path out of the tx entirely
+  when there's nothing to do.
+
+## Verification
+
+- `go test ./internal/cashback/ ./internal/api/` — green.
+- `go test -tags=integration -count=1 ./internal/cashback/` — green; full
+  suite incl. previously-skipped `TestCronProperty_ConcurrentIdempotency`
+  and new `TestCronProperty_PaymentsMadeMatchesCount` in ~14s.
+- Migrations `0078` + `0079` applied successfully against `pg-ledger-test`.
+- No `--no-verify` push.
+
 
