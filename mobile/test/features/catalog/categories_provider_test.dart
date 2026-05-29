@@ -25,6 +25,7 @@ class _FakeCatalogApi extends CatalogApi {
   @override
   Future<Response<ListCategories200Response>> listCategories({
     String? xTraceId,
+    int? depth,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,

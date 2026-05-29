@@ -786,10 +786,11 @@ type RequestOtpJSONBody struct {
 	// Phone Turkish mobile number in E.164 format. Must start with +905.
 	Phone string `json:"phone"`
 
-	// Purpose OTP purpose. Use `login` for initial authentication (default).
+	// Purpose OTP purpose. Omit (or send `login`) for initial authentication —
+	// the server treats an absent value as `login`.
 	// Use `step_up` only if you need a step-up OTP outside the authenticated
 	// step-up flow (`POST /auth/step-up/request`). Most clients should omit
-	// this field and rely on the default.
+	// this field and rely on the server's `login` default.
 	Purpose *RequestOtpJSONBodyPurpose `json:"purpose,omitempty"`
 }
 
@@ -809,7 +810,7 @@ type VerifyOtpJSONBody struct {
 	Code  string `json:"code"`
 	Phone string `json:"phone"`
 
-	// Purpose Must match the purpose used in the corresponding /otp/request call. Defaults to `login`.
+	// Purpose Must match the purpose used in the corresponding /otp/request call. Omit (or send `login`) for login — the server treats an absent value as `login`.
 	Purpose *VerifyOtpJSONBodyPurpose `json:"purpose,omitempty"`
 }
 
@@ -985,6 +986,10 @@ type ListCashbackPaymentsParams struct {
 
 // ListCategoriesParams defines parameters for ListCategories.
 type ListCategoriesParams struct {
+	// Depth Filter chain length from root parent. Valid range 1..3. Omitting
+	// the param returns all depths (historical behavior).
+	Depth *int `form:"depth,omitempty" json:"depth,omitempty"`
+
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
 	// Echoed in error responses as `error.trace_id`.
 	// Falls back to a server-generated UUID if absent.

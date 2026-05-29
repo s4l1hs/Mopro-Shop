@@ -41,7 +41,7 @@ func (m *mockCatalogSvc) Search(_ context.Context, _, _, _ string) ([]catalog.Pr
 func (m *mockCatalogSvc) GetCommissionForCategory(_ context.Context, _ string, id int64) (catalog.CategoryCommission, error) {
 	return catalog.CategoryCommission{CategoryID: id}, nil
 }
-func (m *mockCatalogSvc) ListCategories(_ context.Context, _ string) ([]catalog.CategoryRow, error) {
+func (m *mockCatalogSvc) ListCategories(_ context.Context, _ string, _ int) ([]catalog.CategoryRow, error) {
 	return nil, nil
 }
 func (m *mockCatalogSvc) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {

@@ -15,7 +15,7 @@ func (m *mockRepo) ListAllVariantStocks(_ context.Context) ([]catalog.VariantSto
 	return nil, nil
 }
 
-func (m *mockRepo) ListCategories(_ context.Context, _ string) ([]catalog.CategoryRow, error) {
+func (m *mockRepo) ListCategories(_ context.Context, _ string, _ int) ([]catalog.CategoryRow, error) {
 	return []catalog.CategoryRow{}, nil
 }
 

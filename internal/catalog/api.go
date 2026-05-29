@@ -18,7 +18,11 @@ type Service interface {
 	GetVariantByID(ctx context.Context, variantID int64) (Variant, error)
 
 	// Discovery endpoints (Phase 4.4a).
-	ListCategories(ctx context.Context, locale string) ([]CategoryRow, error)
+	//
+	// `maxDepth` (Session 4c §3) filters to categories whose chain length to
+	// a root parent is at most `maxDepth` (root=0, direct children=1, …).
+	// Pass 0 for "no limit" — preserves the historical behavior.
+	ListCategories(ctx context.Context, locale string, maxDepth int) ([]CategoryRow, error)
 	ListProductsByCategory(ctx context.Context, categoryID int64, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error)
 	SearchSummary(ctx context.Context, query, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error)
 
@@ -55,7 +59,7 @@ type Repository interface {
 	GetVariantByID(ctx context.Context, variantID int64) (Variant, error)
 
 	// Discovery queries (Phase 4.4a).
-	ListCategories(ctx context.Context, locale string) ([]CategoryRow, error)
+	ListCategories(ctx context.Context, locale string, maxDepth int) ([]CategoryRow, error)
 	ListProductsByCategory(ctx context.Context, categoryID int64, locale string, offset, limit int) ([]ProductSummaryRow, int, error)
 	SearchProductsSummary(ctx context.Context, query, locale string, offset, limit int) ([]ProductSummaryRow, int, error)
 
