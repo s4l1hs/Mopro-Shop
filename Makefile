@@ -75,13 +75,20 @@ pg-ledger-test-up:
 	        -e POSTGRES_DB=mopro_ledger postgres:16-alpine > /dev/null ; \
 	    echo "[$(PG_LEDGER_TEST_CONTAINER)] waiting for postgres..." ; \
 	    for i in $$(seq 1 30); do \
-	        docker exec $(PG_LEDGER_TEST_CONTAINER) pg_isready -U ledger_admin -d mopro_ledger > /dev/null 2>&1 && break ; \
+	        if docker exec $(PG_LEDGER_TEST_CONTAINER) psql -U ledger_admin -d mopro_ledger -c 'SELECT 1' > /dev/null 2>&1; then \
+	            break ; \
+	        fi ; \
 	        sleep 1 ; \
 	    done ; \
-	    echo "[$(PG_LEDGER_TEST_CONTAINER)] applying schema..." ; \
+	    echo "[$(PG_LEDGER_TEST_CONTAINER)] applying init schema (deploy/postgres-ledger/init/*.sql)..." ; \
 	    for f in $$(ls deploy/postgres-ledger/init/*.sql | sort); do \
 	        docker exec -i $(PG_LEDGER_TEST_CONTAINER) psql -U ledger_admin -d mopro_ledger < $$f > /dev/null \
-	            || { echo "schema apply failed at $$f" >&2 ; exit 1 ; } ; \
+	            || { echo "init schema apply failed at $$f" >&2 ; exit 1 ; } ; \
+	    done ; \
+	    echo "[$(PG_LEDGER_TEST_CONTAINER)] applying ledger migrations (migrations/ledger/*.up.sql)..." ; \
+	    for f in $$(ls migrations/ledger/*.up.sql | sort); do \
+	        docker exec -i $(PG_LEDGER_TEST_CONTAINER) psql -U ledger_admin -d mopro_ledger < $$f > /dev/null \
+	            || { echo "migration apply failed at $$f" >&2 ; exit 1 ; } ; \
 	    done ; \
 	    echo "[$(PG_LEDGER_TEST_CONTAINER)] ready" ; \
 	fi
