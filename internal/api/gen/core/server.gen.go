@@ -259,7 +259,12 @@ type Category struct {
 	// Name Locale-resolved category name
 	Name     string `json:"name"`
 	ParentId *int64 `json:"parent_id"`
-	Slug     string `json:"slug"`
+
+	// PromoSlot Promo card payload for the desktop mega menu's 3+1 layout. All
+	// fields required when the slot is populated; absence of the slot
+	// itself is null on the parent Category.
+	PromoSlot *CategoryPromoSlot `json:"promo_slot,omitempty"`
+	Slug      string             `json:"slug"`
 }
 
 // CategoryCommission defines model for CategoryCommission.
@@ -272,6 +277,20 @@ type CategoryCommission struct {
 	// KdvPctBps KDV (VAT) rate in basis points
 	KdvPctBps int    `json:"kdv_pct_bps"`
 	Market    string `json:"market"`
+}
+
+// CategoryPromoSlot Promo card payload for the desktop mega menu's 3+1 layout. All
+// fields required when the slot is populated; absence of the slot
+// itself is null on the parent Category.
+type CategoryPromoSlot struct {
+	// DeepLink In-app deep link for the CTA button.
+	DeepLink string `json:"deep_link"`
+
+	// ImageUrl 16:9 image URL. Mobile clients should treat as opaque.
+	ImageUrl string `json:"image_url"`
+
+	// Title 2-line clamp display title.
+	Title string `json:"title"`
 }
 
 // CheckoutRequest defines model for CheckoutRequest.

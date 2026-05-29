@@ -46,12 +46,26 @@ type ProductTranslation struct {
 
 // CategoryRow is a category with its locale-resolved name and commission rate.
 // Used by ListCategories for the buyer-facing GET /categories endpoint.
+//
+// PromoSlot (Session 4d §2) is surfaced only on top-level rows (ParentID == nil).
+// Repository normalizes malformed JSON to nil + warning log; the API contract
+// is "absent or null for everything except seeded top-level categories."
 type CategoryRow struct {
 	ID               int64
 	Slug             string
 	Name             string // locale-resolved (name_tr or name_en)
 	ParentID         *int64
 	CommissionPctBps int
+	PromoSlot        *PromoSlot
+}
+
+// PromoSlot is the optional 16:9 card + title + CTA shown in the desktop
+// mega menu's 3+1 layout. Persisted as JSONB in ref_schema.categories.promo_slot;
+// always null on subcategories and leaves.
+type PromoSlot struct {
+	ImageURL string `json:"imageUrl"`
+	Title    string `json:"title"`
+	DeepLink string `json:"deepLink"`
 }
 
 // ProductSummaryRow is a lightweight product record for list / search results.

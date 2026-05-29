@@ -176,6 +176,7 @@ Class | Method | HTTP request | Description
  - [CashbackPreview](doc/CashbackPreview.md)
  - [Category](doc/Category.md)
  - [CategoryCommission](doc/CategoryCommission.md)
+ - [CategoryPromoSlot](doc/CategoryPromoSlot.md)
  - [ChangePasswordRequest](doc/ChangePasswordRequest.md)
  - [CheckoutRequest](doc/CheckoutRequest.md)
  - [CheckoutRequestPaymentMethod](doc/CheckoutRequestPaymentMethod.md)

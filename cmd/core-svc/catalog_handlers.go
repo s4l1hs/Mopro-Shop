@@ -324,12 +324,19 @@ func parseIntQuery(s string, def int) int {
 	return v
 }
 
+type promoSlotJSON struct {
+	ImageURL string `json:"image_url"`
+	Title    string `json:"title"`
+	DeepLink string `json:"deep_link"`
+}
+
 type categoryJSON struct {
-	ID               int64  `json:"id"`
-	Slug             string `json:"slug"`
-	Name             string `json:"name"`
-	ParentID         *int64 `json:"parent_id"`
-	CommissionPctBps int    `json:"commission_pct_bps"`
+	ID               int64          `json:"id"`
+	Slug             string         `json:"slug"`
+	Name             string         `json:"name"`
+	ParentID         *int64         `json:"parent_id"`
+	CommissionPctBps int            `json:"commission_pct_bps"`
+	PromoSlot        *promoSlotJSON `json:"promo_slot,omitempty"`
 }
 
 func buildCategoryListResponse(rows []catalog.CategoryRow) map[string]any {
@@ -341,6 +348,13 @@ func buildCategoryListResponse(rows []catalog.CategoryRow) map[string]any {
 			Name:             r.Name,
 			ParentID:         r.ParentID,
 			CommissionPctBps: r.CommissionPctBps,
+		}
+		if r.PromoSlot != nil {
+			out[i].PromoSlot = &promoSlotJSON{
+				ImageURL: r.PromoSlot.ImageURL,
+				Title:    r.PromoSlot.Title,
+				DeepLink: r.PromoSlot.DeepLink,
+			}
 		}
 	}
 	return map[string]any{"data": out}
