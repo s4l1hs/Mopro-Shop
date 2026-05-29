@@ -178,9 +178,9 @@ func main() {
 
 	// ── Order capture ledger consumer ─────────────────────────────��──────────
 	orderledgerRepo := orderledger.NewRepository(pool)
-	// commission.CaptureRecorder owns commission_schema.capture_postings;
-	// orderledger persists postings through this seam instead of reaching
-	// across the schema boundary directly.
+	// commission.CaptureRecorder is the seam through which orderledger
+	// persists capture-posting audit rows; the commission package owns
+	// the underlying schema access (see internal/commission/).
 	captureRecorder := commission.NewCaptureRecorder(pool)
 	orderledgerSvc := orderledger.NewService(orderledgerRepo, captureRecorder, walletSvc, slog.Default(), bizM)
 	go func() {
