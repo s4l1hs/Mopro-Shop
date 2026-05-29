@@ -25,7 +25,7 @@ void main() {
     final c = ProviderContainer();
     addTearDown(c.dispose);
     c.read(plpFiltersProvider('42').notifier).set(
-          const PlpFilters(sort: PlpSort.recommended, page: 5),
+          const PlpFilters(page: 5),
         );
     c.read(plpFiltersProvider('42').notifier).setSort(PlpSort.priceDesc);
     final f = c.read(plpFiltersProvider('42'));
