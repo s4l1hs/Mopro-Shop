@@ -157,8 +157,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
             child: _BuyBox(
               product: product,
               selectedVariant: _selectedVariant,
-              onVariantChanged: (v) =>
-                  setState(() => _selectedVariant = v),
+              onVariantChanged: (v) => setState(() => _selectedVariant = v),
             ),
           ),
           SliverPersistentHeader(
@@ -232,7 +231,10 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
     _tabController.index = 2;
     final ctx = wideTabsKey.currentContext;
     if (ctx != null) {
-      Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 300));
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 300),
+      );
     }
   }
 
@@ -252,7 +254,8 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(product.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title:
+            Text(product.title, maxLines: 1, overflow: TextOverflow.ellipsis),
         actions: [
           IconButton(
             icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
@@ -277,51 +280,53 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
                   final galleryW = (c.maxWidth - buyBoxW - gap)
                       .clamp(280.0, isDesktop ? 600.0 : 480.0);
                   final galleryH = galleryW + 84; // square image + thumb strip
-                  final contentH = math.max(galleryH, _buyBoxHeight ?? galleryH);
+                  final contentH =
+                      math.max(galleryH, _buyBoxHeight ?? galleryH);
                   final maxTop =
                       (contentH - galleryH).clamp(0.0, double.infinity);
                   final top = _scrollOffset.clamp(0.0, maxTop);
 
-                  return SizedBox(
-                    height: contentH,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(
-                          width: galleryW,
-                          height: contentH,
-                          child: Stack(
-                            children: [
-                              Positioned(
-                                top: top,
-                                left: 0,
-                                right: 0,
-                                height: galleryH,
-                                child: KeyedSubtree(
-                                  key: wideGalleryKey,
-                                  child: ValueListenableBuilder<LastPointerKind>(
-                                    valueListenable: PointerKindObserver.lastKind,
-                                    builder: (_, kind, __) => PdpImagePager(
-                                      imageUrls: _imageUrls,
-                                      enableHoverZoom: isDesktop &&
-                                          kind == LastPointerKind.mouse,
-                                    ),
+                  // NOTE: the Row is NOT height-constrained — the buy-box must
+                  // measure its natural height (via _buyBoxKey) so contentH can
+                  // grow to it. Only the gallery cell is sized to contentH, so
+                  // the gallery can translate within the taller column.
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: galleryW,
+                        height: contentH,
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              top: top,
+                              left: 0,
+                              right: 0,
+                              height: galleryH,
+                              child: KeyedSubtree(
+                                key: wideGalleryKey,
+                                child: ValueListenableBuilder<LastPointerKind>(
+                                  valueListenable: PointerKindObserver.lastKind,
+                                  builder: (_, kind, __) => PdpImagePager(
+                                    imageUrls: _imageUrls,
+                                    enableHoverZoom: isDesktop &&
+                                        kind == LastPointerKind.mouse,
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: gap),
-                        SizedBox(
-                          width: buyBoxW,
-                          child: KeyedSubtree(
-                            key: _buyBoxKey,
-                            child: _buildWideBuyBox(context, product, isMutating),
-                          ),
+                      ),
+                      const SizedBox(width: gap),
+                      SizedBox(
+                        width: buyBoxW,
+                        child: KeyedSubtree(
+                          key: _buyBoxKey,
+                          child: _buildWideBuyBox(context, product, isMutating),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -388,7 +393,11 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.star_rounded, size: 18, color: Color(0xFFFFB400)),
+                const Icon(
+                  Icons.star_rounded,
+                  size: 18,
+                  color: Color(0xFFFFB400),
+                ),
                 const SizedBox(width: 4),
                 Text(avg.toStringAsFixed(1), style: theme.textTheme.bodyMedium),
                 const SizedBox(width: 6),
@@ -598,10 +607,8 @@ class _Pill extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
-            ?.copyWith(color: textColor),
+        style:
+            Theme.of(context).textTheme.labelSmall?.copyWith(color: textColor),
       ),
     );
   }
@@ -870,9 +877,7 @@ class _ReviewItem extends StatelessWidget {
                 return Icon(
                   filled ? Icons.star_rounded : Icons.star_outline_rounded,
                   size: 16,
-                  color: filled
-                      ? const Color(0xFFFFB400)
-                      : cs.outlineVariant,
+                  color: filled ? const Color(0xFFFFB400) : cs.outlineVariant,
                 );
               }),
             ),
