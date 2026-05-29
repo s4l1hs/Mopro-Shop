@@ -1,0 +1,9 @@
+#!/bin/sh
+# pre-push: run the full verification suite before publishing.
+# Mirrors the legacy `scripts/install-hooks.sh` behavior; lives here so
+# `core.hooksPath = .githooks` doesn't deactivate it.
+#
+# Bypass: `git push --no-verify` (only if you know what you're skipping).
+
+set -e
+make verify

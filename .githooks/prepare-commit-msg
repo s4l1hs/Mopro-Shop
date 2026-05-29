@@ -1,0 +1,35 @@
+#!/bin/sh
+# prepare-commit-msg: same protected-branch guard as pre-commit, fired earlier
+# in the lifecycle so editors that bypass pre-commit still surface the error
+# before the commit-message editor opens.
+#
+# Args (per git docs):
+#   $1 = path to the commit message file
+#   $2 = source of the commit message (message, template, merge, squash, commit)
+#   $3 = commit SHA when source = commit
+
+set -e
+
+# Skip during merge / squash / amend — those have legitimate reasons to be
+# invoked from any branch and the underlying pre-commit (or hand intent)
+# already governs whether the operation is safe.
+case "${2:-}" in
+  merge|squash|commit)
+    exit 0
+    ;;
+esac
+
+PROTECTED="main master"
+current_branch=$(git symbolic-ref --short -q HEAD || echo "DETACHED")
+
+for protected in $PROTECTED; do
+  if [ "$current_branch" = "$protected" ]; then
+    printf '\033[0;31m❌ refusing to prepare commit message on %s\033[0m\n' "$current_branch" >&2
+    printf '   checkout a feature branch first:\n' >&2
+    printf '     git checkout -b feat/your-change\n' >&2
+    printf '   (or pass --no-verify if you really mean it.)\n' >&2
+    exit 1
+  fi
+done
+
+exit 0

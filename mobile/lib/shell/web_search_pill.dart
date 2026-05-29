@@ -1,8 +1,8 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/design/responsive/anchored_overlay_panel.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/catalog/providers/categories_provider.dart';
 import 'package:mopro/features/catalog/providers/home_provider.dart';
@@ -11,13 +11,16 @@ import 'package:mopro/shell/search_suggestions_dropdown.dart';
 
 /// Real-text-input search pill used by `WebHeader` at `>=600` widths.
 ///
-/// Replaces the tap-to-overlay `HeaderSearchBar` behavior with an inline
-/// `TextField` + a `SearchSuggestionsDropdown` overlay anchored to the bottom
-/// edge of the pill via `CompositedTransformFollower`.
+/// The pill is a `TextField`; the `SearchSuggestionsDropdown` is rendered
+/// inside an `AnchoredOverlayPanel` anchored to the pill's bottom edge with
+/// `matchTriggerWidth: true` so the dropdown width tracks the pill.
 ///
-/// Open triggers: TextField gains focus.
-/// Close triggers: outside click, Escape key, route change, or focus moves to
-/// a non-dropdown element.
+/// Session 4b migration: previously this widget owned its own `OverlayPortal`,
+/// `CompositedTransformFollower`, `Shortcuts`/`Actions` for Escape, and the
+/// outside-click dismisser. All of that is now provided by
+/// `AnchoredOverlayPanel`; this widget only configures it (openOnFocus, not
+/// openOnTap — taps go through to the TextField so the cursor lands there
+/// naturally) and renders the inner content.
 class WebSearchPill extends ConsumerStatefulWidget {
   const WebSearchPill({super.key});
 
@@ -25,63 +28,40 @@ class WebSearchPill extends ConsumerStatefulWidget {
   ConsumerState<WebSearchPill> createState() => _WebSearchPillState();
 }
 
-class _WebSearchPillState extends ConsumerState<WebSearchPill>
-    with RouteAware {
+class _WebSearchPillState extends ConsumerState<WebSearchPill> {
   final _controller = TextEditingController();
-  final _focusNode = FocusNode();
-  final _layerLink = LayerLink();
-  final _overlayController = OverlayPortalController();
-
-  @override
-  void initState() {
-    super.initState();
-    _focusNode.addListener(_handleFocusChange);
-  }
+  final _textFocusNode = FocusNode();
 
   @override
   void dispose() {
-    _focusNode
-      ..removeListener(_handleFocusChange)
-      ..dispose();
     _controller.dispose();
+    _textFocusNode.dispose();
     super.dispose();
-  }
-
-  void _handleFocusChange() {
-    if (_focusNode.hasFocus) {
-      _overlayController.show();
-    } else {
-      // Delay close to allow a row tap (which steals focus mid-frame) to
-      // complete before the overlay disappears.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (!_focusNode.hasFocus) _overlayController.hide();
-      });
-    }
   }
 
   void _submit(String query) {
     final q = query.trim();
     if (q.isEmpty) return;
     ref.read(recentSearchesProvider.notifier).add(q);
-    _overlayController.hide();
-    _focusNode.unfocus();
+    _textFocusNode.unfocus();
     context.push('/search?q=${Uri.encodeQueryComponent(q)}');
   }
 
-  void _selectRecent(String q) {
+  void _selectRecent(String q, VoidCallback close) {
     _controller.text = q;
+    close();
     _submit(q);
   }
 
-  void _selectTrending(String q) {
+  void _selectTrending(String q, VoidCallback close) {
     _controller.text = q;
+    close();
     _submit(q);
   }
 
-  void _selectCategory(int categoryId) {
-    _overlayController.hide();
-    _focusNode.unfocus();
+  void _selectCategory(int categoryId, VoidCallback close) {
+    close();
+    _textFocusNode.unfocus();
     context.go('/categories/$categoryId');
   }
 
@@ -93,102 +73,103 @@ class _WebSearchPillState extends ConsumerState<WebSearchPill>
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: OverlayPortal(
-        controller: _overlayController,
-        overlayChildBuilder: (overlayContext) {
-          return _DropdownOverlay(
-            layerLink: _layerLink,
-            anchorContext: context,
-            onDismiss: () {
-              _overlayController.hide();
-              _focusNode.unfocus();
-            },
-            child: Consumer(
-              builder: (context, ref, _) {
-                final recent = ref.watch(recentSearchesProvider);
-                final trending = ref.watch(trendingSearchesProvider);
-                final categoriesState = ref.watch(categoriesProvider);
-                return SearchSuggestionsDropdown(
-                  recentSearches: recent,
-                  trendingSearches: _asSnapshot(trending),
-                  categories:
-                      categoriesState.categories.valueOrNull ?? const [],
-                  onSelectRecent: _selectRecent,
-                  onSelectTrending: _selectTrending,
-                  onSelectCategory: _selectCategory,
-                  onRemoveRecent: _removeRecent,
-                );
-              },
-            ),
-          );
-        },
-        child: Shortcuts(
-          shortcuts: const <ShortcutActivator, Intent>{
-            SingleActivator(LogicalKeyboardKey.escape): _DismissIntent(),
+    return AnchoredOverlayPanel(
+      // The TextField inside the trigger handles its own taps; we just need
+      // the panel to open when the TextField gains focus.
+      openOnHover: false,
+      openOnTap: false,
+      matchTriggerWidth: true,
+      trigger: _PillBody(
+        controller: _controller,
+        focusNode: _textFocusNode,
+        onSubmitted: _submit,
+        onClear: () => setState(_controller.clear),
+        colorScheme: cs,
+      ),
+      panelBuilder: (panelContext, close) {
+        return Consumer(
+          builder: (context, ref, _) {
+            final recent = ref.watch(recentSearchesProvider);
+            final trending = ref.watch(trendingSearchesProvider);
+            final categoriesState = ref.watch(categoriesProvider);
+            return SearchSuggestionsDropdown(
+              recentSearches: recent,
+              trendingSearches: _asSnapshot(trending),
+              categories:
+                  categoriesState.categories.valueOrNull ?? const [],
+              onSelectRecent: (q) => _selectRecent(q, close),
+              onSelectTrending: (q) => _selectTrending(q, close),
+              onSelectCategory: (id) => _selectCategory(id, close),
+              onRemoveRecent: _removeRecent,
+            );
           },
-          child: Actions(
-            actions: <Type, Action<Intent>>{
-              _DismissIntent: CallbackAction<_DismissIntent>(
-                onInvoke: (_) {
-                  _overlayController.hide();
-                  _focusNode.unfocus();
-                  return null;
-                },
-              ),
-            },
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(MoproTokens.radiusFull),
-                border: Border.all(color: cs.outlineVariant),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              child: Row(
-                children: [
-                  Icon(Icons.search, size: 18, color: cs.onSurfaceVariant),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      onSubmitted: _submit,
-                      textInputAction: TextInputAction.search,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: InputDecoration(
-                        isCollapsed: true,
-                        border: InputBorder.none,
-                        hintText: 'search.hint'.tr(),
-                        hintStyle: TextStyle(
-                          color: cs.onSurfaceVariant,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (_controller.text.isNotEmpty)
-                    InkWell(
-                      onTap: () {
-                        _controller.clear();
-                        setState(() {});
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Icon(
-                          Icons.close,
-                          size: 16,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                ],
+        );
+      },
+    );
+  }
+}
+
+class _PillBody extends StatelessWidget {
+  const _PillBody({
+    required this.controller,
+    required this.focusNode,
+    required this.onSubmitted,
+    required this.onClear,
+    required this.colorScheme,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final ValueChanged<String> onSubmitted;
+  final VoidCallback onClear;
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(MoproTokens.radiusFull),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      child: Row(
+        children: [
+          Icon(Icons.search, size: 18, color: colorScheme.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              onSubmitted: onSubmitted,
+              textInputAction: TextInputAction.search,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                isCollapsed: true,
+                border: InputBorder.none,
+                hintText: 'search.hint'.tr(),
+                hintStyle: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 14,
+                ),
               ),
             ),
           ),
-        ),
+          if (controller.text.isNotEmpty)
+            InkWell(
+              onTap: onClear,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.close,
+                  size: 16,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -209,52 +190,4 @@ AsyncSnapshot<List<String>> _asSnapshot(AsyncValue<List<String>> v) {
       d,
     ),
   );
-}
-
-class _DismissIntent extends Intent {
-  const _DismissIntent();
-}
-
-/// Outer overlay shell. A full-viewport `GestureDetector` catches outside
-/// clicks; a `CompositedTransformFollower` positions the dropdown directly
-/// beneath the search pill anchor, matching its width.
-class _DropdownOverlay extends StatelessWidget {
-  const _DropdownOverlay({
-    required this.layerLink,
-    required this.anchorContext,
-    required this.onDismiss,
-    required this.child,
-  });
-
-  final LayerLink layerLink;
-  final BuildContext anchorContext;
-  final VoidCallback onDismiss;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final anchorBox = anchorContext.findRenderObject() as RenderBox?;
-    final width = anchorBox?.size.width ?? 480;
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: onDismiss,
-          ),
-        ),
-        Positioned(
-          width: width,
-          child: CompositedTransformFollower(
-            link: layerLink,
-            showWhenUnlinked: false,
-            // Drop the panel directly beneath the pill (40dp tall) with 6dp
-            // breathing room.
-            offset: const Offset(0, 46),
-            child: child,
-          ),
-        ),
-      ],
-    );
-  }
 }

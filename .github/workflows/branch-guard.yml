@@ -1,0 +1,30 @@
+name: branch-guard
+
+# Refuse any PR whose source branch is `main` or `master`.
+#
+# Why: the local `pre-commit` + `prepare-commit-msg` hooks (.githooks/) catch
+# this for contributors who ran `make hooks`. This workflow is the remote
+# safety net for clones that skipped that step.
+
+on:
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  refuse-pr-from-default-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if head branch is main or master
+        run: |
+          head="${{ github.head_ref }}"
+          case "$head" in
+            main|master)
+              echo "::error::PRs from '$head' are not allowed."
+              echo "Branch your work off main into a feature branch:"
+              echo "  git checkout -b feat/your-change"
+              exit 1
+              ;;
+            *)
+              echo "OK: PR head is '$head'."
+              ;;
+          esac

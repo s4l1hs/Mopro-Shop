@@ -1,12 +1,11 @@
-import 'dart:async';
-
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
+import 'package:mopro/design/responsive/anchored_overlay_panel.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/features/account/current_user_provider.dart';
 
 /// Hover-revealed account menu for the WebHeader at `>=600` widths.
 ///
@@ -14,10 +13,11 @@ import 'package:mopro/design/tokens.dart';
 /// - **Guest**: login/register CTAs + soft-gated rows (Orders, Favorites, Help).
 /// - **Authed**: avatar header + 6 nav rows + logout.
 ///
-/// Hover open delay 80ms, close delay 150ms. Click-toggle for touch web.
-/// Escape closes; the panel stays open while the cursor is over either the
-/// trigger OR the panel itself (separate `MouseRegion` listeners on both).
-class AccountHoverMenu extends ConsumerStatefulWidget {
+/// Session 4b migration: the overlay state machine (hover open/close delays,
+/// MouseRegion shared between trigger and panel, Escape close, outside-click
+/// dismiss, click-toggle for touch) is now provided by `AnchoredOverlayPanel`.
+/// This widget only configures the primitive and renders the variant panel.
+class AccountHoverMenu extends ConsumerWidget {
   const AccountHoverMenu({
     required this.trigger,
     required this.isAuthed,
@@ -28,195 +28,26 @@ class AccountHoverMenu extends ConsumerStatefulWidget {
   final bool isAuthed;
 
   static const double panelWidth = 280;
-  static const Duration openDelay = Duration(milliseconds: 80);
-  static const Duration closeDelay = Duration(milliseconds: 150);
 
   @override
-  ConsumerState<AccountHoverMenu> createState() => _AccountHoverMenuState();
-}
-
-class _AccountHoverMenuState extends ConsumerState<AccountHoverMenu> {
-  final _layerLink = LayerLink();
-  final _overlayController = OverlayPortalController();
-  final _focusNode = FocusNode();
-  bool _hoveringTrigger = false;
-  bool _hoveringPanel = false;
-  bool _focused = false;
-  Timer? _openTimer;
-  Timer? _closeTimer;
-
-  bool get _shouldOpen => _hoveringTrigger || _hoveringPanel || _focused;
-
-  @override
-  void dispose() {
-    _openTimer?.cancel();
-    _closeTimer?.cancel();
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  void _checkState() {
-    final wantOpen = _shouldOpen;
-    final isOpen = _overlayController.isShowing;
-    if (wantOpen && !isOpen) {
-      _closeTimer?.cancel();
-      _openTimer?.cancel();
-      _openTimer = Timer(AccountHoverMenu.openDelay, () {
-        if (mounted && _shouldOpen) _overlayController.show();
-      });
-    } else if (!wantOpen && isOpen) {
-      _openTimer?.cancel();
-      _closeTimer?.cancel();
-      _closeTimer = Timer(AccountHoverMenu.closeDelay, () {
-        if (mounted && !_shouldOpen) _overlayController.hide();
-      });
-    }
-  }
-
-  void _toggle() {
-    if (_overlayController.isShowing) {
-      _overlayController.hide();
-    } else {
-      _overlayController.show();
-      // Move focus into the trigger so the Escape shortcut is in scope.
-      _focusNode.requestFocus();
-    }
-  }
-
-  void _dismiss() {
-    _openTimer?.cancel();
-    _closeTimer?.cancel();
-    _overlayController.hide();
-    _focusNode.unfocus();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: Shortcuts(
-        shortcuts: const <ShortcutActivator, Intent>{
-          SingleActivator(LogicalKeyboardKey.escape): _DismissIntent(),
+  Widget build(BuildContext context, WidgetRef ref) {
+    return AnchoredOverlayPanel(
+      maxWidth: panelWidth,
+      // Right-align the panel to the trigger so the menu drops down beneath
+      // the avatar without overflowing the header on the right.
+      triggerAnchor: Alignment.bottomRight,
+      panelAnchor: Alignment.topRight,
+      exclusivityGroup: 'webheader.menus',
+      trigger: trigger,
+      panelBuilder: (panelContext, close) => _PanelBody(
+        isAuthed: isAuthed,
+        onDismiss: close,
+        onLogout: () {
+          ref.read(authNotifierProvider.notifier).setLoggedOut();
+          close();
+          if (context.mounted) context.go('/');
         },
-        child: Actions(
-          actions: <Type, Action<Intent>>{
-            _DismissIntent: CallbackAction<_DismissIntent>(
-              onInvoke: (_) {
-                _dismiss();
-                return null;
-              },
-            ),
-          },
-          child: OverlayPortal(
-            controller: _overlayController,
-            overlayChildBuilder: (overlayContext) {
-              return _Panel(
-                layerLink: _layerLink,
-                isAuthed: widget.isAuthed,
-                onDismiss: _dismiss,
-                onPanelEnter: () {
-                  _hoveringPanel = true;
-                  _checkState();
-                },
-                onPanelExit: () {
-                  _hoveringPanel = false;
-                  _checkState();
-                },
-                onLogout: () {
-                  ref
-                      .read(authNotifierProvider.notifier)
-                      .setLoggedOut();
-                  _dismiss();
-                  if (context.mounted) context.go('/');
-                },
-              );
-            },
-            child: MouseRegion(
-              onEnter: (_) {
-                _hoveringTrigger = true;
-                _checkState();
-              },
-              onExit: (_) {
-                _hoveringTrigger = false;
-                _checkState();
-              },
-              child: Focus(
-                focusNode: _focusNode,
-                onFocusChange: (f) {
-                  _focused = f;
-                  _checkState();
-                },
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _toggle,
-                  child: widget.trigger,
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
-    );
-  }
-}
-
-class _DismissIntent extends Intent {
-  const _DismissIntent();
-}
-
-class _Panel extends StatelessWidget {
-  const _Panel({
-    required this.layerLink,
-    required this.isAuthed,
-    required this.onDismiss,
-    required this.onPanelEnter,
-    required this.onPanelExit,
-    required this.onLogout,
-  });
-
-  final LayerLink layerLink;
-  final bool isAuthed;
-  final VoidCallback onDismiss;
-  final VoidCallback onPanelEnter;
-  final VoidCallback onPanelExit;
-  final VoidCallback onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Outside-click dismisser.
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: onDismiss,
-          ),
-        ),
-        // The panel itself, anchored beneath the trigger.
-        Positioned(
-          width: AccountHoverMenu.panelWidth,
-          child: CompositedTransformFollower(
-            link: layerLink,
-            showWhenUnlinked: false,
-            // Drop beneath a 44dp trigger with 6dp breathing room.
-            offset: const Offset(
-              // Right-align: shift left so panel right edge lines up with
-              // trigger right edge (which is 44dp wide).
-              -(AccountHoverMenu.panelWidth - 44),
-              50,
-            ),
-            child: MouseRegion(
-              onEnter: (_) => onPanelEnter(),
-              onExit: (_) => onPanelExit(),
-              child: _PanelBody(
-                isAuthed: isAuthed,
-                onDismiss: onDismiss,
-                onLogout: onLogout,
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -347,41 +178,9 @@ class _PanelBody extends StatelessWidget {
   ) {
     final cs = Theme.of(context).colorScheme;
     return [
-      // Header strip with placeholder name — user info wiring deferred.
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(
-                color: MoproTokens.primaryLight,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'M',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'account.title'.tr(),
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+      // Header strip — name + email pulled from currentUserProvider.
+      // Loading / error / null states render the placeholder used in 4a.
+      const _AuthedMenuHeader(),
       const Divider(height: 1),
       _MenuRow(
         icon: Icons.person_outline_rounded,
@@ -440,6 +239,79 @@ class _PanelBody extends StatelessWidget {
         onTap: logout,
       ),
     ];
+  }
+}
+
+class _AuthedMenuHeader extends ConsumerWidget {
+  const _AuthedMenuHeader();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cs = Theme.of(context).colorScheme;
+    final asyncUser = ref.watch(currentUserProvider);
+
+    final user = asyncUser.valueOrNull;
+    final hasUser = user != null;
+    final initials = hasUser ? user.initials : 'M';
+    final primaryLine = hasUser && user.displayName.isNotEmpty
+        ? user.displayName
+        : 'account.title'.tr();
+    final secondaryLine = hasUser ? user.email : null;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: MoproTokens.primaryLight,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  primaryLine,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (secondaryLine != null && secondaryLine.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    secondaryLine,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
