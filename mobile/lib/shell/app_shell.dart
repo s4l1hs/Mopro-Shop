@@ -2,13 +2,44 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/cart/application/cart_count_provider.dart';
+import 'package:mopro/shell/web_header.dart';
 
+/// Adaptive root shell.
+///
+/// - Mobile (<600): existing 5-tab bottom navigation, untouched.
+/// - Tablet (600..<1024) and desktop (≥1024): no bottom nav; `WebHeader`
+///   pinned at top via a Scaffold appBar. The actual top-region content
+///   (logo / search / icons) lives in [WebHeader] (§4 fills it in).
 class AppShell extends ConsumerWidget {
   const AppShell({required this.navigationShell, super.key});
 
   final StatefulNavigationShell navigationShell;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ResponsiveBuilder(
+      mobile: (_) => _MobileShell(navigationShell: navigationShell),
+      tablet: (_) => _WebShell(navigationShell: navigationShell),
+      desktop: (_) => _WebShell(navigationShell: navigationShell),
+    );
+  }
+}
+
+// ── Mobile shell (unchanged from Session 1) ─────────────────────────────────
+
+class _MobileShell extends ConsumerWidget {
+  const _MobileShell({required this.navigationShell});
+  final StatefulNavigationShell navigationShell;
+
+  void _branch(int index) {
+    navigationShell.goBranch(
+      index,
+      initialLocation: index == navigationShell.currentIndex,
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -94,14 +125,24 @@ class AppShell extends ConsumerWidget {
       ),
     );
   }
+}
 
-  void _branch(int index) {
-    navigationShell.goBranch(
-      index,
-      initialLocation: index == navigationShell.currentIndex,
+// ── Tablet + desktop shell — WebHeader pinned, no bottom nav ─────────────────
+
+class _WebShell extends StatelessWidget {
+  const _WebShell({required this.navigationShell});
+  final StatefulNavigationShell navigationShell;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: const WebHeader(),
+      body: navigationShell,
     );
   }
 }
+
+// ── Mobile bottom-nav item (unchanged) ──────────────────────────────────────
 
 class _NavItem extends StatelessWidget {
   const _NavItem({

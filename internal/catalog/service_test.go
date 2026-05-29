@@ -358,6 +358,9 @@ func (m *mockRepo) HomeRails(_ context.Context) ([]catalog.HomeRailRow, error) {
 func (m *mockRepo) HomeBanners(_ context.Context) ([]catalog.HomeBannerRow, error) {
 	return nil, nil
 }
+func (m *mockRepo) HomeMoodStories(_ context.Context) ([]catalog.HomeMoodStoryRow, error) {
+	return nil, nil
+}
 func (m *mockRepo) ListReviews(_ context.Context, _ int64, _, _ int) ([]catalog.ProductReviewRow, int, error) {
 	return nil, 0, nil
 }

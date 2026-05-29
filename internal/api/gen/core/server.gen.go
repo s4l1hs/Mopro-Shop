@@ -426,13 +426,27 @@ type ProductSummary struct {
 
 	// CoverImageUrl First image URL of the lowest-priced variant
 	CoverImageUrl *string `json:"cover_image_url"`
-	Id            int64   `json:"id"`
-	PriceCurrency string  `json:"price_currency"`
+
+	// DiscountPct Server-computed discount % when original_price_minor > price_minor.
+	// Render as red %-badge next to the strikethrough.
+	DiscountPct *int  `json:"discount_pct"`
+	Id          int64 `json:"id"`
+
+	// OriginalPriceMinor MSRP in minor units. When set and greater than price_minor, render
+	// with strikethrough; backend also emits discount_pct.
+	OriginalPriceMinor *int64 `json:"original_price_minor"`
+	PriceCurrency      string `json:"price_currency"`
 
 	// PriceMinor Lowest-priced active variant price in minor units
-	PriceMinor int64                `json:"price_minor"`
-	SellerId   int64                `json:"seller_id"`
-	Status     ProductSummaryStatus `json:"status"`
+	PriceMinor int64 `json:"price_minor"`
+
+	// RatingAvg Average review rating (0.0–5.0); null when rating_count = 0
+	RatingAvg *float32 `json:"rating_avg"`
+
+	// RatingCount Number of reviews aggregated into rating_avg
+	RatingCount *int                 `json:"rating_count,omitempty"`
+	SellerId    int64                `json:"seller_id"`
+	Status      ProductSummaryStatus `json:"status"`
 
 	// Title Locale-resolved
 	Title string `json:"title"`
@@ -941,6 +955,28 @@ type UnregisterDeviceParams struct {
 	XIdempotencyKey IdempotencyKey `json:"X-Idempotency-Key"`
 }
 
+// ChangePasswordJSONBody defines parameters for ChangePassword.
+type ChangePasswordJSONBody struct {
+	// NewPassword New password (≥8 chars, 1 upper, 1 lower, 1 special)
+	NewPassword string `json:"new_password"`
+
+	// OldPassword Current password (plaintext over TLS)
+	OldPassword string `json:"old_password"`
+}
+
+// ChangePasswordParams defines parameters for ChangePassword.
+type ChangePasswordParams struct {
+	// XTraceId Client-generated trace identifier (UUID or opaque string).
+	// Echoed in error responses as `error.trace_id`.
+	// Falls back to a server-generated UUID if absent.
+	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
+
+	// XIdempotencyKey UUIDv7 generated client-side. Server caches the response for 24 hours
+	// keyed on this value. Duplicate requests within that window return the
+	// cached response without re-executing the operation.
+	XIdempotencyKey IdempotencyKey `json:"X-Idempotency-Key"`
+}
+
 // ListOrdersParams defines parameters for ListOrders.
 type ListOrdersParams struct {
 	Status  *ListOrdersParamsStatus `form:"status,omitempty" json:"status,omitempty"`
@@ -1186,6 +1222,9 @@ type UpdateMeJSONRequestBody UpdateMeJSONBody
 // RegisterDeviceJSONRequestBody defines body for RegisterDevice for application/json ContentType.
 type RegisterDeviceJSONRequestBody RegisterDeviceJSONBody
 
+// ChangePasswordJSONRequestBody defines body for ChangePassword for application/json ContentType.
+type ChangePasswordJSONRequestBody ChangePasswordJSONBody
+
 // CreateOrderJSONRequestBody defines body for CreateOrder for application/json ContentType.
 type CreateOrderJSONRequestBody CreateOrderJSONBody
 
@@ -1272,6 +1311,9 @@ type ServerInterface interface {
 	// Remove a registered device (deregister push notifications)
 	// (DELETE /me/devices/{id})
 	UnregisterDevice(w http.ResponseWriter, r *http.Request, id int64, params UnregisterDeviceParams)
+	// Change the authenticated user's password
+	// (POST /me/password)
+	ChangePassword(w http.ResponseWriter, r *http.Request, params ChangePasswordParams)
 	// List the authenticated user's orders
 	// (GET /orders)
 	ListOrders(w http.ResponseWriter, r *http.Request, params ListOrdersParams)
@@ -2771,6 +2813,75 @@ func (siw *ServerInterfaceWrapper) UnregisterDevice(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// ChangePassword operation middleware
+func (siw *ServerInterfaceWrapper) ChangePassword(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ChangePasswordParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Trace-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Trace-Id")]; found {
+		var XTraceId TraceId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Trace-Id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Trace-Id", valueList[0], &XTraceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Trace-Id", Err: err})
+			return
+		}
+
+		params.XTraceId = &XTraceId
+
+	}
+
+	// ------------- Required header parameter "X-Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Idempotency-Key")]; found {
+		var XIdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Idempotency-Key", valueList[0], &XIdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Idempotency-Key", Err: err})
+			return
+		}
+
+		params.XIdempotencyKey = XIdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter X-Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "X-Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangePassword(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListOrders operation middleware
 func (siw *ServerInterfaceWrapper) ListOrders(w http.ResponseWriter, r *http.Request) {
 
@@ -4008,6 +4119,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("PATCH "+options.BaseURL+"/me", wrapper.UpdateMe)
 	m.HandleFunc("POST "+options.BaseURL+"/me/devices", wrapper.RegisterDevice)
 	m.HandleFunc("DELETE "+options.BaseURL+"/me/devices/{id}", wrapper.UnregisterDevice)
+	m.HandleFunc("POST "+options.BaseURL+"/me/password", wrapper.ChangePassword)
 	m.HandleFunc("GET "+options.BaseURL+"/orders", wrapper.ListOrders)
 	m.HandleFunc("POST "+options.BaseURL+"/orders", wrapper.CreateOrder)
 	m.HandleFunc("POST "+options.BaseURL+"/orders/checkout", wrapper.Checkout)
@@ -5150,6 +5262,52 @@ func (response UnregisterDevice503JSONResponse) VisitUnregisterDeviceResponse(w 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
+type ChangePasswordRequestObject struct {
+	Params ChangePasswordParams
+	Body   *ChangePasswordJSONRequestBody
+}
+
+type ChangePasswordResponseObject interface {
+	VisitChangePasswordResponse(w http.ResponseWriter) error
+}
+
+type ChangePassword204Response struct {
+}
+
+func (response ChangePassword204Response) VisitChangePasswordResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ChangePassword401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response ChangePassword401JSONResponse) VisitChangePasswordResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ChangePassword422JSONResponse struct {
+	UnprocessableEntityJSONResponse
+}
+
+func (response ChangePassword422JSONResponse) VisitChangePasswordResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ChangePassword500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response ChangePassword500JSONResponse) VisitChangePasswordResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListOrdersRequestObject struct {
 	Params ListOrdersParams
 }
@@ -6005,6 +6163,9 @@ type StrictServerInterface interface {
 	// Remove a registered device (deregister push notifications)
 	// (DELETE /me/devices/{id})
 	UnregisterDevice(ctx context.Context, request UnregisterDeviceRequestObject) (UnregisterDeviceResponseObject, error)
+	// Change the authenticated user's password
+	// (POST /me/password)
+	ChangePassword(ctx context.Context, request ChangePasswordRequestObject) (ChangePasswordResponseObject, error)
 	// List the authenticated user's orders
 	// (GET /orders)
 	ListOrders(ctx context.Context, request ListOrdersRequestObject) (ListOrdersResponseObject, error)
@@ -6764,6 +6925,39 @@ func (sh *strictHandler) UnregisterDevice(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UnregisterDeviceResponseObject); ok {
 		if err := validResponse.VisitUnregisterDeviceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangePassword operation middleware
+func (sh *strictHandler) ChangePassword(w http.ResponseWriter, r *http.Request, params ChangePasswordParams) {
+	var request ChangePasswordRequestObject
+
+	request.Params = params
+
+	var body ChangePasswordJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangePassword(ctx, request.(ChangePasswordRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangePassword")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangePasswordResponseObject); ok {
+		if err := validResponse.VisitChangePasswordResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -502,13 +502,27 @@ type ProductSummary struct {
 
 	// CoverImageUrl First image URL of the lowest-priced variant
 	CoverImageUrl *string `json:"cover_image_url"`
-	Id            int64   `json:"id"`
-	PriceCurrency string  `json:"price_currency"`
+
+	// DiscountPct Server-computed discount % when original_price_minor > price_minor.
+	// Render as red %-badge next to the strikethrough.
+	DiscountPct *int  `json:"discount_pct"`
+	Id          int64 `json:"id"`
+
+	// OriginalPriceMinor MSRP in minor units. When set and greater than price_minor, render
+	// with strikethrough; backend also emits discount_pct.
+	OriginalPriceMinor *int64 `json:"original_price_minor"`
+	PriceCurrency      string `json:"price_currency"`
 
 	// PriceMinor Lowest-priced active variant price in minor units
-	PriceMinor int64                `json:"price_minor"`
-	SellerId   int64                `json:"seller_id"`
-	Status     ProductSummaryStatus `json:"status"`
+	PriceMinor int64 `json:"price_minor"`
+
+	// RatingAvg Average review rating (0.0–5.0); null when rating_count = 0
+	RatingAvg *float32 `json:"rating_avg"`
+
+	// RatingCount Number of reviews aggregated into rating_avg
+	RatingCount *int                 `json:"rating_count,omitempty"`
+	SellerId    int64                `json:"seller_id"`
+	Status      ProductSummaryStatus `json:"status"`
 
 	// Title Locale-resolved
 	Title string `json:"title"`
@@ -1078,6 +1092,28 @@ type UnregisterDeviceParams struct {
 	XIdempotencyKey IdempotencyKey `json:"X-Idempotency-Key"`
 }
 
+// ChangePasswordJSONBody defines parameters for ChangePassword.
+type ChangePasswordJSONBody struct {
+	// NewPassword New password (≥8 chars, 1 upper, 1 lower, 1 special)
+	NewPassword string `json:"new_password"`
+
+	// OldPassword Current password (plaintext over TLS)
+	OldPassword string `json:"old_password"`
+}
+
+// ChangePasswordParams defines parameters for ChangePassword.
+type ChangePasswordParams struct {
+	// XTraceId Client-generated trace identifier (UUID or opaque string).
+	// Echoed in error responses as `error.trace_id`.
+	// Falls back to a server-generated UUID if absent.
+	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
+
+	// XIdempotencyKey UUIDv7 generated client-side. Server caches the response for 24 hours
+	// keyed on this value. Duplicate requests within that window return the
+	// cached response without re-executing the operation.
+	XIdempotencyKey IdempotencyKey `json:"X-Idempotency-Key"`
+}
+
 // ListOrdersParams defines parameters for ListOrders.
 type ListOrdersParams struct {
 	Status  *ListOrdersParamsStatus `form:"status,omitempty" json:"status,omitempty"`
@@ -1343,6 +1379,9 @@ type UpdateMeJSONRequestBody UpdateMeJSONBody
 
 // RegisterDeviceJSONRequestBody defines body for RegisterDevice for application/json ContentType.
 type RegisterDeviceJSONRequestBody RegisterDeviceJSONBody
+
+// ChangePasswordJSONRequestBody defines body for ChangePassword for application/json ContentType.
+type ChangePasswordJSONRequestBody ChangePasswordJSONBody
 
 // CreateOrderJSONRequestBody defines body for CreateOrder for application/json ContentType.
 type CreateOrderJSONRequestBody CreateOrderJSONBody

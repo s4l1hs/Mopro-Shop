@@ -19,6 +19,20 @@ class HomeRail {
   final String title;
 }
 
+/// One circular tile in the home-screen "mood stories" strip.
+class HomeMoodStory {
+  const HomeMoodStory({
+    required this.id,
+    required this.title,
+    required this.imageUrl,
+    required this.deepLink,
+  });
+  final int id;
+  final String title;
+  final String imageUrl;
+  final String deepLink;
+}
+
 /// Fetches banner carousel data from GET /home/banners.
 final homeBannersProvider = FutureProvider.autoDispose<List<HomeBanner>>(
   (ref) async {
@@ -54,6 +68,30 @@ final homeRailsProvider = FutureProvider.autoDispose<List<HomeRail>>(
         HomeRail(key: 'bestseller', title: 'Çok satanlar'),
         HomeRail(key: 'newest', title: 'Yeni gelenler'),
       ];
+    }
+  },
+);
+
+/// Fetches mood-story tiles from GET /home/stories. Returns an empty list on
+/// any error so the home screen can simply omit the strip rather than show a
+/// broken state.
+final homeMoodStoriesProvider = FutureProvider.autoDispose<List<HomeMoodStory>>(
+  (ref) async {
+    final dio = ref.watch(dioProvider);
+    try {
+      final resp = await dio.get<Map<String, dynamic>>('/home/stories');
+      final data = (resp.data?['data'] as List<dynamic>?) ?? [];
+      return data.map((e) {
+        final m = e as Map<String, dynamic>;
+        return HomeMoodStory(
+          id: m['id'] as int,
+          title: m['title'] as String,
+          imageUrl: m['image_url'] as String,
+          deepLink: m['deep_link'] as String? ?? '/',
+        );
+      }).toList();
+    } on DioException catch (_) {
+      return const <HomeMoodStory>[];
     }
   },
 );

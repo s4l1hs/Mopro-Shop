@@ -410,6 +410,9 @@ func main() {
 	mux.Handle("GET /home/rails",
 		httpTrace(http.HandlerFunc(handleHomeRails(catalogSvc, defaultLocale))),
 	)
+	mux.Handle("GET /home/stories",
+		httpTrace(http.HandlerFunc(handleHomeMoodStories(catalogSvc, defaultLocale))),
+	)
 	mux.Handle("POST /products/batch",
 		httpTrace(http.HandlerFunc(handleProductsBatch(catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)

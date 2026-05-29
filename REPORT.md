@@ -403,3 +403,98 @@ Total session adds: **55 new tests**. Total suite: 223 passing.
    `PdpSellerCard`, `PdpStickyCta` from the current 600-line file.
 8. CardsScreen — list / add / delete saved cards.
 9. Enable bank-transfer + cashback payment paths in CheckoutPaymentScreen.
+
+---
+
+# Session 3 — Responsive Web Primitives + WebHeader + Path-URL Routing + 2/3 Deferred Backend Endpoints
+
+**Branch:** `feat/responsive-web-and-parity`
+**Scope as approved:** §1 baselines, §2 responsive primitives + tests, §3 AppShell mobile/web swap, §4 minimal WebHeader (no dropdowns), §12 path-URL + 404 + tab titles, §13.1 DTO regen attempt (graceful-fail per flag 1), §13.2 `POST /me/password`, §13.3 MoodStoriesStrip + endpoint + migration, §15 partial REPORT entry.
+
+## Shipped
+
+| Area | Item |
+|---|---|
+| §2 Responsive primitives | `mobile/lib/design/responsive/{breakpoints,breakpoint_resolver,responsive_builder,adaptive_value,centered_content_column,hover_region,responsive}.dart` (6 new files + barrel) |
+| §2 Tests | `mobile/test/design/responsive/responsive_test.dart` — 22 tests covering boundaries (0/599/600/1023/1024/1025/4096), `AdaptiveValue` fallback chain, `ResponsiveBuilder` branch selection via `setSurfaceSize`, embedded resolution against parent constraints, `CenteredContentColumn` padding scale, `HoverRegion` focus-as-hovering |
+| §3 AppShell swap | `mobile/lib/shell/app_shell.dart` rewritten — top-level `ResponsiveBuilder` returns `_MobileShell` (<600, bottom-nav untouched) or `_WebShell` (≥600, `WebHeader` pinned, no bottom nav). `_NavItem` extracted intact. |
+| §3 AppShell tests | `mobile/test/shell/app_shell_test.dart` — pumped at `Size(390,720)` by default so the existing bottom-nav structure assertions resolve through the mobile branch. Goldens regenerated at mobile width. |
+| §4 WebHeader (minimal) | `mobile/lib/shell/web_header.dart` — `PreferredSizeWidget` (64dp), full-bleed surface + 1dp bottom border, content inside `CenteredContentColumn`. Reuses existing `HeaderSearchBar`. Renders: logo (`→/`), search pill (`→/search`), favorites + cart icon buttons (with badges, 44dp hit targets), guest `_LoginPill` (`→/auth/login`) OR authed `_AccountAvatar` with initial (`→/account`). Watches `cartCountProvider`, `favoritesProvider.length`, `authNotifierProvider`. |
+| §4 WebHeader tests | `mobile/test/shell/web_header_test.dart` — 15 widget tests (structure, guest vs authed variant, badge count / 99+ clamp / favorites filled-icon flip, navigation per icon) + 3 golden baselines (1024 light, 1440 light, 1440 dark). Uses `_FakeAuthNotifier extends AuthNotifier` override. |
+| §12 Path URL strategy | `mobile/lib/main.dart` — `usePathUrlStrategy()` from `package:flutter_web_plugins/url_strategy.dart` called pre-Easy-Localization. |
+| §12 404 page | `mobile/lib/features/not_found/not_found_screen.dart` — branded with orange icon badge, `404` headline, localized title/subtitle, attempted-path in monospace, "Ana sayfaya dön" CTA. Wrapped in `Title('Mopro · 404')`. |
+| §12 Router | `mobile/lib/core/router/app_router.dart` — `errorBuilder: NotFoundScreen(attemptedPath: state.uri.toString())`; new `_titled(page, child)` helper wraps each of the 5 tab branches in `Title` with `MoproTokens.primaryLight` (Ana Sayfa / Kategoriler / Favorilerim / Sepetim / Hesabım). |
+| §12 i18n | `mobile/assets/translations/{tr-TR,en-US,de-DE,ar-AE}.json` — `errors.not_found_title`, `errors.not_found_subtitle`, `errors.not_found_cta`. |
+| §13.2 Backend `POST /me/password` | `api/openapi.yaml` — new path under `/me/password`; `internal/identity/api.go` — `Service.ChangePassword`; `internal/identity/service.go` — implementation (verifies old via bcrypt, runs `validatePassword`, rotates hash, calls `RevokeAllUserTokens`); `cmd/core-svc/auth_handlers.go` — `handleChangePassword` registered under `requireAuth`; `internal/api/gen/{core,types}/*.gen.go` regenerated (Go only). |
+| §13.2 Tests | `internal/identity/service_test.go` — 5 new tests: success rotates hash + revokes tokens, wrong-old-password → `ErrInvalidCredentials`, weak-new-password → `ErrWeakPassword`, phone-only user → `ErrInvalidCredentials`, unknown user → `ErrUserNotFound`. `mockRepo` upgraded so `SetPasswordHash` mutates and `RevokeAllUserTokens` tracks calls. |
+| §13.2 Mobile wiring | `mobile/lib/features/account/security_screen.dart` — graceful 404 branch removed; the screen now relies on the real endpoint returning `invalid_credentials` / `weak_password` codes that the existing error mapper already understands. |
+| §13.3 Migration | `migrations/ecom/0066_home_mood_stories.{up,down}.sql` — `catalog_schema.home_mood_stories` (bilingual title, image_url, deep_link, sort_order, active), partial sort index, 6 placeholder seed rows (`/categories?mood=…`), grant to `catalog_user`. |
+| §13.3 Backend | `internal/catalog/domain.go` — `HomeMoodStoryRow`; `internal/catalog/api.go` — `Service.HomeMoodStories` + `Repository.HomeMoodStories`; `internal/catalog/service.go` + `internal/catalog/repository.go` — implementation; `cmd/core-svc/home_handlers.go` — `handleHomeMoodStories` (locale-resolved title); `cmd/core-svc/main.go` — `GET /home/stories` route. |
+| §13.3 Mobile | `mobile/lib/features/catalog/providers/home_provider.dart` — `HomeMoodStory` model + `homeMoodStoriesProvider` (graceful empty on DioException); `mobile/lib/features/catalog/widgets/mood_stories_strip.dart` (new) — 110dp horizontally-scrolled strip of 72dp circular tiles with brand-orange gradient ring, `CachedNetworkImage`, `context.go(deepLink)` on tap; `home_screen.dart` — strip inserted between top bar and banner carousel + added to `RefreshIndicator` invalidation list. |
+| §13.3 Tests | `mobile/test/features/catalog/widgets/mood_stories_strip_test.dart` — 3 widget tests (empty → collapsed, error → collapsed, populated → tile per story with title). |
+
+## Deferred (with reason + intended landing point)
+
+| Section | What was deferred | Why | Intended landing |
+|---|---|---|---|
+| §3 | MegaMenuBar (category mega-menu under header) | Out of approved scope (header-only this turn) | Session 4 §5 |
+| §4 | Header search-suggestions dropdown | Out of approved scope (defer; minimal pill only this turn) | Session 4 §4-followup |
+| §4 | Account avatar hover-menu | Out of approved scope (single-tap → `/account` this turn) | Session 4 §4-followup |
+| §5–§9 | Adaptive Home grid, PLP filter rail, PDP two-column, Cart sidebar summary, Account sidebar nav, Auth split-card desktop layout | Approved subset explicitly excluded body screens this turn | Session 4 §5–§9 |
+| §10 | Hover/focus states + keyboard navigation on cards, buttons, chips | Depends on a uniform `HoverRegion`-wrapped interactive primitive — primitive landed this turn, application deferred | Session 4 §10 |
+| §11 | Image optimization layer (`responsive_image.dart`, srcset/density variants) | No new packages without justification; ties into a future image CDN decision | Session 4 §11 |
+| §13.1 | `make api-gen-dart` regen for `ProductSummary` new fields | **Build-runner blocker — see Drive-by issues below** | Next session (per flag 1) |
+| §13.4 | `FlashDealsRail` + `GET /home/flash-deals` + countdown widget | Out of approved subset | Session 4 §13.4 |
+| §13.5 | Reviews helpful-vote endpoint, sort options, pagination | Out of approved subset | Session 4 §13.5 |
+| §14 | A11y audit pass (semantics labels, focus order, contrast checks) | Out of approved subset; primitives in place for it | Session 4 §14 |
+
+## Drive-by issues
+
+### §13.1 — Dart `mopro_api` regen blocked by `null-aware-elements`
+
+**Action taken (per flag 1):** added the 4 new `ProductSummary` fields (`original_price_minor`, `discount_pct`, `rating_avg`, `rating_count`) to `api/openapi.yaml`; reverted ALL changes under `mobile/packages/mopro_api/` to `HEAD` (42 files touched by the regen), restored package `pubspec.yaml` SDK constraint to `>=2.17.0 <4.0.0`. Manual `ProductCard` optional-named-params shim from Session 2 stays. The mobile UI still surfaces strikethrough / discount % / rating chip via the shim against the raw JSON payload — only the DTO codegen is deferred.
+
+**Why a revert:**
+1. `make api-gen-dart` itself succeeded (openapi-generator emitted new `.dart` model files containing the 4 fields).
+2. The follow-up `dart run build_runner build --delete-conflicting-outputs` step required to produce the matching `.g.dart` files for every model failed across many files with the same root error (verbatim, sample):
+    ```
+    Could not format because the source could not be parsed:
+
+    line 34, column 27 of .: This requires the 'null-aware-elements' language feature to be enabled.
+       ╷
+    34 │         'reference_type': ?_$WalletTransactionReferenceTypeEnumEnumMap[instance.referenceType],
+       │                           ^
+       ╵
+    ```
+   Per package `pubspec.yaml`, the SDK constraint floor was `>=2.17.0`. I bumped it to `>=3.7.0 <4.0.0` and re-ran; `pub get` succeeded but the same formatter error still fires (the `json_serializable` formatter packaged with the local toolchain — Dart 3.12.0 — still refuses the syntax during the post-emission format step). `Failed to build with build_runner/aot in 14s; wrote 101 outputs.` Result: `product_summary.g.dart` and ~30 other `.g.dart` files were not written → the entire `mopro_api` package was uncompilable.
+3. Per the approved flag 1: *"If `make api-gen-dart` blows up, log the failure verbatim in REPORT.md under 'Drive-by issues,' skip §13.1, do not hand-edit generated DTOs, move on. Manual shims stay until next turn."* — reverted `mobile/packages/mopro_api/` to a compiling state and kept the openapi.yaml additions (pure spec).
+
+**Follow-up:** Next session should either (a) pin a `json_serializable` / `build_runner` / `dart_style` set that pre-dates the `null-aware-elements` emission, or (b) bump the package SDK constraint AND verify the local Dart toolchain can format the new syntax end-to-end, then re-run `make api-gen-dart && dart run build_runner build --delete-conflicting-outputs`.
+
+### §13.2 / §13.3 sync check
+
+`make api-gen-core` + `make api-gen-models` were run (Go only). `make api-gen-dart` was deliberately not re-run this turn to avoid re-triggering the §13.1 failure. CI `api-check-sync` will flag the Dart side as out of date for `ChangePassword` and (after the regen succeeds) the `mood_stories` op id — both are documented carries against the same Session 4 follow-up.
+
+## Session 4 prerequisites established this turn
+
+The primitives landed here unblock the rest of §3–§14 without further plumbing:
+
+- **`ResponsiveBuilder` / `BreakpointResolver`** is the only construct any Session 4 screen needs to branch mobile/tablet/desktop. Embedded panels resolve against parent constraints (verified by test), so an adaptive Cart sidebar can sit inside an already-clamped `_WebShell` body without forcing a duplicate `MediaQuery`.
+- **`AdaptiveValue<T>`** is the lookup type for per-breakpoint column counts (Home grid 2/3/4, PLP grid 2/3/4, MoodStoriesStrip avatar size, padding scale 16/24/32, etc.).
+- **`CenteredContentColumn`** is the 1240px clamp used by `WebHeader`; Session 4 body screens should wrap their `>= tablet` slivers in the same column for visual consistency.
+- **`HoverRegion`** (Mouse + Focus with configurable open/close delays) is the substrate for §10 hover/focus states — card lift-on-hover, dropdown open-on-hover, chip focus rings.
+- **`Title` + path-URL strategy** are in place — every Session 4 screen just needs a `Title(title: '…', color: …, child: …)` wrap to get correct tab titles + clean URLs.
+- **`AppShell` swap** means any new shared chrome (MegaMenuBar, footer, breadcrumb) goes inside `_WebShell` only — the mobile shell never sees it.
+- **`WebHeader`** already exposes the slot pattern (icon row + login/avatar) that Session 4's account hover-menu + suggestions dropdown should drop into without changes to `app_shell.dart`.
+
+## Verification
+
+- `go build ./cmd/core-svc ./cmd/fin-svc ./cmd/jobs-svc` — clean.
+- `go test -race ./internal/catalog/... ./internal/identity/...` — green (catalog 1.5s, identity 11s incl. 5 new ChangePassword tests).
+- `flutter test test/features/catalog/widgets/mood_stories_strip_test.dart` — 3/3 green.
+- `flutter test test/design/responsive/`, `test/shell/app_shell_test.dart`, `test/shell/web_header_test.dart` — all green (see §11 below for full suite).
+- `flutter build web --release` — see §11 below.
+- Mobile goldens — see §11 below.
+
+(Full-suite numbers reported at the end of the §11 verification gate, which runs after this REPORT entry is committed.)
+

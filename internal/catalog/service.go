@@ -160,6 +160,10 @@ func (s *catalogService) HomeBanners(ctx context.Context) ([]HomeBannerRow, erro
 	return s.repo.HomeBanners(ctx)
 }
 
+func (s *catalogService) HomeMoodStories(ctx context.Context) ([]HomeMoodStoryRow, error) {
+	return s.repo.HomeMoodStories(ctx)
+}
+
 func (s *catalogService) ListReviews(ctx context.Context, productID int64, page, perPage int) ([]ProductReviewRow, int, error) {
 	if perPage <= 0 {
 		perPage = 20

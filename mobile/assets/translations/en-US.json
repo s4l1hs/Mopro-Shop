@@ -325,5 +325,10 @@
     "rate_limited": "Too many requests. Please wait.",
     "system_read_only": "System is under maintenance. Please try again later.",
     "validation": "Please check your input."
+  },
+  "errors": {
+    "not_found_title": "We couldn't find that page",
+    "not_found_subtitle": "The page may have been removed, moved, or never existed.",
+    "not_found_cta": "Back to home"
   }
 }

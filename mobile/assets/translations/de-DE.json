@@ -1,1 +1,7 @@
-{}
+{
+  "errors": {
+    "not_found_title": "Seite nicht gefunden",
+    "not_found_subtitle": "Die Seite wurde möglicherweise verschoben oder existiert nicht mehr.",
+    "not_found_cta": "Zur Startseite"
+  }
+}

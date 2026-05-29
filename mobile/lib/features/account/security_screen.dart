@@ -202,10 +202,6 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
           _error = 'Mevcut parolan hatalı.';
         } else if (code == 'weak_password') {
           _error = 'Yeni parola güvenlik kurallarını karşılamıyor.';
-        } else if (e.response?.statusCode == 404) {
-          _error =
-              'Parola değiştirme henüz aktif değil. '
-              'Lütfen "Şifremi Unuttum" akışını kullan.';
         } else {
           _error = 'Bir hata oluştu. Lütfen tekrar dene.';
         }
