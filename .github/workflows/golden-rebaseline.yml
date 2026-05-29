@@ -1,0 +1,46 @@
+name: golden-rebaseline
+
+# Manually-triggered re-baseline of Flutter goldens on the SAME platform CI
+# uses (ubuntu-latest), so committed baselines are pixel-identical to what the
+# `flutter test` gate renders. Run from the Actions tab → "Run workflow" on the
+# branch you want to re-baseline. See CONTRIBUTING.md ("Goldens").
+on:
+  workflow_dispatch:
+
+jobs:
+  rebaseline:
+    name: Re-baseline goldens (linux)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.x"
+          channel: stable
+
+      - name: Install deps
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Regenerate goldens (+ platform sidecars) on linux
+        working-directory: mobile
+        run: flutter test --update-goldens
+
+      - name: Commit re-baselined goldens
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add 'mobile/test/**/goldens/*.png' 'mobile/test/**/goldens/*.png.meta'
+          if git diff --cached --quiet; then
+            echo "No golden changes to commit."
+          else
+            git commit -m "test(goldens): re-baseline on ubuntu-latest via golden-rebaseline workflow
+
+Co-Authored-By: github-actions[bot] <noreply@github.com>"
+            git push
+          fi
