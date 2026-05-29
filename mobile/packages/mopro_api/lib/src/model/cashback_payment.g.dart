@@ -58,7 +58,7 @@ Map<String, dynamic> _$CashbackPaymentToJson(CashbackPayment instance) =>
       'amount_minor': instance.amountMinor,
       'currency': instance.currency,
       'status': _$CashbackPaymentStatusEnumEnumMap[instance.status]!,
-      if (instance.paidAt?.toIso8601String() != null) 'paid_at': instance.paidAt?.toIso8601String(),
+      'paid_at': ?instance.paidAt?.toIso8601String(),
     };
 
 const _$CashbackPaymentStatusEnumEnumMap = {

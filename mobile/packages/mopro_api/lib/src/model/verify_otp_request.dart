@@ -22,7 +22,7 @@ class VerifyOtpRequest {
 
     required  this.code,
 
-     this.purpose = VerifyOtpRequestPurposeEnum.login,
+     this.purpose,
   });
 
   @JsonKey(
@@ -49,9 +49,9 @@ class VerifyOtpRequest {
 
 
 
-      /// Must match the purpose used in the corresponding /otp/request call. Defaults to `login`.
+      /// Must match the purpose used in the corresponding /otp/request call. Omit (or send `login`) for login — the server treats an absent value as `login`.
   @JsonKey(
-    defaultValue: 'login',
+    
     name: r'purpose',
     required: false,
     includeIfNull: false,
@@ -87,12 +87,12 @@ class VerifyOtpRequest {
 
 }
 
-/// Must match the purpose used in the corresponding /otp/request call. Defaults to `login`.
+/// Must match the purpose used in the corresponding /otp/request call. Omit (or send `login`) for login — the server treats an absent value as `login`.
 enum VerifyOtpRequestPurposeEnum {
-    /// Must match the purpose used in the corresponding /otp/request call. Defaults to `login`.
+    /// Must match the purpose used in the corresponding /otp/request call. Omit (or send `login`) for login — the server treats an absent value as `login`.
 @JsonValue(r'login')
 login(r'login'),
-    /// Must match the purpose used in the corresponding /otp/request call. Defaults to `login`.
+    /// Must match the purpose used in the corresponding /otp/request call. Omit (or send `login`) for login — the server treats an absent value as `login`.
 @JsonValue(r'step_up')
 stepUp(r'step_up');
 

@@ -29,5 +29,5 @@ Map<String, dynamic> _$CheckoutResponsePaymentToJson(
   CheckoutResponsePayment instance,
 ) => <String, dynamic>{
   'requires_3ds': instance.requires3ds,
-  if (instance.redirectUrl != null) 'redirect_url': instance.redirectUrl,
+  'redirect_url': ?instance.redirectUrl,
 };

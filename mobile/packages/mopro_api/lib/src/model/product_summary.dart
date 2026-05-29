@@ -37,6 +37,14 @@ class ProductSummary {
 
      this.coverImageUrl,
 
+     this.originalPriceMinor,
+
+     this.discountPct,
+
+     this.ratingAvg,
+
+     this.ratingCount = 0,
+
     required  this.cashbackPreview,
   });
 
@@ -151,6 +159,58 @@ class ProductSummary {
 
 
 
+      /// MSRP in minor units. When set and greater than price_minor, render with strikethrough; backend also emits discount_pct. 
+  @JsonKey(
+    
+    name: r'original_price_minor',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final int? originalPriceMinor;
+
+
+
+      /// Server-computed discount % when original_price_minor > price_minor. Render as red %-badge next to the strikethrough. 
+  @JsonKey(
+    
+    name: r'discount_pct',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final int? discountPct;
+
+
+
+      /// Average review rating (0.0–5.0); null when rating_count = 0
+  @JsonKey(
+    
+    name: r'rating_avg',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final double? ratingAvg;
+
+
+
+      /// Number of reviews aggregated into rating_avg
+  @JsonKey(
+    defaultValue: 0,
+    name: r'rating_count',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final int? ratingCount;
+
+
+
   @JsonKey(
     
     name: r'cashback_preview',
@@ -176,6 +236,10 @@ class ProductSummary {
       other.priceMinor == priceMinor &&
       other.priceCurrency == priceCurrency &&
       other.coverImageUrl == coverImageUrl &&
+      other.originalPriceMinor == originalPriceMinor &&
+      other.discountPct == discountPct &&
+      other.ratingAvg == ratingAvg &&
+      other.ratingCount == ratingCount &&
       other.cashbackPreview == cashbackPreview;
 
     @override
@@ -189,6 +253,10 @@ class ProductSummary {
         priceMinor.hashCode +
         priceCurrency.hashCode +
         coverImageUrl.hashCode +
+        originalPriceMinor.hashCode +
+        discountPct.hashCode +
+        ratingAvg.hashCode +
+        ratingCount.hashCode +
         cashbackPreview.hashCode;
 
   factory ProductSummary.fromJson(Map<String, dynamic> json) => _$ProductSummaryFromJson(json);

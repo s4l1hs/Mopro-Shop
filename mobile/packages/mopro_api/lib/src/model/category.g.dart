@@ -38,7 +38,7 @@ Map<String, dynamic> _$CategoryToJson(Category instance) => <String, dynamic>{
   'id': instance.id,
   'name': instance.name,
   'slug': instance.slug,
-  if (instance.parentId != null) 'parent_id': instance.parentId,
-  if (instance.iconUrl != null) 'icon_url': instance.iconUrl,
+  'parent_id': ?instance.parentId,
+  'icon_url': ?instance.iconUrl,
   'commission_pct_bps': instance.commissionPctBps,
 };

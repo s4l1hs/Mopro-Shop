@@ -1,4 +1,4 @@
-# mopro_api.model.VerifyOtpRequest
+# mopro_api.model.ChangePasswordRequest
 
 ## Load the model package
 ```dart
@@ -8,9 +8,8 @@ import 'package:mopro_api/api.dart';
 ## Properties
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**phone** | **String** |  | 
-**code** | **String** |  | 
-**purpose** | **String** | Must match the purpose used in the corresponding /otp/request call. Omit (or send `login`) for login — the server treats an absent value as `login`. | [optional] 
+**oldPassword** | **String** | Current password (plaintext over TLS) | 
+**newPassword** | **String** | New password (≥8 chars, 1 upper, 1 lower, 1 special) | 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

@@ -9,6 +9,7 @@ import 'package:mopro_api/src/model/cashback_plan.dart';
 import 'package:mopro_api/src/model/cashback_preview.dart';
 import 'package:mopro_api/src/model/category.dart';
 import 'package:mopro_api/src/model/category_commission.dart';
+import 'package:mopro_api/src/model/change_password_request.dart';
 import 'package:mopro_api/src/model/checkout_request.dart';
 import 'package:mopro_api/src/model/checkout_request_payment_method.dart';
 import 'package:mopro_api/src/model/checkout_response.dart';
@@ -101,6 +102,8 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return Category.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'CategoryCommission':
           return CategoryCommission.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'ChangePasswordRequest':
+          return ChangePasswordRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'CheckoutRequest':
           return CheckoutRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'CheckoutRequestPaymentMethod':

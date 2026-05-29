@@ -19,6 +19,7 @@ doc/CashbackPreview.md
 doc/CatalogApi.md
 doc/Category.md
 doc/CategoryCommission.md
+doc/ChangePasswordRequest.md
 doc/CheckoutRequest.md
 doc/CheckoutRequestPaymentMethod.md
 doc/CheckoutResponse.md
@@ -109,6 +110,7 @@ lib/src/model/cashback_plan.dart
 lib/src/model/cashback_preview.dart
 lib/src/model/category.dart
 lib/src/model/category_commission.dart
+lib/src/model/change_password_request.dart
 lib/src/model/checkout_request.dart
 lib/src/model/checkout_request_payment_method.dart
 lib/src/model/checkout_response.dart

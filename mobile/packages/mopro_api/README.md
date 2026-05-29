@@ -141,6 +141,7 @@ Class | Method | HTTP request | Description
 [*DiscoveryApi*](doc/DiscoveryApi.md) | [**listBanners**](doc/DiscoveryApi.md#listbanners) | **GET** /banners | Promotional banners for a given placement
 [*DiscoveryApi*](doc/DiscoveryApi.md) | [**listRecommendations**](doc/DiscoveryApi.md#listrecommendations) | **GET** /recommendations | Personalised product recommendations for the authenticated user
 [*HealthApi*](doc/HealthApi.md) | [**healthz**](doc/HealthApi.md#healthz) | **GET** /healthz | Health check (liveness probe)
+[*MeApi*](doc/MeApi.md) | [**changePassword**](doc/MeApi.md#changepassword) | **POST** /me/password | Change the authenticated user&#39;s password
 [*MeApi*](doc/MeApi.md) | [**deleteMe**](doc/MeApi.md#deleteme) | **DELETE** /me | Soft-delete the authenticated user account (KVKK / GDPR)
 [*MeApi*](doc/MeApi.md) | [**getMe**](doc/MeApi.md#getme) | **GET** /me | Get authenticated user profile
 [*MeApi*](doc/MeApi.md) | [**registerDevice**](doc/MeApi.md#registerdevice) | **POST** /me/devices | Register a device FCM token for push notifications
@@ -175,6 +176,7 @@ Class | Method | HTTP request | Description
  - [CashbackPreview](doc/CashbackPreview.md)
  - [Category](doc/Category.md)
  - [CategoryCommission](doc/CategoryCommission.md)
+ - [ChangePasswordRequest](doc/ChangePasswordRequest.md)
  - [CheckoutRequest](doc/CheckoutRequest.md)
  - [CheckoutRequestPaymentMethod](doc/CheckoutRequestPaymentMethod.md)
  - [CheckoutResponse](doc/CheckoutResponse.md)
