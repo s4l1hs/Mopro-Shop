@@ -32,6 +32,10 @@
   },
   "mega_menu": {
     "see_all": "Alle anzeigen",
-    "empty_children": "Keine Unterkategorien in diesem Bereich."
+    "empty_children": "Keine Unterkategorien in diesem Bereich.",
+    "promo": {
+      "cta": "Entdecken",
+      "image_unavailable": "Bild nicht verfügbar."
+    }
   }
 }

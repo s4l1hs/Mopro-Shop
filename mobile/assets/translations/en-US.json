@@ -92,7 +92,11 @@
   },
   "mega_menu": {
     "see_all": "See all",
-    "empty_children": "No subcategories in this section."
+    "empty_children": "No subcategories in this section.",
+    "promo": {
+      "cta": "Discover",
+      "image_unavailable": "Image unavailable."
+    }
   },
   "empty_state": {
     "empty_message": "Nothing here yet",

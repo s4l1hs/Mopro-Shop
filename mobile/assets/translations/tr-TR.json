@@ -114,7 +114,11 @@
   },
   "mega_menu": {
     "see_all": "Tümünü gör",
-    "empty_children": "Bu kategoride alt kategori bulunmuyor."
+    "empty_children": "Bu kategoride alt kategori bulunmuyor.",
+    "promo": {
+      "cta": "Keşfet",
+      "image_unavailable": "Resim yüklenemedi."
+    }
   },
   "empty_state": {
     "empty_message": "Henüz içerik yok",
