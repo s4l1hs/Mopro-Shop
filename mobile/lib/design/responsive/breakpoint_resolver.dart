@@ -16,7 +16,7 @@ class BreakpointResolver {
 }
 
 /// Convenience accessors backed by `MediaQuery.sizeOf(context).width`.
-/// Note: inside a [ResponsiveBuilder] subtree you should resolve from
+/// Note: inside a `ResponsiveBuilder` subtree you should resolve from
 /// `BoxConstraints.maxWidth` instead so embedded panels react to their
 /// parent column rather than the window.
 extension BreakpointContext on BuildContext {

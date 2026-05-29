@@ -14,6 +14,10 @@ class HoverRegion extends StatefulWidget {
     super.key,
   });
 
+  /// Builder receives `hovering=true` while the pointer is inside the region
+  /// (after `openDelay`) or the descendant focus node has focus. Positional
+  /// `bool` matches Flutter's idiomatic builder-typedef convention.
+  // ignore: avoid_positional_boolean_parameters
   final Widget Function(BuildContext context, bool hovering) builder;
   final Duration openDelay;
   final Duration closeDelay;

@@ -668,6 +668,36 @@ func (s *serviceImpl) ResetPassword(ctx context.Context, token, newPassword stri
 	return nil
 }
 
+// ChangePassword rotates an authenticated user's password after verifying the
+// current one. Mirrors ResetPassword's post-success behavior of revoking every
+// active refresh token so the change propagates immediately to other devices.
+func (s *serviceImpl) ChangePassword(ctx context.Context, userID int64, oldPassword, newPassword string) error {
+	user, err := s.repo.GetUser(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if user.PasswordHash == "" {
+		// Phone-only account — no password to rotate. Treat as invalid creds
+		// (do not leak which kind of account this is).
+		return ErrInvalidCredentials
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)); err != nil {
+		return ErrInvalidCredentials
+	}
+	if err := validatePassword(newPassword); err != nil {
+		return err
+	}
+	pwHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcryptPasswordCost)
+	if err != nil {
+		return fmt.Errorf("identity: hash new password: %w", err)
+	}
+	if err := s.repo.SetPasswordHash(ctx, userID, string(pwHash)); err != nil {
+		return fmt.Errorf("identity: set password: %w", err)
+	}
+	_ = s.repo.RevokeAllUserTokens(ctx, userID)
+	return nil
+}
+
 // ── MFA ───────────────────────────────────────────────────────────────────────
 
 func (s *serviceImpl) EnrollMFA(ctx context.Context, userID int64, phone, clientIP string) error {

@@ -30,7 +30,7 @@ class NotFoundScreen extends StatelessWidget {
                     color: MoproTokens.primaryLight.withAlpha(26),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.search_off_rounded,
                     size: 48,
                     color: MoproTokens.primaryLight,

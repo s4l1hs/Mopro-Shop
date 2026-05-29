@@ -57,7 +57,6 @@ class WebHeader extends ConsumerWidget implements PreferredSizeWidget {
               _LogoButton(
                 onTap: () => context.go('/'),
                 child: const MoproLogo(
-                  variant: MoproLogoVariant.withText,
                   height: 32,
                 ),
               ),

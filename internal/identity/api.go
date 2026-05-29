@@ -86,6 +86,13 @@ type Service interface {
 	// On success all existing refresh tokens are revoked (force logout everywhere).
 	ResetPassword(ctx context.Context, token, newPassword string) error
 
+	// ChangePassword rotates the password for an authenticated user. The
+	// caller MUST present `oldPassword` for verification. Returns
+	// ErrInvalidCredentials if the old password is wrong, ErrWeakPassword if
+	// the new one fails strength rules, ErrUserNotFound if the user record
+	// is gone. On success all other refresh tokens are revoked.
+	ChangePassword(ctx context.Context, userID int64, oldPassword, newPassword string) error
+
 	// ── MFA ───────────────────────────────────────────────────────────────────
 
 	// EnrollMFA sends an OTP to phone for MFA setup. User must confirm with ConfirmMFAEnroll.

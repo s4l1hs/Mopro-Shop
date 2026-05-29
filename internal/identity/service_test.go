@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/mopro/platform/internal/identity"
 	identityjwt "github.com/mopro/platform/internal/identity/jwt"
 	"github.com/mopro/platform/internal/identity/ratelimit"
@@ -35,6 +37,10 @@ type mockRepo struct {
 	verifyErr    error
 	rotateErr    error
 	revokeErr    error
+
+	// ChangePassword observability: list of user IDs whose tokens were
+	// blanket-revoked (i.e. RevokeAllUserTokens was called).
+	revokedAllForUser []int64
 }
 
 func newMockRepo() *mockRepo {
@@ -544,7 +550,12 @@ func (m *mockRepo) FindUserByEmailHash(_ context.Context, _ []byte) (identity.Us
 func (m *mockRepo) CreateEmailUser(_ context.Context, _ []byte, _, _, _, _ string) (identity.User, error) {
 	return identity.User{ID: 1}, nil
 }
-func (m *mockRepo) SetPasswordHash(_ context.Context, _ int64, _ string) error { return nil }
+func (m *mockRepo) SetPasswordHash(_ context.Context, id int64, hash string) error {
+	if u, ok := m.users[id]; ok {
+		u.PasswordHash = hash
+	}
+	return nil
+}
 func (m *mockRepo) MarkEmailVerified(_ context.Context, _ int64) error         { return nil }
 func (m *mockRepo) CreateEmailVerification(_ context.Context, _ int64, _ string, _ time.Time) error {
 	return nil
@@ -563,7 +574,10 @@ func (m *mockRepo) MarkPasswordResetUsed(_ context.Context, _ int64) error      
 func (m *mockRepo) CreateSession(_ context.Context, _ int64, _ identity.RefreshToken) error {
 	return nil
 }
-func (m *mockRepo) RevokeAllUserTokens(_ context.Context, _ int64) error { return nil }
+func (m *mockRepo) RevokeAllUserTokens(_ context.Context, id int64) error {
+	m.revokedAllForUser = append(m.revokedAllForUser, id)
+	return nil
+}
 func (m *mockRepo) UpdateMFAConfig(_ context.Context, _ int64, _ bool, _ []byte, _ string) error {
 	return nil
 }
@@ -580,3 +594,101 @@ type mockEmail struct{}
 
 func (m *mockEmail) SendVerification(_ context.Context, _, _ string) error  { return nil }
 func (m *mockEmail) SendPasswordReset(_ context.Context, _, _ string) error { return nil }
+
+// ── ChangePassword tests ─────────────────────────────────────────────────────
+
+// seedPasswordUser inserts a user with a bcrypt'd `oldPassword` into the mock
+// repo so ChangePassword has something to verify against.
+func seedPasswordUser(t *testing.T, repo *mockRepo, id int64, oldPassword string) {
+	t.Helper()
+	hash, err := bcrypt.GenerateFromPassword([]byte(oldPassword), bcrypt.MinCost)
+	if err != nil {
+		t.Fatalf("seed bcrypt: %v", err)
+	}
+	repo.users[id] = &identity.User{
+		ID: id, PasswordHash: string(hash),
+		Status: identity.StatusActive,
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+}
+
+func TestChangePassword_Success_RotatesHashAndRevokesTokens(t *testing.T) {
+	repo := newMockRepo()
+	seedPasswordUser(t, repo, 42, "OldPass!1")
+	svc := newTestService(repo, &mockSMS{}, &mockLimiter{}, t)
+
+	if err := svc.ChangePassword(context.Background(), 42, "OldPass!1", "NewStrong!2"); err != nil {
+		t.Fatalf("ChangePassword: %v", err)
+	}
+	// Hash must have rotated to one that verifies against the NEW password.
+	updated := repo.users[42]
+	if err := bcrypt.CompareHashAndPassword([]byte(updated.PasswordHash), []byte("NewStrong!2")); err != nil {
+		t.Errorf("new password does not verify: %v", err)
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(updated.PasswordHash), []byte("OldPass!1")); err == nil {
+		t.Errorf("old password still verifies after rotation")
+	}
+	// All other sessions must have been revoked.
+	if len(repo.revokedAllForUser) != 1 || repo.revokedAllForUser[0] != 42 {
+		t.Errorf("RevokeAllUserTokens not called for user 42, got %v", repo.revokedAllForUser)
+	}
+}
+
+func TestChangePassword_WrongOldPassword_ReturnsInvalidCredentials(t *testing.T) {
+	repo := newMockRepo()
+	seedPasswordUser(t, repo, 42, "Correct!1")
+	svc := newTestService(repo, &mockSMS{}, &mockLimiter{}, t)
+
+	err := svc.ChangePassword(context.Background(), 42, "WrongPass!1", "NewStrong!2")
+	if !errors.Is(err, identity.ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials, got %v", err)
+	}
+	// Hash must NOT have rotated.
+	if err := bcrypt.CompareHashAndPassword([]byte(repo.users[42].PasswordHash), []byte("Correct!1")); err != nil {
+		t.Errorf("hash unexpectedly rotated: %v", err)
+	}
+	if len(repo.revokedAllForUser) != 0 {
+		t.Errorf("RevokeAllUserTokens should not be called on failure, got %v", repo.revokedAllForUser)
+	}
+}
+
+func TestChangePassword_WeakNewPassword_ReturnsWeakPassword(t *testing.T) {
+	repo := newMockRepo()
+	seedPasswordUser(t, repo, 42, "OldPass!1")
+	svc := newTestService(repo, &mockSMS{}, &mockLimiter{}, t)
+
+	// Short new password fails the strength check.
+	err := svc.ChangePassword(context.Background(), 42, "OldPass!1", "weak")
+	if !errors.Is(err, identity.ErrWeakPassword) {
+		t.Fatalf("expected ErrWeakPassword, got %v", err)
+	}
+	if len(repo.revokedAllForUser) != 0 {
+		t.Errorf("tokens revoked despite weak-password failure: %v", repo.revokedAllForUser)
+	}
+}
+
+func TestChangePassword_PhoneOnlyUser_ReturnsInvalidCredentials(t *testing.T) {
+	repo := newMockRepo()
+	// Phone-only user — no password hash set.
+	repo.users[7] = &identity.User{
+		ID: 7, PasswordHash: "",
+		Status: identity.StatusActive,
+		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	svc := newTestService(repo, &mockSMS{}, &mockLimiter{}, t)
+
+	err := svc.ChangePassword(context.Background(), 7, "anything", "NewStrong!2")
+	if !errors.Is(err, identity.ErrInvalidCredentials) {
+		t.Fatalf("expected ErrInvalidCredentials for phone-only user, got %v", err)
+	}
+}
+
+func TestChangePassword_UnknownUser_ReturnsUserNotFound(t *testing.T) {
+	repo := newMockRepo()
+	svc := newTestService(repo, &mockSMS{}, &mockLimiter{}, t)
+
+	err := svc.ChangePassword(context.Background(), 999, "x", "NewStrong!2")
+	if !errors.Is(err, identity.ErrUserNotFound) {
+		t.Fatalf("expected ErrUserNotFound, got %v", err)
+	}
+}

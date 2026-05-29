@@ -1,0 +1,98 @@
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:mopro/design/tokens.dart';
+import 'package:mopro/features/catalog/providers/home_provider.dart';
+
+/// Horizontally-scrolled strip of circular mood tiles for the home screen.
+///
+/// Layout: 72dp avatar (with brand-orange ring) over an 11sp label.
+/// Tapping a tile follows its deep_link via go_router. On any provider error
+/// (or empty payload), the strip is collapsed entirely — never shown empty.
+class MoodStoriesStrip extends ConsumerWidget {
+  const MoodStoriesStrip({super.key});
+
+  static const double _avatarSize = 64;
+  static const double _stripHeight = 110;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncStories = ref.watch(homeMoodStoriesProvider);
+    return asyncStories.when(
+      loading: () => const SizedBox(height: _stripHeight),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (stories) {
+        if (stories.isEmpty) return const SizedBox.shrink();
+        return SizedBox(
+          height: _stripHeight,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            itemCount: stories.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, i) => _MoodTile(story: stories[i]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _MoodTile extends StatelessWidget {
+  const _MoodTile({required this.story});
+  final HomeMoodStory story;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => context.go(story.deepLink),
+      borderRadius: BorderRadius.circular(40),
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          children: [
+            Container(
+              width: MoodStoriesStrip._avatarSize + 6,
+              height: MoodStoriesStrip._avatarSize + 6,
+              padding: const EdgeInsets.all(2),
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [MoproTokens.primaryLight, Color(0xFFE36925)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: ClipOval(
+                child: CachedNetworkImage(
+                  imageUrl: story.imageUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => const ColoredBox(
+                    color: Color(0xFFEEEEEE),
+                  ),
+                  errorWidget: (_, __, ___) => const Icon(
+                    Icons.image_not_supported_outlined,
+                    size: 28,
+                    color: Colors.black26,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              story.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

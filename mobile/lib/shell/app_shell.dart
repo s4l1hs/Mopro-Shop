@@ -28,7 +28,7 @@ class AppShell extends ConsumerWidget {
   }
 }
 
-// ── Mobile shell (unchanged from Session 1) ───────────────────────────────────
+// ── Mobile shell (unchanged from Session 1) ─────────────────────────────────
 
 class _MobileShell extends ConsumerWidget {
   const _MobileShell({required this.navigationShell});
@@ -142,7 +142,7 @@ class _WebShell extends StatelessWidget {
   }
 }
 
-// ── Mobile bottom-nav item (unchanged) ────────────────────────────────────────
+// ── Mobile bottom-nav item (unchanged) ──────────────────────────────────────
 
 class _NavItem extends StatelessWidget {
   const _NavItem({

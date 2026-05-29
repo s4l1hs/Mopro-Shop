@@ -516,6 +516,28 @@ func (r *pgxRepository) HomeBanners(ctx context.Context) ([]HomeBannerRow, error
 	return out, rows.Err()
 }
 
+func (r *pgxRepository) HomeMoodStories(ctx context.Context) ([]HomeMoodStoryRow, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, title_tr, title_en, image_url, deep_link, sort_order
+		FROM catalog_schema.home_mood_stories WHERE active = TRUE ORDER BY sort_order`)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: HomeMoodStories: %w", err)
+	}
+	defer rows.Close()
+	var out []HomeMoodStoryRow
+	for rows.Next() {
+		var s HomeMoodStoryRow
+		if err := rows.Scan(&s.ID, &s.TitleTR, &s.TitleEN, &s.ImageURL, &s.DeepLink, &s.SortOrder); err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	if out == nil {
+		out = []HomeMoodStoryRow{}
+	}
+	return out, rows.Err()
+}
+
 func (r *pgxRepository) ListReviews(ctx context.Context, productID int64, offset, limit int) ([]ProductReviewRow, int, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT id, product_id, user_id, rating,

@@ -147,6 +147,14 @@ func (s *CoreServer) DeleteMe(_ context.Context, _ gencore.DeleteMeRequestObject
 	return notImplemented501[gencore.DeleteMeResponseObject]()
 }
 
+// ChangePassword is wired through the manual `POST /me/password` route in
+// cmd/core-svc/auth_handlers.go (which can access identity.Service); the
+// StrictServerInterface stub here exists only for the compile-time interface
+// check and is never reached at runtime.
+func (s *CoreServer) ChangePassword(_ context.Context, _ gencore.ChangePasswordRequestObject) (gencore.ChangePasswordResponseObject, error) {
+	return notImplemented501[gencore.ChangePasswordResponseObject]()
+}
+
 func (s *CoreServer) RegisterDevice(_ context.Context, _ gencore.RegisterDeviceRequestObject) (gencore.RegisterDeviceResponseObject, error) {
 	return notImplemented501[gencore.RegisterDeviceResponseObject]()
 }

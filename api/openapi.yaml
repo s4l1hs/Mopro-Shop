@@ -390,6 +390,47 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /me/password:
+    post:
+      operationId: ChangePassword
+      tags: [me]
+      summary: Change the authenticated user's password
+      description: |
+        Requires the current password in the body for verification. On success,
+        all existing refresh tokens for the user are revoked (forces re-login
+        on every other device). Rate limited by IP. Returns 401
+        `invalid_credentials` if old_password does not match; 422
+        `weak_password` if new_password fails strength rules.
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [old_password, new_password]
+              properties:
+                old_password:
+                  type: string
+                  format: password
+                  description: Current password (plaintext over TLS)
+                new_password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  description: New password (≥8 chars, 1 upper, 1 lower, 1 special)
+      responses:
+        '204':
+          description: Password updated; all other sessions revoked
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /me/devices:
     post:
       operationId: RegisterDevice
@@ -2206,6 +2247,29 @@ components:
           format: uri
           nullable: true
           description: First image URL of the lowest-priced variant
+        # ── Trendyol-style display fields (Session 2 backend, Session 3 spec) ──
+        original_price_minor:
+          type: integer
+          format: int64
+          nullable: true
+          description: |
+            MSRP in minor units. When set and greater than price_minor, render
+            with strikethrough; backend also emits discount_pct.
+        discount_pct:
+          type: integer
+          nullable: true
+          description: |
+            Server-computed discount % when original_price_minor > price_minor.
+            Render as red %-badge next to the strikethrough.
+        rating_avg:
+          type: number
+          format: float
+          nullable: true
+          description: Average review rating (0.0–5.0); null when rating_count = 0
+        rating_count:
+          type: integer
+          default: 0
+          description: Number of reviews aggregated into rating_avg
         cashback_preview:
           $ref: '#/components/schemas/CashbackPreview'
 

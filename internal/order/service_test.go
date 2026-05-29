@@ -477,6 +477,9 @@ func (m *mockCatalogSvc) HomeRails(_ context.Context, _ string) ([]catalog.HomeR
 func (m *mockCatalogSvc) HomeBanners(_ context.Context) ([]catalog.HomeBannerRow, error) {
 	return nil, nil
 }
+func (m *mockCatalogSvc) HomeMoodStories(_ context.Context) ([]catalog.HomeMoodStoryRow, error) {
+	return nil, nil
+}
 func (m *mockCatalogSvc) ListReviews(_ context.Context, _ int64, _, _ int) ([]catalog.ProductReviewRow, int, error) {
 	return nil, 0, nil
 }

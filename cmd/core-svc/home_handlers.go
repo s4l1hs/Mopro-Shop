@@ -34,6 +34,39 @@ func handleHomeBanners(svc catalog.Service) http.HandlerFunc {
 	}
 }
 
+// ── GET /home/stories ─────────────────────────────────────────────────────────
+//
+// Returns the home-screen "mood stories" strip — a horizontally-scrolled row
+// of circular tiles. Locale is resolved from Accept-Language; English clients
+// receive title_en, everything else falls back to title_tr (TR launch market).
+
+func handleHomeMoodStories(svc catalog.Service, defaultLocale string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		locale := parseLocale(r, defaultLocale)
+		stories, err := svc.HomeMoodStories(r.Context())
+		if err != nil {
+			slog.Error("home: HomeMoodStories", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		out := make([]map[string]any, len(stories))
+		for i, s := range stories {
+			title := s.TitleTR
+			if locale == "en-US" || locale == "en" {
+				title = s.TitleEN
+			}
+			out[i] = map[string]any{
+				"id":         s.ID,
+				"title":      title,
+				"image_url":  s.ImageURL,
+				"deep_link":  s.DeepLink,
+				"sort_order": s.SortOrder,
+			}
+		}
+		jsonOK(w, http.StatusOK, map[string]any{"data": out})
+	}
+}
+
 // ── GET /home/rails ───────────────────────────────────────────────────────────
 
 func handleHomeRails(svc catalog.Service, defaultLocale string) http.HandlerFunc {

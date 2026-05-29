@@ -16,7 +16,7 @@ class Breakpoints {
   /// Maximum width of the centered content column on desktop.
   static const double desktopContentMax = 1240;
 
-  /// Horizontal padding applied by [CenteredContentColumn] per breakpoint.
+  /// Horizontal padding applied by `CenteredContentColumn` per breakpoint.
   static const double paddingMobile = 16;
   static const double paddingTablet = 24;
   static const double paddingDesktop = 32;

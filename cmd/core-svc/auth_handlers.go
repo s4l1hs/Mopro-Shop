@@ -76,6 +76,9 @@ func (a *authHandlers) registerRoutes(mux *http.ServeMux, requireAuth func(http.
 	mux.Handle("PATCH /me",
 		httpTrace(requireAuth(http.HandlerFunc(a.handleUpdateMe))),
 	)
+	mux.Handle("POST /me/password",
+		httpTrace(requireAuth(http.HandlerFunc(a.handleChangePassword))),
+	)
 	mux.Handle("DELETE /me",
 		httpTrace(requireAuth(http.HandlerFunc(a.handleDeleteMe))),
 	)
@@ -410,6 +413,27 @@ func (a *authHandlers) handleResetPassword(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	if err := a.svc.ResetPassword(r.Context(), req.Token, req.NewPassword); err != nil {
+		a.writeIdentityError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleChangePassword services POST /me/password (authenticated). Verifies
+// the current password against the stored bcrypt hash, runs strength checks
+// on the new password, then rotates the hash and revokes every other refresh
+// token. Responds 204 on success.
+func (a *authHandlers) handleChangePassword(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.UserIDFromCtx(r.Context())
+	var req struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.OldPassword == "" || req.NewPassword == "" {
+		jsonError(w, "old_password and new_password required", http.StatusBadRequest)
+		return
+	}
+	if err := a.svc.ChangePassword(r.Context(), userID, req.OldPassword, req.NewPassword); err != nil {
 		a.writeIdentityError(w, err)
 		return
 	}

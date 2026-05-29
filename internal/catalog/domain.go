@@ -117,6 +117,17 @@ type HomeBannerRow struct {
 	SortOrder int
 }
 
+// HomeMoodStoryRow is one circular tile in the home-screen "mood stories"
+// strip. Each tile carries a localized title and a deep-link target.
+type HomeMoodStoryRow struct {
+	ID        int64
+	TitleTR   string
+	TitleEN   string
+	ImageURL  string
+	DeepLink  string
+	SortOrder int
+}
+
 // ProductReviewRow is a single user review on a product.
 type ProductReviewRow struct {
 	ID           int64

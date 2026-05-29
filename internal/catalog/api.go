@@ -31,6 +31,9 @@ type Service interface {
 	// HomeBanners returns active banners ordered by sort_order.
 	HomeBanners(ctx context.Context) ([]HomeBannerRow, error)
 
+	// HomeMoodStories returns active mood-story tiles ordered by sort_order.
+	HomeMoodStories(ctx context.Context) ([]HomeMoodStoryRow, error)
+
 	// ListReviews returns paginated reviews for a product.
 	ListReviews(ctx context.Context, productID int64, page, perPage int) ([]ProductReviewRow, int, error)
 
@@ -59,6 +62,7 @@ type Repository interface {
 	ListProductsByIDs(ctx context.Context, ids []int64, locale string) ([]ProductSummaryRow, error)
 	HomeRails(ctx context.Context) ([]HomeRailRow, error)
 	HomeBanners(ctx context.Context) ([]HomeBannerRow, error)
+	HomeMoodStories(ctx context.Context) ([]HomeMoodStoryRow, error)
 	ListReviews(ctx context.Context, productID int64, offset, limit int) ([]ProductReviewRow, int, error)
 
 	ListAllVariantStocks(ctx context.Context) ([]VariantStock, error)

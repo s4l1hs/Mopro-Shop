@@ -10,6 +10,7 @@ import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/features/catalog/providers/home_provider.dart';
 import 'package:mopro/features/catalog/providers/products_rail_provider.dart';
 import 'package:mopro/features/catalog/widgets/home_category_grid.dart';
+import 'package:mopro/features/catalog/widgets/mood_stories_strip.dart';
 import 'package:mopro/features/catalog/widgets/product_rail.dart';
 import 'package:mopro/features/catalog/widgets/trust_bar.dart';
 // ignore: lines_longer_than_80_chars
@@ -29,6 +30,7 @@ class CatalogHomeScreen extends ConsumerWidget {
         onRefresh: () async {
           ref
             ..invalidate(homeBannersProvider)
+            ..invalidate(homeMoodStoriesProvider)
             ..invalidate(homeRailsProvider)
             ..invalidate(productsRailProvider('recommended'))
             ..invalidate(productsRailProvider('bestseller'))
@@ -44,6 +46,9 @@ class CatalogHomeScreen extends ConsumerWidget {
                 child: _HomeTopBar(),
               ),
             ),
+
+            // ── Mood stories strip (server-driven) ────────────────────────────
+            const SliverToBoxAdapter(child: MoodStoriesStrip()),
 
             // ── Banner carousel (server-driven) ──────────────────────────────
             const SliverToBoxAdapter(child: _BannerCarousel()),
