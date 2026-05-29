@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:mopro_api/src/model/category_promo_slot.dart';
 import 'package:json_annotation/json_annotation.dart';
 
 part 'category.g.dart';
@@ -29,6 +30,8 @@ class Category {
      this.iconUrl,
 
     required  this.commissionPctBps,
+
+     this.promoSlot,
   });
 
   @JsonKey(
@@ -105,6 +108,19 @@ class Category {
 
 
 
+      /// Optional promo card surfaced ONLY on top-level categories (parent_id IS NULL). Always null on subcategories and leaves. Used by the desktop mega menu's 3+1 layout (Session 4d §3); mobile clients can ignore. Malformed JSON in the underlying storage is normalized to null + a warning log by the server. 
+  @JsonKey(
+    
+    name: r'promo_slot',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final CategoryPromoSlot? promoSlot;
+
+
+
 
 
     @override
@@ -114,7 +130,8 @@ class Category {
       other.slug == slug &&
       other.parentId == parentId &&
       other.iconUrl == iconUrl &&
-      other.commissionPctBps == commissionPctBps;
+      other.commissionPctBps == commissionPctBps &&
+      other.promoSlot == promoSlot;
 
     @override
     int get hashCode =>
@@ -123,7 +140,8 @@ class Category {
         slug.hashCode +
         parentId.hashCode +
         iconUrl.hashCode +
-        commissionPctBps.hashCode;
+        commissionPctBps.hashCode +
+        promoSlot.hashCode;
 
   factory Category.fromJson(Map<String, dynamic> json) => _$CategoryFromJson(json);
 

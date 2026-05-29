@@ -160,6 +160,75 @@ func TestListCategories_DefaultResponseShapeUnchanged(t *testing.T) {
 	if contains(body, `"children"`) {
 		t.Fatalf("response should not be nested: %s", body)
 	}
+	// Default-depth response must NOT include promo_slot when no rows have
+	// one — the `omitempty` on categoryJSON.PromoSlot suppresses it. (When
+	// rows DO have a promo, the field appears on those rows only; covered
+	// by TestListCategories_PromoSlot_TopLevelOnly below.)
+	if contains(body, `"promo_slot"`) {
+		t.Fatalf("response should not include promo_slot on rows without one: %s", body)
+	}
+}
+
+// TestListCategories_PromoSlot_TopLevelOnly guards the §2 promo_slot
+// surface contract: appears on top-level rows when populated; absent
+// from subcategory/leaf rows even if the service layer returned one.
+func TestListCategories_PromoSlot_TopLevelOnly(t *testing.T) {
+	parentID := int64(1)
+	leafParent := int64(10)
+	svc := &stubCatalogSvc{
+		listCategoriesFn: func(_ context.Context, _ string, _ int) ([]catalog.CategoryRow, error) {
+			return []catalog.CategoryRow{
+				// Top-level with promo — should surface.
+				{
+					ID: 1, Slug: "erkek", Name: "Erkek", CommissionPctBps: 500,
+					PromoSlot: &catalog.PromoSlot{
+						ImageURL: "https://cdn.example.com/promos/erkek.png",
+						Title:    "Erkek Yeni Sezon",
+						DeepLink: "/categories/1?campaign=new",
+					},
+				},
+				// Top-level without promo — should not have the field rendered.
+				{ID: 2, Slug: "kadin", Name: "Kadın", CommissionPctBps: 500},
+				// Subcategory: even if service returned a promo here (it
+				// shouldn't), the handler / API contract says omit.
+				{ID: 10, Slug: "giyim", Name: "Giyim", ParentID: &parentID, CommissionPctBps: 700},
+				// Leaf.
+				{ID: 100, Slug: "tshirt", Name: "T-shirt", ParentID: &leafParent, CommissionPctBps: 700},
+			}, nil
+		},
+	}
+
+	handler := handleListCategories(svc, "tr-TR")
+	req := httptest.NewRequest(http.MethodGet, "/categories?depth=3", nil)
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if rec.Code != 200 {
+		t.Fatalf("status: got %d, want 200", rec.Code)
+	}
+	body := rec.Body.String()
+	// Surface on the populated top-level.
+	if !contains(body, `"image_url":"https://cdn.example.com/promos/erkek.png"`) {
+		t.Fatalf("promo_slot.image_url not surfaced on top-level: %s", body)
+	}
+	if !contains(body, `"deep_link":"/categories/1?campaign=new"`) {
+		t.Fatalf("promo_slot.deep_link not surfaced on top-level: %s", body)
+	}
+	// Absent on subcategory + leaf: only one occurrence of "promo_slot"
+	// (the one on the populated top-level row).
+	if countOccurrences(body, `"promo_slot"`) != 1 {
+		t.Fatalf("promo_slot should appear exactly once (top-level only); body: %s", body)
+	}
+}
+
+func countOccurrences(s, sub string) int {
+	count := 0
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			count++
+		}
+	}
+	return count
 }
 
 func contains(haystack, needle string) bool {

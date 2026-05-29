@@ -5,6 +5,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:mopro/app.dart';
 import 'package:mopro/core/di/providers.dart';
+import 'package:mopro/design/responsive/pointer_kind.dart';
 import 'package:mopro/design/theme_controller.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,6 +17,12 @@ const _apiBaseUrl = String.fromEnvironment(
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Global pointer-router hook (Session 4d §4). Tracks the kind of the most
+  // recent PointerDownEvent so widgets can branch tap behavior between
+  // pointer (mouse/trackpad/stylus) and touch. Used by MegaMenuBar to
+  // implement the Trendyol-style rule: pointer-tap routes to PLP, touch-tap
+  // opens the panel.
+  PointerKindObserver.install();
   // Path URL strategy on web: /products/123 instead of /#/products/123.
   // No-op on mobile.
   usePathUrlStrategy();

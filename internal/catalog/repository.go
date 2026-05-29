@@ -2,8 +2,10 @@ package catalog
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -221,11 +223,18 @@ func (r *pgxRepository) ListCategories(ctx context.Context, locale string, maxDe
 	// to prevent runaway responses per the prompt's safety ceiling.
 	const maxNodes = 1000
 
+	// promo_slot (Session 4d §2): SELECT the JSONB column on every row but
+	// only PARSE / surface it on top-level rows (parent_id IS NULL) in the
+	// scan loop below. Subcategory/leaf rows get nil PromoSlot even when
+	// the column is non-null (defense in depth — the seed only populates
+	// top-level rows, but if someone manually backfills a leaf later the
+	// API contract still holds).
 	var query string
 	var args []any
 	if maxDepth <= 0 {
 		query = `SELECT c.id, c.slug, c.` + nameCol + `, c.parent_id,
-		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps
+		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
+		        c.promo_slot
 		FROM ref_schema.categories c
 		LEFT JOIN ref_schema.commission_rules cr
 		       ON cr.category_id = c.id
@@ -247,7 +256,8 @@ func (r *pgxRepository) ListCategories(ctx context.Context, locale string, maxDe
 		    WHERE c.active = TRUE AND cd.depth + 1 <= $1
 		)
 		SELECT c.id, c.slug, c.` + nameCol + `, c.parent_id,
-		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps
+		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
+		        c.promo_slot
 		FROM ref_schema.categories c
 		JOIN cat_depth cd ON cd.id = c.id
 		LEFT JOIN ref_schema.commission_rules cr
@@ -268,8 +278,23 @@ func (r *pgxRepository) ListCategories(ctx context.Context, locale string, maxDe
 	var cats []CategoryRow
 	for rows.Next() {
 		var c CategoryRow
-		if err := rows.Scan(&c.ID, &c.Slug, &c.Name, &c.ParentID, &c.CommissionPctBps); err != nil {
+		var promoRaw []byte
+		if err := rows.Scan(&c.ID, &c.Slug, &c.Name, &c.ParentID, &c.CommissionPctBps, &promoRaw); err != nil {
 			return nil, fmt.Errorf("catalog.repo: scan category: %w", err)
+		}
+		// Parse promo_slot only on top-level rows. Subcategory/leaf rows
+		// keep PromoSlot=nil even if the column happens to be non-null.
+		if c.ParentID == nil && len(promoRaw) > 0 {
+			var p PromoSlot
+			if err := json.Unmarshal(promoRaw, &p); err != nil {
+				// Malformed JSON: warn + null per the API contract. Do not
+				// fail the request — one bad row shouldn't 500 the whole
+				// categories endpoint.
+				slog.Warn("catalog.repo: malformed promo_slot json; surfacing as null",
+					"category_id", c.ID, "err", err)
+			} else if p.ImageURL != "" || p.Title != "" || p.DeepLink != "" {
+				c.PromoSlot = &p
+			}
 		}
 		cats = append(cats, c)
 	}

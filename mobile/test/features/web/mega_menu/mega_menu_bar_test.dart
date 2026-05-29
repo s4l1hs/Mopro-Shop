@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/design/responsive/anchored_overlay_panel.dart';
+import 'package:mopro/design/responsive/pointer_kind.dart';
 import 'package:mopro/design/theme.dart';
 import 'package:mopro/features/catalog/providers/categories_provider.dart';
 import 'package:mopro/features/web/mega_menu/mega_menu_bar.dart';
@@ -93,6 +94,10 @@ Future<void> _pump(
 void main() {
   setUpAll(initTestEnv);
   setUp(debugResetAnchoredOverlayPanelRegistry);
+  // Pointer kind defaults to unknown (treated as pointer behavior).
+  // Tests that need touch behavior set lastKind.value directly and rely
+  // on this tearDown to reset.
+  tearDown(PointerKindObserver.debugReset);
 
   group('MegaMenuBar — render + structure', () {
     testWidgets('renders top-level category labels', (tester) async {
@@ -135,6 +140,50 @@ void main() {
       // Leaves render too (column structure).
       expect(find.text('T-shirt'), findsOneWidget);
       expect(find.text('Sneaker'), findsOneWidget);
+    });
+  });
+
+  // ── Golden (Session 4d §5): bar collapsed at 1440 light ─────────────────
+  group('MegaMenuBar — goldens', () {
+    testWidgets('bar collapsed at 1440 light', (tester) async {
+      await _pump(tester);
+      await expectLater(
+        find.byType(MegaMenuBar),
+        matchesGoldenFile('goldens/mega_menu_bar_collapsed_1440_light.png'),
+      );
+    });
+  });
+
+  group('MegaMenuBar — touch interactions', () {
+    testWidgets('label tap OPENS panel (does NOT route) when touch is active',
+        (tester) async {
+      // Simulate the last pointer kind being touch by setting the notifier
+      // directly. The bar's ValueListenableBuilder re-renders with isTouch
+      // → AnchoredOverlayPanel.openOnTap=true and the trigger's inner
+      // GestureDetector is dropped.
+      PointerKindObserver.lastKind.value = LastPointerKind.touch;
+      await _pump(tester);
+      await tester.tap(find.text('Erkek'));
+      await tester.pumpAndSettle();
+      // Did NOT route — still on HOME (no PLP_1 surface).
+      expect(find.text('PLP_1'), findsNothing);
+      // Panel content visible.
+      expect(find.text('Giyim'), findsOneWidget);
+    });
+
+    testWidgets('tap on the same item again CLOSES the panel (touch toggle)',
+        (tester) async {
+      PointerKindObserver.lastKind.value = LastPointerKind.touch;
+      await _pump(tester);
+      await tester.tap(find.text('Erkek'));
+      await tester.pumpAndSettle();
+      expect(find.text('Giyim'), findsOneWidget);
+      // Second tap on the same bar item closes the panel.
+      await tester.tap(find.text('Erkek'));
+      await tester.pumpAndSettle();
+      expect(find.text('Giyim'), findsNothing);
+      // Still did not route through the touch flow.
+      expect(find.text('PLP_1'), findsNothing);
     });
   });
 }

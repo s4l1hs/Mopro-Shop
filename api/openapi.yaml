@@ -2126,6 +2126,34 @@ components:
         commission_pct_bps:
           type: integer
           description: Commission rate in basis points (e.g. 1500 = 15%)
+        promo_slot:
+          $ref: '#/components/schemas/CategoryPromoSlot'
+          nullable: true
+          description: |
+            Optional promo card surfaced ONLY on top-level categories
+            (parent_id IS NULL). Always null on subcategories and leaves.
+            Used by the desktop mega menu's 3+1 layout (Session 4d §3);
+            mobile clients can ignore. Malformed JSON in the underlying
+            storage is normalized to null + a warning log by the server.
+
+    CategoryPromoSlot:
+      type: object
+      required: [image_url, title, deep_link]
+      description: |
+        Promo card payload for the desktop mega menu's 3+1 layout. All
+        fields required when the slot is populated; absence of the slot
+        itself is null on the parent Category.
+      properties:
+        image_url:
+          type: string
+          format: uri
+          description: 16:9 image URL. Mobile clients should treat as opaque.
+        title:
+          type: string
+          description: 2-line clamp display title.
+        deep_link:
+          type: string
+          description: In-app deep link for the CTA button.
 
     CategoryCommission:
       type: object

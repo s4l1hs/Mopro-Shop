@@ -24,6 +24,12 @@ Category _$CategoryFromJson(Map<String, dynamic> json) => $checkedCreate(
         'commission_pct_bps',
         (v) => (v as num).toInt(),
       ),
+      promoSlot: $checkedConvert(
+        'promo_slot',
+        (v) => v == null
+            ? null
+            : CategoryPromoSlot.fromJson(v as Map<String, dynamic>),
+      ),
     );
     return val;
   },
@@ -31,6 +37,7 @@ Category _$CategoryFromJson(Map<String, dynamic> json) => $checkedCreate(
     'parentId': 'parent_id',
     'iconUrl': 'icon_url',
     'commissionPctBps': 'commission_pct_bps',
+    'promoSlot': 'promo_slot',
   },
 );
 
@@ -41,4 +48,5 @@ Map<String, dynamic> _$CategoryToJson(Category instance) => <String, dynamic>{
   'parent_id': ?instance.parentId,
   'icon_url': ?instance.iconUrl,
   'commission_pct_bps': instance.commissionPctBps,
+  'promo_slot': ?instance.promoSlot?.toJson(),
 };

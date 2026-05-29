@@ -32,6 +32,10 @@
   },
   "mega_menu": {
     "see_all": "عرض الكل",
-    "empty_children": "لا توجد فئات فرعية في هذا القسم."
+    "empty_children": "لا توجد فئات فرعية في هذا القسم.",
+    "promo": {
+      "cta": "اكتشف",
+      "image_unavailable": "الصورة غير متاحة."
+    }
   }
 }

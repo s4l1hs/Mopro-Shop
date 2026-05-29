@@ -16,6 +16,11 @@ class CategoryNode {
 
   int get id => category.id;
   String get name => category.name;
+
+  /// Top-level-only promo card payload for the desktop mega menu's 3+1
+  /// layout (Session 4d §3). Always null on subcategories and leaves; the
+  /// backend enforces this contract at `internal/catalog/repository.go`.
+  CategoryPromoSlot? get promoSlot => category.promoSlot;
 }
 
 /// Derived: builds a tree from the flat categoriesProvider output. Roots are
