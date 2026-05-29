@@ -373,3 +373,89 @@ func cronNetBalance(pool *pgxpool.Pool, currency string) int64 {
 		WHERE a.currency = $1`, currency).Scan(&net)
 	return net
 }
+
+// ── Property 6: ListDuePlans excludes plans already paid for the run period ───
+// The v6 storage-layer idempotency guard pairs a UNIQUE(plan_id, period_yyyymm)
+// constraint at ClaimPaymentPeriod with a NOT EXISTS period filter in
+// ListDuePlans. This property locks the filter invariant surfaced by PR #10:
+// for any (plan, asOf), once cashback_schema.payments holds a row with
+// period_yyyymm = period(asOf), ListDuePlans must never return that plan for
+// that period again — regardless of the cache value in plans.payments_made.
+
+func TestCronProperty_ListDuePlansExcludesPaidPeriods(t *testing.T) {
+	pool := propCronPool(t)
+	repo := cashback.NewRepository(pool)
+	ctx := context.Background()
+
+	properties := gopter.NewProperties(func() *gopter.TestParameters {
+		p := gopter.DefaultTestParameters()
+		p.MinSuccessfulTests = 100
+		p.SetSeed(0xCA4E00) // deterministic: reproducible shrinking on failure
+		return p
+	}())
+
+	properties.Property("a plan with a payment for period(asOf) is never returned by ListDuePlans", prop.ForAll(
+		func(monthOffset uint8) bool {
+			month := time.Month(int(monthOffset%12) + 1)
+			asOf := time.Date(2026, month, 28, 12, 0, 0, 0, time.UTC)
+			runPeriod := 2026*100 + int(month)
+
+			userID := propUniqueID()
+			startDate := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+			planID := seedPropPlan(t, pool, userID, "TRY_COIN", startDate)
+
+			// Precondition (keeps the test non-vacuous): with no payment for the
+			// run period, the freshly-seeded active plan IS due and appears.
+			if !propListDueContains(t, repo, ctx, asOf, runPeriod, planID) {
+				t.Logf("precondition failed: plan %d not due for period %d before any payment", planID, runPeriod)
+				return false
+			}
+
+			// Insert a payment row for exactly that period (any status counts
+			// toward the NOT EXISTS guard; 'paid' is the representative case).
+			propInsertPayment(t, pool, planID, runPeriod)
+
+			// Invariant: ListDuePlans must now exclude the plan for this period.
+			if propListDueContains(t, repo, ctx, asOf, runPeriod, planID) {
+				t.Logf("invariant violated: plan %d returned for already-paid period %d", planID, runPeriod)
+				return false
+			}
+			return true
+		},
+		gen.UInt8Range(0, 23),
+	))
+
+	properties.TestingRun(t, gopter.ConsoleReporter(false))
+}
+
+// propListDueContains reports whether planID appears in ListDuePlans for the
+// given run date/period. Uses a very large limit so plans accumulated by other
+// property iterations never push the target out of the result window.
+func propListDueContains(t *testing.T, repo cashback.Repository, ctx context.Context, asOf time.Time, runPeriod int, planID int64) bool {
+	t.Helper()
+	plans, err := repo.ListDuePlans(ctx, asOf, runPeriod, 1_000_000)
+	if err != nil {
+		t.Fatalf("ListDuePlans: %v", err)
+	}
+	for i := range plans {
+		if plans[i].ID == planID {
+			return true
+		}
+	}
+	return false
+}
+
+// propInsertPayment inserts a 'paid' payment row for (planID, period) to
+// simulate the run period already having been claimed/paid.
+func propInsertPayment(t *testing.T, pool *pgxpool.Pool, planID int64, period int) {
+	t.Helper()
+	_, err := pool.Exec(context.Background(), `
+		INSERT INTO cashback_schema.payments
+		    (plan_id, period_yyyymm, scheduled_date, amount_minor, status, idempotency_key, attempt_count)
+		VALUES ($1, $2, now(), 500, 'paid', $3, 1)`,
+		planID, period, fmt.Sprintf("prop:listdue:pay:%d:%d", planID, period),
+	)
+	if err != nil {
+		t.Fatalf("propInsertPayment plan=%d period=%d: %v", planID, period, err)
+	}
+}
