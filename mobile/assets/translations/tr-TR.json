@@ -177,6 +177,8 @@
   },
   "product": {
     "add_to_cart": "Sepete Ekle",
+    "add_to_favorites": "Favorilere Ekle",
+    "review_count": "{count} değerlendirme",
     "buy_now": "Hemen Al",
     "sold_by": "{seller} tarafından satılmaktadır",
     "go_to_store": "Mağazaya git",

@@ -147,6 +147,8 @@
   },
   "product": {
     "add_to_cart": "Add to Cart",
+    "add_to_favorites": "Add to Favorites",
+    "review_count": "{count} reviews",
     "buy_now": "Buy Now",
     "sold_by": "Sold by {seller}",
     "go_to_store": "Go to store",

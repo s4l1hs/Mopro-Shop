@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -6,15 +8,20 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/utils/coin_formatter.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
+import 'package:mopro/design/responsive/pointer_kind.dart';
+import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/catalog/providers/product_detail_provider.dart';
 import 'package:mopro/features/catalog/providers/product_reviews_provider.dart';
 import 'package:mopro/features/catalog/providers/products_rail_provider.dart';
+import 'package:mopro/features/catalog/widgets/pdp/pdp_image_pager.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_price_block.dart';
+import 'package:mopro/features/catalog/widgets/pdp/pdp_seller_card.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_sticky_cta.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_variant_selector.dart';
 import 'package:mopro/features/catalog/widgets/pdp_image_gallery.dart';
 import 'package:mopro/features/catalog/widgets/product_card.dart';
+import 'package:mopro/features/catalog/widgets/product_rail.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
 import 'package:mopro_api/mopro_api.dart';
 
@@ -72,29 +79,55 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
   late final TabController _tabController;
   Variant? _selectedVariant;
 
+  // Wide (tablet/desktop) layout state.
+  final ScrollController _wideScroll = ScrollController();
+  final GlobalKey wideGalleryKey = GlobalKey();
+  final GlobalKey wideTabsKey = GlobalKey();
+  final GlobalKey _buyBoxKey = GlobalKey();
+  double _scrollOffset = 0;
+  double? _buyBoxHeight;
+  int _quantity = 1;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
     if (widget.product.variants.isNotEmpty) {
       _selectedVariant = widget.product.variants.first;
     }
+    _wideScroll.addListener(() {
+      if (mounted) setState(() => _scrollOffset = _wideScroll.offset);
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _wideScroll.dispose();
     super.dispose();
   }
 
+  void _selectVariant(Variant v) => setState(() => _selectedVariant = v);
+
+  List<String> get _imageUrls =>
+      (_selectedVariant?.imageUrls.isNotEmpty ?? false)
+          ? _selectedVariant!.imageUrls
+          : widget.product.variants.firstOrNull?.imageUrls ?? [];
+
   @override
   Widget build(BuildContext context) {
+    if (!context.isMobile) return _buildWide(context);
+    return _buildMobile(context);
+  }
+
+  Widget _buildMobile(BuildContext context) {
     final product = widget.product;
     final isMutating = ref.watch(cartProvider).isMutating;
     final isFav = ref.watch(isFavoriteProvider(product.id));
-    final imageUrls = (_selectedVariant?.imageUrls.isNotEmpty ?? false)
-        ? _selectedVariant!.imageUrls
-        : product.variants.firstOrNull?.imageUrls ?? [];
+    final imageUrls = _imageUrls;
 
     return Scaffold(
       body: NestedScrollView(
@@ -171,7 +204,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
       await ref.read(cartProvider.notifier).addItem(
             productId: widget.product.id,
             variantId: variant.id,
-            qty: 1,
+            qty: _quantity,
           );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -191,6 +224,272 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
         );
       }
     }
+  }
+
+  // ── Wide (tablet/desktop) two-column layout ─────────────────────────────────
+
+  void _scrollToReviews() {
+    _tabController.index = 2;
+    final ctx = wideTabsKey.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 300));
+    }
+  }
+
+  Widget _buildWide(BuildContext context) {
+    final product = widget.product;
+    final isMutating = ref.watch(cartProvider).isMutating;
+    final isFav = ref.watch(isFavoriteProvider(product.id));
+
+    // Measure the buy-box height after layout so the sticky gallery column (a
+    // Stack) is bounded by the taller of the two columns.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final h = _buyBoxKey.currentContext?.size?.height;
+      if (h != null && h != _buyBoxHeight && mounted) {
+        setState(() => _buyBoxHeight = h);
+      }
+    });
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(product.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        actions: [
+          IconButton(
+            icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
+            onPressed: () =>
+                ref.read(favoritesProvider.notifier).toggle(product.id),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+      body: SingleChildScrollView(
+        controller: _wideScroll,
+        child: CenteredContentColumn(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              LayoutBuilder(
+                builder: (ctx, c) {
+                  final isDesktop = context.isDesktop;
+                  final buyBoxW = isDesktop ? 480.0 : 360.0;
+                  const gap = 32.0;
+                  final galleryW = (c.maxWidth - buyBoxW - gap)
+                      .clamp(280.0, isDesktop ? 600.0 : 480.0);
+                  final galleryH = galleryW + 84; // square image + thumb strip
+                  final contentH = math.max(galleryH, _buyBoxHeight ?? galleryH);
+                  final maxTop =
+                      (contentH - galleryH).clamp(0.0, double.infinity);
+                  final top = _scrollOffset.clamp(0.0, maxTop);
+
+                  return SizedBox(
+                    height: contentH,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: galleryW,
+                          height: contentH,
+                          child: Stack(
+                            children: [
+                              Positioned(
+                                top: top,
+                                left: 0,
+                                right: 0,
+                                height: galleryH,
+                                child: KeyedSubtree(
+                                  key: wideGalleryKey,
+                                  child: ValueListenableBuilder<LastPointerKind>(
+                                    valueListenable: PointerKindObserver.lastKind,
+                                    builder: (_, kind, __) => PdpImagePager(
+                                      imageUrls: _imageUrls,
+                                      enableHoverZoom: isDesktop &&
+                                          kind == LastPointerKind.mouse,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: gap),
+                        SizedBox(
+                          width: buyBoxW,
+                          child: KeyedSubtree(
+                            key: _buyBoxKey,
+                            child: _buildWideBuyBox(context, product, isMutating),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              KeyedSubtree(
+                key: wideTabsKey,
+                child: _buildWideTabs(context, product),
+              ),
+              const SizedBox(height: 24),
+              ProductRail(
+                title: 'product.related_title'.tr(),
+                sort: 'recommended',
+                layout: RailLayout.grid,
+                gridColumns: context.isDesktop ? 6 : 3,
+                maxItems: 6,
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWideBuyBox(
+    BuildContext context,
+    Product product,
+    bool isMutating,
+  ) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final v = _selectedVariant;
+    final reviews =
+        ref.watch(productReviewsProvider(product.id)).valueOrNull ?? [];
+    final ratingCount = reviews.length;
+    final avg = ratingCount == 0
+        ? 0.0
+        : reviews.map((r) => r.rating).reduce((a, b) => a + b) / ratingCount;
+    final titleSize = context.isDesktop ? 24.0 : 20.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: () =>
+              context.push('/search?q=${Uri.encodeComponent(product.brand)}'),
+          child: Text(
+            product.brand,
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: cs.primary, fontWeight: FontWeight.w500),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          product.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleLarge?.copyWith(fontSize: titleSize),
+        ),
+        if (ratingCount > 0) ...[
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: _scrollToReviews,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.star_rounded, size: 18, color: Color(0xFFFFB400)),
+                const SizedBox(width: 4),
+                Text(avg.toStringAsFixed(1), style: theme.textTheme.bodyMedium),
+                const SizedBox(width: 6),
+                Text(
+                  'product.review_count'
+                      .tr(namedArgs: {'count': '$ratingCount'}),
+                  style: theme.textTheme.bodySmall?.copyWith(color: cs.primary),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        if (v != null) ...[
+          PdpPriceBlock(priceMinor: v.priceMinor),
+          const SizedBox(height: 6),
+          _StockPill(stock: v.stock),
+        ],
+        const SizedBox(height: 16),
+        _CashbackCard(preview: product.cashbackPreview),
+        if (product.variants.length > 1) ...[
+          const SizedBox(height: 16),
+          PdpVariantSelector(
+            variants: product.variants,
+            selected: v,
+            onChanged: _selectVariant,
+          ),
+        ],
+        const SizedBox(height: 16),
+        PdpSellerCard(sellerName: product.sellerName, onTap: () {}),
+        const SizedBox(height: 16),
+        _QuantityStepper(
+          quantity: _quantity,
+          onChanged: (q) => setState(() => _quantity = q),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed:
+                v != null && !isMutating ? () => _addToCart(context) : null,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(56),
+            ),
+            child: Text('product.add_to_cart'.tr()),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () =>
+                ref.read(favoritesProvider.notifier).toggle(product.id),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              side: BorderSide(color: cs.primary),
+              foregroundColor: cs.primary,
+            ),
+            child: Text('product.add_to_favorites'.tr()),
+          ),
+        ),
+        const SizedBox(height: 24),
+        const _TrustBadges(),
+      ],
+    );
+  }
+
+  Widget _buildWideTabs(BuildContext context, Product product) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TabBar(
+          controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
+          tabs: [
+            Tab(text: 'product.description_tab'.tr()),
+            Tab(text: 'product.specs_tab'.tr()),
+            Tab(text: 'product.reviews_tab'.tr()),
+            Tab(text: 'product.qa_tab'.tr()),
+          ],
+        ),
+        const SizedBox(height: 16),
+        switch (_tabController.index) {
+          0 => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: MarkdownBody(data: product.description),
+            ),
+          2 => _WideReviews(productId: product.id),
+          _ => Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'common.loading'.tr(),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        },
+      ],
+    );
   }
 }
 
@@ -622,6 +921,121 @@ class _ReviewItem extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+// ── Wide buy-box helpers ───────────────────────────────────────────────────────
+
+class _QuantityStepper extends StatelessWidget {
+  const _QuantityStepper({required this.quantity, required this.onChanged});
+
+  final int quantity;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    Widget btn(IconData icon, VoidCallback? onTap) => SizedBox(
+          width: 44,
+          height: 44,
+          child: OutlinedButton(
+            onPressed: onTap,
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              side: BorderSide(color: cs.outlineVariant),
+            ),
+            child: Icon(icon, size: 18),
+          ),
+        );
+    return Row(
+      children: [
+        btn(Icons.remove, quantity > 1 ? () => onChanged(quantity - 1) : null),
+        SizedBox(
+          width: 48,
+          child: Text(
+            '$quantity',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+        ),
+        btn(Icons.add, () => onChanged(quantity + 1)),
+      ],
+    );
+  }
+}
+
+class _TrustBadges extends StatelessWidget {
+  const _TrustBadges();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    Widget badge(IconData icon, String key) => Expanded(
+          child: Column(
+            children: [
+              Icon(icon, size: 24, color: cs.onSurfaceVariant),
+              const SizedBox(height: 4),
+              Text(
+                key.tr(),
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
+        );
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        badge(Icons.lock_outline, 'product.trust_secure_payment'),
+        badge(Icons.refresh, 'product.trust_easy_return'),
+        badge(Icons.local_shipping_outlined, 'product.trust_free_shipping'),
+      ],
+    );
+  }
+}
+
+class _WideReviews extends ConsumerWidget {
+  const _WideReviews({required this.productId});
+
+  final int productId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reviewsAsync = ref.watch(productReviewsProvider(productId));
+    final cs = Theme.of(context).colorScheme;
+    return reviewsAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(24),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          'Yorumlar yüklenemedi.',
+          style: TextStyle(color: cs.onSurfaceVariant),
+        ),
+      ),
+      data: (reviews) {
+        if (reviews.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.all(24),
+            child: Text(
+              'Henüz yorum yok.',
+              style: TextStyle(color: cs.onSurfaceVariant),
+            ),
+          );
+        }
+        return Column(
+          children: [
+            for (final r in reviews)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: _ReviewItem(review: r),
+              ),
+          ],
+        );
+      },
     );
   }
 }
