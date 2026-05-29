@@ -1457,11 +1457,24 @@ analyze-clean commits, in execution order by value×certainty:
 
 - §6.4 — catalog `-tags=integration` build-tag fix (real correctness; 5a blocker).
 - §7 — `CONTRIBUTING.md`: "Adding a Notifier" (three shapes + synchronous-reachability rule) and "Writing a Regression Test" (revert-must-fail standard).
+- §5 — Favorites desktop grid (2/4/5 columns; mobile byte-identical; skeleton matches result columns).
 
 _Remaining sections (§2 PLP sidebar, §3 PDP two-column + hover-zoom + extraction,
-§4 Cart two-column, §5 Favorites desktop, §6.1–§6.3 home leftovers) and the
-Session 5b REPORT subsections are tracked for the 5b continuation; see "Carried
-to 5b-continuation" below._
+§4 Cart two-column, §6.1–§6.3 home leftovers) and their goldens/integration
+flows are tracked for the 5b continuation; see "Carried to 5b-continuation"
+below._
+
+## §5 — Favorites desktop grid
+
+`FavoritesScreen` grid columns adapt **2 / 4 / 5** at mobile / tablet / desktop.
+Mobile is byte-identical to before (full-width, 12dp pad, 2-col, same skeleton
+count) so its golden does not regress. Tablet/desktop center + clamp via
+`CenteredContentColumn`; the loading skeleton renders at the same column count as
+the results (§5.1). The existing locale-key empty state and the guest
+batch-fetch (POST `/products/batch`) are unchanged. Tests: empty state renders no
+grid; populated columns assert 2/4/5 at 375/768/1440 (fake Dio batch adapter from
+real `ProductSummary.toJson()`). Desktop goldens are part of the carried golden
+batch (mobile unchanged ⇒ no existing-golden regression).
 
 ## §6.4 — integration build-tag fix (Drive-by / correctness)
 
@@ -1490,7 +1503,7 @@ by `make test-integration-catalog` / CI's integration job.
 
 §2 PLP sidebar filter panel + chip row + sort dropdown; §3 PDP two-column +
 hover-zoom + component extraction; §4 Cart two-column + `OrderSummaryCard` +
-empty state; §5 Favorites desktop grid + empty state; §6.1 Editor's picks /
+empty state; §6.1 Editor's picks /
 Recently viewed home sub-section; §6.2 mood/category 8/12 column counts; §6.3
 `?layout=desktop` rails hint + §2.5 fixture; new integration flows O/P/Q; new
 goldens + Linux re-baseline.
