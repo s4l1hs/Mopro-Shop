@@ -4,9 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/core/di/providers.dart';
+import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/features/catalog/widgets/product_card.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
 import 'package:mopro_api/mopro_api.dart';
+
+/// Favorites grid columns per breakpoint: 2 mobile / 4 tablet / 5 desktop.
+int _favColumns(BuildContext context) =>
+    context.isDesktop ? 5 : (context.isTablet ? 4 : 2);
+
+/// Mobile keeps the full-width 12dp-padded grid (unchanged); tablet/desktop
+/// center + clamp via [CenteredContentColumn].
+Widget _wrapGrid(BuildContext context, Widget grid) =>
+    context.isMobile ? grid : CenteredContentColumn(child: grid);
 
 /// Batch-fetches full product data via POST /products/batch.
 /// Works for both guest (local IDs) and authed users.
@@ -65,23 +75,25 @@ class FavoritesScreen extends ConsumerWidget {
                   : RefreshIndicator(
                       onRefresh: () async =>
                           ref.invalidate(_favProductsProvider),
-                      child: GridView.builder(
-                        padding: const EdgeInsets.all(12),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.62,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
+                      child: _wrapGrid(
+                        context,
+                        GridView.builder(
+                          padding: const EdgeInsets.all(12),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: _favColumns(context),
+                            childAspectRatio: 0.62,
+                            crossAxisSpacing: 10,
+                            mainAxisSpacing: 10,
+                          ),
+                          itemCount: products.length,
+                          itemBuilder: (ctx, i) {
+                            final p = products[i];
+                            return ProductCard(
+                              product: p,
+                              onTap: () => ctx.push('/products/${p.id}'),
+                            );
+                          },
                         ),
-                        itemCount: products.length,
-                        itemBuilder: (ctx, i) {
-                          final p = products[i];
-                          return ProductCard(
-                            product: p,
-                            onTap: () => ctx.push('/products/${p.id}'),
-                          );
-                        },
                       ),
                     ),
             ),
@@ -94,16 +106,20 @@ class _SkeletonGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: const EdgeInsets.all(12),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        childAspectRatio: 0.62,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
+    final cols = _favColumns(context);
+    return _wrapGrid(
+      context,
+      GridView.builder(
+        padding: const EdgeInsets.all(12),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: cols,
+          childAspectRatio: 0.62,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        itemCount: cols * 3,
+        itemBuilder: (_, __) => const SkeletonProductCard(),
       ),
-      itemCount: 6,
-      itemBuilder: (_, __) => const SkeletonProductCard(),
     );
   }
 }
