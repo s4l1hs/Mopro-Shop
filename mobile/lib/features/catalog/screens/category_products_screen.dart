@@ -42,11 +42,16 @@ class _CategoryProductsScreenState
     if (_hydrated) return;
     _hydrated = true;
     // Hydrate filter state from the URL on entry (shareable/deep-linkable).
+    // Read the route here (safe) but defer the provider mutation to after the
+    // frame — modifying a provider during the build/dependencies phase throws.
     final params = GoRouterState.of(context).uri.queryParameters;
     final decoded = _codec.decode(params);
-    if (decoded != ref.read(plpFiltersProvider(_key))) {
-      ref.read(plpFiltersProvider(_key).notifier).set(decoded);
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (decoded != ref.read(plpFiltersProvider(_key))) {
+        ref.read(plpFiltersProvider(_key).notifier).set(decoded);
+      }
+    });
   }
 
   @override

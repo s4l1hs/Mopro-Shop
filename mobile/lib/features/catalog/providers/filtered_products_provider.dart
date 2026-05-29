@@ -25,7 +25,9 @@ class FilteredProductsNotifier
   ProductsState build(String arg) {
     _categoryId = int.parse(arg);
     _sort = ref.watch(plpFiltersProvider(arg).select((f) => f.sort)).token;
-    _load(1, replace: true);
+    // Defer the fetch: _load mutates `state`, which is illegal during build
+    // (the notifier isn't mounted yet). The microtask runs once build returns.
+    Future.microtask(() => _load(1, replace: true));
     return const ProductsState();
   }
 
