@@ -145,7 +145,7 @@ class _SipayWebViewScreenState extends State<SipayWebViewScreen> {
           TextButton(
             onPressed: () async {
               if (await _confirmClose(context)) {
-                if (mounted) {
+                if (context.mounted) {
                   Navigator.of(context)
                       .pop(const SipayResultCancelled());
                 }

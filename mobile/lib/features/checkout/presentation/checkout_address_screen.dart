@@ -131,10 +131,11 @@ class _SelectableAddressCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // TODO(4e): migrate to RadioGroup (Radio API deprecated Flutter 3.32)
               Radio<bool>(
                 value: true,
-                groupValue: isSelected,
-                onChanged: (_) => onTap(),
+                groupValue: isSelected, // ignore: deprecated_member_use
+                onChanged: (_) => onTap(), // ignore: deprecated_member_use
               ),
               Expanded(
                 child: Column(

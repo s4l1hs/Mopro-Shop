@@ -44,7 +44,7 @@ class _FakeCartRepo implements CartRepository {
       priceMinor: 9900,
       qty: qty,
     );
-    _cart = CartDto(
+    return _cart = CartDto(
       id: 'c-1',
       userId: 1,
       lines: [line],
@@ -59,7 +59,6 @@ class _FakeCartRepo implements CartRepository {
       grandTotalMinor: line.lineTotalMinor,
       kdvIncludedMinor: 0,
     );
-    return _cart;
   }
 
   @override

@@ -55,8 +55,7 @@ class _FakeCartRepo implements CartRepository {
     required int qty,
   }) async {
     final line = _line('line-1');
-    _cart = _cartWith([line]);
-    return _cart;
+    return _cart = _cartWith([line]);
   }
 
   @override
@@ -64,7 +63,7 @@ class _FakeCartRepo implements CartRepository {
     required String lineId,
     required int qty,
   }) async {
-    _cart = _cartWith([
+    return _cart = _cartWith([
       CartLineDto(
         id: lineId,
         productId: 1,
@@ -75,7 +74,6 @@ class _FakeCartRepo implements CartRepository {
         qty: qty,
       ),
     ]);
-    return _cart;
   }
 
   @override

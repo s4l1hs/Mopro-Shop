@@ -47,8 +47,8 @@ class CartCashbackCache {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
     if (raw == null) return;
-    final map = Map<String, dynamic>.from(jsonDecode(raw) as Map);
-    map.remove('$variantId');
+    final map = Map<String, dynamic>.from(jsonDecode(raw) as Map)
+      ..remove('$variantId');
     await prefs.setString(_key, jsonEncode(map));
   }
 

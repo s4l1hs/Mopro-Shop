@@ -49,7 +49,6 @@ final searchProvider =
     NotifierProvider<SearchNotifier, SearchState>(SearchNotifier.new);
 
 class SearchNotifier extends Notifier<SearchState> {
-  static const _perPage = 20;
   Timer? _debounce;
 
   @override

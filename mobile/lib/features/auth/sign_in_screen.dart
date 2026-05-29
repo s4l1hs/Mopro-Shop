@@ -190,4 +190,3 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         _ => 'Bir hata oluştu. Lütfen tekrar deneyin.',
       };
 }
-

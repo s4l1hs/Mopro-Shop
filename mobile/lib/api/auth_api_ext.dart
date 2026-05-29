@@ -32,7 +32,7 @@ class AuthApiExt {
     required String nameLast,
     String locale = 'tr-TR',
   }) async {
-    await _dio.post('/auth/register', data: {
+    await _dio.post<void>('/auth/register', data: {
       'email': email,
       'password': password,
       'name_first': nameFirst,
@@ -45,11 +45,11 @@ class AuthApiExt {
     required String email,
     required String password,
   }) async {
-    final resp = await _dio.post('/auth/login', data: {
+    final resp = await _dio.post<Map<String, dynamic>>('/auth/login', data: {
       'email': email,
       'password': password,
     },);
-    final data = resp.data as Map<String, dynamic>;
+    final data = resp.data!;
     if (data['mfa_required'] == true) {
       return LoginResult(
         mfaToken: data['mfa_token'] as String?,
@@ -87,14 +87,14 @@ class AuthApiExt {
   }
 
   Future<void> forgotPassword({required String email}) async {
-    await _dio.post('/auth/forgot-password', data: {'email': email});
+    await _dio.post<void>('/auth/forgot-password', data: {'email': email});
   }
 
   Future<void> resetPassword({
     required String token,
     required String newPassword,
   }) async {
-    await _dio.post('/auth/reset-password', data: {
+    await _dio.post<void>('/auth/reset-password', data: {
       'token': token,
       'new_password': newPassword,
     },);
@@ -104,11 +104,11 @@ class AuthApiExt {
     required String mfaToken,
     required String code,
   }) async {
-    final resp = await _dio.post('/auth/mfa/verify', data: {
+    final resp = await _dio.post<Map<String, dynamic>>('/auth/mfa/verify', data: {
       'mfa_token': mfaToken,
       'code': code,
     },);
-    final data = resp.data as Map<String, dynamic>;
+    final data = resp.data!;
     return LoginResult(
       accessToken: data['access_token'] as String?,
       refreshToken: data['refresh_token'] as String?,
@@ -117,17 +117,17 @@ class AuthApiExt {
   }
 
   Future<void> enrollMFA({required String phone}) async {
-    await _dio.post('/auth/mfa/enroll', data: {'phone': phone});
+    await _dio.post<void>('/auth/mfa/enroll', data: {'phone': phone});
   }
 
   Future<void> confirmMFAEnroll({
     required String phone,
     required String code,
   }) async {
-    await _dio.post('/auth/mfa/confirm', data: {'phone': phone, 'code': code});
+    await _dio.post<void>('/auth/mfa/confirm', data: {'phone': phone, 'code': code});
   }
 
   Future<void> disableMFA() async {
-    await _dio.delete('/auth/mfa');
+    await _dio.delete<void>('/auth/mfa');
   }
 }

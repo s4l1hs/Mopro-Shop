@@ -226,10 +226,12 @@ class _PaymentMethodTile extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodySmall,
               )
             : null,
+        // TODO(4e): migrate to RadioGroup (Radio API deprecated Flutter 3.32)
         trailing: Radio<String>(
           value: method,
-          groupValue: selectedMethod,
-          onChanged: enabled ? (v) => onSelect(v!) : null,
+          groupValue: selectedMethod, // ignore: deprecated_member_use
+          onChanged: // ignore: deprecated_member_use
+              enabled ? (v) => onSelect(v!) : null,
         ),
         selected: isSelected,
         enabled: enabled,

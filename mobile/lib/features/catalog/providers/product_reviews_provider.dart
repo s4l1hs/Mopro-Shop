@@ -13,14 +13,6 @@ class ProductReview {
     required this.createdAt,
   });
 
-  final int id;
-  final int userId;
-  final int rating;
-  final String title;
-  final String body;
-  final int helpfulCount;
-  final String createdAt;
-
   factory ProductReview.fromJson(Map<String, dynamic> j) => ProductReview(
         id: j['id'] as int,
         userId: j['user_id'] as int,
@@ -30,6 +22,14 @@ class ProductReview {
         helpfulCount: (j['helpful_count'] as int?) ?? 0,
         createdAt: (j['created_at'] as String?) ?? '',
       );
+
+  final int id;
+  final int userId;
+  final int rating;
+  final String title;
+  final String body;
+  final int helpfulCount;
+  final String createdAt;
 }
 
 /// Fetches GET /products/{id}/reviews — public endpoint, pagination naive

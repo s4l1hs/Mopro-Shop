@@ -10,3 +10,7 @@ linter:
   rules:
     public_member_api_docs: false
     one_member_abstracts: false
+    # very_good_analysis enforces an 80-char line limit the codebase has never
+    # followed (~77 violations, red on CI since PR #5). dart format already
+    # wraps at the configured page width; we don't gate on the hard 80-col rule.
+    lines_longer_than_80_chars: false
