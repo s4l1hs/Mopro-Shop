@@ -8,3 +8,7 @@ analyzer:
     - lib/src/model/*.g.dart
   errors:
     deprecated_member_use_from_same_package: ignore
+    # dart-dio emits an ErrorEnvelope import in every *_api.dart even when the
+    # operation surfaces errors via DioException rather than the typed model,
+    # leaving the import unused. This is generator template noise, not our code.
+    unused_import: ignore

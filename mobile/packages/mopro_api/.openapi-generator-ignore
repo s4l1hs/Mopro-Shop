@@ -24,3 +24,7 @@
 
 # Preserve our SDK constraint + json_annotation pin (Dart 3.8+ for null-aware-elements)
 pubspec.yaml
+
+# Hand-tuned lint config (unused_import + deprecated suppression for generated noise).
+# Protected so the generator's default template does not clobber our errors block.
+analysis_options.yaml
