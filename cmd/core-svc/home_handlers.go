@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/mopro/platform/internal/catalog"
@@ -91,6 +92,55 @@ func handleHomeRails(svc catalog.Service, defaultLocale string) http.HandlerFunc
 			out[i] = railJSON{Key: rail.RailKey, Title: title}
 		}
 		jsonOK(w, http.StatusOK, map[string]any{"data": out})
+	}
+}
+
+// ── GET /home/flash-deals ─────────────────────────────────────────────────────
+//
+// Returns the single active flash-deals collection (within its time window),
+// or the one given by ?collectionId (admin/preview, ignores the window).
+// 204 No Content when there is no active collection; 404 when a requested
+// collectionId doesn't exist. Each product carries flash_price_minor.
+
+func handleHomeFlashDeals(svc catalog.Service, defaultLocale, cashbackCurrency string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		locale := parseLocale(r, defaultLocale)
+		var collectionID *int64
+		if q := r.URL.Query().Get("collectionId"); q != "" {
+			id, err := strconv.ParseInt(q, 10, 64)
+			if err != nil || id <= 0 {
+				jsonError(w, "invalid collectionId", http.StatusBadRequest)
+				return
+			}
+			collectionID = &id
+		}
+		res, err := svc.HomeFlashDeals(r.Context(), locale, collectionID)
+		if err != nil {
+			slog.Error("home: HomeFlashDeals", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if res == nil {
+			if collectionID != nil {
+				jsonError(w, "collection not found", http.StatusNotFound)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		products := make([]productSummaryJSON, len(res.Products))
+		for i, p := range res.Products {
+			j := buildProductSummaryJSON(p.Summary, cashbackCurrency)
+			fp := p.FlashPriceMinor
+			j.FlashPriceMinor = &fp
+			products[i] = j
+		}
+		jsonOK(w, http.StatusOK, map[string]any{
+			"id":       res.ID,
+			"title":    res.Title,
+			"endsAt":   res.EndsAt.UTC().Format(time.RFC3339),
+			"products": products,
+		})
 	}
 }
 

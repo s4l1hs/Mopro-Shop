@@ -13,6 +13,7 @@ import (
 // arguments handler tests need to verify. Other methods are no-op stubs.
 type stubCatalogSvc struct {
 	listCategoriesFn func(ctx context.Context, locale string, maxDepth int) ([]catalog.CategoryRow, error)
+	homeFlashDealsFn func(ctx context.Context, locale string, collectionID *int64) (*catalog.FlashDealsResult, error)
 }
 
 func (s *stubCatalogSvc) CreateProduct(_ context.Context, _ catalog.CreateProductRequest) (catalog.Product, error) {
@@ -58,6 +59,13 @@ func (s *stubCatalogSvc) HomeBanners(_ context.Context) ([]catalog.HomeBannerRow
 	return nil, nil
 }
 func (s *stubCatalogSvc) HomeMoodStories(_ context.Context) ([]catalog.HomeMoodStoryRow, error) {
+	return nil, nil
+}
+
+func (s *stubCatalogSvc) HomeFlashDeals(ctx context.Context, locale string, collectionID *int64) (*catalog.FlashDealsResult, error) {
+	if s.homeFlashDealsFn != nil {
+		return s.homeFlashDealsFn(ctx, locale, collectionID)
+	}
 	return nil, nil
 }
 func (s *stubCatalogSvc) ListReviews(_ context.Context, _ int64, _, _ int) ([]catalog.ProductReviewRow, int, error) {

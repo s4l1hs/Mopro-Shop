@@ -448,8 +448,13 @@ type ProductSummary struct {
 
 	// DiscountPct Server-computed discount % when original_price_minor > price_minor.
 	// Render as red %-badge next to the strikethrough.
-	DiscountPct *int  `json:"discount_pct"`
-	Id          int64 `json:"id"`
+	DiscountPct *int `json:"discount_pct"`
+
+	// FlashPriceMinor Flash-deal price in minor units; set only for products served by the
+	// /home/flash-deals rail. When present, render this as the price and
+	// price_minor as the strikethrough original.
+	FlashPriceMinor *int64 `json:"flash_price_minor"`
+	Id              int64  `json:"id"`
 
 	// OriginalPriceMinor MSRP in minor units. When set and greater than price_minor, render
 	// with strikethrough; backend also emits discount_pct.

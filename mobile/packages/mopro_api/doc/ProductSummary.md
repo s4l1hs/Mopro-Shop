@@ -21,6 +21,7 @@ Name | Type | Description | Notes
 **discountPct** | **int** | Server-computed discount % when original_price_minor > price_minor. Render as red %-badge next to the strikethrough.  | [optional] 
 **ratingAvg** | **double** | Average review rating (0.0–5.0); null when rating_count = 0 | [optional] 
 **ratingCount** | **int** | Number of reviews aggregated into rating_avg | [optional] [default to 0]
+**flashPriceMinor** | **int** | Flash-deal price in minor units; set only for products served by the /home/flash-deals rail. When present, render this as the price and price_minor as the strikethrough original.  | [optional] 
 **cashbackPreview** | [**CashbackPreview**](CashbackPreview.md) |  | 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

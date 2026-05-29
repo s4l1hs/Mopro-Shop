@@ -554,6 +554,52 @@ func (r *pgxRepository) HomeRails(ctx context.Context) ([]HomeRailRow, error) {
 	return out, rows.Err()
 }
 
+func (r *pgxRepository) HomeFlashDeals(ctx context.Context, collectionID *int64) (*FlashDealsCollectionRow, error) {
+	var col FlashDealsCollectionRow
+	var err error
+	if collectionID != nil {
+		// Preview by id — ignores the active window so admins can preview.
+		err = r.pool.QueryRow(ctx,
+			`SELECT id, title, ends_at FROM catalog_schema.home_flash_deals_collections WHERE id = $1`,
+			*collectionID,
+		).Scan(&col.ID, &col.Title, &col.EndsAt)
+	} else {
+		err = r.pool.QueryRow(ctx,
+			`SELECT id, title, ends_at FROM catalog_schema.home_flash_deals_collections
+			 WHERE is_active = TRUE AND NOW() BETWEEN starts_at AND ends_at
+			 ORDER BY id LIMIT 1`,
+		).Scan(&col.ID, &col.Title, &col.EndsAt)
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: HomeFlashDeals collection: %w", err)
+	}
+
+	rows, err := r.pool.Query(ctx,
+		`SELECT product_id, flash_price_minor, sort_order
+		 FROM catalog_schema.home_flash_deals_items
+		 WHERE collection_id = $1 ORDER BY sort_order, product_id`,
+		col.ID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: HomeFlashDeals items: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var it FlashDealItemRow
+		if err := rows.Scan(&it.ProductID, &it.FlashPriceMinor, &it.SortOrder); err != nil {
+			return nil, err
+		}
+		col.Items = append(col.Items, it)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return &col, nil
+}
+
 func (r *pgxRepository) HomeBanners(ctx context.Context) ([]HomeBannerRow, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT id, image_url, deep_link, sort_order

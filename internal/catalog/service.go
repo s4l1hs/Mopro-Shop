@@ -164,6 +164,50 @@ func (s *catalogService) HomeMoodStories(ctx context.Context) ([]HomeMoodStoryRo
 	return s.repo.HomeMoodStories(ctx)
 }
 
+func (s *catalogService) HomeFlashDeals(ctx context.Context, locale string, collectionID *int64) (*FlashDealsResult, error) {
+	col, err := s.repo.HomeFlashDeals(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+	if col == nil {
+		return nil, nil
+	}
+	ids := make([]int64, 0, len(col.Items))
+	flashByID := make(map[int64]int64, len(col.Items))
+	for _, it := range col.Items {
+		ids = append(ids, it.ProductID)
+		flashByID[it.ProductID] = it.FlashPriceMinor
+	}
+	var rows []ProductSummaryRow
+	if len(ids) > 0 {
+		rows, err = s.repo.ListProductsByIDs(ctx, ids, locale)
+		if err != nil {
+			return nil, err
+		}
+	}
+	byID := make(map[int64]ProductSummaryRow, len(rows))
+	for _, r := range rows {
+		byID[r.ID] = r
+	}
+	// Assemble in the collection's item order, skipping any product that no
+	// longer resolves (deleted/inactive).
+	products := make([]FlashDealProduct, 0, len(col.Items))
+	for _, it := range col.Items {
+		if row, ok := byID[it.ProductID]; ok {
+			products = append(products, FlashDealProduct{
+				Summary:         row,
+				FlashPriceMinor: flashByID[it.ProductID],
+			})
+		}
+	}
+	return &FlashDealsResult{
+		ID:       col.ID,
+		Title:    col.Title,
+		EndsAt:   col.EndsAt,
+		Products: products,
+	}, nil
+}
+
 func (s *catalogService) ListReviews(ctx context.Context, productID int64, page, perPage int) ([]ProductReviewRow, int, error) {
 	if perPage <= 0 {
 		perPage = 20

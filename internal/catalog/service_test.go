@@ -361,6 +361,10 @@ func (m *mockRepo) HomeBanners(_ context.Context) ([]catalog.HomeBannerRow, erro
 func (m *mockRepo) HomeMoodStories(_ context.Context) ([]catalog.HomeMoodStoryRow, error) {
 	return nil, nil
 }
+
+func (m *mockRepo) HomeFlashDeals(_ context.Context, _ *int64) (*catalog.FlashDealsCollectionRow, error) {
+	return nil, nil
+}
 func (m *mockRepo) ListReviews(_ context.Context, _ int64, _, _ int) ([]catalog.ProductReviewRow, int, error) {
 	return nil, 0, nil
 }

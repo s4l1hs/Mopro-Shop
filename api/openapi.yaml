@@ -2318,6 +2318,14 @@ components:
           type: integer
           default: 0
           description: Number of reviews aggregated into rating_avg
+        flash_price_minor:
+          type: integer
+          format: int64
+          nullable: true
+          description: |
+            Flash-deal price in minor units; set only for products served by the
+            /home/flash-deals rail. When present, render this as the price and
+            price_minor as the strikethrough original.
         cashback_preview:
           $ref: '#/components/schemas/CashbackPreview'
 

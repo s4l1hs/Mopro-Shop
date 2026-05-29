@@ -38,6 +38,11 @@ type Service interface {
 	// HomeMoodStories returns active mood-story tiles ordered by sort_order.
 	HomeMoodStories(ctx context.Context) ([]HomeMoodStoryRow, error)
 
+	// HomeFlashDeals returns the active flash-deals collection (or the one with
+	// collectionID when non-nil) with products hydrated. Returns (nil, nil) when
+	// there is no active collection / the id doesn't exist.
+	HomeFlashDeals(ctx context.Context, locale string, collectionID *int64) (*FlashDealsResult, error)
+
 	// ListReviews returns paginated reviews for a product.
 	ListReviews(ctx context.Context, productID int64, page, perPage int) ([]ProductReviewRow, int, error)
 
@@ -67,6 +72,7 @@ type Repository interface {
 	HomeRails(ctx context.Context) ([]HomeRailRow, error)
 	HomeBanners(ctx context.Context) ([]HomeBannerRow, error)
 	HomeMoodStories(ctx context.Context) ([]HomeMoodStoryRow, error)
+	HomeFlashDeals(ctx context.Context, collectionID *int64) (*FlashDealsCollectionRow, error)
 	ListReviews(ctx context.Context, productID int64, offset, limit int) ([]ProductReviewRow, int, error)
 
 	ListAllVariantStocks(ctx context.Context) ([]VariantStock, error)

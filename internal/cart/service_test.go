@@ -410,6 +410,10 @@ func (m *mockCatalogSvc) HomeBanners(_ context.Context) ([]catalog.HomeBannerRow
 func (m *mockCatalogSvc) HomeMoodStories(_ context.Context) ([]catalog.HomeMoodStoryRow, error) {
 	return nil, nil
 }
+
+func (m *mockCatalogSvc) HomeFlashDeals(_ context.Context, _ string, _ *int64) (*catalog.FlashDealsResult, error) {
+	return nil, nil
+}
 func (m *mockCatalogSvc) ListReviews(_ context.Context, _ int64, _, _ int) ([]catalog.ProductReviewRow, int, error) {
 	return nil, 0, nil
 }
