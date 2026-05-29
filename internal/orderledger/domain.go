@@ -30,6 +30,12 @@ type OrderPaidEvent struct {
 
 // CaptureInputs is the normalized, aggregated input to Compute().
 // Derived from OrderPaidEvent by summing item-level frozen snapshots.
+//
+// The CommissionMinor / KdvMinor / SellerNetMinor / ShippingMinor fields
+// flow into commission.CapturePosting via the commission.CaptureRecorder
+// seam — none of these are recomputed from live commission rates. The
+// snapshot story stays on the input side; orderledger is pure persistence
+// orchestration.
 type CaptureInputs struct {
 	OrderID         int64
 	SellerID        int64
