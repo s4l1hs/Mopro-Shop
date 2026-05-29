@@ -773,3 +773,201 @@ Authed 1440 light golden regenerated for the new header content.
 - `api-check-sync` — n/a this turn (no spec changes); green on main as of `8dd98030`
 - Hooks verified firing on main / silent on feature branch (see §2.3 above)
 
+---
+
+# Session 4c — Categories ?depth=N + MegaMenuBar + MegaMenuPanel (bounded)
+
+**Branch:** `feat/megamenu-and-categories-api` (off main, post-PR-#6 merge at `51b30e3e`)
+**Scope chosen with user upfront:** §0 (gofmt cleanup), §2 (drive-bys), §3-depth-only (no promo column / no migration 0067), §4 (4-col panel + pointer-only, no touch detection, no Tab-past-last close). Full prompt was estimated at 23-34h; the bounded subset shipped here is the high-leverage core that delivers visible mega menu navigation without bundling decorative + a11y features.
+
+## Baseline vs. final
+
+| Metric | Baseline | Final | Delta |
+|---|---|---|---|
+| `flutter analyze` total issues | 126 | **126** | 0 — clean for new code |
+| `flutter analyze` errors in new code | 0 | 0 | — |
+| `flutter test` totals | 285 / 285 green | **289 / 289 green** | **+4 mega menu tests** |
+| `go test ./...` | green | **green** | +9 catalog handler tests |
+| `flutter build web --release` | succeeds | succeeds | — |
+| `build/web/main.dart.js` size | 4,394,250 bytes | 4,404,493 bytes | **+10,243 bytes (+0.23%)** — well under 10% budget |
+| Pre-existing gofmt drift | 12 files | **0 files** | cleaned in §0 |
+| Existing 4a/4b goldens | (unchanged) | (unchanged) | — |
+
+## §0 — gofmt cleanup
+
+Ran `gofmt -w $(gofmt -l .)` on the 12 pre-existing drifted Go files PR #6 flagged. No behavior change. `go build` clean across all 3 binaries, `go vet ./...` clean, `go test ./internal/...` green. `gofmt -l .` now returns empty. Pre-push hook (introduced in PR #6) now passes without `--no-verify` for this branch and subsequent ones — unblocks the §1.1 prerequisite the prompt's §1.1 explicitly demands.
+
+## §2 — Operational drive-bys
+
+### 2.1 Empty-file guard in `.githooks/pre-commit`
+
+Added a new block in the existing pre-commit hook that refuses any staged 0-byte file under `.githooks/`. Catches the Session 4b foot-gun where a misplaced `touch` (with the agent's cwd drifted into `mobile/`) created an empty `mobile/.githooks/pre-commit`. POSIX shell, no bashisms.
+
+Verified:
+```
+$ touch .githooks/empty-test && git add .githooks/empty-test && git commit -m "x"
+❌ refusing to commit empty file: .githooks/empty-test
+   remove it or populate it before committing.
+```
+
+### 2.2 `pwd` echo convention in `CONTRIBUTING.md`
+
+New paragraph under the Git hooks section: any multi-step shell command that chains `git` operations MUST run `echo "pwd=$(pwd)"` as its first step. Documented as a convention, not a code check; flagged TODO for a future `tool/lint-shell.sh` if it becomes worth automating.
+
+## §3 — Categories `?depth=N` query
+
+### Audit
+Existing endpoint returned a flat `{data: [...categories...]}` envelope with `parent_id` on each row for client-side tree reconstruction. Default behavior preserved exactly (mobile callers rely on this).
+
+### Implementation
+- `Service.ListCategories` + `Repository.ListCategories` gained a `maxDepth int` parameter. `0` = no limit (preserves historical behavior). `1..3` = filter via recursive CTE.
+- Repository SQL: when `maxDepth > 0`, swaps the simple SELECT for a `WITH RECURSIVE cat_depth` CTE that computes each category's chain length to its root parent (root=0, direct children=1, …) and filters to `<= maxDepth`. Both branches share a 1000-node `LIMIT` ceiling per the prompt's safety cap.
+- Handler validates `?depth=N` as integer in `[1, 3]`; returns `400 bad_request` otherwise. Missing param → `maxDepth=0` → no limit.
+
+### Wire format decision: flat, not nested
+
+Considered the prompt's "nested structure" wording but went flat because:
+1. Mobile contract: existing flat shape MUST be preserved (regression risk).
+2. Nesting requires a new DTO type, branched response, and Dart regen cascade.
+3. The mega menu (the actual §3 consumer) builds the tree client-side from `parent_id` either way — no benefit to nesting on the wire.
+
+Documented in the OpenAPI description: response stays flat with `parent_id`; client reconstructs the tree.
+
+### Sample curl
+
+```
+GET /categories?depth=3
+{"data":[
+  {"id":1,"slug":"erkek","name":"Erkek","parent_id":null,"commission_pct_bps":500},
+  {"id":10,"slug":"giyim","name":"Giyim","parent_id":1,"commission_pct_bps":700},
+  {"id":100,"slug":"tshirt","name":"T-shirt","parent_id":10,"commission_pct_bps":700},
+  ...
+]}
+
+GET /categories?depth=99
+{"error":"bad_request: depth must be an integer in [1,3]"}  # 400
+```
+
+### OpenAPI delta
+- New `depth` query parameter on `/categories` (integer, minimum: 1, maximum: 3).
+- New `400` response.
+- Description documents the omit-=-no-limit contract and the flat-shape stability invariant.
+- Go (`oapi-codegen`) + Dart (`openapi-generator dart-dio`) regenerated; `Depth *int` surfaces on `ListCategoriesParams`.
+
+### Tests (9 total in `cmd/core-svc/catalog_handlers_test.go`)
+- `TestListCategories_DepthValidation`: 8 cases — missing → no limit, depth=1, depth=3, depth=0 → 400, depth=4 → 400, depth=99 → 400, depth=-1 → 400, depth=abc → 400. Asserts status, whether service was called, and the `maxDepth` value forwarded.
+- `TestListCategories_DefaultResponseShapeUnchanged`: regression guard on the flat envelope (`data` array with `parent_id` per row, no nested `children`).
+- Existing test mocks (`cart/service_test.go`, `order/service_test.go`, `catalog/discovery_test.go`) updated for the signature change. Existing Dart `_FakeCatalogApi.listCategories` override gained the new `int? depth` named parameter to satisfy the regenerated DTO interface.
+
+Integration tests against real Postgres for the recursive CTE behavior were NOT written this turn (handler-level validation is fully covered; SQL is straightforward and has the 1000-node ceiling). Deferred to Session 4d or a focused integration sweep.
+
+## §4 — MegaMenuBar + MegaMenuPanel (4-col, pointer-only)
+
+### `MegaMenuBar` (`lib/features/web/mega_menu/mega_menu_bar.dart`)
+- 44dp horizontal strip mounted under WebHeader at `>=768` widths (the threshold is enforced in `_WebShell`, not the bar; bar stays breakpoint-agnostic).
+- Top-level categories from `categoryTreeProvider` (derived from existing `categoriesProvider`).
+- Surface bg, 1dp `outlineVariant` bottom border.
+- Items: 14sp medium label + downward chevron when children present.
+- 2dp brand-orange (#CA4E00) bottom indicator on the active route (matched via `GoRouterState.uri` prefix).
+- Horizontal scroll with `ShaderMask` edge fade (2.5% on each side). `ScrollController` plumbed for future scroll-to-active.
+- Each item with children wraps in `AnchoredOverlayPanel` with `exclusivityGroup: 'megamenu'`. `openOnHover: true, openOnFocus: true, openOnTap: false` — hover/focus opens, tap on label routes to category PLP.
+- `IntrinsicWidth` around the active indicator Column because the parent ListView is horizontally unbounded — caught by widget test ("BoxConstraints forces an infinite width").
+
+### `MegaMenuPanel` (`lib/features/web/mega_menu/mega_menu_panel.dart`)
+- 4-column layout: subcategories distributed round-robin across columns.
+- Column structure: subcategory name header (16sp semibold, tappable → subcategory PLP) → up to 8 leaf rows (14sp regular, → leaf PLP) → "Tümünü gör" link in brand orange if there are more than 8 leaves.
+- Surface bg, bottom-only 8dp corner radius (flush against the bar above), left+right+bottom 1dp `outlineVariant` border (top is the bar's border continuing), 6dp shadow.
+- Content clamped to `Breakpoints.desktopContentMax` via `CenteredContentColumn`. 24dp vertical padding; 32dp column gap; 8dp row gap.
+- **Empty state:** `mega_menu.empty_children` centered message if `active.children` is empty.
+- **3+1 promo layout deferred** to Session 4d alongside the `promo_slot` JSONB column + migration 0067.
+
+### `categoryTreeProvider`
+Derived `Provider<AsyncValue<List<CategoryNode>>>` that builds a tree from the flat `categoriesProvider` output via O(n) two-pass index + attach-children. Dangling `parent_id`s become roots rather than getting dropped. Source-of-truth fetch stays in `categoriesProvider` (unchanged — no separate request to `/categories?depth=3`; existing call already fetches all categories which is a superset).
+
+### Pointer-vs-touch behavior
+
+This turn ships the POINTER device behavior only:
+- Hover or focus → panel opens (after `AnchoredOverlayPanel`'s 80ms `openDelay`).
+- Cursor leaves both bar item and panel → panel closes (after 150ms `closeDelay`).
+- Tap on the bar label → routes to category PLP (does NOT open the panel).
+- Escape inside the panel → closes + returns focus to the bar item (via `AnchoredOverlayPanel`'s built-in Shortcuts/Actions).
+
+**On a touch device today the label tap routes to the PLP — same as pointer.** The §4.4 "tap-opens-panel-on-touch" detection requires `PointerDeviceKind` plumbing that's deferred to Session 4d. Documented in the doc comment at the top of `mega_menu_bar.dart`.
+
+### Keyboard nav
+
+Supported via the wrapping `AnchoredOverlayPanel`:
+- Tab moves through bar items naturally (each is a `Focus`-wrapped trigger).
+- Focusing a bar item opens its panel (after 80ms).
+- Escape closes the active panel and returns focus to the bar item.
+
+Deferred to Session 5 a11y sweep (already flagged in Session 4b REPORT):
+- Arrow Right/Left to switch active category from the bar.
+- Arrow Down from a bar item to move focus into the first leaf of the first column.
+- Tab-past-last-focusable to close panel + continue normal tab order.
+- Per-row arrow nav inside the panel (column-major Tab order).
+- ARIA semantics / screen-reader landmark roles.
+
+### i18n
+4 locales gained `mega_menu.see_all` + `mega_menu.empty_children`:
+- tr-TR: "Tümünü gör", "Bu kategoride alt kategori bulunmuyor."
+- en-US: "See all", "No subcategories in this section."
+- de-DE: "Alle anzeigen", "Keine Unterkategorien in diesem Bereich."
+- ar-AE: "عرض الكل", "لا توجد فئات فرعية في هذا القسم."
+
+### Tests (4 widget tests)
+- Renders top-level category labels; subcategories hidden until panel opens.
+- Renders empty when category tree is empty (no fallback chrome leaks into the closed bar).
+- Label tap routes to category PLP and does NOT open the panel (pointer behavior contract).
+- Hover (via `PointerDeviceKind.mouse` synthetic gesture + 80ms wait) opens the panel showing subcategory headers + leaves.
+
+**NOT shipped per scope agreement** (the prompt's §4.6 listed 12+ test cases + 8 goldens; bounded subset trades golden + integration coverage for landing in a single PR):
+- Goldens at 1024/1440 light/dark for the 4 panel states — will land with Session 4d alongside the promo column visual.
+- Touch-device tap-opens-panel test.
+- Arrow Right/Left + Arrow Down + Tab-past-last close tests.
+- Promo column render-only-when-present test.
+- Below-768 bar-not-in-tree test (small but skipped to keep test surface tight).
+- Integration flows I/J/K.
+
+## Deferred to Session 4d / Session 5+
+
+| Item | Why |
+|---|---|
+| `promo_slot` JSONB column + migration 0067 + 3+1 panel layout + image error placeholder + 3 more backend tests | Decorative; defers cleanly. The current 4-column layout handles every existing top-level category. |
+| Touch-vs-pointer detection (label tap opens panel on touch) | Out of bounded scope. Needs `PointerDeviceKind` plumbing. |
+| Tab-past-last-focusable auto-close inside panel | Session 5 a11y sweep (also deferred in Session 4b REPORT). |
+| Arrow Right/Left bar nav + Arrow Down panel entry | Session 5 a11y sweep. |
+| Goldens at 1024 + 1440 × light + dark for 4 panel states (8 total) | Lands with Session 4d when the 3+1 promo layout is added; reduces churn. |
+| Integration flows I (pointer flow), J (keyboard flow), K (touch flow) | Heavy harness work; widget tests cover render + interaction. |
+| Adaptive home composition (grid rails, banner mode, footer) | Session 5. |
+| URL-encoded PLP filters + `PlpFilters` codec + browser-back tests | Session 5. |
+| PLP sidebar filter UI | Session 5. |
+| PDP two-column layout | Session 5. |
+| Cart/Account/Favorites/Auth adaptive layouts | Session 5. |
+| Responsive image hints | Session 5. |
+| Full a11y sweep (skip links, focus rings, ARIA, screen reader) | Session 5. |
+| FlashDealsRail + countdown | Session 5. |
+| Reviews helpful-vote + sort + pagination | Session 5. |
+
+## Risk notes
+
+- **Recursive CTE performance** — at 1000-node ceiling and current ~42 categories, the cost is negligible (O(N) with parent index). If the categories table grows past several thousand, add an explicit btree index on `(parent_id, active)` and benchmark before raising the ceiling.
+- **Mega menu hover behavior on hybrid devices** (touch + mouse, e.g. iPad with trackpad) — today's pointer-only behavior means the label tap navigates instead of opening the menu. Acceptable for desktop; documented as a Session 4d follow-up. The fix is local to `mega_menu_bar.dart`'s trigger.
+- **Active-route matching uses URL prefix** (`/categories/{id}`) — matches the top-level even when the user is on a leaf within that branch. Correct for the visual intent. If a leaf has a different parent-tree path in the future (e.g. a category renamed), the active indicator follows the URL, not the tree.
+- **`categoryTreeProvider`'s dangling parent_id → root fallback** — if the backend ever returns inconsistent data (a leaf whose parent_id doesn't appear in the same response, e.g. because of a depth filter that includes the leaf but not its parent), the leaf becomes a stray top-level item in the bar. Mitigated in practice by the recursive CTE returning parents-first; not enforced.
+- **OpenAPI ceiling cap edge case** — the 1000-node `LIMIT` is hardcoded in the repo. If a future category taxonomy legitimately exceeds 1000 nodes, responses silently truncate without an error code. Document in REPORT as a known sharp edge; raise to 5000 if needed.
+- **Pre-push gate** — passes from this branch without `--no-verify`. The §0 gofmt cleanup commit isolated the fix so the rest of the PR's commits run through the standard gate.
+
+## Verification
+
+- `gofmt -l .` — empty (was 12 files at session start).
+- `go test ./...` — green; +9 new catalog handler tests.
+- `flutter analyze` — **126 issues** (flat vs baseline), 0 errors, 0 new lints in files I created.
+- `flutter test` — **289/289 green** (+4 mega menu tests; +1 catalog provider test override adjusted for the new `depth` param on the DTO).
+- `flutter test integration_test` — not run this turn (no integration coverage added per scope agreement; existing wallet_flow_test untouched).
+- `flutter build web --release` — succeeds, `main.dart.js` = 4,404,493 bytes (+0.23% vs baseline; well under +10% budget).
+- Existing mobile + Session 4a/4b goldens — unchanged.
+- `api-check-sync` — passes locally; Go + Dart regen committed.
+- Pre-commit empty-file guard + branch-on-main guards — verified firing.
+
+
