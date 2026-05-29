@@ -61,7 +61,7 @@ List<Override> _overrides() => [
       homeMoodStoriesProvider.overrideWith((ref) async => const []),
       trendingSearchesProvider.overrideWith((ref) async => const <String>[]),
       homeRailsProvider.overrideWith(
-        (ref) async =>
+        (ref, layout) async =>
             const [HomeRail(key: 'recommended', title: 'Sizin için seçtiklerimiz')],
       ),
       productsRailProvider('recommended')

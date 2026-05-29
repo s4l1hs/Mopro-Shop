@@ -27,7 +27,9 @@ class CatalogHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final railsAsync = ref.watch(homeRailsProvider);
+    // §6.3: hint the server how many rails to surface (desktop ≤6, mobile ≤3).
+    final railsLayout = context.isDesktop ? 'desktop' : 'mobile';
+    final railsAsync = ref.watch(homeRailsProvider(railsLayout));
 
     // Adaptive composition (§2). Mobile is unchanged: full-width, scroller
     // rails. Tablet/desktop center content in a CenteredContentColumn and
@@ -57,7 +59,7 @@ class CatalogHomeScreen extends ConsumerWidget {
           ref
             ..invalidate(homeBannersProvider)
             ..invalidate(homeMoodStoriesProvider)
-            ..invalidate(homeRailsProvider)
+            ..invalidate(homeRailsProvider(railsLayout))
             ..invalidate(flashDealsProvider)
             ..invalidate(productsRailProvider('recommended'))
             ..invalidate(productsRailProvider('bestseller'))
@@ -104,12 +106,42 @@ class CatalogHomeScreen extends ConsumerWidget {
                   .toList(),
             ),
 
+            // ── Desktop-only "Editor's picks / Recently viewed" sub-section ──
+            // Two 50% columns, 32dp gap. Recently-viewed has no local-history
+            // provider yet, so it is always empty and hidden — the row collapses
+            // to a single full-width Editor's picks column (§6.1).
+            if (context.isDesktop)
+              const SliverToBoxAdapter(child: _EditorsPicksSection()),
+
             // ── Desktop-only thin footer ───────────────────────────────
             if (context.isDesktop)
               const SliverToBoxAdapter(child: HomeFooter()),
 
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Desktop-only "Editor's picks" sub-section: a 3×2 product grid inside the
+/// centered content column. The companion "Recently viewed" column is omitted
+/// while there is no local recently-viewed history provider (hide-when-empty,
+/// §6.1) — the row is therefore single-column / full-width.
+class _EditorsPicksSection extends StatelessWidget {
+  const _EditorsPicksSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return CenteredContentColumn(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: ProductRail(
+          title: 'home.editors_picks'.tr(),
+          sort: 'bestseller',
+          layout: RailLayout.grid,
+          maxItems: 6,
         ),
       ),
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/design/widgets/responsive_network_image.dart';
 import 'package:mopro/features/catalog/providers/home_provider.dart';
@@ -24,6 +25,27 @@ class MoodStoriesStrip extends ConsumerWidget {
       error: (_, __) => const SizedBox.shrink(),
       data: (stories) {
         if (stories.isEmpty) return const SizedBox.shrink();
+        // Mobile keeps the horizontal scroller; tablet/desktop lay the tiles out
+        // as a fixed-column grid: 8 per row (tablet) / 12 per row (desktop) (§6.2).
+        if (!context.isMobile) {
+          final perRow = context.isDesktop ? 12 : 8;
+          final tiles = stories.take(perRow).toList();
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: perRow,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 0.78,
+              ),
+              itemCount: tiles.length,
+              itemBuilder: (context, i) => _MoodTile(story: tiles[i]),
+            ),
+          );
+        }
         return SizedBox(
           height: _stripHeight,
           child: ListView.separated(

@@ -14,6 +14,7 @@ import (
 type stubCatalogSvc struct {
 	listCategoriesFn func(ctx context.Context, locale string, maxDepth int) ([]catalog.CategoryRow, error)
 	homeFlashDealsFn func(ctx context.Context, locale string, collectionID *int64) (*catalog.FlashDealsResult, error)
+	homeRailsRows    []catalog.HomeRailRow
 }
 
 func (s *stubCatalogSvc) CreateProduct(_ context.Context, _ catalog.CreateProductRequest) (catalog.Product, error) {
@@ -53,7 +54,7 @@ func (s *stubCatalogSvc) ListProductsByIDs(_ context.Context, _ []int64, _, _ st
 	return nil, nil
 }
 func (s *stubCatalogSvc) HomeRails(_ context.Context, _ string) ([]catalog.HomeRailRow, error) {
-	return nil, nil
+	return s.homeRailsRows, nil
 }
 func (s *stubCatalogSvc) HomeBanners(_ context.Context) ([]catalog.HomeBannerRow, error) {
 	return nil, nil

@@ -91,6 +91,14 @@ func handleHomeRails(svc catalog.Service, defaultLocale string) http.HandlerFunc
 			}
 			out[i] = railJSON{Key: rail.RailKey, Title: title}
 		}
+		// Layout hint (§6.3): desktop surfaces up to 6 rails, mobile up to 3.
+		limit := 3
+		if r.URL.Query().Get("layout") == "desktop" {
+			limit = 6
+		}
+		if len(out) > limit {
+			out = out[:limit]
+		}
 		jsonOK(w, http.StatusOK, map[string]any{"data": out})
 	}
 }
