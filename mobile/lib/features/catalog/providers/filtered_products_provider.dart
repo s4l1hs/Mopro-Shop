@@ -1,38 +1,30 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/api/client.dart';
 import 'package:mopro/core/network/app_error.dart';
+import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
 import 'package:mopro/features/catalog/providers/products_by_category_provider.dart';
 import 'package:mopro_api/mopro_api.dart';
 
-@immutable
-class ProductFilter {
-  const ProductFilter({required this.categoryId, this.sort = 'recommended'});
-
-  final int categoryId;
-  final String sort;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is ProductFilter &&
-          categoryId == other.categoryId &&
-          sort == other.sort);
-
-  @override
-  int get hashCode => Object.hash(categoryId, sort);
-}
-
+/// Family key is the category id as a string (e.g. `'42'`). The active sort is
+/// sourced from `plpFiltersProvider(categoryId)`; changing the sort rebuilds
+/// this provider and refetches from page 1. (Price/brand/rating/shipping live
+/// in the same filter state for the URL + the 5b sidebar but do not yet affect
+/// the fetch — the catalog API only filters by sort today; see REPORT §8.4.)
 final filteredProductsProvider =
-    NotifierProviderFamily<FilteredProductsNotifier, ProductsState, ProductFilter>(
+    NotifierProviderFamily<FilteredProductsNotifier, ProductsState, String>(
   FilteredProductsNotifier.new,
 );
 
 class FilteredProductsNotifier
-    extends FamilyNotifier<ProductsState, ProductFilter> {
+    extends FamilyNotifier<ProductsState, String> {
+  late int _categoryId;
+  late String _sort;
+
   @override
-  ProductsState build(ProductFilter arg) {
+  ProductsState build(String arg) {
+    _categoryId = int.parse(arg);
+    _sort = ref.watch(plpFiltersProvider(arg).select((f) => f.sort)).token;
     _load(1, replace: true);
     return const ProductsState();
   }
@@ -52,9 +44,9 @@ class FilteredProductsNotifier
     try {
       final api = ref.read(catalogApiProvider);
       final resp = await api.listProducts(
-        categoryId: arg.categoryId,
+        categoryId: _categoryId,
         page: page,
-        sort: arg.sort,
+        sort: _sort,
       );
       final incoming = resp.data?.data ?? [];
       final meta = resp.data?.pagination;
