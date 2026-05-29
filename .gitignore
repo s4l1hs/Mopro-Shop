@@ -62,3 +62,6 @@ load-tests/reports/*.md
 
 # Flutter golden test failure captures (transient)
 **/test/**/failures/
+
+# §2 image normalization local safety net (never committed)
+mobile/assets/images/_originals/

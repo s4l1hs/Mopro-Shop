@@ -126,3 +126,26 @@ Do **not** change:
 - `internal/cashback/calculator.go` formula without a new constitution version.
 - `reference_interest_rate_bps` on existing plans.
 - The 3-business-day delay for cashback or seller payout.
+
+## Goldens (Flutter)
+
+Flutter goldens render differently per platform (fonts/subpixel), so this repo
+**baselines them on Linux** — the same `ubuntu-latest` the `flutter test` CI
+gate runs on. macOS-generated goldens will not match CI.
+
+A platform guard (`mobile/test/_support/golden_platform.dart`, installed via
+`mobile/test/flutter_test_config.dart`) stamps every golden with a
+`<name>.png.meta` sidecar recording its platform. When you run goldens on a
+platform that doesn't match a golden's sidecar, the test fails with a clear
+message pointing here — instead of a cryptic pixel diff.
+
+To (re-)baseline goldens:
+
+- **Preferred — CI:** open the **Actions** tab → **golden-rebaseline** → **Run
+  workflow** on your branch. It runs `flutter test --update-goldens` on
+  `ubuntu-latest`, writes the `.png` + `.png.meta` files, and commits them back
+  to the branch.
+- **Local (Linux only):** `make update-goldens`.
+
+Do **not** commit macOS-generated goldens. New golden tests are added without a
+baseline; trigger the workflow to produce it.

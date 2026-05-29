@@ -12,6 +12,7 @@ OPENAPI_GEN_VERSION   := v7.10.0
 OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSION)
 
 .PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order \
+        verify-image-manifest update-goldens \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
         caddy-validate caddy-reload \
@@ -23,7 +24,26 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
         smoke loadtest grafana-deploy
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order
+verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order verify-image-manifest
+
+# Re-baseline Flutter goldens on the CURRENT platform and stamp each with a
+# `.png.meta` platform sidecar (written by the guard in
+# test/_support/golden_platform.dart). Goldens are baselined on Linux/CI — run
+# this via the `golden-rebaseline` GitHub workflow (or on a Linux machine), not
+# on macOS. See CONTRIBUTING.md.
+update-goldens:
+	cd mobile && flutter test --update-goldens
+
+# Regenerate the image manifest and fail if the committed copy is stale.
+# Build-time tool: requires ImageMagick (see tool/audit-images.sh).
+verify-image-manifest:
+	@./tool/audit-images.sh
+	@git diff --quiet -- mobile/assets/images/MANIFEST.md || { \
+	    echo "" >&2 ; \
+	    echo "ERROR: mobile/assets/images/MANIFEST.md is stale." >&2 ; \
+	    echo "Run ./tool/audit-images.sh and commit the result." >&2 ; \
+	    git --no-pager diff -- mobile/assets/images/MANIFEST.md >&2 ; \
+	    exit 1 ; }
 
 # Wire `.githooks/` into this clone (run once per machine, or after pulling
 # a new hook). Refuses commits on main/master and runs the api-gen sync check.
