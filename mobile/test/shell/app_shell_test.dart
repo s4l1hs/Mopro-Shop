@@ -66,7 +66,13 @@ GoRouter _shellRouter() => GoRouter(
 Future<void> _pumpShell(
   WidgetTester tester, {
   Brightness brightness = Brightness.light,
+  // Default to mobile width so the existing bottom-nav structure tests
+  // resolve through the mobile branch of the new adaptive AppShell.
+  // Web-branch tests should pass an explicit Size(>=600, ...).
+  Size size = const Size(390, 720),
 }) async {
+  await tester.binding.setSurfaceSize(size);
+  addTearDown(() => tester.binding.setSurfaceSize(null));
   final prefs = await SharedPreferences.getInstance();
   await tester.pumpWidget(
     ProviderScope(
