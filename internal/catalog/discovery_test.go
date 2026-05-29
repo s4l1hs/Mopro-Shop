@@ -9,35 +9,6 @@ import (
 	"github.com/mopro/platform/internal/catalog"
 )
 
-// ── New repository method stubs (satisfies updated Repository interface) ───────
-
-func (m *mockRepo) ListAllVariantStocks(_ context.Context) ([]catalog.VariantStock, error) {
-	return nil, nil
-}
-
-func (m *mockRepo) ListCategories(_ context.Context, _ string, _ int) ([]catalog.CategoryRow, error) {
-	return []catalog.CategoryRow{}, nil
-}
-
-func (m *mockRepo) ListProductsByCategory(_ context.Context, _ int64, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
-	return []catalog.ProductSummaryRow{}, 0, nil
-}
-
-func (m *mockRepo) SearchProductsSummary(_ context.Context, query, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
-	// Return a matching row when query matches the hard-coded test title "elbise".
-	if query == "elbise" {
-		return []catalog.ProductSummaryRow{
-			{
-				ID:            1,
-				Title:         "Kırmızı Elbise",
-				PriceMinor:    10000,
-				PriceCurrency: "TRY",
-			},
-		}, 1, nil
-	}
-	return []catalog.ProductSummaryRow{}, 0, nil
-}
-
 // ── D: cashback_preview formula test ──────────────────────────────────────────
 
 // TestCashbackPreviewFormula validates the integer-arithmetic formula:
