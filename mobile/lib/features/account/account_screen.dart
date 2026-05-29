@@ -479,15 +479,6 @@ class _ThemeTile extends ConsumerWidget {
                 .setMode(ThemeMode.dark),
             cs: cs,
           ),
-          const SizedBox(width: 6),
-          _ModeChip(
-            icon: Icons.brightness_auto_rounded,
-            selected: themeMode == ThemeMode.system,
-            onTap: () => ref
-                .read(themeControllerProvider.notifier)
-                .setMode(ThemeMode.system),
-            cs: cs,
-          ),
         ],
       ),
     );
@@ -742,19 +733,6 @@ class _GuestMenu extends ConsumerWidget {
                     Icons.dark_mode_rounded,
                     size: 20,
                     color: themeMode == ThemeMode.dark
-                        ? cs.primary
-                        : cs.onSurfaceVariant,
-                  ),
-                ),
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => ref
-                      .read(themeControllerProvider.notifier)
-                      .setMode(ThemeMode.system),
-                  icon: Icon(
-                    Icons.brightness_auto_rounded,
-                    size: 20,
-                    color: themeMode == ThemeMode.system
                         ? cs.primary
                         : cs.onSurfaceVariant,
                   ),
