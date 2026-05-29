@@ -8,19 +8,19 @@ import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/cart/application/cart_count_provider.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
-import 'package:mopro/shell/header_search_bar.dart';
+import 'package:mopro/shell/account_hover_menu.dart';
+import 'package:mopro/shell/web_search_pill.dart';
 
 /// Tablet + desktop top header. Full-bleed surface background with a 1dp
 /// bottom border; content clamped + centered via [CenteredContentColumn].
 ///
-/// **Session 3 minimal scope:** logo · reused [HeaderSearchBar] (keeps the
-/// existing full-screen overlay behaviour when tapped) · favorites/cart
-/// icons with badges · guest login pill OR authed avatar.
+/// **Session 4a scope:** logo · `WebSearchPill` (real text input with the
+/// `SearchSuggestionsDropdown` anchored beneath it) · favorites/cart icons
+/// with badges · guest login pill OR authed avatar, each wrapped in
+/// `AccountHoverMenu` so hover reveals the menu panel.
 ///
-/// **Deferred to Session 4:** suggestions dropdown (currently the search
-/// pill routes to `/search` like on mobile), account hover-menu (currently
-/// the avatar taps through to `/account`), exact 56dp tablet vs 64dp
-/// desktop split (currently 64 at both).
+/// **Still deferred:** exact 56dp tablet vs 64dp desktop split (currently
+/// 64 at both); MegaMenuBar (Session 4b §4).
 class WebHeader extends ConsumerWidget implements PreferredSizeWidget {
   const WebHeader({super.key});
 
@@ -69,9 +69,7 @@ class WebHeader extends ConsumerWidget implements PreferredSizeWidget {
                     minWidth: 320,
                     maxWidth: 720,
                   ),
-                  child: HeaderSearchBar(
-                    onTap: () => context.push('/search'),
-                  ),
+                  child: const WebSearchPill(),
                 ),
               ),
               const SizedBox(width: 16),
@@ -96,11 +94,15 @@ class WebHeader extends ConsumerWidget implements PreferredSizeWidget {
               ),
               const SizedBox(width: 8),
 
-              // ── Account region (login pill OR avatar) ───────────────────
-              if (isAuthed)
-                _AccountAvatar(onTap: () => context.go('/account'))
-              else
-                _LoginPill(onTap: () => context.push('/auth/login')),
+              // ── Account region (login pill OR avatar), wrapped in
+              //    AccountHoverMenu so hover reveals the menu panel. The
+              //    trigger still navigates on tap (forwarded by the menu).
+              AccountHoverMenu(
+                isAuthed: isAuthed,
+                trigger: isAuthed
+                    ? const _AccountAvatar()
+                    : const _LoginPill(),
+              ),
             ],
           ),
         ),
@@ -201,62 +203,63 @@ class _HeaderIconButton extends StatelessWidget {
 }
 
 // ── Guest login pill ─────────────────────────────────────────────────────────
+// Visual-only trigger. Interaction (hover-open / click-toggle) is owned by
+// the wrapping AccountHoverMenu.
 
 class _LoginPill extends StatelessWidget {
-  const _LoginPill({required this.onTap});
-  final VoidCallback onTap;
+  const _LoginPill();
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton(
-      onPressed: onTap,
-      style: FilledButton.styleFrom(
-        backgroundColor: MoproTokens.primaryLight,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        minimumSize: const Size(0, 40),
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: MoproTokens.primaryLight,
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: const Text(
-        'Giriş Yap',
-        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+      child: const Center(
+        child: Text(
+          'Giriş Yap',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
       ),
     );
   }
 }
 
 // ── Authed account avatar (initial-only for minimal scope) ───────────────────
+// Visual-only trigger; AccountHoverMenu owns interaction.
 
 class _AccountAvatar extends StatelessWidget {
-  const _AccountAvatar({required this.onTap});
-  final VoidCallback onTap;
+  const _AccountAvatar();
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
       message: 'Account',
-      child: InkResponse(
-        onTap: onTap,
-        radius: 22,
-        child: SizedBox(
-          width: 44,
-          height: 44,
-          child: Center(
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: MoproTokens.primaryLight,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'M',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                ),
+      child: SizedBox(
+        width: 44,
+        height: 44,
+        child: Center(
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: MoproTokens.primaryLight,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const Text(
+              'M',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
               ),
             ),
           ),

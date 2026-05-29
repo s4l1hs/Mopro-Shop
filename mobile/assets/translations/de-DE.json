@@ -3,5 +3,31 @@
     "not_found_title": "Seite nicht gefunden",
     "not_found_subtitle": "Die Seite wurde möglicherweise verschoben oder existiert nicht mehr.",
     "not_found_cta": "Zur Startseite"
+  },
+  "search": {
+    "hint": "Produkte, Marken oder Kategorien suchen…",
+    "recent_searches": "Zuletzt gesucht",
+    "trending": "Beliebt",
+    "clear_recent": "Löschen",
+    "suggested_categories": "Kategorien"
+  },
+  "nav": {
+    "favorites": "Favoriten"
+  },
+  "auth": {
+    "login_title": "Anmelden"
+  },
+  "account": {
+    "title": "Mein Konto",
+    "orders": "Meine Bestellungen",
+    "wallet": "Meine Wallet",
+    "profile": "Profil",
+    "addresses": "Meine Adressen",
+    "cards": "Meine Karten",
+    "security": "Sicherheit",
+    "logout": "Abmelden",
+    "menu_login_prompt": "In dein Konto einloggen",
+    "menu_register": "Registrieren",
+    "menu_help": "Hilfe"
   }
 }

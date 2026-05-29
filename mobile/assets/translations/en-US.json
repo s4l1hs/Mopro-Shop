@@ -86,6 +86,7 @@
   "search": {
     "hint": "Search products, brands or categories...",
     "recent_searches": "Recent Searches",
+    "trending": "Trending",
     "clear_recent": "Clear",
     "suggested_categories": "Categories"
   },
@@ -108,7 +109,10 @@
     "cards": "My Cards",
     "security": "Security",
     "logout": "Sign Out",
-    "logout_confirm": "Are you sure you want to sign out?"
+    "logout_confirm": "Are you sure you want to sign out?",
+    "menu_login_prompt": "Sign in to your account",
+    "menu_register": "Sign Up",
+    "menu_help": "Help"
   },
   "address": {
     "list_title": "My Addresses",
