@@ -46,7 +46,10 @@ class ProductsByCategoryNotifier
     extends FamilyNotifier<ProductsState, int> {
   @override
   ProductsState build(int arg) {
-    _load(1, replace: true);
+    // Defer the fetch: _load mutates `state` (AsyncLoading) before its first
+    // await, which is illegal during build (the notifier isn't mounted yet).
+    // The microtask runs once build returns. Mirrors FilteredProductsNotifier.
+    Future.microtask(() => _load(1, replace: true));
     return const ProductsState();
   }
 

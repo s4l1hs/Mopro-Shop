@@ -1324,9 +1324,8 @@ built these code paths):
 2. `FilteredProductsNotifier.build()` called `_load()`, which mutates `state`
    before its first `await` — illegal during `build` (the notifier isn't mounted
    yet). Now scheduled via `Future.microtask`.
-   - **Backlog:** the sibling `productsByCategoryProvider` has the identical latent
-     pattern (`_load` called synchronously from `build`). Left untouched here to
-     keep the PR scoped; should get the same `Future.microtask` treatment.
+   - The sibling `productsByCategoryProvider` had the identical latent pattern;
+     it is fixed in the follow-up sweep below (§8.8).
 
 ## §8.3 — FlashDealsRail + backend (§4) and responsive images (§5)
 
@@ -1397,3 +1396,37 @@ Existing flows I–L unaffected.
 - `feat(home): adaptive home composition — grid rails, banner aspect, desktop footer`
 - `test(home,plp): integration flows M + N; fix two latent build-phase bugs`
 - `test(home): golden tests for adaptive home (375/768/1440) + flash deals (375/1440)`
+
+## §8.8 — Follow-up sweep: AsyncNotifier build-time state mutations
+
+After the `FilteredProductsNotifier` fix, every `Notifier` / `AsyncNotifier` /
+`FamilyNotifier` subclass in `mobile/lib/` was swept for the same class of bug:
+mutating `state` (directly, or via a helper called synchronously from `build`)
+**before the first `await`** — illegal because the notifier isn't mounted yet.
+
+**Key subtlety:** `unawaited(f())` and `Future.wait([f(), g()])` do **not** defer —
+they call `f()`/`g()` synchronously, which run to their first `await`. Only
+`Future.microtask(f)` (or returning state from `build` and letting a later event
+drive the load) is safe. The audit therefore traced each `build` into the helper
+it invokes and checked whether the first `state =` precedes the first `await`.
+
+| Metric | Count |
+|---|---|
+| Notifier subclasses scanned | **20** |
+| Bugs found | **2** |
+| Already fixed (this PR's parent / §8.2) | 1 — `FilteredProductsNotifier` |
+| Fixed in this sweep | 1 — `ProductsByCategoryNotifier` |
+
+The 18 clean ones fall into three safe shapes: return a `const` state and mutate
+only in event handlers (`Auth`, `MFA`, `SignIn/Up`, `ForgotPassword`, `PlpFilters`,
+`Search`, `Checkout`, `AddressForm`); explicitly defer with `Future.microtask`
+(`Addresses`, `Cart`, `Categories`, `ProductDetail`); or call a loader that only
+touches `state` **after** its first `await` (`OrderDetail`, `Orders`,
+`CashbackPlans`, `Wallet`, `PlanDetail` — the last two via `Future.wait`, whose
+sub-loaders were each checked individually).
+
+`ProductsByCategoryNotifier.build()` was the lone remaining offender (`_load(1,
+replace: true)` set `state = AsyncLoading()` as its first statement). Fixed with
+`Future.microtask`, guarded by `products_by_category_provider_test.dart` (first
+read returns normally + resolves to data; verified to throw the
+"uninitialized provider" `StateError` when the fix is reverted).
