@@ -1495,13 +1495,65 @@ the lens zooms **in place** (`Transform.scale` about the cursor, clipped) — sa
 magnification, no collision. Tested via a mouse gesture (lens appears) vs. the
 disabled case (no lens).
 
-**Carried:** only the two-column **screen composition** (§3.1/§3.4) that wires
-`PdpImagePager` into a sticky gallery column + the desktop buy-box (brand/title/
-rating/price/variants/seller/quantity/CTAs/trust badges) — it adds PDP goldens at
-1024/1440 needing a Linux re-baseline.
-
 New locale keys: `product.go_to_store`, `product.lowest_30d` (tr-TR + en-US;
 de-DE/ar-AE lack the `product` block and fall back to tr-TR).
+
+### §3 (cont.) — PDP two-column screen composition (§3.1/§3.4)
+
+`ProductDetailScreen` branches by breakpoint: mobile keeps the existing
+`NestedScrollView` + `PdpStickyCta` unchanged; tablet/desktop render the two-column
+layout in `CenteredContentColumn`.
+
+- **Sticky gallery (left):** a `Stack` whose gallery child's `top` tracks the page
+  scroll offset, clamped to `[0, contentH - galleryH]` (per §11's documented-
+  alternative allowance — a `SliverPersistentHeader` can't host a side-by-side
+  column, and `IntrinsicHeight` throws on the buy-box's `Wrap`). `contentH` = the
+  buy-box's natural height, **measured unconstrained** via a post-frame
+  `GlobalKey` read — a bug found while writing the sticky test was that wrapping
+  the row in `SizedBox(height: contentH)` capped the buy-box at the gallery height
+  so `maxTop` was always 0 and the gallery never pinned.
+- **Hover-zoom** gated to desktop × mouse via `ValueListenableBuilder` on
+  `PointerKindObserver.lastKind`.
+- **Buy-box (right, 480/360dp):** brand → title → rating (shown only when reviews
+  exist — `Product` has no rating field) → `PdpPriceBlock` → stock → cashback →
+  `PdpVariantSelector` → `PdpSellerCard` → quantity stepper → Sepete Ekle (56dp) →
+  Favorilere Ekle outline (48dp) → trust badges. Components reused, no duplication.
+- **Below-fold:** tab bar + inline tab content (rendered inline, not `TabBarView`,
+  to avoid nested unbounded scroll) + "Benzer ürünler" grid rail (6/3 col).
+  "Son baktıkların" omitted — no `recentlyViewedProvider` exists ⇒ hide-when-empty
+  makes it always hidden.
+
+**Sticky scroll test** (`pdp_screen_sticky_gallery_test.dart`): (1) small forward
+scroll → gallery origin unchanged (pinned); (2) large scroll → origin moves up
+(released) + tab bar crosses toward top; (3) scroll back → re-pins at origin;
+(4) variant change → gallery height unchanged (it's height-locked by the
+`Positioned(height: galleryH)`). All pass.
+
+**Integration flow P** (`test/integration/flow_p_desktop_pdp_test.dart`, runs under
+`flutter test` like flows M/N): two-column present → mouse-hover shows zoom lens /
+move-out hides it → "Mavi" variant selects → Sepete Ekle increments
+`cartCountProvider` 0→1 → large scroll releases the gallery. **Pass.**
+
+**PDP goldens** (8, baselined on ubuntu via `golden-rebaseline` run
+[26657231005](https://github.com/s4l1hs/Mopro-Shop/actions/runs/26657231005)):
+`pdp_two_col_{variants,simple}_{1024,1440}_{light,dark}.png`. (The spec's
+"discount" fixture can't render a discount — the model exposes no original price;
+`PdpPriceBlock`'s discount path is unit-tested separately.)
+
+New locale keys (this cycle): `product.add_to_favorites`, `product.review_count`
+(tr-TR + en-US).
+
+### Updated Session 5b remaining scope
+
+- [x] ~~§3 PDP two-column + hover-zoom + component extraction~~ (done)
+- [x] ~~§5 Favorites desktop grid~~ (done)
+- [x] ~~§6.4 integration build-tag fix~~ · [x] ~~§7 contributor docs~~
+- [ ] §2 PLP sidebar filter panel + chip row + sort dropdown (+ flow O, goldens)
+- [ ] §4 Cart desktop two-column + `OrderSummaryCard` + empty state (+ flow Q, goldens)
+- [ ] §6.1 Editor's picks / Recently viewed home sub-section
+- [ ] §6.2 mood/category 8/12 column counts
+- [ ] §6.3 `?layout=desktop` rails hint + §2.5 fixture
+- [ ] Final golden-rebaseline covering PLP / Cart / Home
 
 ## §5 — Favorites desktop grid
 
@@ -1540,8 +1592,7 @@ by `make test-integration-catalog` / CI's integration job.
 
 ## Carried to 5b-continuation
 
-§2 PLP sidebar filter panel + chip row + sort dropdown; §3 PDP two-column +
-hover-zoom layout (component extraction DONE); §4 Cart two-column +
+§2 PLP sidebar filter panel + chip row + sort dropdown; §4 Cart two-column +
 `OrderSummaryCard` + empty state; §6.1 Editor's picks /
 Recently viewed home sub-section; §6.2 mood/category 8/12 column counts; §6.3
 `?layout=desktop` rails hint + §2.5 fixture; new integration flows O/P/Q; new
