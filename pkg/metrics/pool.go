@@ -8,9 +8,9 @@ import (
 // pgxPoolCollector is a prometheus.Collector that reads live stats from a
 // pgxpool.Pool on every Collect call. Register once at startup.
 type pgxPoolCollector struct {
-	pool    *pgxpool.Pool
-	svc     string
-	db      string
+	pool     *pgxpool.Pool
+	svc      string
+	db       string
 	acquired *prometheus.Desc
 	idle     *prometheus.Desc
 	maxConns *prometheus.Desc

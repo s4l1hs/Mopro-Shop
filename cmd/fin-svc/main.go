@@ -394,8 +394,11 @@ func newJobPinger(inner healthcheck.Pinger, jobM *metrics.JobStatusMetrics, svc,
 	return &jobPinger{inner: inner, jobM: jobM, svc: svc, job: job}
 }
 
-func (p *jobPinger) Start(ctx context.Context)   { p.inner.Start(ctx) }
-func (p *jobPinger) Success(ctx context.Context) { p.inner.Success(ctx); p.jobM.SetSuccess(p.svc, p.job) }
+func (p *jobPinger) Start(ctx context.Context) { p.inner.Start(ctx) }
+func (p *jobPinger) Success(ctx context.Context) {
+	p.inner.Success(ctx)
+	p.jobM.SetSuccess(p.svc, p.job)
+}
 func (p *jobPinger) Fail(ctx context.Context, msg string) {
 	p.inner.Fail(ctx, msg)
 	p.jobM.SetFailure(p.svc, p.job)
