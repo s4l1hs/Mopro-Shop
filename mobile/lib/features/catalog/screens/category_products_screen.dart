@@ -69,10 +69,12 @@ class _CategoryProductsScreenState
     _debouncer.run(() {
       if (!mounted) return;
       final q = _codec.encode(next);
-      final uri = GoRouterState.of(context)
-          .uri
-          .replace(queryParameters: q.isEmpty ? null : q);
-      context.go(uri.toString());
+      final base = GoRouterState.of(context).uri;
+      // NB: Uri.replace(queryParameters: null) KEEPS the existing query, so to
+      // clear all filters we must navigate to the bare path.
+      final location =
+          q.isEmpty ? base.path : base.replace(queryParameters: q).toString();
+      context.go(location);
     });
   }
 
