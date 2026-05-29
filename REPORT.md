@@ -1269,4 +1269,131 @@ Adaptive home composition; `PlpFilters` codec + URL wiring; PLP sidebar filter U
 | `go test ./...` | all pass (0 FAIL) |
 | containers | compose lives under `deploy/`; not running locally (unset env warnings) |
 
-_Remaining §8 subsections appended at session end._
+## §8.1 — Adaptive home composition (§2)
+
+Same widgets, breakpoint-specific containers. **Mobile (<600) is unchanged** —
+full-width, horizontal scroller rails, 16:9 banner, no chevrons, no footer — so
+the existing mobile goldens do not regress (`wrap()` is a pass-through on mobile).
+
+- **Tablet/desktop:** every section is wrapped in `CenteredContentColumn`
+  (clamps width + pads); rails switch to `RailLayout.grid` (tablet 3-col / cap 6,
+  desktop 5-col / cap 10) with matching grid skeletons.
+- **Banner:** desktop renders a wider **16:5** aspect with prev/next chevrons and
+  **autoplay-pause-on-hover** (`MouseRegion` → `_paused`); tablet/mobile keep 16:9
+  and no chevrons. The 5 s autoplay timer checks `_paused` each tick.
+- **FlashDealsRail mounted directly after the banner** (additive — renders nothing
+  when there's no active collection); `onRefresh` invalidates it.
+- **Desktop-only `HomeFooter`** (`if (context.isDesktop)`): copyright + placeholder
+  info links + language menu + theme toggle; `footer.*` keys added to all 4 locales.
+- Breakpoint decisions are read at the screen level via `context.isMobile/.isDesktop`
+  and passed down as params (`layout`, `gridColumns`, `maxItems`, `desktop`) — no
+  inline `if (isDesktop)` inside leaf widgets.
+
+**Tests:** `product_rail_test.dart` (scroller→ListView at 375; grid→GridView capped
+at maxItems at 1440), `home_footer_test.dart` (renders its controls), and Flow M
+(below). Goldens at 375/768/1440 (§8.4).
+
+### Deferred from §2 (explicitly out of this PR)
+- **Editor's-picks / Recently-viewed** two-column desktop sub-section (and the
+  "hide recently-viewed when empty" rule). Not built.
+- **Exact mood/category column counts** (mood 8/row tablet · 12/row desktop with a
+  96 dp ring; category 8/12 per row). The strips are centered + clamped on
+  non-mobile but still use their existing per-item sizing, not the prescribed
+  fixed column counts.
+- **§2.5 `?layout=desktop` rails hint** (URL override of the breakpoint for rails)
+  — not implemented; consequently no §2.5 fixture golden.
+- "Tümünü gör" top-right placement is via the existing `seeAllRoute` button, not a
+  redesigned desktop header row.
+
+## §8.2 — PlpFilters URL substrate (§3)
+
+`PlpFilters` value object + `PlpFiltersCodec` + `plpFiltersProvider(key)` family
+(committed earlier this session). `CategoryProductsScreen` hydrates filters from
+the URL query string on entry, mirrors changes back via a **300 ms debounced
+`context.go`**, and a fresh deep link reconstructs the matching state. No sidebar
+UI (5b). Sort tokens are the app's real ones (`recommended/bestseller/newest/
+price_asc/price_desc/cashback_desc`); price/brand/rating/shipping live in the URL
++ state but do not yet affect the fetch (the catalog API filters by sort only —
+backend work for 5b).
+
+**Two latent build-phase bugs were fixed** (uncovered by Flow N — no test had ever
+built these code paths):
+1. `CategoryProductsScreen` hydrated the provider inside `didChangeDependencies`;
+   modifying a provider during the build/dependencies phase throws. Now deferred
+   to a post-frame callback (route read stays synchronous).
+2. `FilteredProductsNotifier.build()` called `_load()`, which mutates `state`
+   before its first `await` — illegal during `build` (the notifier isn't mounted
+   yet). Now scheduled via `Future.microtask`.
+   - **Backlog:** the sibling `productsByCategoryProvider` has the identical latent
+     pattern (`_load` called synchronously from `build`). Left untouched here to
+     keep the PR scoped; should get the same `Future.microtask` treatment.
+
+## §8.3 — FlashDealsRail + backend (§4) and responsive images (§5)
+
+- **§4:** migration `0068_home_flash_deals` (collections + items, active-window
+  partial index, seed of one active collection + 8 products); `GET /home/flash-deals`
+  (active collection, 204 when none, `?collectionId` preview, 404 missing, 400 bad
+  id); `flash_price_minor` added to `ProductSummary` via OpenAPI regen (Go + Dart);
+  `FlashDealsRail` countdown widget (`clock.now()`, 1 s ticker, ended state) +
+  `flashDealsProvider` (5-min refetch). Backend tests in
+  `cmd/core-svc/flash_deals_handlers_test.go`; widget tests in
+  `flash_deals_rail_test.dart`.
+  - **Backlog (§4):** the integration round-trip handler test was reverted — it
+    can't compile under `-tags=integration` because `mockRepo.ListAllVariantStocks`
+    lives in a `!integration`-tagged file while the untagged `service_test.go` also
+    uses `mockRepo` (pre-existing build-tag breakage, not introduced here).
+- **§5:** `responsiveImageUrl()` pure helper (rounds physical px up to the next 100,
+  clamps [100,2000], appends `?w=`, idempotent, preserves existing params) +
+  `ResponsiveNetworkImage` (LayoutBuilder + devicePixelRatio). Migrated ProductCard,
+  MoodStoriesStrip, and the mega-menu promo image. The banner uses gradients/network
+  images that are already `BoxFit.cover` without a width hint.
+  - **Backlog (§5):** CDN `?w=` could not be verified live — `cdn.moproshop.com`
+    image URLs are placeholders (no live CDN; curl returns no response). The helper
+    is future-proofed; verify once the CDN is provisioned.
+
+## §8.4 — Goldens (§7)
+
+New golden tests (baselined on Linux/CI via the `golden-rebaseline` workflow; the
+platform guard fails them on macOS with a remediation message, by design):
+- `home_goldens_5a_test.dart` — home at **375 / 768 / 1440** (light).
+- `flash_deals_goldens_5a_test.dart` — FlashDealsRail at **375 / 1440** (light,
+  fixed clock).
+
+Both load real translations via `EasyLocalization` so cards render with short
+cashback-chip strings (no overflow stripes). On macOS a benign
+`MissingPluginException` (path_provider) is emitted by EasyLocalization's asset
+cache; it's non-fatal (translations still load from assets) and matches the
+existing `cart_line_card_golden_test` behavior on CI.
+
+## §8.5 — Integration flows (§6)
+
+- **Flow M (desktop home)** — `desktop_home_flow_test.dart`: at 1440 the rails
+  render as grids, banner chevrons are present, and `HomeFooter` is mounted; at 375
+  there are no chevrons and no footer. **pass.**
+- **Flow N (PLP URL)** — `plp_url_flow_test.dart`: deep link `?sort=price_asc&min=10000`
+  hydrates `PlpFilters`; changing the sort writes `sort=price_desc` back into the URL
+  after the 300 ms debounce (preserving `min`); a different deep link
+  (`?sort=cashback_desc&shipping=free`) reconstructs the matching state. **pass.**
+
+Existing flows I–L unaffected.
+
+## §8.6 — Verification
+
+- `flutter analyze` on all touched lib + test files: **0 issues**.
+- `flutter test`: **357 passed, 26 failed**; every failure is golden-platform-guard
+  related — 21 pre-existing Linux-baselined goldens hitting the macOS guard
+  (`was baselined on`) + 5 new goldens with no baseline yet (`non-existent file`).
+  No functional regressions. Goldens go green once the `golden-rebaseline` workflow
+  runs on the branch.
+- Go: `catalog`, `core-svc`, `cart`, `order` packages build + test green;
+  `make api-gen` produced a clean Go + Dart diff.
+
+## §8.7 — Commits (one per section)
+
+- `feat(home): flash-deals backend — migration 0068 + GET /home/flash-deals + DTO`
+- `feat(home): FlashDealsRail widget + provider + ProductCard priceOverride`
+- (§3) `PlpFilters` value object + codec + provider + `CategoryProductsScreen` wiring
+- (§5) `responsiveImageUrl` + `ResponsiveNetworkImage` + migrations
+- `feat(home): adaptive home composition — grid rails, banner aspect, desktop footer`
+- `test(home,plp): integration flows M + N; fix two latent build-phase bugs`
+- `test(home): golden tests for adaptive home (375/768/1440) + flash deals (375/1440)`
