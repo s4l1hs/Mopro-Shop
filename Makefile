@@ -12,6 +12,7 @@ OPENAPI_GEN_VERSION   := v7.10.0
 OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSION)
 
 .PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order \
+        pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
         caddy-validate caddy-reload \
         test-integration-catalog test-integration-outbox test-integration-cart test-integration-order \
@@ -45,15 +46,60 @@ lint:
 boundaries:
 	./scripts/check-module-boundaries.sh
 
-property-cashback:
+# ── Test infrastructure: pg-ledger-test:6434 ────────────────────────────────
+#
+# Property-* tests for cashback, sellerpayout, and wallet hit a postgres
+# instance at localhost:6434 with the full ledger schema applied. Before
+# Session 4d these had to be provisioned manually; PRs #7 and #8 both
+# used `--no-verify` because of it. This block lets `make verify` run
+# end-to-end without that bypass.
+#
+# `pg-ledger-test-up` is idempotent: reuses an existing container if one
+# is on the expected name, otherwise spins up fresh + waits for postgres
+# ready + applies every deploy/postgres-ledger/init/*.sql migration.
+# `pg-ledger-test-down` is a manual escape hatch (also useful before
+# running test-integration-sellerpayout which uses port 6434 too).
+#
+# Reuse caveat: state persists across `make verify` runs. Most property
+# tests TRUNCATE / DROP what they need; if cross-run drift causes a
+# flake, run `make pg-ledger-test-down && make verify`.
+PG_LEDGER_TEST_CONTAINER := pg-ledger-test
+
+pg-ledger-test-up:
+	@if docker inspect $(PG_LEDGER_TEST_CONTAINER) > /dev/null 2>&1; then \
+	    echo "[$(PG_LEDGER_TEST_CONTAINER)] already running, reusing" ; \
+	else \
+	    echo "[$(PG_LEDGER_TEST_CONTAINER)] starting fresh on port 6434..." ; \
+	    docker run -d --name $(PG_LEDGER_TEST_CONTAINER) -p 6434:5432 \
+	        -e POSTGRES_USER=ledger_admin -e POSTGRES_PASSWORD=test123 \
+	        -e POSTGRES_DB=mopro_ledger postgres:16-alpine > /dev/null ; \
+	    echo "[$(PG_LEDGER_TEST_CONTAINER)] waiting for postgres..." ; \
+	    for i in $$(seq 1 30); do \
+	        docker exec $(PG_LEDGER_TEST_CONTAINER) pg_isready -U ledger_admin -d mopro_ledger > /dev/null 2>&1 && break ; \
+	        sleep 1 ; \
+	    done ; \
+	    echo "[$(PG_LEDGER_TEST_CONTAINER)] applying schema..." ; \
+	    for f in $$(ls deploy/postgres-ledger/init/*.sql | sort); do \
+	        docker exec -i $(PG_LEDGER_TEST_CONTAINER) psql -U ledger_admin -d mopro_ledger < $$f > /dev/null \
+	            || { echo "schema apply failed at $$f" >&2 ; exit 1 ; } ; \
+	    done ; \
+	    echo "[$(PG_LEDGER_TEST_CONTAINER)] ready" ; \
+	fi
+
+pg-ledger-test-down:
+	-@docker rm -f $(PG_LEDGER_TEST_CONTAINER) > /dev/null 2>&1 ; \
+	echo "[$(PG_LEDGER_TEST_CONTAINER)] torn down"
+
+property-cashback: pg-ledger-test-up
 	go test -tags=integration -run Property ./internal/cashback/...
 
-property-payout:
+property-payout: pg-ledger-test-up
 	go test -tags=integration -run Property ./internal/sellerpayout/...
 
-property-ledger:
+property-ledger: pg-ledger-test-up
 	go test -tags=integration -run Property ./internal/wallet/...
 
+# property-timex and property-order are pure-math; no DB needed.
 property-timex:
 	go test -tags=integration -run Property ./pkg/timex/...
 
