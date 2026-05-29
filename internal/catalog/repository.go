@@ -209,13 +209,22 @@ func (r *pgxRepository) SearchProducts(ctx context.Context, query, locale, marke
 	return products, rows.Err()
 }
 
-func (r *pgxRepository) ListCategories(ctx context.Context, locale string) ([]CategoryRow, error) {
+func (r *pgxRepository) ListCategories(ctx context.Context, locale string, maxDepth int) ([]CategoryRow, error) {
 	nameCol := "name_en"
 	if locale == "tr-TR" || locale == "tr" {
 		nameCol = "name_tr"
 	}
-	rows, err := r.pool.Query(ctx,
-		`SELECT c.id, c.slug, c.`+nameCol+`, c.parent_id,
+
+	// `maxDepth <= 0` preserves the historical behavior (return all).
+	// `maxDepth >= 1` filters via a recursive CTE that computes each
+	// category's chain length to its root parent. Capped at 1000 nodes
+	// to prevent runaway responses per the prompt's safety ceiling.
+	const maxNodes = 1000
+
+	var query string
+	var args []any
+	if maxDepth <= 0 {
+		query = `SELECT c.id, c.slug, c.` + nameCol + `, c.parent_id,
 		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps
 		FROM ref_schema.categories c
 		LEFT JOIN ref_schema.commission_rules cr
@@ -223,8 +232,34 @@ func (r *pgxRepository) ListCategories(ctx context.Context, locale string) ([]Ca
 		      AND cr.active = TRUE
 		      AND (cr.effective_to IS NULL OR cr.effective_to > now())
 		WHERE c.active = TRUE
-		ORDER BY c.id ASC`,
-	)
+		ORDER BY c.id ASC
+		LIMIT $1`
+		args = []any{maxNodes}
+	} else {
+		query = `WITH RECURSIVE cat_depth AS (
+		    SELECT id, parent_id, 0 AS depth
+		    FROM ref_schema.categories
+		    WHERE parent_id IS NULL AND active = TRUE
+		  UNION ALL
+		    SELECT c.id, c.parent_id, cd.depth + 1
+		    FROM ref_schema.categories c
+		    JOIN cat_depth cd ON c.parent_id = cd.id
+		    WHERE c.active = TRUE AND cd.depth + 1 <= $1
+		)
+		SELECT c.id, c.slug, c.` + nameCol + `, c.parent_id,
+		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps
+		FROM ref_schema.categories c
+		JOIN cat_depth cd ON cd.id = c.id
+		LEFT JOIN ref_schema.commission_rules cr
+		       ON cr.category_id = c.id
+		      AND cr.active = TRUE
+		      AND (cr.effective_to IS NULL OR cr.effective_to > now())
+		ORDER BY c.id ASC
+		LIMIT $2`
+		args = []any{maxDepth, maxNodes}
+	}
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("catalog.repo: ListCategories: %w", err)
 	}

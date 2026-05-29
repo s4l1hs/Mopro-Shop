@@ -90,6 +90,10 @@
     "clear_recent": "Clear",
     "suggested_categories": "Categories"
   },
+  "mega_menu": {
+    "see_all": "See all",
+    "empty_children": "No subcategories in this section."
+  },
   "empty_state": {
     "empty_message": "Nothing here yet",
     "error_message": "Something went wrong. Please try again.",

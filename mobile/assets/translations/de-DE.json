@@ -29,5 +29,9 @@
     "menu_login_prompt": "In dein Konto einloggen",
     "menu_register": "Registrieren",
     "menu_help": "Hilfe"
+  },
+  "mega_menu": {
+    "see_all": "Alle anzeigen",
+    "empty_children": "Keine Unterkategorien in diesem Bereich."
   }
 }

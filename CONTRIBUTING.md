@@ -40,6 +40,19 @@ CI safety net: `.github/workflows/branch-guard.yml` refuses any PR whose source
 branch is `main` or `master` — protects against the same foot-gun at the
 remote layer.
 
+### Convention: echo `pwd` before chained `git` operations
+
+Any multi-step shell command that chains `git` operations (especially `git
+checkout`, `git branch`, `git reset`, or anything creating files in the working
+tree) MUST run `echo "pwd=$(pwd)"` as its first step. Rationale: Session 4b
+created an empty `mobile/.githooks/pre-commit` because the agent's cwd had
+drifted into `mobile/` mid-chain — the `.githooks/pre-commit` empty-file guard
+catches the result, but knowing `pwd` upfront catches the cause.
+
+This is a documented convention, not a code check today. TODO: a future session
+may add `tool/lint-shell.sh` that scans long-form scripts in the repo for
+multi-`git` chains without a `pwd` echo.
+
 ## Core rules
 
 Before writing any code, read **CLAUDE.md** fully. It is the constitution.

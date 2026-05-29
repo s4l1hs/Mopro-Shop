@@ -291,10 +291,11 @@ _responseData = rawData == null ? null : deserialize<Product, Product>(rawData, 
   }
 
   /// List all 42 product categories (locale-resolved names)
-  /// 
+  /// Returns a flat list of active categories; each row carries &#x60;parent_id&#x60; for client-side tree reconstruction. Default behavior returns all depths (mobile callers rely on this — do not change).  Optional &#x60;depth&#x60; query param filters to categories whose chain length to a root parent is at most N (root&#x3D;0, direct children&#x3D;1, …). Used by the desktop mega menu (Session 4c §3) to pre-load the bar + subcategory leaves in one call. Hard ceiling: 1000 nodes per response. 
   ///
   /// Parameters:
   /// * [xTraceId] - Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+  /// * [depth] - Filter chain length from root parent. Valid range 1..3. Omitting the param returns all depths (historical behavior). 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -306,6 +307,7 @@ _responseData = rawData == null ? null : deserialize<Product, Product>(rawData, 
   /// Throws [DioException] if API call or serialization fails
   Future<Response<ListCategories200Response>> listCategories({ 
     String? xTraceId,
+    int? depth,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -333,9 +335,14 @@ _responseData = rawData == null ? null : deserialize<Product, Product>(rawData, 
       validateStatus: validateStatus,
     );
 
+    final _queryParameters = <String, dynamic>{
+      if (depth != null) r'depth': depth,
+    };
+
     final _response = await _dio.request<Object>(
       _path,
       options: _options,
+      queryParameters: _queryParameters,
       cancelToken: cancelToken,
       onSendProgress: onSendProgress,
       onReceiveProgress: onReceiveProgress,

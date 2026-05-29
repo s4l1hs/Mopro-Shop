@@ -16,12 +16,29 @@ const (
 	referenceInterestRateBps = 5000
 )
 
-// handleListCategories returns all active categories with locale-resolved name.
-// GET /categories
+// handleListCategories returns active categories with locale-resolved name.
+// GET /categories[?depth=N]
+//
+// Optional `depth` query param (Session 4c §3) filters the response to
+// categories whose chain length to a root parent is at most N. Valid range
+// 1..3; out-of-range values return 400 bad_request. Omitting the param
+// preserves the historical "return all depths" behavior (mobile callers
+// rely on this — do not change the default).
 func handleListCategories(svc catalog.Service, defaultLocale string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		locale := parseLocale(r, defaultLocale)
-		cats, err := svc.ListCategories(r.Context(), locale)
+
+		maxDepth := 0 // 0 = no limit
+		if raw := r.URL.Query().Get("depth"); raw != "" {
+			n, err := strconv.Atoi(raw)
+			if err != nil || n < 1 || n > 3 {
+				jsonError(w, "bad_request: depth must be an integer in [1,3]", http.StatusBadRequest)
+				return
+			}
+			maxDepth = n
+		}
+
+		cats, err := svc.ListCategories(r.Context(), locale, maxDepth)
 		if err != nil {
 			slog.Error("catalog: ListCategories", "err", err)
 			jsonError(w, "internal error", http.StatusInternalServerError)

@@ -106,11 +106,11 @@ func (s *catalogService) GetVariantByID(ctx context.Context, variantID int64) (V
 	return s.repo.GetVariantByID(ctx, variantID)
 }
 
-func (s *catalogService) ListCategories(ctx context.Context, locale string) ([]CategoryRow, error) {
+func (s *catalogService) ListCategories(ctx context.Context, locale string, maxDepth int) ([]CategoryRow, error) {
 	if locale == "" {
 		locale = s.defaultLocale
 	}
-	return s.repo.ListCategories(ctx, locale)
+	return s.repo.ListCategories(ctx, locale, maxDepth)
 }
 
 func (s *catalogService) ListProductsByCategory(ctx context.Context, categoryID int64, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error) {

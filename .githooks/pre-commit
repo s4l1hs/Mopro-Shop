@@ -25,6 +25,24 @@ for protected in $PROTECTED; do
   fi
 done
 
+# ── Empty-file guard under .githooks/ ──────────────────────────────────────
+#
+# Why: Session 4b accidentally created an empty `mobile/.githooks/pre-commit`
+# from a misplaced `touch` (the agent's cwd had drifted into `mobile/`). An
+# empty hook script that gets sourced as a hook does nothing — silent
+# bypass. This refuses to commit any 0-byte file under `.githooks/` so the
+# foot-gun stays loud.
+
+EMPTY_HOOKS=$(git diff --cached --name-only --diff-filter=AM | grep '^\.githooks/' || true)
+for f in $EMPTY_HOOKS; do
+  # `wc -c` on a non-existent file would fail under set -e; guard with -f.
+  if [ -f "$f" ] && [ ! -s "$f" ]; then
+    printf '\033[0;31m❌ refusing to commit empty file: %s\033[0m\n' "$f" >&2
+    printf '   remove it or populate it before committing.\n' >&2
+    exit 1
+  fi
+done
+
 # ── api-gen sync check (existing behavior preserved) ────────────────────────
 
 SPEC_STAGED=$(git diff --cached --name-only | grep '^api/openapi.yaml' || true)

@@ -152,7 +152,8 @@ func (s *Seeder) SeedCategories(ctx context.Context) error {
 				_, _ = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT "+sp)
 				return fmt.Errorf("upsert root category %s: %w", c.Slug, err)
 			}
-			inserted += n.inserted; updated += n.updated
+			inserted += n.inserted
+			updated += n.updated
 		}
 		if _, err := tx.Exec(ctx, "RELEASE SAVEPOINT "+sp); err != nil {
 			return fmt.Errorf("release savepoint %s: %w", sp, err)
@@ -180,7 +181,8 @@ func (s *Seeder) SeedCategories(ctx context.Context) error {
 				_, _ = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT "+sp)
 				return fmt.Errorf("upsert leaf category %s: %w", c.Slug, err)
 			}
-			inserted += n.inserted; updated += n.updated
+			inserted += n.inserted
+			updated += n.updated
 		}
 		if _, err := tx.Exec(ctx, "RELEASE SAVEPOINT "+sp); err != nil {
 			return fmt.Errorf("release savepoint %s: %w", sp, err)
@@ -347,7 +349,8 @@ func (s *Seeder) SeedProducts(ctx context.Context) error {
 				_, _ = tx.Exec(ctx, "ROLLBACK TO SAVEPOINT "+sp)
 				return fmt.Errorf("upsert product %s: %w", p.ExternalSKU, err)
 			}
-			inserted += n.inserted; updated += n.updated
+			inserted += n.inserted
+			updated += n.updated
 		}
 		if _, err := tx.Exec(ctx, "RELEASE SAVEPOINT "+sp); err != nil {
 			return fmt.Errorf("release savepoint %s: %w", sp, err)

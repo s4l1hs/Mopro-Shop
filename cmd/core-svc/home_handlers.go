@@ -216,4 +216,3 @@ func handleFavoritesSync(pool *pgxpool.Pool) http.HandlerFunc {
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
-

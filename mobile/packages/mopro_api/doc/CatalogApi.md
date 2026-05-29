@@ -152,9 +152,11 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **listCategories**
-> ListCategories200Response listCategories(xTraceId)
+> ListCategories200Response listCategories(xTraceId, depth)
 
 List all 42 product categories (locale-resolved names)
+
+Returns a flat list of active categories; each row carries `parent_id` for client-side tree reconstruction. Default behavior returns all depths (mobile callers rely on this — do not change).  Optional `depth` query param filters to categories whose chain length to a root parent is at most N (root=0, direct children=1, …). Used by the desktop mega menu (Session 4c §3) to pre-load the bar + subcategory leaves in one call. Hard ceiling: 1000 nodes per response. 
 
 ### Example
 ```dart
@@ -162,9 +164,10 @@ import 'package:mopro_api/api.dart';
 
 final api = MoproApi().getCatalogApi();
 final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+final int depth = 56; // int | Filter chain length from root parent. Valid range 1..3. Omitting the param returns all depths (historical behavior). 
 
 try {
-    final response = api.listCategories(xTraceId);
+    final response = api.listCategories(xTraceId, depth);
     print(response);
 } catch on DioException (e) {
     print('Exception when calling CatalogApi->listCategories: $e\n');
@@ -176,6 +179,7 @@ try {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+ **depth** | **int**| Filter chain length from root parent. Valid range 1..3. Omitting the param returns all depths (historical behavior).  | [optional] 
 
 ### Return type
 

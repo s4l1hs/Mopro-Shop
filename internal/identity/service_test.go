@@ -556,7 +556,7 @@ func (m *mockRepo) SetPasswordHash(_ context.Context, id int64, hash string) err
 	}
 	return nil
 }
-func (m *mockRepo) MarkEmailVerified(_ context.Context, _ int64) error         { return nil }
+func (m *mockRepo) MarkEmailVerified(_ context.Context, _ int64) error { return nil }
 func (m *mockRepo) CreateEmailVerification(_ context.Context, _ int64, _ string, _ time.Time) error {
 	return nil
 }
@@ -570,7 +570,7 @@ func (m *mockRepo) CreatePasswordReset(_ context.Context, _ int64, _ string, _ t
 func (m *mockRepo) FindPasswordReset(_ context.Context, _ string) (identity.PasswordReset, error) {
 	return identity.PasswordReset{}, identity.ErrPasswordResetInvalid
 }
-func (m *mockRepo) MarkPasswordResetUsed(_ context.Context, _ int64) error             { return nil }
+func (m *mockRepo) MarkPasswordResetUsed(_ context.Context, _ int64) error { return nil }
 func (m *mockRepo) CreateSession(_ context.Context, _ int64, _ identity.RefreshToken) error {
 	return nil
 }
@@ -607,7 +607,7 @@ func seedPasswordUser(t *testing.T, repo *mockRepo, id int64, oldPassword string
 	}
 	repo.users[id] = &identity.User{
 		ID: id, PasswordHash: string(hash),
-		Status: identity.StatusActive,
+		Status:    identity.StatusActive,
 		CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}
 }
@@ -672,7 +672,7 @@ func TestChangePassword_PhoneOnlyUser_ReturnsInvalidCredentials(t *testing.T) {
 	// Phone-only user — no password hash set.
 	repo.users[7] = &identity.User{
 		ID: 7, PasswordHash: "",
-		Status: identity.StatusActive,
+		Status:    identity.StatusActive,
 		CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}
 	svc := newTestService(repo, &mockSMS{}, &mockLimiter{}, t)

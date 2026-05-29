@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/cart/application/cart_count_provider.dart';
+import 'package:mopro/features/web/mega_menu/mega_menu_bar.dart';
 import 'package:mopro/shell/web_header.dart';
 
 /// Adaptive root shell.
@@ -128,16 +129,31 @@ class _MobileShell extends ConsumerWidget {
 }
 
 // ── Tablet + desktop shell — WebHeader pinned, no bottom nav ─────────────────
+//
+// `MegaMenuBar` (Session 4c) mounts directly under the WebHeader at `>=768`
+// widths only. Below 768dp the bar is NOT in the widget tree — small tablets
+// reach categories via the dedicated `/categories` route. The 768 threshold
+// is enforced HERE in the shell rather than inside the bar so the bar's own
+// rendering stays breakpoint-agnostic.
 
 class _WebShell extends StatelessWidget {
   const _WebShell({required this.navigationShell});
   final StatefulNavigationShell navigationShell;
 
+  static const double megaMenuMinWidth = 768;
+
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.sizeOf(context).width;
+    final showMegaMenu = width >= megaMenuMinWidth;
     return Scaffold(
       appBar: const WebHeader(),
-      body: navigationShell,
+      body: Column(
+        children: [
+          if (showMegaMenu) const MegaMenuBar(),
+          Expanded(child: navigationShell),
+        ],
+      ),
     );
   }
 }
