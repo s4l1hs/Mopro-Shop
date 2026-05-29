@@ -143,6 +143,17 @@ void main() {
     });
   });
 
+  // ── Golden (Session 4d §5): bar collapsed at 1440 light ─────────────────
+  group('MegaMenuBar — goldens', () {
+    testWidgets('bar collapsed at 1440 light', (tester) async {
+      await _pump(tester);
+      await expectLater(
+        find.byType(MegaMenuBar),
+        matchesGoldenFile('goldens/mega_menu_bar_collapsed_1440_light.png'),
+      );
+    });
+  });
+
   group('MegaMenuBar — touch interactions', () {
     testWidgets('label tap OPENS panel (does NOT route) when touch is active',
         (tester) async {

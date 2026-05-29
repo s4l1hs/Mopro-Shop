@@ -162,4 +162,55 @@ void main() {
       expect(find.text('mega_menu.promo.image_unavailable'), findsOneWidget);
     });
   });
+
+  // ── Goldens (Session 4d §5): 3 essential baselines for the panel ───────
+  group('MegaMenuPanel — goldens', () {
+    testWidgets('4-column layout (no promo) at 1440 light', (tester) async {
+      await _pump(tester, active: _seedTopLevel());
+      await expectLater(
+        find.byType(MegaMenuPanel),
+        matchesGoldenFile('goldens/mega_menu_panel_4col_1440_light.png'),
+      );
+    });
+
+    testWidgets('3+1 layout (with promo) at 1440 light', (tester) async {
+      final promo = CategoryPromoSlot(
+        imageUrl: 'https://example.test/promo.png',
+        title: 'Spring Sale',
+        deepLink: '/categories/1?campaign=spring',
+      );
+      await _pump(tester, active: _seedTopLevel(promo: promo));
+      // CachedNetworkImage's network fetch fails in tests → errorWidget
+      // (PromoImagePlaceholder) renders. The golden captures that
+      // already-realistic dev-time state.
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(MegaMenuPanel),
+        matchesGoldenFile('goldens/mega_menu_panel_3plus1_1440_light.png'),
+      );
+    });
+
+    testWidgets('PromoImagePlaceholder standalone at 1440 light',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(400, 300));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 320, height: 180,
+                child: PromoImagePlaceholder(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await expectLater(
+        find.byType(PromoImagePlaceholder),
+        matchesGoldenFile('goldens/promo_image_placeholder_1440_light.png'),
+      );
+    });
+  });
 }
