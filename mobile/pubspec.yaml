@@ -50,3 +50,7 @@ flutter:
     - assets/translations/
     - assets/data/
     - assets/images/
+    # Bundled Inter static weights so google_fonts resolves Inter from assets
+    # (allowRuntimeFetching=false) instead of fetching at runtime — deterministic
+    # text rendering for goldens on every platform, and no runtime font fetch.
+    - assets/google_fonts/
