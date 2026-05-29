@@ -29,5 +29,9 @@
     "menu_login_prompt": "سجّل الدخول إلى حسابك",
     "menu_register": "إنشاء حساب",
     "menu_help": "المساعدة"
+  },
+  "mega_menu": {
+    "see_all": "عرض الكل",
+    "empty_children": "لا توجد فئات فرعية في هذا القسم."
   }
 }

@@ -112,6 +112,10 @@
     "clear_recent": "Temizle",
     "suggested_categories": "Kategoriler"
   },
+  "mega_menu": {
+    "see_all": "Tümünü gör",
+    "empty_children": "Bu kategoride alt kategori bulunmuyor."
+  },
   "empty_state": {
     "empty_message": "Henüz içerik yok",
     "error_message": "Bir hata oluştu. Lütfen tekrar deneyin.",
