@@ -1,10 +1,10 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/design/widgets/responsive_network_image.dart';
 import 'package:mopro/features/catalog/providers/category_tree_provider.dart';
 import 'package:mopro/features/web/mega_menu/mega_menu_focus_ring.dart';
 import 'package:mopro/features/web/mega_menu/promo_image_placeholder.dart';
@@ -413,9 +413,8 @@ class _PromoColumnState extends State<_PromoColumn> {
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: cs.outlineVariant),
                           ),
-                          child: CachedNetworkImage(
+                          child: ResponsiveNetworkImage(
                             imageUrl: widget.promo.imageUrl,
-                            fit: BoxFit.cover,
                             placeholder: (_, __) =>
                                 Container(color: cs.surfaceContainerHighest),
                             errorWidget: (_, __, ___) =>

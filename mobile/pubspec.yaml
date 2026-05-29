@@ -10,6 +10,9 @@ environment:
 dependencies:
   cached_network_image: ^3.4.1
   carousel_slider: ^5.0.0
+  # clock: testable "now" so the flash-deals countdown is deterministic in
+  # goldens/tests (withClock). Already in the dep tree transitively.
+  clock: ^1.1.1
   dio: ^5.7.0
   easy_localization: ^3.0.7
   fl_chart: ^0.69.0

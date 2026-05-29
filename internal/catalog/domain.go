@@ -8,6 +8,38 @@ type VariantStock struct {
 	Stock     int
 }
 
+// FlashDealsCollectionRow is a flash-deals collection's metadata + its item
+// references (product id + flash price), as stored. The service hydrates the
+// products via ListProductsByIDs.
+type FlashDealsCollectionRow struct {
+	ID     int64
+	Title  string
+	EndsAt time.Time
+	Items  []FlashDealItemRow
+}
+
+// FlashDealItemRow links a product to a collection at a flash price.
+type FlashDealItemRow struct {
+	ProductID       int64
+	FlashPriceMinor int64
+	SortOrder       int
+}
+
+// FlashDealsResult is the assembled flash-deals collection returned by the
+// service: metadata + hydrated product summaries, each carrying its flash price.
+type FlashDealsResult struct {
+	ID       int64
+	Title    string
+	EndsAt   time.Time
+	Products []FlashDealProduct
+}
+
+// FlashDealProduct is a product summary plus its flash price within a collection.
+type FlashDealProduct struct {
+	Summary         ProductSummaryRow
+	FlashPriceMinor int64
+}
+
 // Product is the aggregate root for a seller listing.
 type Product struct {
 	ID              int64     `json:"id"`

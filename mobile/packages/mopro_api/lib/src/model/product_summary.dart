@@ -45,6 +45,8 @@ class ProductSummary {
 
      this.ratingCount = 0,
 
+     this.flashPriceMinor,
+
     required  this.cashbackPreview,
   });
 
@@ -211,6 +213,19 @@ class ProductSummary {
 
 
 
+      /// Flash-deal price in minor units; set only for products served by the /home/flash-deals rail. When present, render this as the price and price_minor as the strikethrough original. 
+  @JsonKey(
+    
+    name: r'flash_price_minor',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final int? flashPriceMinor;
+
+
+
   @JsonKey(
     
     name: r'cashback_preview',
@@ -240,6 +255,7 @@ class ProductSummary {
       other.discountPct == discountPct &&
       other.ratingAvg == ratingAvg &&
       other.ratingCount == ratingCount &&
+      other.flashPriceMinor == flashPriceMinor &&
       other.cashbackPreview == cashbackPreview;
 
     @override
@@ -257,6 +273,7 @@ class ProductSummary {
         discountPct.hashCode +
         ratingAvg.hashCode +
         ratingCount.hashCode +
+        flashPriceMinor.hashCode +
         cashbackPreview.hashCode;
 
   factory ProductSummary.fromJson(Map<String, dynamic> json) => _$ProductSummaryFromJson(json);

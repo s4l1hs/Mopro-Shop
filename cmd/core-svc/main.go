@@ -413,6 +413,9 @@ func main() {
 	mux.Handle("GET /home/stories",
 		httpTrace(http.HandlerFunc(handleHomeMoodStories(catalogSvc, defaultLocale))),
 	)
+	mux.Handle("GET /home/flash-deals",
+		httpTrace(http.HandlerFunc(handleHomeFlashDeals(catalogSvc, defaultLocale, cashbackCurrency))),
+	)
 	mux.Handle("POST /products/batch",
 		httpTrace(http.HandlerFunc(handleProductsBatch(catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)

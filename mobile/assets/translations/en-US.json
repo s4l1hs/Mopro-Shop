@@ -58,7 +58,8 @@
     "trust_free_shipping": "Free Shipping",
     "trust_secure_payment": "Secure Payment",
     "trust_easy_return": "Easy Returns",
-    "trust_perpetual_cashback": "Perpetual Cashback"
+    "trust_perpetual_cashback": "Perpetual Cashback",
+    "flash_deals_ended": "Deal ended"
   },
   "catalog": {
     "categories": "Categories",
@@ -342,5 +343,12 @@
     "not_found_title": "We couldn't find that page",
     "not_found_subtitle": "The page may have been removed, moved, or never existed.",
     "not_found_cta": "Back to home"
+  },
+  "footer": {
+    "about": "About",
+    "help": "Help",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "language": "Language"
   }
 }

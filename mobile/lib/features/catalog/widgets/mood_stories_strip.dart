@@ -1,8 +1,8 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/design/widgets/responsive_network_image.dart';
 import 'package:mopro/features/catalog/providers/home_provider.dart';
 
 /// Horizontally-scrolled strip of circular mood tiles for the home screen.
@@ -65,9 +65,8 @@ class _MoodTile extends StatelessWidget {
                 ),
               ),
               child: ClipOval(
-                child: CachedNetworkImage(
+                child: ResponsiveNetworkImage(
                   imageUrl: story.imageUrl,
-                  fit: BoxFit.cover,
                   placeholder: (_, __) => const ColoredBox(
                     color: Color(0xFFEEEEEE),
                   ),

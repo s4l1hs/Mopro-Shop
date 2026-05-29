@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/features/catalog/providers/categories_provider.dart';
@@ -30,6 +31,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(searchProvider);
     final recent = ref.watch(recentSearchesProvider);
+
+    // Reflect the search query in the browser tab title (§3.7).
+    final query = _searchController.text.trim();
+    SystemChrome.setApplicationSwitcherDescription(
+      ApplicationSwitcherDescription(
+        label: query.isEmpty ? 'Mopro · Arama' : 'Mopro · "$query" araması',
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(

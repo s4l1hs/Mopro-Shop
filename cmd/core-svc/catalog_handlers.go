@@ -240,50 +240,54 @@ type productSummaryJSON struct {
 	RatingAvg          *float64 `json:"rating_avg,omitempty"`
 	RatingCount        int      `json:"rating_count"`
 
+	// FlashPriceMinor is set only for flash-deals rail products; the original
+	// price comes from PriceMinor (rendered with strikethrough on the UI).
+	FlashPriceMinor *int64 `json:"flash_price_minor,omitempty"`
+
 	CashbackPreview cashbackPreviewJSON `json:"cashback_preview"`
+}
+
+// buildProductSummaryJSON maps one row to the wire DTO (cashback preview +
+// discount %). Shared by the list response and the flash-deals endpoint.
+func buildProductSummaryJSON(r catalog.ProductSummaryRow, cashbackCurrency string) productSummaryJSON {
+	commMinor := r.PriceMinor * int64(r.CommissionPctBps) / 10000
+	yearlyYield := commMinor * referenceInterestRateBps / 10000
+	monthlyMinor := yearlyYield / 12
+	var discountPct *int
+	if r.OriginalPriceMinor != nil && *r.OriginalPriceMinor > r.PriceMinor && *r.OriginalPriceMinor > 0 {
+		pct := int(((*r.OriginalPriceMinor - r.PriceMinor) * 100) / *r.OriginalPriceMinor)
+		if pct > 0 {
+			discountPct = &pct
+		}
+	}
+	return productSummaryJSON{
+		ID:                 r.ID,
+		SellerID:           r.SellerID,
+		CategoryID:         r.CategoryID,
+		Brand:              r.Brand,
+		Status:             r.Status,
+		Title:              r.Title,
+		PriceMinor:         r.PriceMinor,
+		PriceCurrency:      r.PriceCurrency,
+		CoverImageURL:      mediaurl.CDNUrl(r.CoverImageKey),
+		CommissionPctBps:   r.CommissionPctBps,
+		OriginalPriceMinor: r.OriginalPriceMinor,
+		DiscountPct:        discountPct,
+		RatingAvg:          r.RatingAvg,
+		RatingCount:        r.RatingCount,
+		CashbackPreview: cashbackPreviewJSON{
+			MonthlyAmountMinor: monthlyMinor,
+			Currency:           cashbackCurrency,
+			ReferenceRateBps:   referenceInterestRateBps,
+			CommissionPctBps:   r.CommissionPctBps,
+		},
+	}
 }
 
 func buildProductListResponse(rows []catalog.ProductSummaryRow, total, page, perPage int, cashbackCurrency string) map[string]any {
 	out := make([]productSummaryJSON, len(rows))
 	for i, r := range rows {
-		commMinor := r.PriceMinor * int64(r.CommissionPctBps) / 10000
-		yearlyYield := commMinor * referenceInterestRateBps / 10000
-		monthlyMinor := yearlyYield / 12
-		// Compute discount % when a usable original price is present.
-		var discountPct *int
-		if r.OriginalPriceMinor != nil && *r.OriginalPriceMinor > r.PriceMinor && *r.OriginalPriceMinor > 0 {
-			pct := int(((*r.OriginalPriceMinor - r.PriceMinor) * 100) / *r.OriginalPriceMinor)
-			if pct > 0 {
-				discountPct = &pct
-			}
-		}
-		out[i] = productSummaryJSON{
-			ID:                 r.ID,
-			SellerID:           r.SellerID,
-			CategoryID:         r.CategoryID,
-			Brand:              r.Brand,
-			Status:             r.Status,
-			Title:              r.Title,
-			PriceMinor:         r.PriceMinor,
-			PriceCurrency:      r.PriceCurrency,
-			CoverImageURL:      mediaurl.CDNUrl(r.CoverImageKey),
-			CommissionPctBps:   r.CommissionPctBps,
-			OriginalPriceMinor: r.OriginalPriceMinor,
-			DiscountPct:        discountPct,
-			RatingAvg:          r.RatingAvg,
-			RatingCount:        r.RatingCount,
-
-			CashbackPreview: cashbackPreviewJSON{
-
-				MonthlyAmountMinor: monthlyMinor,
-
-				Currency: cashbackCurrency,
-
-				ReferenceRateBps: referenceInterestRateBps,
-
-				CommissionPctBps: r.CommissionPctBps,
-			},
-		}
+		out[i] = buildProductSummaryJSON(r, cashbackCurrency)
 	}
 	totalPages := 0
 	if perPage > 0 && total > 0 {
