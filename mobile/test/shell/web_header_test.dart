@@ -94,7 +94,7 @@ void main() {
   group('WebHeader — structure', () {
     testWidgets('renders logo, search pill, icon row', (tester) async {
       await _pump(tester);
-      // Logo icon — MoproLogo renders an Image; search pill exposes search icon.
+      // Logo: MoproLogo renders an Image; search pill exposes search icon.
       expect(find.byIcon(Icons.search), findsOneWidget);
       // Two action icons (favorites + cart) when both have zero counts.
       expect(find.byIcon(Icons.favorite_border_rounded), findsOneWidget);
@@ -150,20 +150,6 @@ void main() {
   });
 
   group('WebHeader — navigation', () {
-    testWidgets('login pill routes to /auth/login', (tester) async {
-      await _pump(tester);
-      await tester.tap(find.text('Giriş Yap'));
-      await tester.pumpAndSettle();
-      expect(find.text('LOGIN_PAGE'), findsOneWidget);
-    });
-
-    testWidgets('avatar (authed) routes to /account', (tester) async {
-      await _pump(tester, authState: const AuthAuthenticated());
-      await tester.tap(find.text('M'));
-      await tester.pumpAndSettle();
-      expect(find.text('ACCOUNT_PAGE'), findsOneWidget);
-    });
-
     testWidgets('cart icon routes to /cart', (tester) async {
       await _pump(tester);
       await tester.tap(find.byIcon(Icons.shopping_bag_outlined));
@@ -178,13 +164,13 @@ void main() {
       expect(find.text('FAV_PAGE'), findsOneWidget);
     });
 
-    testWidgets('search pill routes to /search', (tester) async {
-      await _pump(tester);
-      // The HeaderSearchBar exposes a tap area that calls onTap → /search.
-      await tester.tap(find.byIcon(Icons.search));
-      await tester.pumpAndSettle();
-      expect(find.text('SEARCH_PAGE'), findsOneWidget);
-    });
+    // Note: in Session 4a the login pill and account avatar no longer
+    // navigate on tap — they toggle the AccountHoverMenu instead.
+    // Navigation is exercised by `account_hover_menu_test.dart`.
+    //
+    // The search pill is now a real TextField; submitting routes to
+    // `/search?q=<query>`. That flow is exercised by
+    // `web_search_pill_test.dart`.
   });
 
   group('WebHeader — goldens', () {
@@ -197,7 +183,7 @@ void main() {
     });
 
     testWidgets('1440 light', (tester) async {
-      await _pump(tester, size: const Size(1440, 800));
+      await _pump(tester);
       await expectLater(
         find.byType(WebHeader),
         matchesGoldenFile('goldens/web_header_1440_light.png'),
@@ -205,7 +191,7 @@ void main() {
     });
 
     testWidgets('1440 dark', (tester) async {
-      await _pump(tester, brightness: Brightness.dark, size: const Size(1440, 800));
+      await _pump(tester, brightness: Brightness.dark);
       await expectLater(
         find.byType(WebHeader),
         matchesGoldenFile('goldens/web_header_1440_dark.png'),

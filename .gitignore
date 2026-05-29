@@ -59,3 +59,6 @@ load-tests/reports/*.json
 load-tests/reports/*.md
 !load-tests/reports/README.md
 !load-tests/reports/.gitkeep
+
+# Flutter golden test failure captures (transient)
+**/test/**/failures/

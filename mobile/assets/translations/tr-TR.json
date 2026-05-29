@@ -108,6 +108,7 @@
   "search": {
     "hint": "Ürün, marka veya kategori ara...",
     "recent_searches": "Son Aramalar",
+    "trending": "Popüler Aramalar",
     "clear_recent": "Temizle",
     "suggested_categories": "Kategoriler"
   },
@@ -138,7 +139,10 @@
     "active_orders": "Aktif Sipariş",
     "coin_balance": "Mopro Coin",
     "active_plans": "Aktif Plan",
-    "saved_cards": "Kayıtlı Kartlarım"
+    "saved_cards": "Kayıtlı Kartlarım",
+    "menu_login_prompt": "Hesabınıza giriş yapın",
+    "menu_register": "Üye Ol",
+    "menu_help": "Yardım"
   },
   "address": {
     "list_title": "Adreslerim",

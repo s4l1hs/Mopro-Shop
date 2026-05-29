@@ -498,3 +498,94 @@ The primitives landed here unblock the rest of §3–§14 without further plumbi
 
 (Full-suite numbers reported at the end of the §11 verification gate, which runs after this REPORT entry is committed.)
 
+---
+
+# Session 4a — WebHeader Search Dropdown + Account Hover Menu
+
+**Branch:** `feat/web-header-search-and-account-menu` (off main, post-PR-#3 + PR-#4 merges)
+**Scope chosen by user:** §3 only from the Session 4 prompt — search suggestions dropdown + account hover menu. §4 (mega menu), §5 (adaptive home), §6 (URL-encoded PLP filters) explicitly deferred to Session 4b/5 because the full prompt was scoped at ~30-40h of work for one PR.
+
+## §2 status — already done in PR #4
+
+The prompt's §2 ("Resolve the `make api-gen-dart` toolchain") was the focus of the previous turn. PR #4 (`chore/api-gen-toolchain`) shipped: SDK floor → `>=3.8.0` (root cause was `null-aware-elements` enabled in Dart **3.8**, verified against `_fe_analyzer_shared::flags.dart::nullAwareElements::experimentEnabledVersion: Version(3, 8)`); `json_annotation: ^4.12.0`; `pubspec.yaml` in `.openapi-generator-ignore` so the pin survives future regens; removed broken `default: login` enum specs; 43 files regenerated including `ChangePasswordRequest` DTO and natively-typed `ProductSummary` fields.
+
+Verified on main: PR #3 at `59e1904e`, PR #4 at `6ccf3435`. `api-check-sync` green on main; no DTO drift to backfill in this PR.
+
+## Baseline vs. final
+
+| Metric | Baseline (pre-§3) | Final (post-§3) | Delta |
+|---|---|---|---|
+| `flutter analyze` total issues | 130 (13 warnings, 117 info) | 126 (13 warnings, 113 info) | **-4** |
+| `flutter analyze` errors in new code | 0 | 0 | — |
+| `flutter test` totals | 263 / 263 green | 277 / 277 green | **+14 new tests** |
+| `flutter build web --release` | succeeds | succeeds | — |
+| `build/web/main.dart.js` size | 4,376,852 bytes (4.18 MB) | 4,391,480 bytes (4.19 MB) | **+14,628 bytes (+0.33%)** — well under 15% budget |
+| Existing mobile goldens | (unchanged) | (unchanged) | no `.png` diffs outside the WebHeader trio that visually changed |
+
+## Shipped this turn
+
+| Item | Files | Tests added | Breakpoints |
+|---|---|---|---|
+| `SearchSuggestionsDropdown` — pure UI, 3 sections (recent / trending / categories), empty-section collapse, trending skeleton loading state | `mobile/lib/shell/search_suggestions_dropdown.dart` (new) | 8 widget tests + 1 golden | tablet + desktop (≥600) |
+| `WebSearchPill` — real `TextField` + `FocusNode`, `OverlayPortal`-hosted dropdown anchored via `CompositedTransformFollower`, outside-click + Escape dismiss, `onSubmitted` → `/search?q=<encoded>` + writes to `recentSearchesProvider` | `mobile/lib/shell/web_search_pill.dart` (new) | exercised via WebHeader tests | tablet + desktop |
+| `AccountHoverMenu` — 80ms open / 150ms close, separate `MouseRegion` listeners on trigger + panel so cursor moving from trigger to panel keeps it open, click-to-toggle for touch, Escape closes, guest variant (login/register CTAs + soft-gated rows) and authed variant (header + 6 nav rows + logout) | `mobile/lib/shell/account_hover_menu.dart` (new) | 9 widget tests + 2 goldens | tablet + desktop |
+| `WebHeader` wiring | `mobile/lib/shell/web_header.dart` (edit) | 3 nav tests removed (replaced by widget-specific tests); 3 goldens regenerated | tablet + desktop |
+| i18n: `search.trending`, `account.menu_login_prompt`, `account.menu_register`, `account.menu_help` added to all 4 locales; ar-AE + de-DE files expanded from `errors`-only stubs to include the `search`/`nav`/`auth`/`account` keys this turn uses | `mobile/assets/translations/*.json` | — | — |
+
+## Architecture notes worth remembering
+
+- **`OverlayPortal` + `CompositedTransformFollower` pattern** — used by both the dropdown and the hover menu. The trigger wraps itself in `CompositedTransformTarget(link: LayerLink)`; the overlay child uses `CompositedTransformFollower` with `offset: Offset(0, anchorHeight + breathingRoom)` and `Positioned(width: anchorWidth)` to render directly beneath the anchor. Outside-click dismiss via a full-viewport `Positioned.fill(GestureDetector(behavior: HitTestBehavior.translucent, onTap: dismiss))` *below* the panel in the stack. The MegaMenuBar in §4 and Session 5's PLP sidebar should reuse this primitive.
+- **Hover state shared across trigger + panel** — `AccountHoverMenu` doesn't reuse `HoverRegion` because `OverlayPortal`'s overlay child is reparented to the root `Overlay`, so a single trigger-side `MouseRegion` wouldn't catch enter/exit on the panel. Instead, two `MouseRegion` widgets (trigger + panel) update separate `_hoveringTrigger`/`_hoveringPanel` fields; the menu stays visible while EITHER is true. Open/close timers debounced per the spec's 80ms / 150ms.
+- **Click on trigger toggles, doesn't navigate** — deliberate UX change from PR #3's "tap pill → push `/auth/login`". Navigation lives inside the menu rows. The trigger is purely a menu opener (works for both mouse and touch). The 3 removed WebHeader nav tests are replaced by `account_hover_menu_test.dart`; the new contract is documented in a comment in the navigation test group so future maintainers don't restore the old tests.
+- **Auto-focus the trigger on click-open** — `_toggle()` calls `_focusNode.requestFocus()` when opening so the `Shortcuts` widget's Escape binding is in scope. Without this, clicking opens the menu but Escape goes to the body and doesn't dismiss. (Required for the Escape-closes test to pass.)
+- **`_asSnapshot` adapter** — `WebSearchPill` converts Riverpod's `AsyncValue<List<String>>` into Flutter's `AsyncSnapshot<List<String>>` before handing it to `SearchSuggestionsDropdown`. Keeps the dropdown framework-agnostic (no Riverpod dependency in the presentational layer); reusable in any Flutter context.
+
+## WebHeader visuals — what changed
+
+Three goldens regenerated (`web_header_1024_light.png`, `web_header_1440_light.png`, `web_header_1440_dark.png`). Visual differences from PR #3:
+- Search pill is now a `TextField` with a hint string and a cursor caret instead of a static placeholder.
+- Login pill / account avatar are no longer wrapped in `InkResponse` chrome — they're pure visual triggers; hover/click logic is on the outer `AccountHoverMenu`.
+
+Mobile (`<600`) goldens (bottom-nav) completely unaffected — mobile uses `_MobileShell` which doesn't include `WebHeader`. Confirmed via `git status`: no `.png` diffs under `mobile/test/shell/goldens/bottom_nav_*`.
+
+## Deferred (carried to Session 4b / Session 5)
+
+| Section | Item | Why deferred | Suggested landing |
+|---|---|---|---|
+| §3.2 | Full Tab + arrow-key nav inside `AccountHoverMenu` | Out of approved scope; basic `FocusTraversalGroup` is in place and Tab traversal works, but per-arrow-key handling needs explicit `Shortcuts`/`Actions` mapping per row | Session 4b §3-followup |
+| §3.2 | Render user name + email in the authed account menu header | No `currentUserProvider` exists yet; PR #3 didn't add a `GET /me` provider. Placeholder "Hesabım" label rendered instead | Session 4b — add `currentUserProvider` calling `MeApi.getMe()` |
+| §3.1 | Live-as-you-type suggestion fetch (debounce → server completion API) | No `/search/suggestions?prefix=...` endpoint exists; current dropdown uses static recent/trending/categories. Submit-on-Enter works. | Session 5 — backend `GET /search/suggestions?q=` + provider |
+| §3.3 | Tablet 56dp vs desktop 64dp WebHeader height split | Cosmetic; 64 everywhere ≥600 works | Session 4b §3-followup |
+| §4 | MegaMenuBar + MegaMenuPanel + categories depth=3 + promo slot + migration 0067 | Requires backend coordination (depth param, JSONB column, migration, two DTO regen cycles) | Session 4b |
+| §5 | Adaptive Home composition (grid rails, banner mode switch, two-column sub-section, footer, server-driven layout hint) | Large composition + backend `/home/rails?layout=desktop` extension | Session 4b or 5 |
+| §6 | URL-encoded PLP filters + `PlpFilters` codec + browser back/forward tests | Bounded but not in approved Session 4a subset | Session 5 |
+| §6 | Path URL strategy + branded 404 + per-tab titles | **Already shipped in PR #3** (Session 3 §12) — `usePathUrlStrategy()` in main.dart, `NotFoundScreen` wired to `errorBuilder`, all 5 tab branches wrapped in `Title()` | Session 5 (only §6.2-3 remains) |
+| §13.4 | FlashDealsRail + countdown | Out of approved scope | Session 5 |
+| §13.5 | Reviews helpful-vote + sort + pagination | Out of approved scope | Session 5 |
+
+## Drive-by fixes
+
+- `mobile/test/shell/web_header_test.dart` — removed 3 redundant args (`size: const Size(1440, 800)` matching default) and 1 over-80 line that pre-existed from PR #3. Net: `flutter analyze` dropped 130 → 126.
+- `mobile/assets/translations/ar-AE.json` + `de-DE.json` expanded from `errors`-only stubs (6 lines each) into full namespaces matching the keys this turn uses. easy_localization fallback was masking the gap; durable hygiene for §10's "all 4 locales" requirement, unblocks future AR / DE locale screenshots.
+
+## Session 4b / Session 5 prerequisites established this turn
+
+- **`OverlayPortal` + `CompositedTransformFollower` anchored-overlay pattern** is now used twice. MegaMenuBar in §4 should reuse it; the hover-state-across-trigger-and-panel pattern (two `MouseRegion` widgets + debounced timers) is also reusable.
+- **`recentSearchesProvider`** is now mutated from the WebHeader as well as the existing search screen; both write-sites preserve the 5-item cap and de-dupe on insertion.
+- **i18n base for `account.*` + `search.*`** now exists in all 4 locales — Session 4b's mega menu category names will need a similar fan-out.
+
+## Risk notes
+
+- **Hover-only behavior on iPad Safari (touch web)** — click-to-toggle fallback covers this. Verified by widget test (`opens on click`); real-device test on iPad Safari should be part of Session 4b's QA pass.
+- **`OverlayPortal` positioning during viewport resize** — `CompositedTransformFollower` re-positions automatically when the anchor moves. Verified at 1024 and 1440 via goldens; mid-resize behavior (browser drag) not exercised by tests but expected to work per Flutter's overlay rebuild semantics.
+- **`_asSnapshot` adapter loses Riverpod error context** — if `trendingSearchesProvider` errors, the dropdown sees `ConnectionState.done` with empty data and hides the trending section silently. This is the intended graceful-degradation per spec ("hide the section header entirely if the section is empty") but means an upstream error is invisible to the user. Telemetry should fire from the provider itself, not the UI.
+
+## Verification
+
+- `go test ./...` — n/a this turn (no backend changes)
+- `flutter analyze` — 126 issues (was 130, -4), 0 errors, 0 new warnings, 0 lints in files I created
+- `flutter test` — **277/277 green** (was 263, +14: 8 dropdown, 9 hover menu; structure/badge tests preserved minus 3 nav tests removed by spec change)
+- `flutter test integration_test` — not run this turn (no integration coverage added for §3; deferred to Session 4b which has the multi-screen flows)
+- `flutter build web --release` — succeeds, `main.dart.js` = 4,391,480 bytes (+0.33% vs baseline)
+- Existing mobile goldens — unchanged (`git status` shows no diffs under `test/shell/goldens/bottom_nav_*`, `test/features/*/goldens/*`)
+- `api-check-sync` — n/a this turn (no spec changes); was green on main as of `6ccf3435`

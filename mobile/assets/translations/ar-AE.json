@@ -3,5 +3,31 @@
     "not_found_title": "لم نتمكن من العثور على الصفحة",
     "not_found_subtitle": "قد تكون الصفحة محذوفة أو منقولة أو غير موجودة.",
     "not_found_cta": "العودة إلى الصفحة الرئيسية"
+  },
+  "search": {
+    "hint": "ابحث عن المنتجات أو العلامات التجارية أو الفئات...",
+    "recent_searches": "عمليات البحث الأخيرة",
+    "trending": "الأكثر بحثًا",
+    "clear_recent": "مسح",
+    "suggested_categories": "الفئات"
+  },
+  "nav": {
+    "favorites": "المفضلة"
+  },
+  "auth": {
+    "login_title": "تسجيل الدخول"
+  },
+  "account": {
+    "title": "حسابي",
+    "orders": "طلباتي",
+    "wallet": "محفظتي",
+    "profile": "الملف الشخصي",
+    "addresses": "عناويني",
+    "cards": "بطاقاتي",
+    "security": "الأمان",
+    "logout": "تسجيل الخروج",
+    "menu_login_prompt": "سجّل الدخول إلى حسابك",
+    "menu_register": "إنشاء حساب",
+    "menu_help": "المساعدة"
   }
 }
