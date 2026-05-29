@@ -12,10 +12,33 @@
 ```bash
 cp .env.example .env.local
 chmod 600 .env.local
-./scripts/install-hooks.sh   # installs pre-commit lint + boundary checks
+make hooks                   # points core.hooksPath at .githooks/
 go mod download
 make verify
 ```
+
+### Git hooks (`.githooks/`)
+
+`make hooks` runs `tool/setup-hooks.sh`, which sets `core.hooksPath = .githooks`
+and makes the hook scripts executable. After this, three hooks are active:
+
+- **`pre-commit`** — refuses commits when `HEAD` is `main`/`master` (added after
+  the Session 4a turn produced an orphan commit on local `main`), then runs the
+  api-gen sync check (fails if `api/openapi.yaml` is staged but the generated
+  Go + Dart files aren't).
+- **`prepare-commit-msg`** — same protected-branch guard, fired earlier so
+  editors that bypass `pre-commit` still surface the error.
+- **`pre-push`** — runs `make verify` (gofmt + vet + race tests + golangci-lint
+  + module boundary checks + property tests). Skips can be bypassed with
+  `git push --no-verify` for emergencies only.
+
+The legacy `scripts/install-hooks.sh` writes to `.git/hooks/`, which `git`
+ignores once `core.hooksPath` is set. The `.githooks/pre-push` above preserves
+its behavior; no need to run both.
+
+CI safety net: `.github/workflows/branch-guard.yml` refuses any PR whose source
+branch is `main` or `master` — protects against the same foot-gun at the
+remote layer.
 
 ## Core rules
 

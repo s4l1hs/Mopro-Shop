@@ -24,6 +24,11 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
 # verify chains all static checks; must pass before every push.
 verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order
 
+# Wire `.githooks/` into this clone (run once per machine, or after pulling
+# a new hook). Refuses commits on main/master and runs the api-gen sync check.
+hooks:
+	@sh tool/setup-hooks.sh
+
 fmt:
 	gofmt -l . | tee /tmp/gofmt.out
 	test ! -s /tmp/gofmt.out

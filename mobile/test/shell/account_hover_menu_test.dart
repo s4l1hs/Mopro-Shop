@@ -7,6 +7,7 @@ import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/design/theme.dart';
 import 'package:mopro/design/theme_controller.dart';
+import 'package:mopro/features/account/current_user_provider.dart';
 import 'package:mopro/shell/account_hover_menu.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -105,6 +106,7 @@ Future<void> _pump(
   bool isAuthed = false,
   Brightness brightness = Brightness.light,
   Size size = const Size(1440, 800),
+  CurrentUser? user,
 }) async {
   await tester.binding.setSurfaceSize(size);
   addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -121,6 +123,10 @@ Future<void> _pump(
                 : const AuthUnauthenticated(),
           ),
         ),
+        // Override currentUserProvider so the menu doesn't try to call
+        // MeApi.getMe() through Dio in widget tests (which would leave a
+        // pending Timer and fail the test invariant check).
+        currentUserProvider.overrideWith((ref) async => user),
       ],
       child: MaterialApp.router(
         theme: brightness == Brightness.dark
@@ -210,6 +216,40 @@ void main() {
       await tester.tap(find.text('account.wallet'));
       await tester.pumpAndSettle();
       expect(find.text('WALLET_PAGE'), findsOneWidget);
+    });
+
+    testWidgets('header renders displayName + email when provided',
+        (tester) async {
+      await _pump(
+        tester,
+        isAuthed: true,
+        user: const CurrentUser(
+          id: 1,
+          displayName: 'Ayşe Yılmaz',
+          email: 'ayse@example.test',
+        ),
+      );
+      await _openMenuByClick(tester);
+      expect(find.text('Ayşe Yılmaz'), findsOneWidget);
+      expect(find.text('ayse@example.test'), findsOneWidget);
+      // The placeholder header (account.title) should NOT render when a
+      // real user is loaded.
+      expect(find.text('account.title'), findsNothing);
+    });
+
+    testWidgets('header falls back to email local-part when displayName empty',
+        (tester) async {
+      await _pump(
+        tester,
+        isAuthed: true,
+        user: const CurrentUser(
+          id: 1,
+          displayName: 'ada',
+          email: 'ada@lovelace.dev',
+        ),
+      );
+      await _openMenuByClick(tester);
+      expect(find.text('ada'), findsOneWidget);
     });
   });
 

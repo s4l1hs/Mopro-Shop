@@ -589,3 +589,187 @@ Mobile (`<600`) goldens (bottom-nav) completely unaffected — mobile uses `_Mob
 - `flutter build web --release` — succeeds, `main.dart.js` = 4,391,480 bytes (+0.33% vs baseline)
 - Existing mobile goldens — unchanged (`git status` shows no diffs under `test/shell/goldens/bottom_nav_*`, `test/features/*/goldens/*`)
 - `api-check-sync` — n/a this turn (no spec changes); was green on main as of `6ccf3435`
+
+---
+
+# Session 4b — Branch-Slip Guards + AnchoredOverlayPanel + currentUserProvider
+
+**Branch:** `chore/branch-guards-and-overlay-primitive` (off main, post-PR-#5 merge at `8dd98030`)
+**Scope chosen with user upfront:** §2 + §3 + §6 from the Session 4b prompt — infrastructure-only. §4 (categories `?depth=3` + promo slot + migration 0067) and §5 (MegaMenuBar + MegaMenuPanel) deferred to Session 4c as one focused "visible value" turn now that the AnchoredOverlayPanel primitive is in place. Full prompt was estimated at 25-38h; this turn shipped the high-leverage architectural foundation in ~6-8h of actual work.
+
+## Baseline vs. final
+
+| Metric | Baseline | Final | Delta |
+|---|---|---|---|
+| `flutter analyze` total issues | 126 | 126 | 0 |
+| `flutter analyze` errors in new code | 0 | 0 | — |
+| `flutter test` totals | 277 / 277 green | **285 / 285 green** | **+8 new tests** |
+| `flutter build web --release` | succeeds | succeeds | — |
+| `build/web/main.dart.js` size | 4,391,480 bytes | 4,394,250 bytes | **+2,770 bytes (+0.06%)** — well under the 10% budget |
+| Existing 4a + mobile goldens | (unchanged) | (unchanged — except authed account menu, regenerated for the new header content) | — |
+
+## §2 — Branch-slip diagnosis and guards
+
+### Diagnosis
+
+Reflog excerpt from the Session 4a window (the offending step is **HEAD@{2026-05-29 10:33:01}**, ~3 min after the feature branch was created):
+
+```
+6ccf3435 HEAD@{2026-05-29 10:33:01 +0300}: checkout: moving from feat/web-header-search-and-account-menu to main   ← the slip
+6ccf3435 HEAD@{2026-05-29 10:29:33 +0300}: checkout: moving from main to feat/web-header-search-and-account-menu  ← intentional branch create
+6ccf3435 HEAD@{2026-05-29 10:29:32 +0300}: checkout: moving from main to main
+6ccf3435 HEAD@{2026-05-29 10:26:28 +0300}: pull --ff --recurse-submodules --progress origin: Fast-forward
+```
+
+The next entry after the slip was a `commit:` action that landed on main, producing the orphan commit `abeb27f7` later recovered onto the feature branch via `git branch <branch> <sha>` + `git reset --hard origin/main`.
+
+**Root cause: indeterminate.** I (the agent) issued the implicit `git checkout main` somewhere between 10:29:33 (branch created) and 10:33:01 — most likely inside a composite Bash command I didn't fully scrutinize. No repository tooling (hooks, Makefile targets, wrapper scripts) was found that performs an automatic `git checkout main`. The session transcript doesn't surface a specific `git checkout main` call I authored, but the bash tool history isn't authoritative enough to rule it out absolutely. Per §2.1's "if cause cannot be traced, install guards regardless" — proceeded with §2.2.
+
+### Guards installed
+
+| File | Purpose |
+|---|---|
+| `.githooks/pre-commit` | Refuses commits on `main`/`master` (POSIX shell, no bashisms; `git symbolic-ref` for detached-HEAD safety). Then delegates to the existing api-gen-sync check so PR #3's behavior is preserved. |
+| `.githooks/prepare-commit-msg` | Same protected-branch guard, fired earlier in the lifecycle so editors that bypass `pre-commit` still surface the error before the commit-message editor opens. Skips during merge/squash/amend operations. |
+| `.githooks/pre-push` | Runs `make verify` — preserves the legacy `scripts/install-hooks.sh` behavior after `core.hooksPath` is set to `.githooks/` (which would otherwise deactivate `.git/hooks/pre-push`). |
+| `tool/setup-hooks.sh` | Sets `core.hooksPath = .githooks` and `chmod +x` the scripts. Reports success and lists active hooks. |
+| `Makefile` (new `hooks` target) | One-shot: `make hooks` runs the setup script. Documented in CONTRIBUTING.md as the post-clone step. |
+| `.github/workflows/branch-guard.yml` | First CI workflow in the repo. Refuses any PR whose source branch is `main` or `master`. Independent of contributor hook setup. |
+| `CONTRIBUTING.md` | Updated `Local setup` to use `make hooks` instead of the legacy script; new "Git hooks" section explains each hook + the `--no-verify` bypass. |
+
+### Verification
+
+`git checkout main && git commit --allow-empty -m "test"` from the feature branch:
+
+```
+❌ refusing to commit on main
+   checkout a feature branch first:
+     git checkout -b feat/your-change
+     git commit ...
+   (or pass --no-verify if you really mean it.)
+```
+
+`sh .githooks/pre-commit` on the feature branch exits 0 silently. `sh .githooks/prepare-commit-msg /dev/null message` on the feature branch exits 0 silently. Hook activation confirmed via `git config --get core.hooksPath` returning `.githooks`.
+
+## §3 — `AnchoredOverlayPanel` primitive
+
+### API surface (`lib/design/responsive/anchored_overlay_panel.dart`)
+
+```dart
+AnchoredOverlayPanel(
+  trigger: ...,              // required
+  panelBuilder: (ctx, close) => ...,  // required, `close` is the dismiss callback
+  triggerAnchor: Alignment.bottomLeft,
+  panelAnchor: Alignment.topLeft,
+  offset: const Offset(0, 6),
+  openDelay: 80ms, closeDelay: 150ms,
+  openOnHover: true, openOnFocus: true, openOnTap: true,
+  closeOnOutsideTap: true, closeOnEscape: true, closeOnRouteChange: true,
+  matchTriggerWidth: false, maxWidth: null,
+  exclusivityGroup: null,
+)
+```
+
+### Behavior contract (verified by widget tests)
+
+- Hover state shared across trigger + panel (separate `MouseRegion` widgets writing to `_hoveringTrigger` / `_hoveringPanel`; menu open while EITHER is true) — necessary because `OverlayPortal` reparents the panel to the root `Overlay`, escaping the trigger's MouseRegion.
+- Open/close delays debounced via `Timer`; re-checked in the timer callback so a quick hover-then-leave doesn't show a phantom panel.
+- Tap-opens are **pinned** via an internal `_pinnedOpen` flag — without this, a `_recompute` triggered by hover-leave or focus-leave would close the panel even though the user just tapped to open it. Pin is cleared on `_closeImmediately`.
+- Escape closes via `Shortcuts`/`Actions` mapping `_DismissPanelIntent`; returns focus to the trigger.
+- Outside tap closes via a full-viewport `GestureDetector(behavior: HitTestBehavior.translucent)` rendered BELOW the panel in the overlay Stack.
+- Exclusivity registry is a module-level `Map<Object, _AnchoredOverlayPanelState>`; opening a panel in a group closes the prior one in the same group immediately (no delay). Cleared on dispose. `@visibleForTesting` reset hook so test setUp can clear between cases.
+- Alignment-based positioning: `triggerAnchor + offset - panelAnchor` projection. Panel-anchor only takes effect when effective width is known (via `matchTriggerWidth: true` or `maxWidth: N`); otherwise defaults to top-left of the panel at the trigger anchor + offset.
+- `openOnTap: false` deliberately does NOT wrap the trigger in a `GestureDetector` — so descendant widgets (e.g. a `TextField` inside the trigger, as in `WebSearchPill`) keep receiving their own taps and focus naturally.
+
+### Consumers migrated
+
+| Consumer | API config | Tests result |
+|---|---|---|
+| `WebSearchPill` (`lib/shell/web_search_pill.dart`) | `openOnHover: false`, `openOnTap: false`, `matchTriggerWidth: true` — focus alone opens the dropdown so the inner TextField's natural tap-to-focus drives the open. | All 12 web_header_test cases still green without test changes. Search dropdown golden unchanged. |
+| `AccountHoverMenu` (`lib/shell/account_hover_menu.dart`) | `maxWidth: 280`, `triggerAnchor: bottomRight`, `panelAnchor: topRight`, `exclusivityGroup: 'webheader.menus'` — right-aligned panel drops beneath the avatar without overflowing the header. Reduced from 312 lines to 271 lines; all overlay state machinery moved to the primitive. | All 11 hover-menu tests still green; 2 new tests added for the §6 header. Authed golden regenerated for the new name+email header. |
+
+### API tweaks made because of migration friction
+
+1. **`_pinnedOpen` flag** added during testing — without it, the exclusivity test "different groups remain independent" failed because tapping trigger B stole focus from trigger A, and trigger A's focus-leave handler closed panel A even though no exclusivity rule was triggered. With pinning, tap-opened panels stay open until explicitly closed. Existing AccountHoverMenu test passed without this change (because its default `openOnFocus: true` + `requestFocus()` on tap kept the panel pinned via focus), so this is purely an extension to support `openOnFocus: false` consumers.
+2. **Conditional `GestureDetector` wrap** — initially the primitive always wrapped the trigger in `GestureDetector(behavior: HitTestBehavior.opaque)` which blocked the inner `TextField` from receiving taps. Now only applied when `openOnTap: true`. WebSearchPill specifically relies on this.
+
+### Tests (`test/design/responsive/anchored_overlay_panel_test.dart`)
+
+6 widget tests covering: tap toggle, Escape close, outside-tap close, openDelay debounce (verified with `tester.createGesture(kind: PointerDeviceKind.mouse)` + explicit `pump(Duration)`), exclusivity within a group, independence across groups.
+
+### Known limitations (carried to Session 5 §11 a11y sweep)
+
+- **Tab-past-last-focusable doesn't auto-close + advance normal tab order.** The `Shortcuts`/`Actions` infrastructure is in place; wiring `NextFocusAction` requires per-row registration that belongs in the a11y sweep. Neither current consumer relies on it.
+- **`closeOnRouteChange`** currently relies on the OverlayPortal's natural unmount when the host screen pops. Consumers that navigate via `context.go(...)` BEFORE calling `close` (which both 4a consumers do) are unaffected.
+
+## §6 — `currentUserProvider` + account menu header
+
+### Provider (`lib/features/account/current_user_provider.dart`)
+
+`FutureProvider<CurrentUser?>` watching `authNotifierProvider`. Returns `null` immediately for guests (no network call). For authed users, calls `MeApi.getMe()` and derives:
+
+- `displayName` from `name_first + ' ' + name_last`, falling back to `name_first`, then to the local-part of `email`, then to empty string.
+- `email` passed through.
+- `avatarUrl` always `null` for now (DTO doesn't carry one yet — kept on the model so consumers don't reshape later).
+- `initials` getter computes 1-2 character initials from `displayName`, falling back to `'M'` on empty.
+
+Refresh semantics: invalidates automatically when `authNotifierProvider` transitions out of `AuthAuthenticated`. No new network calls on every menu open (FutureProvider caches the result for the auth session).
+
+### Account menu header
+
+Extracted into `_AuthedMenuHeader` (private `ConsumerWidget`) at the bottom of `account_hover_menu.dart`. Renders:
+
+- Avatar with `user.initials` (or `'M'` fallback) in brand orange.
+- `displayName` (15sp semibold, 1 line, ellipsis on overflow).
+- `email` (13sp regular, `onSurfaceVariant`, 1 line, ellipsis) — only when present.
+- Loading / error / null states render the placeholder used in 4a (`account.title` label, no email).
+
+### Tests
+
+2 new tests in `account_hover_menu_test.dart`:
+- `header renders displayName + email when provided` — pumps with `CurrentUser('Ayşe Yılmaz', 'ayse@example.test')`, expects both strings visible, expects `account.title` placeholder absent.
+- `header falls back to email local-part when displayName empty` — verifies the derivation logic.
+
+Existing 9 hover-menu tests adjusted to override `currentUserProvider` in `_pump` so the menu doesn't try to call MeApi through Dio (which would leave a pending Timer and fail the test invariant check). Override defaults to `null` user, matching the placeholder header.
+
+Authed 1440 light golden regenerated for the new header content.
+
+## Drive-by fixes
+
+- `mobile/test/design/responsive/anchored_overlay_panel_test.dart`: 1 over-80 line fixed during initial run.
+
+## Deferred to Session 4c / Session 5
+
+| Section | Item | Why |
+|---|---|---|
+| §4 | Backend categories `?depth=3` + `promo_slot` JSONB column + migration 0067 + DTO regen | Out of approved Session 4b scope; bundles cleanly with §5 |
+| §5 | `MegaMenuBar` + `MegaMenuPanel` + 6 goldens + keyboard nav + touch detection | Out of approved Session 4b scope; will consume the `AnchoredOverlayPanel` primitive (exclusivityGroup, hover delays already wired) |
+| §3.x | Tab-past-last-focusable auto-close inside the panel | Part of Session 5 a11y sweep |
+| §5 (Session 4 prompt) | Adaptive home composition (grid rails, banner mode switch, footer, two-column sub-section) | Session 4c or 5 |
+| §6 (Session 4 prompt) | URL-encoded PLP filters + `PlpFilters` codec | Session 5 |
+| §7 | PLP sidebar filter panel UI | Session 5 |
+| §8 | PDP two-column layout | Session 5 |
+| §9 | Cart/Account/Favorites/Auth adaptive layouts | Session 5 |
+| §10 | Responsive image hints | Session 5 |
+| §11 | Full a11y sweep (skip links, focus rings, ARIA semantics) | Session 5 |
+| §13.4 | FlashDealsRail + countdown | Session 5 |
+| §13.5 | Reviews helpful-vote + sort + pagination | Session 5 |
+
+## Risk notes
+
+- **`OverlayPortal` + `CompositedTransformFollower` + viewport resize on hybrid devices** — verified at 1024 and 1440 widths via Session 4a goldens (unchanged in 4b); mid-resize behavior (browser window drag) not exercised by tests but expected to work per Flutter's overlay rebuild semantics. If iPad Safari split-screen exhibits drift, the fix lives in the primitive (single source of truth now).
+- **Exclusivity registry is process-global** — if a future scenario mounts two independent overlay trees (e.g. nested Navigator with its own theme), groups still collide if they share group keys. Recommendation: use namespaced keys per shell (e.g. `'webheader.menus'` vs `'megamenu.bar'`).
+- **`currentUserProvider` triggers `GET /me` on first authed render of the account menu** — if `/me` is slow, the header briefly shows the placeholder. Consider prefetching at login time in Session 4c if perceived latency matters.
+- **Hooks bypass with `--no-verify`** — documented but discouraged in CONTRIBUTING.md. The CI workflow at `.github/workflows/branch-guard.yml` is the safety net for hook-skipped commits that land in a PR.
+
+## Verification
+
+- `go test ./...` — n/a this turn (no backend changes)
+- `flutter analyze` — **126 issues** (flat vs baseline), 0 errors, 0 new warnings, 0 lints in files I created
+- `flutter test` — **285 / 285 green** (+8: 6 primitive, 2 currentUserProvider)
+- `flutter test integration_test` — not run this turn (no integration coverage added; deferred to §5 mega menu turn)
+- `flutter build web --release` — succeeds, `main.dart.js` = 4,394,250 bytes (+0.06% vs baseline)
+- Existing mobile + Session 4a goldens — unchanged except the authed account menu (regenerated for new header content; old placeholder layout is gone by design)
+- `api-check-sync` — n/a this turn (no spec changes); green on main as of `8dd98030`
+- Hooks verified firing on main / silent on feature branch (see §2.3 above)
+

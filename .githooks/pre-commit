@@ -1,6 +1,31 @@
-#!/usr/bin/env bash
-# Pre-commit: fail if api/openapi.yaml is staged but generated files are not.
-set -euo pipefail
+#!/bin/sh
+# pre-commit: refuse commits when HEAD is on a protected default branch,
+# then delegate to the project's api-gen-sync check.
+#
+# Why the protected-branch guard: the Session 4a turn had an orphan commit
+# land on local `main` because the workflow lost track of HEAD mid-session.
+# The guard makes that foot-gun noisy — you have to explicitly switch to a
+# feature branch before committing.
+#
+# Bypass (genuinely unusual cases only): `git commit --no-verify`.
+
+set -e
+
+PROTECTED="main master"
+current_branch=$(git symbolic-ref --short -q HEAD || echo "DETACHED")
+
+for protected in $PROTECTED; do
+  if [ "$current_branch" = "$protected" ]; then
+    printf '\033[0;31m❌ refusing to commit on %s\033[0m\n' "$current_branch" >&2
+    printf '   checkout a feature branch first:\n' >&2
+    printf '     git checkout -b feat/your-change\n' >&2
+    printf '     git commit ...\n' >&2
+    printf '   (or pass --no-verify if you really mean it.)\n' >&2
+    exit 1
+  fi
+done
+
+# ── api-gen sync check (existing behavior preserved) ────────────────────────
 
 SPEC_STAGED=$(git diff --cached --name-only | grep '^api/openapi.yaml' || true)
 
@@ -23,3 +48,4 @@ if [ -z "$GENERATED_STAGED" ]; then
 fi
 
 echo "[pre-commit] Generated files are staged. OK."
+exit 0
