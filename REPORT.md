@@ -1649,3 +1649,96 @@ coupon backend; AnchoredOverlayPanel sort; RadioGroup migration.
 
 Account two-pane layout; `LoginRequiredDialog` web presenter; reviews
 helpful-vote / sort / pagination; full a11y sweep beyond this turn's screens.
+
+---
+
+# Session 5c — LoginRequiredDialog web presenter, SearchScreen sidebar, URL-clear hygiene (partial)
+
+> Base: `main` @ 4a43c869 (PR #16 Session 5b merged). Branch:
+> `feat/account-login-reviews-a11y`.
+
+## Baseline (pre-flight)
+
+| Metric | Baseline |
+|---|---|
+| `flutter analyze` | 0 issues |
+| `flutter test` | 391 pass / 46 fail — **all golden platform-guard** (macOS); 0 real |
+| `flutter test integration_test` | device-only; flows run under `flutter test` in `test/integration/` |
+| `flutter build web --release` | success; `main.dart.js` = **4,531,520 B** (+10% ⇒ ~4,984,672 ceiling) |
+| `go test ./...` | 30 ok, 0 FAIL |
+| containers | not running locally |
+
+## Landed this turn (complete, green, analyze-clean)
+
+### §7.2 — `clearQueryParameters` Uri extension + CONTRIBUTING note
+`lib/core/utils/uri_ext.dart` adds `clearQueryParameters()` so the 5b filter-clear
+bug (`Uri.replace(queryParameters: null)` is a no-op) is prevented by API shape.
+`CategoryProductsScreen._writeUrl` migrated to it. Unit test asserts it clears +
+a contrast test proving the `null` form does NOT clear. `CONTRIBUTING.md` gains a
+"URL state" section.
+
+### §3 — LoginRequiredDialog web presenter
+Presenter-agnostic `LoginRequired` content (lock illustration + reason + Giriş Yap
+/ Üye Ol / Misafir CTAs; listens for auth → dismiss + `onResume`, preserving the
+Session 1 resume contract). `showLoginRequiredSheet`/`requireAuth` now adapt:
+bottom sheet `<600`, centered `AuthCard` dialog `>=600` (`showDialog` provides the
+focus trap, Escape + barrier dismiss, and focus restore — §3.4). `AuthCard`: 480dp
+clamp, surface, outlineVariant border, 12dp corners, MoproLogo top-center + child.
+Tests: sheet-vs-dialog by width; both fire `onResume` after auth; Escape + barrier
+dismiss (6 tests). AuthCard dialog goldens (1440 light/dark). Updated the existing
+`login_required_sheet_test` for the adaptive behavior + locale-key text (forced
+mobile); its sheet goldens regenerate. New `auth.*` locale keys (tr-TR + en-US).
+
+### §5 — SearchScreen sidebar
+`SearchScreen` renders a two-column layout at `>=768` reusing 5b's `FilterPanel`
+(new `showCategoryTree` flag, false here) + a non-removable query `Chip` + filter
+chips, keyed by `plpKeyForSearch(query)`. Grid 3/5-col via
+`CatalogShell.gridCrossAxisCount`. Like PLP, filters write the substrate but don't
+yet affect the search fetch (`searchProvider` ignores them) — backend search
+filtering is future work. Tests (sidebar ≥768/not below, category tree hidden,
+query chip non-removable) + golden (1440 light). **Note:** the 5a "SearchScreen
+binds plpFiltersProvider" premise was not actually wired in 5a (search used
+`searchProvider` + a local sort); this turn mounts the FilterPanel against the
+substrate, fetch-binding remains a backend follow-up.
+
+## Carried to 5c-continuation (NOT in this PR)
+
+- **§2 Account two-pane** — needs a go_router `ShellRoute` over `/account/*` so the
+  left rail persists while the right pane swaps per sub-route (deep links + browser
+  back). That's routing surgery best done as its own commit; not started here to
+  avoid destabilizing existing account navigation.
+- **§4 Reviews helpful-vote + sort + pagination** — migration `0069`, two
+  endpoints (toggle vote w/ 23505 handling, paginated list + summary), OpenAPI/DTO
+  regen, `reviewsProvider` + histogram + optimistic toggle + "Daha fazla", and
+  backend concurrent-vote tests. The largest single deliverable; carried whole.
+- **§6 Full a11y sweep** — skip-to-content link, focus-ring audit across all
+  Session 4a–5b widgets, semantic-label audit, per-route page titles,
+  contrast-check script, `A11yAuditHarness` + `screen_a11y_test`, keyboard-only
+  flow R. Carried whole.
+- Integration flows S (desktop login), T (reviews helpful), U (account two-pane),
+  R (keyboard) — depend on the carried features.
+
+## §7.1 — 1024 PLP golden
+
+Carried with §2/§4/§6 (folds into the continuation's rebaseline).
+
+## Goldens this turn
+
+New: `auth_card_dialog_{light,dark}`, `search_sidebar_1440_light`; regenerated:
+`login_required_sheet_{light,dark}` (content changed). Baselined via the
+`golden-rebaseline` workflow.
+
+## Backlog (carried)
+
+`sellerpayout_schema` split; Radio→RadioGroup migration; notifier-shapes lint;
+brand-count aggregation endpoint; CDN `?w=` re-verification; Notifications + Help
+screens (will surface as rail placeholders when §2 lands).
+
+## Risk notes
+
+- `requireAuth` resume contract: `onResume` fires via the in-content `ref.listen`
+  while the presenter is open; if the user authenticates after the presenter has
+  closed (e.g. via the pushed `/auth/login` route then back), resume does not
+  re-fire — this matches the pre-existing Session 1 behavior (not regressed).
+- SearchScreen filters are state/URL-substrate only; they visibly render but don't
+  change results until backend search filtering exists — could surprise QA.
