@@ -83,6 +83,8 @@ class AnchoredOverlayPanel extends StatefulWidget {
     this.matchTriggerWidth = false,
     this.maxWidth,
     this.exclusivityGroup,
+    this.controller,
+    this.triggerFocusSkipTraversal = false,
   });
 
   /// The visible region that controls the panel. Hovering, focusing, or tapping
@@ -124,8 +126,46 @@ class AnchoredOverlayPanel extends StatefulWidget {
   /// string constant) across siblings.
   final Object? exclusivityGroup;
 
+  /// Optional imperative handle: open/close the panel from outside the trigger
+  /// (e.g. keyboard ArrowDown opening the mega menu, or a Tab-past-last sentinel
+  /// closing it). See [AnchoredOverlayController].
+  final AnchoredOverlayController? controller;
+
+  /// When true the trigger's own focus node is skipped by Tab traversal, so a
+  /// focusable the consumer nests inside [trigger] becomes the keyboard stop
+  /// (the trigger node still reports descendant focus to drive open-on-focus).
+  /// Leave false for plain triggers that should themselves be Tab stops.
+  final bool triggerFocusSkipTraversal;
+
   @override
   State<AnchoredOverlayPanel> createState() => _AnchoredOverlayPanelState();
+}
+
+/// Imperative handle for an [AnchoredOverlayPanel]. Attach by passing the same
+/// instance to the widget's `controller`. Safe to call before/after mount —
+/// methods no-op while detached.
+class AnchoredOverlayController {
+  _AnchoredOverlayPanelState? _state;
+
+  // ignore: use_setters_to_change_properties — paired with _detach below
+  void _attach(_AnchoredOverlayPanelState state) => _state = state;
+  void _detach(_AnchoredOverlayPanelState state) {
+    if (_state == state) _state = null;
+  }
+
+  /// Whether the panel overlay is currently showing.
+  bool get isOpen => _state?._isShowing ?? false;
+
+  /// Open immediately (bypasses `openDelay`) and pin until explicitly closed.
+  void open() => _state?._openImmediate();
+
+  /// Close and return focus to the trigger.
+  void close() => _state?._dismissAndReturnFocus();
+
+  /// Close without moving focus — used by a Tab-past-last sentinel so focus can
+  /// continue onward to the next page focusable. Suppresses focus-reopen so a
+  /// transient refocus of the trigger during the handoff doesn't reopen it.
+  void closeWithoutFocus() => _state?._closeForTabPast();
 }
 
 /// Module-level registry tracking the currently-open panel per exclusivity
@@ -148,16 +188,39 @@ class _AnchoredOverlayPanelState extends State<AnchoredOverlayPanel> {
   // focus-leave would close the panel even though the user just tapped to
   // open it.
   bool _pinnedOpen = false;
+  // Set when Escape (or a panel sentinel) dismisses while the trigger keeps
+  // focus, so focus-driven reopen is suppressed until focus leaves and returns
+  // (or hover/tap/imperative-open reopens it). Without this, returning focus to
+  // the trigger after Escape would immediately reopen an openOnFocus panel.
+  bool _suppressFocusOpen = false;
   Timer? _openTimer;
   Timer? _closeTimer;
 
   bool get _shouldOpen =>
       _pinnedOpen ||
       (widget.openOnHover && (_hoveringTrigger || _hoveringPanel)) ||
-      (widget.openOnFocus && _focused);
+      (widget.openOnFocus && _focused && !_suppressFocusOpen);
+
+  bool get _isShowing => _overlayController.isShowing;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller?._attach(this);
+  }
+
+  @override
+  void didUpdateWidget(AnchoredOverlayPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?._detach(this);
+      widget.controller?._attach(this);
+    }
+  }
 
   @override
   void dispose() {
+    widget.controller?._detach(this);
     _openTimer?.cancel();
     _closeTimer?.cancel();
     _triggerFocusNode.dispose();
@@ -166,6 +229,15 @@ class _AnchoredOverlayPanelState extends State<AnchoredOverlayPanel> {
       _exclusivityRegistry.remove(group);
     }
     super.dispose();
+  }
+
+  /// Open immediately (bypasses openDelay), pinning until explicitly closed.
+  void _openImmediate() {
+    _openTimer?.cancel();
+    _closeTimer?.cancel();
+    _suppressFocusOpen = false;
+    _pinnedOpen = true;
+    _open();
   }
 
   void _open() {
@@ -191,7 +263,16 @@ class _AnchoredOverlayPanelState extends State<AnchoredOverlayPanel> {
 
   void _dismissAndReturnFocus() {
     _closeImmediately();
+    // Returning focus to the trigger must NOT reopen an openOnFocus panel.
+    _suppressFocusOpen = true;
     _triggerFocusNode.requestFocus();
+  }
+
+  /// Close for a Tab-past-last handoff: hide and suppress focus-reopen so the
+  /// brief refocus while traversal advances doesn't reopen the panel.
+  void _closeForTabPast() {
+    _suppressFocusOpen = true;
+    _closeImmediately();
   }
 
   void _recompute() {
@@ -283,6 +364,7 @@ class _AnchoredOverlayPanelState extends State<AnchoredOverlayPanel> {
             child: MouseRegion(
               onEnter: (_) {
                 _hoveringTrigger = true;
+                _suppressFocusOpen = false;
                 _recompute();
               },
               onExit: (_) {
@@ -292,8 +374,11 @@ class _AnchoredOverlayPanelState extends State<AnchoredOverlayPanel> {
               child: Focus(
                 focusNode: _triggerFocusNode,
                 canRequestFocus: true,
+                skipTraversal: widget.triggerFocusSkipTraversal,
                 onFocusChange: (f) {
                   _focused = f;
+                  // Focus left the trigger entirely → allow focus-open again.
+                  if (!f) _suppressFocusOpen = false;
                   _recompute();
                 },
                 // When openOnTap is true we intercept taps to toggle the

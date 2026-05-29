@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/design/responsive/anchored_overlay_panel.dart';
@@ -6,30 +7,31 @@ import 'package:mopro/design/responsive/pointer_kind.dart';
 import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/catalog/providers/category_tree_provider.dart';
+import 'package:mopro/features/web/mega_menu/mega_menu_focus_ring.dart';
 import 'package:mopro/features/web/mega_menu/mega_menu_panel.dart';
 
 /// Persistent top-level category bar mounted directly under the `WebHeader`
-/// at `>=768` widths. Below 768dp the bar is NOT in the widget tree — the
-/// shell decides visibility, not the bar.
+/// at `>=768` widths. Below 768dp the bar is NOT in the widget tree.
 ///
-/// Built as a consumer of `AnchoredOverlayPanel` (Session 4b): each bar item
-/// wraps in a panel that opens on hover/focus, with `exclusivityGroup:
-/// "megamenu"` so hovering from one category to the next opens the new panel
-/// and closes the old without a flash of two panels.
+/// Each bar item wraps in an `AnchoredOverlayPanel` (`exclusivityGroup:
+/// "megamenu"`) that opens on hover/focus. Tap behavior depends on the last
+/// observed pointer kind (Session 4d): pointer routes to the PLP; touch opens
+/// the panel.
 ///
-/// Tap behavior (Session 4d §4) depends on the last observed pointer kind:
+/// ## Keyboard contract (Session 4e §4.2)
 ///
-/// - **Pointer (mouse / trackpad / stylus):** label tap routes to the
-///   category PLP; hover or focus opens the panel.
-/// - **Touch:** label tap OPENS the panel; tapping the active item again
-///   closes it; routing happens only through panel content (leaves +
-///   "Tümünü gör").
+/// - **Tab / Shift+Tab** move between bar items in source order.
+/// - **Arrow Right / Left** move the active bar item; focusing it opens its
+///   panel (exclusivity closes the prior one).
+/// - **Arrow Down** opens the focused item's panel and moves focus to the first
+///   leaf of the first column.
+/// - **Enter / Space** invoke label behavior: route to the PLP on pointer-class
+///   devices, open the panel on touch-class devices.
+/// - **Escape** closes any open panel; focus stays on the bar item
+///   (handled by `AnchoredOverlayPanel`).
 ///
-/// Detection lives in `PointerKindObserver` (installed in `main.dart`);
-/// the bar reads it via `ValueListenableBuilder` so each bar item
-/// rebuilds when the kind changes (rare in practice — fires on the
-/// FIRST pointer event after install). Escape inside the panel always
-/// returns focus to the bar item regardless of pointer kind.
+/// A keyboard-only focus ring (`MegaMenuFocusRing`) wraps each item's
+/// label+chevron region.
 class MegaMenuBar extends ConsumerWidget {
   const MegaMenuBar({super.key});
 
@@ -61,9 +63,8 @@ class MegaMenuBar extends ConsumerWidget {
   }
 }
 
-/// Horizontal scroller with 24dp edge fade masks on both sides. The fades use
-/// `ShaderMask` over the scroll view; the scroll view itself uses a controller
-/// so future programmatic scroll-to-active can hook in without restructuring.
+/// Horizontal scroller with edge fade masks. Owns one [FocusNode] per bar item
+/// so Arrow Left/Right can move focus between siblings deterministically.
 class _BarScroller extends StatefulWidget {
   const _BarScroller({required this.roots});
   final List<CategoryNode> roots;
@@ -74,41 +75,80 @@ class _BarScroller extends StatefulWidget {
 
 class _BarScrollerState extends State<_BarScroller> {
   final _scrollController = ScrollController();
+  late List<FocusNode> _itemFocusNodes;
+
+  @override
+  void initState() {
+    super.initState();
+    _itemFocusNodes = _makeNodes(widget.roots.length);
+  }
+
+  @override
+  void didUpdateWidget(_BarScroller old) {
+    super.didUpdateWidget(old);
+    if (old.roots.length != widget.roots.length) {
+      for (final n in _itemFocusNodes) {
+        n.dispose();
+      }
+      _itemFocusNodes = _makeNodes(widget.roots.length);
+    }
+  }
+
+  List<FocusNode> _makeNodes(int n) => List.generate(
+        n,
+        (i) => FocusNode(debugLabel: 'megamenu-bar-item-$i'),
+      );
 
   @override
   void dispose() {
     _scrollController.dispose();
+    for (final n in _itemFocusNodes) {
+      n.dispose();
+    }
     super.dispose();
+  }
+
+  /// Move focus to the sibling at [from] + [delta], clamped to the ends.
+  void _focusSibling(int from, int delta) {
+    final next = (from + delta).clamp(0, _itemFocusNodes.length - 1);
+    if (next != from) _itemFocusNodes[next].requestFocus();
   }
 
   @override
   Widget build(BuildContext context) {
-    return ShaderMask(
-      shaderCallback: (rect) {
-        return const LinearGradient(
-          colors: [
-            Colors.transparent,
-            Colors.black,
-            Colors.black,
-            Colors.transparent,
-          ],
-          stops: [0.0, 0.025, 0.975, 1.0],
-        ).createShader(rect);
-      },
-      blendMode: BlendMode.dstIn,
-      child: ListView.separated(
-        controller: _scrollController,
-        scrollDirection: Axis.horizontal,
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        itemCount: widget.roots.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 4),
-        itemBuilder: (context, i) {
-          return _BarItem(
-            node: widget.roots[i],
-            isActive: _isActiveRoute(context, widget.roots[i]),
-          );
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      label: 'Top-level categories',
+      child: ShaderMask(
+        shaderCallback: (rect) {
+          return const LinearGradient(
+            colors: [
+              Colors.transparent,
+              Colors.black,
+              Colors.black,
+              Colors.transparent,
+            ],
+            stops: [0.0, 0.025, 0.975, 1.0],
+          ).createShader(rect);
         },
+        blendMode: BlendMode.dstIn,
+        child: ListView.separated(
+          controller: _scrollController,
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          itemCount: widget.roots.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 4),
+          itemBuilder: (context, i) {
+            return _BarItem(
+              node: widget.roots[i],
+              isActive: _isActiveRoute(context, widget.roots[i]),
+              focusNode: _itemFocusNodes[i],
+              onFocusSibling: (delta) => _focusSibling(i, delta),
+            );
+          },
+        ),
       ),
     );
   }
@@ -119,41 +159,97 @@ class _BarScrollerState extends State<_BarScroller> {
   }
 }
 
-class _BarItem extends StatelessWidget {
-  const _BarItem({required this.node, required this.isActive});
+class _BarItem extends StatefulWidget {
+  const _BarItem({
+    required this.node,
+    required this.isActive,
+    required this.focusNode,
+    required this.onFocusSibling,
+  });
   final CategoryNode node;
   final bool isActive;
+  final FocusNode focusNode;
+  final ValueChanged<int> onFocusSibling;
+
+  @override
+  State<_BarItem> createState() => _BarItemState();
+}
+
+class _BarItemState extends State<_BarItem> {
+  final _panelController = AnchoredOverlayController();
+  // Attached to the panel's first focusable; ArrowDown targets it.
+  final _panelFirstFocusNode =
+      FocusNode(debugLabel: 'megamenu-panel-first');
+  bool _ringVisible = false;
+
+  bool get _hasChildren => widget.node.children.isNotEmpty;
+
+  @override
+  void dispose() {
+    _panelFirstFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _activate() {
+    final isTouch = PointerKindObserver.lastKind.value == LastPointerKind.touch;
+    if (isTouch && _hasChildren) {
+      _panelController.open();
+    } else {
+      context.go('/categories/${widget.node.id}');
+    }
+  }
+
+  void _openAndEnterPanel() {
+    if (!_hasChildren) return;
+    _panelController.open();
+    // Let the panel mount, then move focus to its first leaf/header.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _panelFirstFocusNode.requestFocus();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final hasChildren = node.children.isNotEmpty;
-
-    // Rebuild on pointer-kind change. The decision below — whether the
-    // bar item's label tap routes (pointer) or opens the panel (touch)
-    // — is recomputed each time.
     return ValueListenableBuilder<LastPointerKind>(
       valueListenable: PointerKindObserver.lastKind,
       builder: (context, kind, _) {
         final isTouch = kind == LastPointerKind.touch;
         return AnchoredOverlayPanel(
-          openOnHover: hasChildren,
-          openOnFocus: hasChildren,
-          // Touch: AnchoredOverlayPanel handles the tap as a toggle.
-          // Pointer: trigger's own GestureDetector routes; the panel
-          // opens via hover/focus only.
-          openOnTap: isTouch && hasChildren,
+          controller: _panelController,
+          openOnHover: _hasChildren,
+          openOnFocus: _hasChildren,
+          openOnTap: isTouch && _hasChildren,
+          // The bar item's own FocusableActionDetector is the keyboard stop.
+          triggerFocusSkipTraversal: true,
           exclusivityGroup: 'megamenu',
           offset: Offset.zero,
           trigger: _BarItemTrigger(
-            node: node,
-            isActive: isActive,
-            // On touch the trigger's inner GestureDetector is dropped
-            // so the outer panel-toggle wins; on pointer it routes to
-            // the PLP and the panel stays driven by hover/focus.
+            node: widget.node,
+            isActive: widget.isActive,
             isTouch: isTouch,
+            focusNode: widget.focusNode,
+            ringVisible: _ringVisible,
+            onShowFocusHighlight: (v) {
+              if (v != _ringVisible) setState(() => _ringVisible = v);
+            },
+            onActivate: _activate,
+            onArrowDown: _openAndEnterPanel,
+            onFocusSibling: widget.onFocusSibling,
           ),
           panelBuilder: (panelContext, close) {
-            return MegaMenuPanel(active: node, onDismiss: close);
+            return MegaMenuPanel(
+              active: widget.node,
+              onDismiss: close,
+              firstFocusNode: _panelFirstFocusNode,
+              onTabPastLast: () {
+                // Close without grabbing focus, then let traversal continue
+                // to the next page focusable.
+                _panelController.closeWithoutFocus();
+                widget.focusNode.nextFocus();
+              },
+              // Close and return focus to the originating bar item.
+              onShiftTabBeforeFirst: _panelController.close,
+            );
           },
         );
       },
@@ -161,37 +257,94 @@ class _BarItem extends StatelessWidget {
   }
 }
 
+/// The focusable, keyboard-navigable bar item. Wraps the label+chevron in a
+/// [MegaMenuFocusRing] (keyboard focus only) and maps Arrow/Enter/Space to the
+/// §4.2 contract via a [FocusableActionDetector].
 class _BarItemTrigger extends StatelessWidget {
   const _BarItemTrigger({
     required this.node,
     required this.isActive,
     required this.isTouch,
+    required this.focusNode,
+    required this.ringVisible,
+    required this.onShowFocusHighlight,
+    required this.onActivate,
+    required this.onArrowDown,
+    required this.onFocusSibling,
   });
   final CategoryNode node;
   final bool isActive;
   final bool isTouch;
+  final FocusNode focusNode;
+  final bool ringVisible;
+  final ValueChanged<bool> onShowFocusHighlight;
+  final VoidCallback onActivate;
+  final VoidCallback onArrowDown;
+  final ValueChanged<int> onFocusSibling;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final hasChildren = node.children.isNotEmpty;
 
-    // On touch the inner GestureDetector is dropped entirely so the outer
-    // AnchoredOverlayPanel's tap-toggle wins; on pointer the inner GD
-    // routes to the PLP and the panel opens via hover/focus.
-    final inner = SizedBox(
-      height: MegaMenuBar.height,
+    final body = MegaMenuFocusRing(
+      show: ringVisible,
       child: _buildTriggerBody(context, cs, hasChildren),
     );
-    if (isTouch) {
-      return inner;
-    }
+
+    final detector = FocusableActionDetector(
+      focusNode: focusNode,
+      mouseCursor: SystemMouseCursors.click,
+      onShowFocusHighlight: onShowFocusHighlight,
+      shortcuts: <ShortcutActivator, Intent>{
+        const SingleActivator(LogicalKeyboardKey.arrowRight):
+            const _MoveFocusIntent(1),
+        const SingleActivator(LogicalKeyboardKey.arrowLeft):
+            const _MoveFocusIntent(-1),
+        const SingleActivator(LogicalKeyboardKey.enter):
+            const _ActivateIntent(),
+        const SingleActivator(LogicalKeyboardKey.space):
+            const _ActivateIntent(),
+        if (hasChildren)
+          const SingleActivator(LogicalKeyboardKey.arrowDown):
+              const _OpenPanelIntent(),
+      },
+      actions: <Type, Action<Intent>>{
+        _MoveFocusIntent: CallbackAction<_MoveFocusIntent>(
+          onInvoke: (i) {
+            onFocusSibling(i.delta);
+            return null;
+          },
+        ),
+        _ActivateIntent: CallbackAction<_ActivateIntent>(
+          onInvoke: (_) {
+            onActivate();
+            return null;
+          },
+        ),
+        _OpenPanelIntent: CallbackAction<_OpenPanelIntent>(
+          onInvoke: (_) {
+            onArrowDown();
+            return null;
+          },
+        ),
+      },
+      child: Semantics(
+        button: true,
+        label: node.name,
+        hint: hasChildren ? 'Submenü açmak için Aşağı ok' : null,
+        excludeSemantics: true,
+        child: body,
+      ),
+    );
+
+    // On touch the inner GestureDetector is dropped so the outer
+    // AnchoredOverlayPanel tap-toggle wins; on pointer it routes to the PLP.
+    if (isTouch) return detector;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      // Pointer: label tap routes to category PLP — does NOT open the panel.
       onTap: () => context.go('/categories/${node.id}'),
-      child: inner,
+      child: detector,
     );
   }
 
@@ -200,48 +353,60 @@ class _BarItemTrigger extends StatelessWidget {
     ColorScheme cs,
     bool hasChildren,
   ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      // IntrinsicWidth + stretch so the 2dp indicator spans exactly the
-      // label+chevron width, not the unbounded ListView item width.
-      child: IntrinsicWidth(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    node.name,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+    return SizedBox(
+      height: MegaMenuBar.height,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: IntrinsicWidth(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      node.name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  if (hasChildren) ...[
-                    const SizedBox(width: 4),
-                    Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 18,
-                      color: cs.onSurfaceVariant,
-                    ),
+                    if (hasChildren) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 18,
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            // 2dp brand-orange bottom indicator on the active route.
-            Container(
-              height: 2,
-              color: isActive
-                  ? MoproTokens.primaryLight
-                  : Colors.transparent,
-            ),
-          ],
+              Container(
+                height: 2,
+                color:
+                    isActive ? MoproTokens.primaryLight : Colors.transparent,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _MoveFocusIntent extends Intent {
+  const _MoveFocusIntent(this.delta);
+  final int delta;
+}
+
+class _ActivateIntent extends Intent {
+  const _ActivateIntent();
+}
+
+class _OpenPanelIntent extends Intent {
+  const _OpenPanelIntent();
 }
