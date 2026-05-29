@@ -26,6 +26,14 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
 # verify chains all static checks; must pass before every push.
 verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order verify-image-manifest
 
+# Re-baseline Flutter goldens on the CURRENT platform and stamp each with a
+# `.png.meta` platform sidecar (written by the guard in
+# test/_support/golden_platform.dart). Goldens are baselined on Linux/CI — run
+# this via the `golden-rebaseline` GitHub workflow (or on a Linux machine), not
+# on macOS. See CONTRIBUTING.md.
+update-goldens:
+	cd mobile && flutter test --update-goldens
+
 # Regenerate the image manifest and fail if the committed copy is stale.
 # Build-time tool: requires ImageMagick (see tool/audit-images.sh).
 verify-image-manifest:
