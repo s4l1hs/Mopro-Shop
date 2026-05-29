@@ -12,8 +12,8 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"unicode"
 	"time"
+	"unicode"
 
 	"golang.org/x/crypto/bcrypt"
 

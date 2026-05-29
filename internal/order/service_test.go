@@ -88,8 +88,8 @@ func (m *mockCartSvc) RemoveItem(_ context.Context, _, _ int64) error     { retu
 func (m *mockCartSvc) Reserve(_ context.Context, _ int64) (string, time.Time, error) {
 	return "res-id", time.Now().Add(15 * time.Minute), nil
 }
-func (m *mockCartSvc) Release(_ context.Context, _ string) error         { return nil }
-func (m *mockCartSvc) SeedStock(_ context.Context, _ int64, _ int) error        { return nil }
+func (m *mockCartSvc) Release(_ context.Context, _ string) error                 { return nil }
+func (m *mockCartSvc) SeedStock(_ context.Context, _ int64, _ int) error         { return nil }
 func (m *mockCartSvc) SeedStockIfAbsent(_ context.Context, _ int64, _ int) error { return nil }
 
 // ── repo mock ─────────────────────────────────────────────────────────────────

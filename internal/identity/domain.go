@@ -9,18 +9,18 @@ import (
 // User is the canonical domain representation of a registered user.
 type User struct {
 	ID            int64
-	PhoneHash     []byte     // HMAC-SHA256 of E.164 phone (legacy OTP login)
-	PhoneEnc      string     // AES-GCM encrypted E.164 phone
-	EmailHash     []byte     // HMAC-SHA256 of email — indexed lookup for email auth
-	EmailEnc      string     // AES-GCM encrypted email
-	PasswordHash  string     // bcrypt(cost=12) of plaintext password; empty for phone-only users
-	EmailVerified bool       // true after the user clicks the verification link/code
-	MFAEnabled    bool       // true when phone-based MFA is active
-	MFAPhoneHash  []byte     // HMAC-SHA256 of MFA phone
-	MFAPhoneEnc   string     // AES-GCM encrypted MFA phone
-	Name          string     // full display name (not encrypted)
-	Locale        string     // BCP 47, e.g. "tr-TR"
-	Status        string     // "active" | "suspended" | "deleted"
+	PhoneHash     []byte // HMAC-SHA256 of E.164 phone (legacy OTP login)
+	PhoneEnc      string // AES-GCM encrypted E.164 phone
+	EmailHash     []byte // HMAC-SHA256 of email — indexed lookup for email auth
+	EmailEnc      string // AES-GCM encrypted email
+	PasswordHash  string // bcrypt(cost=12) of plaintext password; empty for phone-only users
+	EmailVerified bool   // true after the user clicks the verification link/code
+	MFAEnabled    bool   // true when phone-based MFA is active
+	MFAPhoneHash  []byte // HMAC-SHA256 of MFA phone
+	MFAPhoneEnc   string // AES-GCM encrypted MFA phone
+	Name          string // full display name (not encrypted)
+	Locale        string // BCP 47, e.g. "tr-TR"
+	Status        string // "active" | "suspended" | "deleted"
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 	DeletedAt     *time.Time

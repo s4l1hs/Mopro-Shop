@@ -11,8 +11,9 @@ import (
 // Grafana/Mimir can alert when a job fails or stops running.
 //
 // Gauge semantics:
-//   mopro_job_last_run_status{service,job}      1 = last run succeeded, 0 = failed
-//   mopro_job_last_run_timestamp_seconds{service,job}  Unix epoch of last completion
+//
+//	mopro_job_last_run_status{service,job}      1 = last run succeeded, 0 = failed
+//	mopro_job_last_run_timestamp_seconds{service,job}  Unix epoch of last completion
 type JobStatusMetrics struct {
 	status    *prometheus.GaugeVec
 	timestamp *prometheus.GaugeVec

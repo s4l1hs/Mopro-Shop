@@ -350,9 +350,9 @@ func (a *authHandlers) handleLoginEmail(w http.ResponseWriter, r *http.Request) 
 	}
 	if result.MFAToken != "" {
 		jsonOK(w, http.StatusOK, map[string]any{
-			"mfa_required":    true,
-			"mfa_token":       result.MFAToken,
-			"masked_phone":    result.MaskedPhone,
+			"mfa_required": true,
+			"mfa_token":    result.MFAToken,
+			"masked_phone": result.MaskedPhone,
 		})
 		return
 	}
