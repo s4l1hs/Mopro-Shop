@@ -4,10 +4,12 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/features/account/account_placeholder_screen.dart';
 import 'package:mopro/features/account/account_screen.dart';
 import 'package:mopro/features/account/cards_screen.dart';
 import 'package:mopro/features/account/profile_screen.dart';
 import 'package:mopro/features/account/security_screen.dart';
+import 'package:mopro/features/account/widgets/account_shell.dart';
 import 'package:mopro/features/address/screens/address_form_screen.dart';
 import 'package:mopro/features/address/screens/address_list_screen.dart';
 import 'package:mopro/features/auth/email_verify_screen.dart';
@@ -90,6 +92,8 @@ final _favoritesNavKey =
     GlobalKey<NavigatorState>(debugLabel: 'favoritesNav');
 final _cartNavKey = GlobalKey<NavigatorState>(debugLabel: 'cartNav');
 final _accountNavKey = GlobalKey<NavigatorState>(debugLabel: 'accountNav');
+final _accountShellNavKey =
+    GlobalKey<NavigatorState>(debugLabel: 'accountShellNav');
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -180,49 +184,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           return CategoryProductsScreen(categoryId: id, categoryName: name);
         },
       ),
-      GoRoute(
-        path: '/profile/addresses',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (_, __) => const AddressListScreen(),
-        routes: [
-          GoRoute(
-            path: 'new',
-            builder: (_, __) =>
-                const AddressFormScreen(),
-          ),
-          GoRoute(
-            path: ':id/edit',
-            builder: (_, state) {
-              final extra = state.extra;
-              return AddressFormScreen(
-                editAddress: extra is Address ? extra : null,
-              );
-            },
-          ),
-        ],
-      ),
-      // ── Wallet (root-level; accessible from account screen) ────────────────
-      GoRoute(
-        path: '/wallet',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (_, __) => const WalletScreen(),
-        routes: [
-          GoRoute(
-            path: 'plans/:id',
-            builder: (_, state) {
-              final raw = state.pathParameters['id'];
-              final planId = raw != null ? int.tryParse(raw) : null;
-              if (planId == null || planId <= 0) {
-                WidgetsBinding.instance.addPostFrameCallback(
-                  (_) => rootNavigatorKey.currentContext?.go('/wallet'),
-                );
-                return const WalletScreen();
-              }
-              return PlanDetailScreen(planId: planId);
-            },
-          ),
-        ],
-      ),
       // ── Checkout overlay (full-screen above nav shell) ─────────────────
       GoRoute(
         path: '/checkout',
@@ -254,41 +215,103 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
-      // ── Account sub-pages ──────────────────────────────────────────────────
-      GoRoute(
-        path: '/account/profile',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (_, __) => const AccountProfileScreen(),
-      ),
-      GoRoute(
-        path: '/account/security',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (_, __) => const SecurityScreen(),
-      ),
-      GoRoute(
-        path: '/account/cards',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (_, __) => const CardsScreen(),
-      ),
-      // ── Orders (root-level for deep links) ─────────────────────────────────
-      GoRoute(
-        path: '/orders',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (_, __) => const OrderHistoryScreen(),
+      // ── Account section shell — desktop/tablet two-pane (Option A) ─────────
+      // Wraps the account sub-pages + orders/wallet/addresses. On mobile the
+      // AccountShell builder is a pass-through, so these render full-screen with
+      // their own app bars exactly as before (list-then-detail unchanged). On
+      // tablet/desktop it renders WebHeader + rail + pane with the child's app
+      // bar suppressed via AccountChromeScope. The auth guard (computeAuthRedirect)
+      // still applies at the route level — the shell adds no second check.
+      // `/account` itself stays the bottom-nav tab below (AccountScreen handles
+      // its own desktop two-pane via ResponsiveBuilder).
+      ShellRoute(
+        navigatorKey: _accountShellNavKey,
+        builder: (_, __, child) => AccountShell(child: child),
         routes: [
           GoRoute(
-            path: ':id',
-            builder: (_, state) {
-              final raw = state.pathParameters['id'];
-              final id = raw != null ? int.tryParse(raw) : null;
-              if (id == null || id <= 0) {
-                WidgetsBinding.instance.addPostFrameCallback(
-                  (_) => rootNavigatorKey.currentContext?.go('/orders'),
-                );
-                return const SizedBox.shrink();
-              }
-              return OrderDetailScreen(orderId: id);
-            },
+            path: '/account/profile',
+            builder: (_, __) => const AccountProfileScreen(),
+          ),
+          GoRoute(
+            path: '/account/security',
+            builder: (_, __) => const SecurityScreen(),
+          ),
+          GoRoute(
+            path: '/account/cards',
+            builder: (_, __) => const CardsScreen(),
+          ),
+          GoRoute(
+            path: '/account/notifications',
+            builder: (_, __) => const AccountPlaceholderScreen(
+              titleKey: 'account.notifications',
+              icon: Icons.notifications_outlined,
+            ),
+          ),
+          GoRoute(
+            path: '/help',
+            builder: (_, __) => const AccountPlaceholderScreen(
+              titleKey: 'account.menu_help',
+              icon: Icons.help_outline_rounded,
+            ),
+          ),
+          GoRoute(
+            path: '/orders',
+            builder: (_, __) => const OrderHistoryScreen(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (_, state) {
+                  final raw = state.pathParameters['id'];
+                  final id = raw != null ? int.tryParse(raw) : null;
+                  if (id == null || id <= 0) {
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => rootNavigatorKey.currentContext?.go('/orders'),
+                    );
+                    return const SizedBox.shrink();
+                  }
+                  return OrderDetailScreen(orderId: id);
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: '/wallet',
+            builder: (_, __) => const WalletScreen(),
+            routes: [
+              GoRoute(
+                path: 'plans/:id',
+                builder: (_, state) {
+                  final raw = state.pathParameters['id'];
+                  final planId = raw != null ? int.tryParse(raw) : null;
+                  if (planId == null || planId <= 0) {
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => rootNavigatorKey.currentContext?.go('/wallet'),
+                    );
+                    return const WalletScreen();
+                  }
+                  return PlanDetailScreen(planId: planId);
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: '/profile/addresses',
+            builder: (_, __) => const AddressListScreen(),
+            routes: [
+              GoRoute(
+                path: 'new',
+                builder: (_, __) => const AddressFormScreen(),
+              ),
+              GoRoute(
+                path: ':id/edit',
+                builder: (_, state) {
+                  final extra = state.extra;
+                  return AddressFormScreen(
+                    editAddress: extra is Address ? extra : null,
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/utils/coin_formatter.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
+import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 import 'package:mopro/features/wallet/providers/plan_detail_provider.dart';
 import 'package:mopro/features/wallet/widgets/plan_timeline_row.dart';
 import 'package:mopro_api/mopro_api.dart';
@@ -18,8 +19,10 @@ class PlanDetailScreen extends ConsumerWidget {
     final state = ref.watch(planDetailProvider(planId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: state.plan.maybeWhen(
+      appBar: AccountChromeScope.suppressed(context)
+          ? null
+          : AppBar(
+              title: state.plan.maybeWhen(
           data: (plan) => Text(
             plan.productTitle,
             overflow: TextOverflow.ellipsis,

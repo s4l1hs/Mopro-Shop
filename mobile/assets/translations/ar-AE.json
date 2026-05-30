@@ -28,7 +28,14 @@
     "logout": "تسجيل الخروج",
     "menu_login_prompt": "سجّل الدخول إلى حسابك",
     "menu_register": "إنشاء حساب",
-    "menu_help": "المساعدة"
+    "menu_help": "المساعدة",
+    "rail_profile": "ملفي",
+    "notifications": "الإشعارات",
+    "theme": "المظهر",
+    "theme_light": "فاتح",
+    "theme_dark": "داكن",
+    "language": "اللغة",
+    "coming_soon": "هذا القسم قريباً."
   },
   "mega_menu": {
     "see_all": "عرض الكل",

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/widgets/empty_state.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
+import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 import 'package:mopro/features/order/application/orders_provider.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/features/order/widgets/order_summary_card.dart';
@@ -56,9 +57,11 @@ class _OrderHistoryScreenState extends ConsumerState<OrderHistoryScreen> {
     final state = ref.watch(ordersProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('order.history_title'.tr()),
-      ),
+      appBar: AccountChromeScope.suppressed(context)
+          ? null
+          : AppBar(
+              title: Text('order.history_title'.tr()),
+            ),
       body: Column(
         children: [
           // ── Search bar ────────────────────────────────────────────────────

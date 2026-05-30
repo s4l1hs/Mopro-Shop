@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
+import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 import 'package:mopro/features/order/application/order_detail_provider.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/features/order/data/order_item_dto.dart';
@@ -21,9 +22,11 @@ class OrderDetailScreen extends ConsumerWidget {
     final state = ref.watch(orderDetailProvider(orderId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('order.detail_title'.tr()),
-      ),
+      appBar: AccountChromeScope.suppressed(context)
+          ? null
+          : AppBar(
+              title: Text('order.detail_title'.tr()),
+            ),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, _) {

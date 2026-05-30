@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/widgets/empty_state.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
+import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 import 'package:mopro/features/address/providers/addresses_provider.dart';
 import 'package:mopro/features/address/widgets/address_card.dart';
 
@@ -16,9 +17,11 @@ class AddressListScreen extends ConsumerWidget {
     final state = ref.watch(addressesProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('address.list_title'.tr()),
-        actions: [
+      appBar: AccountChromeScope.suppressed(context)
+          ? null
+          : AppBar(
+              title: Text('address.list_title'.tr()),
+              actions: [
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () => context.push('/profile/addresses/new'),

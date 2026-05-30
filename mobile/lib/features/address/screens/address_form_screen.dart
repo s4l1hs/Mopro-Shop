@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
+import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 import 'package:mopro/features/address/providers/address_form_controller.dart';
 import 'package:mopro/features/address/providers/addresses_provider.dart';
 import 'package:mopro/features/address/widgets/address_form.dart';
@@ -38,12 +39,14 @@ class _AddressFormScreenState extends ConsumerState<AddressFormScreen> {
     final formState = ref.watch(addressFormProvider(_editId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          _editId != null
-              ? 'address.edit_title'.tr()
-              : 'address.new_title'.tr(),
-        ),
+      appBar: AccountChromeScope.suppressed(context)
+          ? null
+          : AppBar(
+              title: Text(
+                _editId != null
+                    ? 'address.edit_title'.tr()
+                    : 'address.new_title'.tr(),
+              ),
       ),
       body: Column(
         children: [

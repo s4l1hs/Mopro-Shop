@@ -28,7 +28,14 @@
     "logout": "Abmelden",
     "menu_login_prompt": "In dein Konto einloggen",
     "menu_register": "Registrieren",
-    "menu_help": "Hilfe"
+    "menu_help": "Hilfe",
+    "rail_profile": "Mein Profil",
+    "notifications": "Benachrichtigungen",
+    "theme": "Design",
+    "theme_light": "Hell",
+    "theme_dark": "Dunkel",
+    "language": "Sprache",
+    "coming_soon": "Dieser Bereich kommt bald."
   },
   "mega_menu": {
     "see_all": "Alle anzeigen",

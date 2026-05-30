@@ -175,7 +175,14 @@
     "saved_cards": "Kayıtlı Kartlarım",
     "menu_login_prompt": "Hesabınıza giriş yapın",
     "menu_register": "Üye Ol",
-    "menu_help": "Yardım"
+    "menu_help": "Yardım",
+    "rail_profile": "Profilim",
+    "notifications": "Bildirimler",
+    "theme": "Tema",
+    "theme_light": "Açık",
+    "theme_dark": "Koyu",
+    "language": "Dil",
+    "coming_soon": "Bu bölüm yakında."
   },
   "address": {
     "list_title": "Adreslerim",
