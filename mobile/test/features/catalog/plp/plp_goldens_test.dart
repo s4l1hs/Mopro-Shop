@@ -84,6 +84,7 @@ Future<void> _pump(
   WidgetTester tester, {
   required String initial,
   required Brightness brightness,
+  double width = 1440,
 }) async {
   // ProductCard cells slightly overflow their grid aspect ratio (a pre-existing
   // card artifact); filter so --update-goldens can still capture the baseline.
@@ -94,7 +95,7 @@ Future<void> _pump(
   };
   addTearDown(() => FlutterError.onError = original);
 
-  tester.view.physicalSize = const Size(1440, 1000);
+  tester.view.physicalSize = Size(width, 1000);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
@@ -172,6 +173,33 @@ void main() {
       await expectLater(
         find.byType(CategoryProductsScreen),
         matchesGoldenFile('goldens/plp_sidebar_with_filters_1440_$b.png'),
+      );
+    });
+
+    // 1024 carry (Session 5c §7.1) — same fixture, narrower viewport.
+    testWidgets('plp sidebar no filters 1024 $b', (tester) async {
+      await _pump(
+        tester,
+        initial: '/categories/5',
+        brightness: brightness,
+        width: 1024,
+      );
+      await expectLater(
+        find.byType(CategoryProductsScreen),
+        matchesGoldenFile('goldens/plp_sidebar_no_filters_1024_$b.png'),
+      );
+    });
+
+    testWidgets('plp sidebar with filters + chips 1024 $b', (tester) async {
+      await _pump(
+        tester,
+        initial: '/categories/5?brand=Adidas&shipping=free&rating=4',
+        brightness: brightness,
+        width: 1024,
+      );
+      await expectLater(
+        find.byType(CategoryProductsScreen),
+        matchesGoldenFile('goldens/plp_sidebar_with_filters_1024_$b.png'),
       );
     });
   }
