@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/catalog/pdp/reviews/reviews_provider.dart';
 
 /// Trendyol-style rating summary: a large average score with a "{N}
@@ -46,6 +47,22 @@ class RatingDistributionHistogram extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < 5; i++)
+                    Icon(
+                      i < summary.average.round()
+                          ? Icons.star_rounded
+                          : Icons.star_outline_rounded,
+                      size: 14,
+                      color: i < summary.average.round()
+                          ? MoproTokens.ratingStar
+                          : cs.outlineVariant,
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
               Text(
                 'product.review_count'.tr(
                   namedArgs: {'count': '${summary.totalCount}'},
@@ -98,7 +115,7 @@ class _BarRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          Icon(Icons.star_rounded, size: 12, color: cs.primary),
+          const Icon(Icons.star_rounded, size: 12, color: MoproTokens.ratingStar),
           const SizedBox(width: 2),
           SizedBox(
             width: 10,

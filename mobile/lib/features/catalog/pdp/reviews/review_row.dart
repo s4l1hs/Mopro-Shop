@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/core/widgets/login_required_sheet.dart';
+import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/catalog/pdp/reviews/reviews_provider.dart';
 
 /// A single review: star rating + date, optional title/body, and a "Faydalı (N)"
@@ -59,7 +60,7 @@ class ReviewRow extends ConsumerWidget {
                     : Icons.star_outline_rounded,
                 size: 16,
                 color: i < review.rating
-                    ? const Color(0xFFFFB400)
+                    ? MoproTokens.ratingStar
                     : cs.outlineVariant,
               ),
             const SizedBox(width: 8),

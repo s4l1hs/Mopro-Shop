@@ -109,7 +109,9 @@ Future<void> _pumpTab(
   WidgetTester tester, {
   required _Adapter adapter,
   AuthState auth = const AuthUnauthenticated(),
-  Size size = const Size(420, 1600),
+  // Tall enough that all rows + dividers stay within the ListView cacheExtent so
+  // find.byType(ReviewRow) sees every built row (the list builds lazily).
+  Size size = const Size(420, 3200),
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;

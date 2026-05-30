@@ -10,6 +10,7 @@ import 'package:mopro/core/utils/coin_formatter.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/design/responsive/pointer_kind.dart';
 import 'package:mopro/design/responsive/responsive.dart';
+import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/catalog/pdp/reviews/pdp_reviews_tab.dart';
 import 'package:mopro/features/catalog/pdp/reviews/reviews_provider.dart';
@@ -394,7 +395,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
                 const Icon(
                   Icons.star_rounded,
                   size: 18,
-                  color: Color(0xFFFFB400),
+                  color: MoproTokens.ratingStar,
                 ),
                 const SizedBox(width: 4),
                 Text(avg.toStringAsFixed(1), style: theme.textTheme.bodyMedium),

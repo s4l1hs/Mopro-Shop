@@ -300,7 +300,7 @@ class _RatingChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.star_rounded, size: 13, color: Color(0xFFFFB400)),
+        const Icon(Icons.star_rounded, size: 13, color: MoproTokens.ratingStar),
         const SizedBox(width: 2),
         Text(
           avg.toStringAsFixed(1),

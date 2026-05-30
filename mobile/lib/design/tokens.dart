@@ -50,6 +50,10 @@ abstract final class MoproTokens {
   static const Color warningLight = Color(0xFFB87A00);
   /// oklch(0.82 0.15 75)
   static const Color warningDark = Color(0xFFCB9A00);
+  /// Rating-star gold. Shared by every rating-star glyph (product card, PDP
+  /// header, review rows, histogram) so the app never drifts between gold and
+  /// brand-orange for the same concept. Theme-independent by design.
+  static const Color ratingStar = Color(0xFFFFB400);
 
   // ── Borders ─────────────────────────────────────────────────────────────────
   /// oklch(0.92 0.003 50)

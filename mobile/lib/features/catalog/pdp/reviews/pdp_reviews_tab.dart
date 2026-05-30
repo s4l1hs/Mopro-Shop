@@ -79,7 +79,9 @@ class PdpReviewsTab extends ConsumerWidget {
         ],
       ),
       const SizedBox(height: 8),
-      for (final r in state.items) ...[
+      for (final (i, r) in state.items.indexed) ...[
+        if (i > 0) const Divider(height: 1),
+        if (i > 0) const SizedBox(height: 16),
         ReviewRow(review: r, productId: productId),
         const SizedBox(height: 16),
       ],
