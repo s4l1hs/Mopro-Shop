@@ -5,8 +5,12 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/core/widgets/login_required_sheet.dart';
+import 'package:mopro/design/responsive/centered_content_column.dart';
+import 'package:mopro/design/responsive/responsive_builder.dart';
 import 'package:mopro/design/theme_controller.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/features/account/widgets/account_left_rail.dart';
+import 'package:mopro/features/account/widgets/account_welcome_panel.dart';
 import 'package:mopro/features/order/application/orders_provider.dart';
 import 'package:mopro/features/wallet/providers/cashback_plans_provider.dart';
 import 'package:mopro/features/wallet/providers/wallet_provider.dart';
@@ -15,6 +19,58 @@ import 'package:mopro_api/mopro_api.dart';
 
 class AccountScreen extends ConsumerWidget {
   const AccountScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Mobile: existing list-then-detail menu, unchanged. Tablet/desktop: the
+    // two-pane (rail + welcome panel) rendered inside the AppShell's WebHeader.
+    return ResponsiveBuilder(
+      mobile: (_) => const _AccountMobileBody(),
+      tablet: (_) => const _AccountWidePane(),
+      desktop: (_) => const _AccountWidePane(),
+    );
+  }
+}
+
+/// Tablet/desktop `/account` content: sticky rail + welcome panel. Sits inside
+/// the AppShell (which already provides the WebHeader + MegaMenuBar), so it adds
+/// no top chrome of its own.
+class _AccountWidePane extends StatelessWidget {
+  const _AccountWidePane();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDesktop =
+        MediaQuery.sizeOf(context).width >= 1024;
+    final railWidth = isDesktop ? 260.0 : 240.0;
+    final gap = isDesktop ? 32.0 : 24.0;
+    return Scaffold(
+      body: CenteredContentColumn(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: railWidth,
+              child: const SingleChildScrollView(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: AccountLeftRail(),
+              ),
+            ),
+            SizedBox(width: gap),
+            const Expanded(
+              child: SingleChildScrollView(
+                child: AccountWelcomePanel(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountMobileBody extends ConsumerWidget {
+  const _AccountMobileBody();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
