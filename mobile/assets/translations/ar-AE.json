@@ -47,5 +47,18 @@
     "privacy": "الخصوصية",
     "terms": "الشروط",
     "language": "اللغة"
+  },
+  "reviews": {
+    "header": "التقييمات ({count})",
+    "helpful_count": "مفيد ({count})",
+    "load_more": "تحميل المزيد من التقييمات",
+    "empty": "لا توجد تقييمات بعد.",
+    "action_failed": "حدث خطأ، يرجى المحاولة مرة أخرى.",
+    "load_error": "تعذّر تحميل التقييمات.",
+    "login_to_vote": "سجّل الدخول لتمييز التقييم كمفيد.",
+    "sort_newest": "الأحدث",
+    "sort_highest": "الأعلى تقييماً",
+    "sort_lowest": "الأدنى تقييماً",
+    "sort_helpful": "الأكثر فائدة"
   }
 }

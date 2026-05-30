@@ -47,5 +47,18 @@
     "privacy": "Datenschutz",
     "terms": "AGB",
     "language": "Sprache"
+  },
+  "reviews": {
+    "header": "Bewertungen ({count})",
+    "helpful_count": "Hilfreich ({count})",
+    "load_more": "Weitere Bewertungen laden",
+    "empty": "Noch keine Bewertungen.",
+    "action_failed": "Etwas ist schiefgelaufen, bitte erneut versuchen.",
+    "load_error": "Bewertungen konnten nicht geladen werden.",
+    "login_to_vote": "Zum Markieren als hilfreich anmelden.",
+    "sort_newest": "Neueste",
+    "sort_highest": "Beste Bewertung",
+    "sort_lowest": "Schlechteste Bewertung",
+    "sort_helpful": "Hilfreichste"
   }
 }

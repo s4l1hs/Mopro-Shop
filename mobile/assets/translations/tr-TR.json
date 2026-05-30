@@ -220,6 +220,19 @@
     "qa_tab": "Soru & Cevap",
     "related_title": "Benzer Ürünler"
   },
+  "reviews": {
+    "header": "Yorumlar ({count})",
+    "helpful_count": "Faydalı ({count})",
+    "load_more": "Daha fazla yorum yükle",
+    "empty": "Henüz değerlendirme yok.",
+    "action_failed": "İşlem başarısız, tekrar deneyin.",
+    "load_error": "Yorumlar yüklenemedi.",
+    "login_to_vote": "Faydalı işaretlemek için giriş yapın.",
+    "sort_newest": "En yeniler",
+    "sort_highest": "En yüksek puan",
+    "sort_lowest": "En düşük puan",
+    "sort_helpful": "En faydalı"
+  },
   "cashback": {
     "schedule_title": "Cashback Takvimi",
     "preview_title": "Mopro Cashback",
