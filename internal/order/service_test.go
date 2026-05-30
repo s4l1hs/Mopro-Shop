@@ -484,6 +484,15 @@ func (m *mockCatalogSvc) HomeMoodStories(_ context.Context) ([]catalog.HomeMoodS
 func (m *mockCatalogSvc) HomeFlashDeals(_ context.Context, _ string, _ *int64) (*catalog.FlashDealsResult, error) {
 	return nil, nil
 }
-func (m *mockCatalogSvc) ListReviews(_ context.Context, _ int64, _, _ int) ([]catalog.ProductReviewRow, int, error) {
+func (m *mockCatalogSvc) ListReviews(_ context.Context, _ int64, _ catalog.ReviewSort, _, _ int, _ int64) ([]catalog.ProductReviewRow, int, error) {
 	return nil, 0, nil
+}
+func (m *mockCatalogSvc) ReviewsSummary(_ context.Context, _ int64) (catalog.ReviewsSummary, error) {
+	return catalog.ReviewsSummary{}, nil
+}
+func (m *mockCatalogSvc) ReviewProductID(_ context.Context, _ int64) (int64, error) {
+	return 0, nil
+}
+func (m *mockCatalogSvc) ToggleHelpfulVote(_ context.Context, _, _ int64) (catalog.HelpfulVoteResult, error) {
+	return catalog.HelpfulVoteResult{}, nil
 }

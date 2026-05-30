@@ -350,6 +350,7 @@ func main() {
 
 	// Identity / auth routes
 	requireAuth := middleware.RequireAuth(jwtSigner)
+	optionalAuth := middleware.OptionalAuth(jwtSigner)
 	auth := &authHandlers{svc: identitySvc, log: slog.Default()}
 	auth.registerRoutes(mux, requireAuth)
 
@@ -419,8 +420,13 @@ func main() {
 	mux.Handle("POST /products/batch",
 		httpTrace(http.HandlerFunc(handleProductsBatch(catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)
+	// Reviews list: public read, but OptionalAuth personalizes votedByCurrentUser.
 	mux.Handle("GET /products/{id}/reviews",
-		httpTrace(http.HandlerFunc(handleProductReviews(catalogSvc))),
+		httpTrace(optionalAuth(http.HandlerFunc(handleProductReviews(catalogSvc)))),
+	)
+	// Helpful-vote toggle: auth required (401 for guests).
+	mux.Handle("POST /products/{id}/reviews/{reviewId}/helpful",
+		httpTrace(requireAuth(http.HandlerFunc(handleReviewHelpfulVote(catalogSvc)))),
 	)
 	mux.Handle("GET /search/trending",
 		httpTrace(http.HandlerFunc(handleSearchTrending())),

@@ -12,9 +12,13 @@ import (
 // stubCatalogSvc is a minimal catalog.Service implementation that records the
 // arguments handler tests need to verify. Other methods are no-op stubs.
 type stubCatalogSvc struct {
-	listCategoriesFn func(ctx context.Context, locale string, maxDepth int) ([]catalog.CategoryRow, error)
-	homeFlashDealsFn func(ctx context.Context, locale string, collectionID *int64) (*catalog.FlashDealsResult, error)
-	homeRailsRows    []catalog.HomeRailRow
+	listCategoriesFn  func(ctx context.Context, locale string, maxDepth int) ([]catalog.CategoryRow, error)
+	homeFlashDealsFn  func(ctx context.Context, locale string, collectionID *int64) (*catalog.FlashDealsResult, error)
+	homeRailsRows     []catalog.HomeRailRow
+	listReviewsFn     func() ([]catalog.ProductReviewRow, int, error)
+	reviewsSummaryFn  func() (catalog.ReviewsSummary, error)
+	reviewProductIDFn func(reviewID int64) (int64, error)
+	toggleHelpfulFn   func() (catalog.HelpfulVoteResult, error)
 }
 
 func (s *stubCatalogSvc) CreateProduct(_ context.Context, _ catalog.CreateProductRequest) (catalog.Product, error) {
@@ -69,8 +73,29 @@ func (s *stubCatalogSvc) HomeFlashDeals(ctx context.Context, locale string, coll
 	}
 	return nil, nil
 }
-func (s *stubCatalogSvc) ListReviews(_ context.Context, _ int64, _, _ int) ([]catalog.ProductReviewRow, int, error) {
+func (s *stubCatalogSvc) ListReviews(_ context.Context, _ int64, _ catalog.ReviewSort, _, _ int, _ int64) ([]catalog.ProductReviewRow, int, error) {
+	if s.listReviewsFn != nil {
+		return s.listReviewsFn()
+	}
 	return nil, 0, nil
+}
+func (s *stubCatalogSvc) ReviewsSummary(_ context.Context, _ int64) (catalog.ReviewsSummary, error) {
+	if s.reviewsSummaryFn != nil {
+		return s.reviewsSummaryFn()
+	}
+	return catalog.ReviewsSummary{Distribution: map[int]int{1: 0, 2: 0, 3: 0, 4: 0, 5: 0}}, nil
+}
+func (s *stubCatalogSvc) ReviewProductID(_ context.Context, reviewID int64) (int64, error) {
+	if s.reviewProductIDFn != nil {
+		return s.reviewProductIDFn(reviewID)
+	}
+	return 0, catalog.ErrReviewNotFound
+}
+func (s *stubCatalogSvc) ToggleHelpfulVote(_ context.Context, _, _ int64) (catalog.HelpfulVoteResult, error) {
+	if s.toggleHelpfulFn != nil {
+		return s.toggleHelpfulFn()
+	}
+	return catalog.HelpfulVoteResult{}, nil
 }
 func (s *stubCatalogSvc) ListAllVariantStocks(_ context.Context) ([]catalog.VariantStock, error) {
 	return nil, nil

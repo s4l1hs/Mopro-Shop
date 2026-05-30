@@ -150,6 +150,30 @@ CREATE TABLE catalog_schema.variants (
 );
 
 CREATE UNIQUE INDEX variants_product_sku_uq ON catalog_schema.variants(product_id, sku);
+
+-- Reviews + helpful votes (mirrors migration 0064 + the additive 0069 created_at).
+DROP TABLE IF EXISTS catalog_schema.review_helpful_votes CASCADE;
+DROP TABLE IF EXISTS catalog_schema.product_reviews CASCADE;
+
+CREATE TABLE catalog_schema.product_reviews (
+    id            BIGSERIAL   PRIMARY KEY,
+    product_id    BIGINT      NOT NULL,
+    user_id       BIGINT      NOT NULL,
+    rating        SMALLINT    NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    title         TEXT,
+    body          TEXT,
+    helpful_count INT         NOT NULL DEFAULT 0,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (product_id, user_id)
+);
+
+CREATE TABLE catalog_schema.review_helpful_votes (
+    review_id  BIGINT      NOT NULL REFERENCES catalog_schema.product_reviews(id) ON DELETE CASCADE,
+    user_id    BIGINT      NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (review_id, user_id)
+);
 `
 	_, err := pool.Exec(ctx, ddl)
 	return err
