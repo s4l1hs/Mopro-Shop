@@ -1742,3 +1742,49 @@ screens (will surface as rail placeholders when §2 lands).
   re-fire — this matches the pre-existing Session 1 behavior (not regressed).
 - SearchScreen filters are state/URL-substrate only; they visibly render but don't
   change results until backend search filtering exists — could surprise QA.
+
+---
+
+# Reviews PR — Helpful-Vote + Sort + Pagination + Histogram
+
+Branch `feat/reviews-helpful-sort-pagination`, **stacked on the unmerged Session 5c
+stack** (PR #17 not yet merged to `main`). This is deliberate: Flow T (§5) and the
+guest "Faydalı" gate (§4.3) depend on `LoginRequiredDialog`, which exists only on
+the 5c stack. The PR therefore targets `feat/account-login-reviews-a11y` (the 5c
+branch), not `main`.
+
+## Reviews PR — Baseline (pre-flight, captured before any code)
+
+| Gate | Baseline |
+|---|---|
+| `go test ./...` | **PASS** — all packages `ok`, 0 failures |
+| `flutter analyze` | **0 issues** ("No issues found!") |
+| `flutter test` | **+402 / -49** — all 49 failures are golden-class (LoginRequiredSheet, auth_card_goldens, …); repo goldens are baselined on ubuntu-latest CI and fail on local macOS by design. No non-golden failures. |
+| `flutter build web --release` | **SUCCESS** — `build/web/main.dart.js` = **4,533,143 B** (+5% budget ⇒ ≤ 4,759,800 B) |
+| `flutter test integration_test` | Deferred — requires a device/driver; integration flows run in CI. Captured at §8. |
+| Containers | All healthy: core-svc, fin-svc, jobs-svc, postgres-ecom, postgres-ledger, redis, meilisearch, caddy, pgbouncer×2 |
+| CI | Captured on WIP push (below). |
+
+### Schema reality vs. prompt (§2.1 adaptation)
+The prompt assumed brand-new `reviews_helpful_votes` table + new `helpful_count`
+column. In reality migration `0064_home_features` **already** created
+`catalog_schema.product_reviews` (with `helpful_count INT NOT NULL DEFAULT 0`,
+`UNIQUE(product_id,user_id)`) and `catalog_schema.review_helpful_votes` (with
+`PRIMARY KEY (review_id, user_id)` + FK cascade). Creating a parallel
+`reviews_helpful_votes` table is forbidden (CLAUDE.md §11). **Adaptation:** reuse
+`review_helpful_votes`; migration `0069` is additive only (add `created_at` +
+`COMMENT` naming the authoritative source — mirrors existing
+`0079_payments_made_cache_comment`).
+
+### Module-location reality (§2.2 adaptation)
+There is no `internal/reviews` and CLAUDE.md §2.3 locks the module layout against
+adding one. Reviews are owned by `internal/catalog` (existing
+`catalog.Service.ListReviews`, `ProductReviewRow`). **Adaptation:** all backend
+work lands in `internal/catalog` + a hand-written POST handler in `cmd/core-svc`
+(mirrors existing `handleProductReviews`).
+
+### OpenAPI/DTO reality (§2.5 adaptation)
+Reviews endpoints are not in `api/openapi.yaml`; the GET is hand-written and the
+Dart side hand-parses JSON (no generated reviews DTO). **Decision (user-approved):**
+match existing convention — hand-write the handler + hand-parse the new fields in
+Dart; no codegen. `api-check-sync` unaffected (reviews never were in the spec).
