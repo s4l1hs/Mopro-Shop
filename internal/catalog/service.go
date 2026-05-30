@@ -2,7 +2,10 @@ package catalog
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type catalogService struct {
@@ -208,10 +211,65 @@ func (s *catalogService) HomeFlashDeals(ctx context.Context, locale string, coll
 	}, nil
 }
 
-func (s *catalogService) ListReviews(ctx context.Context, productID int64, page, perPage int) ([]ProductReviewRow, int, error) {
-	if perPage <= 0 {
-		perPage = 20
+func (s *catalogService) ListReviews(ctx context.Context, productID int64, sort ReviewSort, page, pageSize int, viewerUserID int64) ([]ProductReviewRow, int, error) {
+	if pageSize <= 0 {
+		pageSize = 10
 	}
-	offset := (page - 1) * perPage
-	return s.repo.ListReviews(ctx, productID, offset, perPage)
+	if page < 1 {
+		page = 1
+	}
+	if sort == "" {
+		sort = ReviewSortNewest
+	}
+	offset := (page - 1) * pageSize
+	return s.repo.ListReviews(ctx, productID, sort, offset, pageSize, viewerUserID)
+}
+
+// ReviewsSummary delegates to the repository; the aggregate is identical for every
+// page request of the same product.
+func (s *catalogService) ReviewsSummary(ctx context.Context, productID int64) (ReviewsSummary, error) {
+	return s.repo.ReviewsSummary(ctx, productID)
+}
+
+// ReviewProductID delegates to the repository (URL ownership check, 404 source).
+func (s *catalogService) ReviewProductID(ctx context.Context, reviewID int64) (int64, error) {
+	return s.repo.ReviewProductID(ctx, reviewID)
+}
+
+// ToggleHelpfulVote inserts or deletes the (reviewID, userID) row inside a
+// SERIALIZABLE transaction, refreshes the helpful_count cache in the same tx, and
+// returns the new state. Authoritative source: catalog_schema.review_helpful_votes.
+//
+// The toggle is INSERT-first: on a 23505 conflict (already voted, possibly from a
+// concurrent request) InsertHelpfulVote returns ErrAlreadyVoted and we toggle off
+// by deleting instead. WithTx retries serialization failures, so under concurrency
+// each call applies exactly one net flip and the final state is deterministic.
+func (s *catalogService) ToggleHelpfulVote(ctx context.Context, reviewID, userID int64) (HelpfulVoteResult, error) {
+	var result HelpfulVoteResult
+	err := s.repo.WithTx(ctx, pgx.Serializable, func(tx pgx.Tx) error {
+		voted := true
+		if insErr := s.repo.InsertHelpfulVote(ctx, tx, reviewID, userID); insErr != nil {
+			if !errors.Is(insErr, ErrAlreadyVoted) {
+				return insErr
+			}
+			// Already voted (or concurrent duplicate) → toggle off.
+			if _, delErr := s.repo.DeleteHelpfulVote(ctx, tx, reviewID, userID); delErr != nil {
+				return delErr
+			}
+			voted = false
+		}
+		if err := s.repo.RefreshHelpfulCountCache(ctx, tx, reviewID); err != nil {
+			return err
+		}
+		cnt, err := s.repo.HelpfulCount(ctx, tx, reviewID)
+		if err != nil {
+			return err
+		}
+		result = HelpfulVoteResult{Voted: voted, HelpfulCount: cnt}
+		return nil
+	})
+	if err != nil {
+		return HelpfulVoteResult{}, err
+	}
+	return result, nil
 }

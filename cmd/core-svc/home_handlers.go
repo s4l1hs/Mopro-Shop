@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -185,6 +186,23 @@ func handleProductsBatch(svc catalog.Service, defaultLocale, defaultMarket, cash
 
 // ── GET /products/{id}/reviews ────────────────────────────────────────────────
 
+// reviewJSON is the per-review wire shape (camelCase). helpfulCount is the
+// denormalized cache; votedByCurrentUser is true only for the viewing user's own
+// helpful votes (always false for guests).
+type reviewJSON struct {
+	ID                 int64  `json:"id"`
+	UserID             int64  `json:"userId"`
+	Rating             int    `json:"rating"`
+	Title              string `json:"title"`
+	Body               string `json:"body"`
+	HelpfulCount       int    `json:"helpfulCount"`
+	VotedByCurrentUser bool   `json:"votedByCurrentUser"`
+	CreatedAt          string `json:"createdAt"`
+}
+
+// handleProductReviews serves GET /products/{id}/reviews with sort + pagination +
+// a product-level summary (identical across pages). No auth required, but
+// OptionalAuth lets it personalize votedByCurrentUser for signed-in viewers.
 func handleProductReviews(svc catalog.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		productID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
@@ -192,41 +210,138 @@ func handleProductReviews(svc catalog.Service) http.HandlerFunc {
 			jsonError(w, "invalid product id", http.StatusBadRequest)
 			return
 		}
-		page := parseIntQuery(r.URL.Query().Get("page"), 1)
-		perPage := parseIntQuery(r.URL.Query().Get("per_page"), 20)
-		if perPage > 50 {
-			perPage = 50
+
+		sortRaw := r.URL.Query().Get("sort")
+		if sortRaw == "" {
+			sortRaw = string(catalog.ReviewSortNewest)
 		}
-		reviews, total, err := svc.ListReviews(r.Context(), productID, page, perPage)
+		sort, ok := catalog.ParseReviewSort(sortRaw)
+		if !ok {
+			jsonError(w, "invalid sort", http.StatusBadRequest)
+			return
+		}
+
+		// Strict validation: absent → default; present-but-invalid → 400 (we cannot
+		// use parseIntQuery here because it silently coerces 0/invalid to the default).
+		page := 1
+		if raw := r.URL.Query().Get("page"); raw != "" {
+			v, err := strconv.Atoi(raw)
+			if err != nil || v < 1 {
+				jsonError(w, "page must be >= 1", http.StatusBadRequest)
+				return
+			}
+			page = v
+		}
+
+		// Prefer pageSize; accept legacy per_page as an alias for backward compat.
+		pageSize := 10
+		pageSizeRaw := r.URL.Query().Get("pageSize")
+		if pageSizeRaw == "" {
+			pageSizeRaw = r.URL.Query().Get("per_page")
+		}
+		if pageSizeRaw != "" {
+			v, err := strconv.Atoi(pageSizeRaw)
+			if err != nil || v < 1 || v > 50 {
+				jsonError(w, "pageSize must be between 1 and 50", http.StatusBadRequest)
+				return
+			}
+			pageSize = v
+		}
+
+		viewerUserID := middleware.UserIDFromCtx(r.Context()) // 0 for guest
+
+		reviews, total, err := svc.ListReviews(r.Context(), productID, sort, page, pageSize, viewerUserID)
 		if err != nil {
 			slog.Error("catalog: ListReviews", "product_id", productID, "err", err)
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		type reviewJSON struct {
-			ID           int64  `json:"id"`
-			UserID       int64  `json:"user_id"`
-			Rating       int    `json:"rating"`
-			Title        string `json:"title"`
-			Body         string `json:"body"`
-			HelpfulCount int    `json:"helpful_count"`
-			CreatedAt    string `json:"created_at"`
+		summary, err := svc.ReviewsSummary(r.Context(), productID)
+		if err != nil {
+			slog.Error("catalog: ReviewsSummary", "product_id", productID, "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
 		}
-		out := make([]reviewJSON, len(reviews))
+
+		items := make([]reviewJSON, len(reviews))
 		for i, rv := range reviews {
-			out[i] = reviewJSON{
+			items[i] = reviewJSON{
 				ID: rv.ID, UserID: rv.UserID, Rating: rv.Rating,
 				Title: rv.Title, Body: rv.Body,
-				HelpfulCount: rv.HelpfulCount, CreatedAt: rv.CreatedAt,
+				HelpfulCount: rv.HelpfulCount, VotedByCurrentUser: rv.VotedByCurrentUser,
+				CreatedAt: rv.CreatedAt,
 			}
 		}
-		totalPages := 0
-		if perPage > 0 && total > 0 {
-			totalPages = (total + perPage - 1) / perPage
+
+		jsonOK(w, http.StatusOK, map[string]any{
+			"items":    items,
+			"total":    total,
+			"page":     page,
+			"pageSize": pageSize,
+			"summary": map[string]any{
+				"average":      summary.Average,
+				"distribution": distributionJSON(summary.Distribution),
+				"totalCount":   summary.TotalCount,
+			},
+		})
+	}
+}
+
+// distributionJSON renders the rating histogram with stable string keys "1".."5".
+func distributionJSON(d map[int]int) map[string]int {
+	return map[string]int{
+		"1": d[1], "2": d[2], "3": d[3], "4": d[4], "5": d[5],
+	}
+}
+
+// ── POST /products/{id}/reviews/{reviewId}/helpful ────────────────────────────
+
+// handleReviewHelpfulVote toggles the current user's helpful vote on a review.
+// Auth is required (wired via requireAuth). Validates that {reviewId} belongs to
+// {id} (404 otherwise), then toggles. Returns {helpfulCount, voted}.
+func handleReviewHelpfulVote(svc catalog.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		productID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil || productID <= 0 {
+			jsonError(w, "invalid product id", http.StatusBadRequest)
+			return
+		}
+		reviewID, err := strconv.ParseInt(r.PathValue("reviewId"), 10, 64)
+		if err != nil || reviewID <= 0 {
+			jsonError(w, "invalid review id", http.StatusBadRequest)
+			return
+		}
+		userID := middleware.UserIDFromCtx(r.Context())
+		if userID == 0 {
+			jsonError(w, "auth_required", http.StatusUnauthorized)
+			return
+		}
+
+		// The review must exist AND belong to the product in the URL.
+		ownerProductID, err := svc.ReviewProductID(r.Context(), reviewID)
+		if err != nil {
+			if errors.Is(err, catalog.ErrReviewNotFound) {
+				jsonError(w, "review not found", http.StatusNotFound)
+				return
+			}
+			slog.Error("catalog: ReviewProductID", "review_id", reviewID, "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if ownerProductID != productID {
+			jsonError(w, "review not found", http.StatusNotFound)
+			return
+		}
+
+		res, err := svc.ToggleHelpfulVote(r.Context(), reviewID, userID)
+		if err != nil {
+			slog.Error("catalog: ToggleHelpfulVote", "review_id", reviewID, "user_id", userID, "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
 		}
 		jsonOK(w, http.StatusOK, map[string]any{
-			"data": out,
-			"meta": paginationMeta{Page: page, PerPage: perPage, Total: total, TotalPages: totalPages},
+			"helpfulCount": res.HelpfulCount,
+			"voted":        res.Voted,
 		})
 	}
 }

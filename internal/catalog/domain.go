@@ -175,13 +175,74 @@ type HomeMoodStoryRow struct {
 }
 
 // ProductReviewRow is a single user review on a product.
+//
+// HelpfulCount is the denormalized cache from product_reviews.helpful_count; the
+// authoritative source is catalog_schema.review_helpful_votes (see
+// RefreshHelpfulCountCache). VotedByCurrentUser is true only when the viewing
+// user has a row in review_helpful_votes for this review (always false for guests,
+// who are passed viewerUserID == 0).
 type ProductReviewRow struct {
-	ID           int64
-	ProductID    int64
-	UserID       int64
-	Rating       int
-	Title        string
-	Body         string
+	ID                 int64
+	ProductID          int64
+	UserID             int64
+	Rating             int
+	Title              string
+	Body               string
+	HelpfulCount       int
+	VotedByCurrentUser bool
+	CreatedAt          string
+}
+
+// ReviewSort enumerates the allowed sort orders for the reviews list endpoint.
+type ReviewSort string
+
+const (
+	ReviewSortNewest  ReviewSort = "newest"  // created_at DESC
+	ReviewSortHighest ReviewSort = "highest" // rating DESC, created_at DESC
+	ReviewSortLowest  ReviewSort = "lowest"  // rating ASC, created_at DESC
+	ReviewSortHelpful ReviewSort = "helpful" // helpful_count DESC, created_at DESC
+)
+
+// ParseReviewSort validates a raw sort string. ok is false for unknown values so
+// the HTTP layer can return 400.
+func ParseReviewSort(s string) (ReviewSort, bool) {
+	switch ReviewSort(s) {
+	case ReviewSortNewest, ReviewSortHighest, ReviewSortLowest, ReviewSortHelpful:
+		return ReviewSort(s), true
+	}
+	return "", false
+}
+
+// orderByClause returns the trusted, whitelisted SQL ORDER BY for this sort.
+// A stable final tiebreaker (id DESC) guarantees pagination has no overlaps or
+// gaps even when created_at ties.
+func (s ReviewSort) orderByClause() string {
+	switch s {
+	case ReviewSortHighest:
+		return "r.rating DESC, r.created_at DESC, r.id DESC"
+	case ReviewSortLowest:
+		return "r.rating ASC, r.created_at DESC, r.id DESC"
+	case ReviewSortHelpful:
+		return "r.helpful_count DESC, r.created_at DESC, r.id DESC"
+	case ReviewSortNewest:
+		fallthrough
+	default:
+		return "r.created_at DESC, r.id DESC"
+	}
+}
+
+// ReviewsSummary is the product-level rating aggregate that drives the histogram.
+// It is identical across every page request for the same product. Distribution is
+// keyed by rating (1..5); ratings with no reviews are present with a zero count.
+type ReviewsSummary struct {
+	Average      float64
+	Distribution map[int]int
+	TotalCount   int
+}
+
+// HelpfulVoteResult is the outcome of a helpful-vote toggle: the new vote state for
+// the calling user plus the refreshed authoritative count.
+type HelpfulVoteResult struct {
+	Voted        bool
 	HelpfulCount int
-	CreatedAt    string
 }

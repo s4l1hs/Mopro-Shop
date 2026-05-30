@@ -10,9 +10,11 @@ import 'package:mopro/core/utils/coin_formatter.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/design/responsive/pointer_kind.dart';
 import 'package:mopro/design/responsive/responsive.dart';
+import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
+import 'package:mopro/features/catalog/pdp/reviews/pdp_reviews_tab.dart';
+import 'package:mopro/features/catalog/pdp/reviews/reviews_provider.dart';
 import 'package:mopro/features/catalog/providers/product_detail_provider.dart';
-import 'package:mopro/features/catalog/providers/product_reviews_provider.dart';
 import 'package:mopro/features/catalog/providers/products_rail_provider.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_image_pager.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_price_block.dart';
@@ -183,7 +185,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
               productId: product.id,
             ),
             const _StubTab(),
-            _ReviewsTab(productId: product.id),
+            PdpReviewsTab(productId: product.id),
             const _StubTab(),
           ],
         ),
@@ -359,12 +361,9 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final v = _selectedVariant;
-    final reviews =
-        ref.watch(productReviewsProvider(product.id)).valueOrNull ?? [];
-    final ratingCount = reviews.length;
-    final avg = ratingCount == 0
-        ? 0.0
-        : reviews.map((r) => r.rating).reduce((a, b) => a + b) / ratingCount;
+    final summary = ref.watch(reviewsNotifierProvider(product.id)).summary;
+    final ratingCount = summary?.totalCount ?? 0;
+    final avg = summary?.average ?? 0.0;
     final titleSize = context.isDesktop ? 24.0 : 20.0;
 
     return Column(
@@ -396,7 +395,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
                 const Icon(
                   Icons.star_rounded,
                   size: 18,
-                  color: Color(0xFFFFB400),
+                  color: MoproTokens.ratingStar,
                 ),
                 const SizedBox(width: 4),
                 Text(avg.toStringAsFixed(1), style: theme.textTheme.bodyMedium),
@@ -486,7 +485,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: MarkdownBody(data: product.description),
             ),
-          2 => _WideReviews(productId: product.id),
+          2 => PdpReviewsTab(productId: product.id, scrollable: false),
           _ => Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
@@ -802,134 +801,6 @@ class _StubTab extends StatelessWidget {
   }
 }
 
-class _ReviewsTab extends ConsumerWidget {
-  const _ReviewsTab({required this.productId});
-  final int productId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final reviewsAsync = ref.watch(productReviewsProvider(productId));
-    final cs = Theme.of(context).colorScheme;
-
-    return reviewsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, __) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'Yorumlar yüklenemedi.',
-            style: TextStyle(color: cs.onSurfaceVariant),
-          ),
-        ),
-      ),
-      data: (reviews) {
-        if (reviews.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.rate_review_outlined,
-                  size: 48,
-                  color: cs.outlineVariant,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Henüz yorum yok.',
-                  style: TextStyle(color: cs.onSurfaceVariant),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'İlk yorumu sen yaz!',
-                  style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
-                ),
-              ],
-            ),
-          );
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          itemCount: reviews.length,
-          separatorBuilder: (_, __) => const Divider(height: 24),
-          itemBuilder: (_, i) => _ReviewItem(review: reviews[i]),
-        );
-      },
-    );
-  }
-}
-
-class _ReviewItem extends StatelessWidget {
-  const _ReviewItem({required this.review});
-  final ProductReview review;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            // Star row
-            Row(
-              children: List.generate(5, (i) {
-                final filled = i < review.rating;
-                return Icon(
-                  filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                  size: 16,
-                  color: filled ? const Color(0xFFFFB400) : cs.outlineVariant,
-                );
-              }),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              review.createdAt.split('T').first,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
-        if (review.title.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(
-            review.title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ],
-        if (review.body.isNotEmpty) ...[
-          const SizedBox(height: 4),
-          Text(
-            review.body,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-        ],
-        if (review.helpfulCount > 0) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(
-                Icons.thumb_up_outlined,
-                size: 14,
-                color: cs.onSurfaceVariant,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${review.helpfulCount} kişi faydalı buldu',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-              ),
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-}
-
 // ── Wide buy-box helpers ───────────────────────────────────────────────────────
 
 class _QuantityStepper extends StatelessWidget {
@@ -996,51 +867,6 @@ class _TrustBadges extends StatelessWidget {
         badge(Icons.refresh, 'product.trust_easy_return'),
         badge(Icons.local_shipping_outlined, 'product.trust_free_shipping'),
       ],
-    );
-  }
-}
-
-class _WideReviews extends ConsumerWidget {
-  const _WideReviews({required this.productId});
-
-  final int productId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final reviewsAsync = ref.watch(productReviewsProvider(productId));
-    final cs = Theme.of(context).colorScheme;
-    return reviewsAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (_, __) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Text(
-          'Yorumlar yüklenemedi.',
-          style: TextStyle(color: cs.onSurfaceVariant),
-        ),
-      ),
-      data: (reviews) {
-        if (reviews.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text(
-              'Henüz yorum yok.',
-              style: TextStyle(color: cs.onSurfaceVariant),
-            ),
-          );
-        }
-        return Column(
-          children: [
-            for (final r in reviews)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: _ReviewItem(review: r),
-              ),
-          ],
-        );
-      },
     );
   }
 }

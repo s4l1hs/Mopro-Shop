@@ -52,6 +52,36 @@ func RequireAuth(signer jwt.Signer) func(http.Handler) http.Handler {
 	}
 }
 
+// OptionalAuth is RequireAuth's permissive sibling: if a valid API-scope Bearer
+// token is present it stores the user ID + claims in the context (so handlers can
+// personalize the response), but a missing or invalid token is NOT an error — the
+// request proceeds as a guest with UserIDFromCtx == 0. Used by public read
+// endpoints that still want viewer-specific fields (e.g. reviews'
+// votedByCurrentUser).
+func OptionalAuth(signer jwt.Signer) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tok := bearerToken(r)
+			if tok == "" {
+				next.ServeHTTP(w, r)
+				return
+			}
+			claims, err := signer.Verify(tok)
+			if err != nil || claims.Scope != jwt.ScopeAPI {
+				// Treat an unusable token as guest; do not reject.
+				next.ServeHTTP(w, r)
+				return
+			}
+			ctx := context.WithValue(r.Context(), ctxKeyUserID, claims.UserID)
+			ctx = context.WithValue(ctx, ctxKeyClaims, claims)
+			span := trace.SpanFromContext(ctx)
+			span.SetAttributes(attribute.Int64("user_id", claims.UserID))
+			ctx = logx.With(ctx, slog.Int64("user_id", claims.UserID))
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 // RequireStepUp validates that the request carries a valid step-up JWT (scope="high_sensitivity").
 // Must be applied AFTER RequireAuth so the base user ID is already in context.
 func RequireStepUp(signer jwt.Signer) func(http.Handler) http.Handler {
@@ -76,6 +106,13 @@ func RequireStepUp(signer jwt.Signer) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// ContextWithUserID returns a copy of ctx carrying the given authenticated user
+// ID under the same key RequireAuth/OptionalAuth use. Useful for composing
+// contexts in tests and internal callers that bypass the HTTP middleware.
+func ContextWithUserID(ctx context.Context, userID int64) context.Context {
+	return context.WithValue(ctx, ctxKeyUserID, userID)
 }
 
 // UserIDFromCtx returns the authenticated user ID from the context.

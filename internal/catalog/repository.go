@@ -644,18 +644,25 @@ func (r *pgxRepository) HomeMoodStories(ctx context.Context) ([]HomeMoodStoryRow
 	return out, rows.Err()
 }
 
-func (r *pgxRepository) ListReviews(ctx context.Context, productID int64, offset, limit int) ([]ProductReviewRow, int, error) {
-	rows, err := r.pool.Query(ctx,
-		`SELECT id, product_id, user_id, rating,
-		        COALESCE(title,''), COALESCE(body,''),
-		        helpful_count, created_at::text,
-		        count(*) OVER() AS total_count
-		FROM catalog_schema.product_reviews
-		WHERE product_id = $1
-		ORDER BY created_at DESC
-		LIMIT $2 OFFSET $3`,
-		productID, limit, offset,
-	)
+// ListReviews returns one page of reviews ordered by sort. VotedByCurrentUser is
+// computed via a LEFT JOIN to the authoritative review_helpful_votes table keyed
+// on viewerUserID (0 matches no user → false for guests). The ORDER BY is a
+// trusted whitelist (ReviewSort.orderByClause), never interpolated user input.
+func (r *pgxRepository) ListReviews(ctx context.Context, productID int64, sort ReviewSort, offset, limit int, viewerUserID int64) ([]ProductReviewRow, int, error) {
+	//nolint:gosec // orderByClause is a fixed whitelist, not user input.
+	q := `SELECT r.id, r.product_id, r.user_id, r.rating,
+	             COALESCE(r.title,''), COALESCE(r.body,''),
+	             r.helpful_count,
+	             (v.user_id IS NOT NULL) AS voted_by_current_user,
+	             r.created_at::text,
+	             count(*) OVER() AS total_count
+	      FROM catalog_schema.product_reviews r
+	      LEFT JOIN catalog_schema.review_helpful_votes v
+	             ON v.review_id = r.id AND v.user_id = $4
+	      WHERE r.product_id = $1
+	      ORDER BY ` + sort.orderByClause() + `
+	      LIMIT $2 OFFSET $3`
+	rows, err := r.pool.Query(ctx, q, productID, limit, offset, viewerUserID)
 	if err != nil {
 		return nil, 0, fmt.Errorf("catalog.repo: ListReviews: %w", err)
 	}
@@ -666,7 +673,7 @@ func (r *pgxRepository) ListReviews(ctx context.Context, productID int64, offset
 		var rv ProductReviewRow
 		if err := rows.Scan(
 			&rv.ID, &rv.ProductID, &rv.UserID, &rv.Rating,
-			&rv.Title, &rv.Body, &rv.HelpfulCount, &rv.CreatedAt, &total,
+			&rv.Title, &rv.Body, &rv.HelpfulCount, &rv.VotedByCurrentUser, &rv.CreatedAt, &total,
 		); err != nil {
 			return nil, 0, err
 		}
@@ -676,4 +683,163 @@ func (r *pgxRepository) ListReviews(ctx context.Context, productID int64, offset
 		out = []ProductReviewRow{}
 	}
 	return out, total, rows.Err()
+}
+
+// ReviewsSummary computes the rating aggregate from product_reviews (authoritative
+// for the histogram). Distribution always has keys 1..5 (zero when absent).
+func (r *pgxRepository) ReviewsSummary(ctx context.Context, productID int64) (ReviewsSummary, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT rating, COUNT(*) FROM catalog_schema.product_reviews
+		 WHERE product_id = $1 GROUP BY rating`, productID)
+	if err != nil {
+		return ReviewsSummary{}, fmt.Errorf("catalog.repo: ReviewsSummary: %w", err)
+	}
+	defer rows.Close()
+	dist := map[int]int{1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+	var total, weighted int
+	for rows.Next() {
+		var rating, count int
+		if err := rows.Scan(&rating, &count); err != nil {
+			return ReviewsSummary{}, err
+		}
+		if rating >= 1 && rating <= 5 {
+			dist[rating] = count
+		}
+		total += count
+		weighted += rating * count
+	}
+	if err := rows.Err(); err != nil {
+		return ReviewsSummary{}, err
+	}
+	var avg float64
+	if total > 0 {
+		avg = float64(weighted) / float64(total)
+	}
+	return ReviewsSummary{Average: avg, Distribution: dist, TotalCount: total}, nil
+}
+
+// ReviewProductID returns the product a review belongs to, or ErrReviewNotFound.
+func (r *pgxRepository) ReviewProductID(ctx context.Context, reviewID int64) (int64, error) {
+	var pid int64
+	err := r.pool.QueryRow(ctx,
+		`SELECT product_id FROM catalog_schema.product_reviews WHERE id = $1`, reviewID).Scan(&pid)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrReviewNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("catalog.repo: ReviewProductID: %w", err)
+	}
+	return pid, nil
+}
+
+// WithTx runs fn in a transaction at the given isolation level, retrying on
+// serialization failures (40001) and deadlocks (40P01) — required because the
+// helpful-vote toggle runs at SERIALIZABLE and concurrent toggles legitimately
+// conflict. Each successful fn applies exactly one logical change regardless of
+// how many times it is retried (nothing commits until the final attempt).
+func (r *pgxRepository) WithTx(ctx context.Context, iso pgx.TxIsoLevel, fn func(pgx.Tx) error) error {
+	const maxRetries = 10
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: iso})
+		if err != nil {
+			return fmt.Errorf("catalog.repo: begin tx: %w", err)
+		}
+		if err := fn(tx); err != nil {
+			_ = tx.Rollback(ctx)
+			if isSerializationFailure(err) {
+				lastErr = err
+				continue
+			}
+			return err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			_ = tx.Rollback(ctx)
+			if isSerializationFailure(err) {
+				lastErr = err
+				continue
+			}
+			return fmt.Errorf("catalog.repo: commit tx: %w", err)
+		}
+		return nil
+	}
+	return fmt.Errorf("catalog.repo: tx serialization retries exhausted: %w", lastErr)
+}
+
+// isSerializationFailure reports whether err is a Postgres serialization failure
+// (40001) or deadlock (40P01) — the retryable transaction-conflict codes.
+func isSerializationFailure(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "40001" || pgErr.Code == "40P01"
+	}
+	return false
+}
+
+// InsertHelpfulVote inserts the (reviewID, userID) row. On a 23505 unique
+// violation it returns ErrAlreadyVoted — the EXPECTED concurrent / already-voted
+// path (the PRIMARY KEY is the authoritative double-vote guard), NOT logged. The
+// INSERT is wrapped in a savepoint so a conflict does not poison the outer
+// transaction; the caller toggles off instead.
+func (r *pgxRepository) InsertHelpfulVote(ctx context.Context, tx pgx.Tx, reviewID, userID int64) error {
+	sp, err := tx.Begin(ctx) // nested tx = SAVEPOINT
+	if err != nil {
+		return fmt.Errorf("catalog.repo: InsertHelpfulVote savepoint: %w", err)
+	}
+	_, err = sp.Exec(ctx,
+		`INSERT INTO catalog_schema.review_helpful_votes (review_id, user_id) VALUES ($1, $2)`,
+		reviewID, userID)
+	if err != nil {
+		_ = sp.Rollback(ctx) // ROLLBACK TO SAVEPOINT — outer tx stays usable
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgxUniqueViolation {
+			return ErrAlreadyVoted
+		}
+		return fmt.Errorf("catalog.repo: InsertHelpfulVote: %w", err)
+	}
+	if err := sp.Commit(ctx); err != nil { // RELEASE SAVEPOINT
+		return fmt.Errorf("catalog.repo: InsertHelpfulVote release: %w", err)
+	}
+	return nil
+}
+
+// DeleteHelpfulVote removes the vote row; the bool reports whether a row existed.
+func (r *pgxRepository) DeleteHelpfulVote(ctx context.Context, tx pgx.Tx, reviewID, userID int64) (bool, error) {
+	ct, err := tx.Exec(ctx,
+		`DELETE FROM catalog_schema.review_helpful_votes WHERE review_id = $1 AND user_id = $2`,
+		reviewID, userID)
+	if err != nil {
+		return false, fmt.Errorf("catalog.repo: DeleteHelpfulVote: %w", err)
+	}
+	return ct.RowsAffected() > 0, nil
+}
+
+// RefreshHelpfulCountCache recomputes product_reviews.helpful_count from the
+// authoritative review_helpful_votes rows. helpful_count is a DENORMALIZED CACHE,
+// not the source of truth; this MUST run inside the same (SERIALIZABLE) tx as the
+// vote insert/delete so the cache can never drift. Mirrors RefreshPaymentsMadeCache.
+func (r *pgxRepository) RefreshHelpfulCountCache(ctx context.Context, tx pgx.Tx, reviewID int64) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE catalog_schema.product_reviews
+		    SET helpful_count = (SELECT COUNT(*) FROM catalog_schema.review_helpful_votes WHERE review_id = $1)
+		  WHERE id = $1`, reviewID)
+	if err != nil {
+		return fmt.Errorf("catalog.repo: RefreshHelpfulCountCache: %w", err)
+	}
+	return nil
+}
+
+// HelpfulCount reads the cached helpful_count within the tx (called right after a
+// refresh, so it reflects the authoritative vote rows).
+func (r *pgxRepository) HelpfulCount(ctx context.Context, tx pgx.Tx, reviewID int64) (int, error) {
+	var c int
+	err := tx.QueryRow(ctx,
+		`SELECT helpful_count FROM catalog_schema.product_reviews WHERE id = $1`, reviewID).Scan(&c)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrReviewNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("catalog.repo: HelpfulCount: %w", err)
+	}
+	return c, nil
 }

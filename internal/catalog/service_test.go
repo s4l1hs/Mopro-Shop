@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/mopro/platform/internal/catalog"
 )
 
@@ -365,8 +366,29 @@ func (m *mockRepo) HomeMoodStories(_ context.Context) ([]catalog.HomeMoodStoryRo
 func (m *mockRepo) HomeFlashDeals(_ context.Context, _ *int64) (*catalog.FlashDealsCollectionRow, error) {
 	return nil, nil
 }
-func (m *mockRepo) ListReviews(_ context.Context, _ int64, _, _ int) ([]catalog.ProductReviewRow, int, error) {
+func (m *mockRepo) ListReviews(_ context.Context, _ int64, _ catalog.ReviewSort, _, _ int, _ int64) ([]catalog.ProductReviewRow, int, error) {
 	return nil, 0, nil
+}
+func (m *mockRepo) ReviewsSummary(_ context.Context, _ int64) (catalog.ReviewsSummary, error) {
+	return catalog.ReviewsSummary{}, nil
+}
+func (m *mockRepo) ReviewProductID(_ context.Context, _ int64) (int64, error) {
+	return 0, nil
+}
+func (m *mockRepo) InsertHelpfulVote(_ context.Context, _ pgx.Tx, _, _ int64) error {
+	return nil
+}
+func (m *mockRepo) DeleteHelpfulVote(_ context.Context, _ pgx.Tx, _, _ int64) (bool, error) {
+	return false, nil
+}
+func (m *mockRepo) RefreshHelpfulCountCache(_ context.Context, _ pgx.Tx, _ int64) error {
+	return nil
+}
+func (m *mockRepo) HelpfulCount(_ context.Context, _ pgx.Tx, _ int64) (int, error) {
+	return 0, nil
+}
+func (m *mockRepo) WithTx(_ context.Context, _ pgx.TxIsoLevel, _ func(pgx.Tx) error) error {
+	return nil
 }
 
 // ── Discovery repository method stubs ─────────────────────────────────────────

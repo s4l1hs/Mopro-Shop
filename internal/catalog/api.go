@@ -3,7 +3,11 @@
 // Other modules (cart, order, search) import ONLY the Service interface from this package.
 package catalog
 
-import "context"
+import (
+	"context"
+
+	"github.com/jackc/pgx/v5"
+)
 
 // Service is the public interface of the catalog module.
 // It is the ONLY exported API. Other modules must import this interface, never
@@ -43,8 +47,22 @@ type Service interface {
 	// there is no active collection / the id doesn't exist.
 	HomeFlashDeals(ctx context.Context, locale string, collectionID *int64) (*FlashDealsResult, error)
 
-	// ListReviews returns paginated reviews for a product.
-	ListReviews(ctx context.Context, productID int64, page, perPage int) ([]ProductReviewRow, int, error)
+	// ListReviews returns one page of reviews for a product, ordered by sort.
+	// viewerUserID computes ProductReviewRow.VotedByCurrentUser (pass 0 for guest).
+	ListReviews(ctx context.Context, productID int64, sort ReviewSort, page, pageSize int, viewerUserID int64) ([]ProductReviewRow, int, error)
+
+	// ReviewsSummary returns the product-level rating aggregate (average,
+	// distribution, totalCount) that drives the histogram. Identical across pages.
+	ReviewsSummary(ctx context.Context, productID int64) (ReviewsSummary, error)
+
+	// ReviewProductID returns the product a review belongs to (for URL validation),
+	// or ErrReviewNotFound. Used by the helpful-vote endpoint to 404 mismatches.
+	ReviewProductID(ctx context.Context, reviewID int64) (int64, error)
+
+	// ToggleHelpfulVote flips the (reviewID, userID) helpful vote inside a
+	// SERIALIZABLE transaction and returns the new vote state plus refreshed count.
+	// Authoritative source: catalog_schema.review_helpful_votes.
+	ToggleHelpfulVote(ctx context.Context, reviewID, userID int64) (HelpfulVoteResult, error)
 
 	// ListAllVariantStocks returns (variantID, stock) for every variant with stock > 0.
 	// Used at core-svc startup to seed Redis stock counters.
@@ -73,7 +91,35 @@ type Repository interface {
 	HomeBanners(ctx context.Context) ([]HomeBannerRow, error)
 	HomeMoodStories(ctx context.Context) ([]HomeMoodStoryRow, error)
 	HomeFlashDeals(ctx context.Context, collectionID *int64) (*FlashDealsCollectionRow, error)
-	ListReviews(ctx context.Context, productID int64, offset, limit int) ([]ProductReviewRow, int, error)
+
+	// ListReviews returns one page (offset/limit) ordered by sort, with
+	// VotedByCurrentUser computed against viewerUserID (0 = guest).
+	ListReviews(ctx context.Context, productID int64, sort ReviewSort, offset, limit int, viewerUserID int64) ([]ProductReviewRow, int, error)
+	// ReviewsSummary returns the rating aggregate for the histogram.
+	ReviewsSummary(ctx context.Context, productID int64) (ReviewsSummary, error)
+	// ReviewProductID returns the owning product id or ErrReviewNotFound.
+	ReviewProductID(ctx context.Context, reviewID int64) (int64, error)
+
+	// ── Helpful-vote primitives (authoritative table: review_helpful_votes) ──
+	// All three run inside a caller-provided tx (see WithTx) so the vote mutation
+	// and the helpful_count cache refresh commit atomically.
+	//
+	// InsertHelpfulVote returns ErrAlreadyVoted on a 23505 PK conflict (expected
+	// concurrent / already-voted path; not logged). It is savepoint-guarded so the
+	// outer tx survives the conflict and can toggle off instead.
+	InsertHelpfulVote(ctx context.Context, tx pgx.Tx, reviewID, userID int64) error
+	// DeleteHelpfulVote removes the vote; bool reports whether a row was deleted.
+	DeleteHelpfulVote(ctx context.Context, tx pgx.Tx, reviewID, userID int64) (bool, error)
+	// RefreshHelpfulCountCache recomputes product_reviews.helpful_count from the
+	// authoritative review_helpful_votes rows. helpful_count is a denormalized
+	// cache, never the source of truth.
+	RefreshHelpfulCountCache(ctx context.Context, tx pgx.Tx, reviewID int64) error
+	// HelpfulCount reads the (just-refreshed) cached count within the tx.
+	HelpfulCount(ctx context.Context, tx pgx.Tx, reviewID int64) (int, error)
+
+	// WithTx runs fn inside a transaction at the given isolation level, retrying
+	// on serialization failures (40001) and deadlocks (40P01).
+	WithTx(ctx context.Context, iso pgx.TxIsoLevel, fn func(pgx.Tx) error) error
 
 	ListAllVariantStocks(ctx context.Context) ([]VariantStock, error)
 }

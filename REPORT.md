@@ -1742,3 +1742,186 @@ screens (will surface as rail placeholders when §2 lands).
   re-fire — this matches the pre-existing Session 1 behavior (not regressed).
 - SearchScreen filters are state/URL-substrate only; they visibly render but don't
   change results until backend search filtering exists — could surprise QA.
+
+---
+
+# Reviews PR — Helpful-Vote + Sort + Pagination + Histogram
+
+Branch `feat/reviews-helpful-sort-pagination`, **stacked on the unmerged Session 5c
+stack** (PR #17 not yet merged to `main`). This is deliberate: Flow T (§5) and the
+guest "Faydalı" gate (§4.3) depend on `LoginRequiredDialog`, which exists only on
+the 5c stack. The PR therefore targets `feat/account-login-reviews-a11y` (the 5c
+branch), not `main`.
+
+## Reviews PR — Baseline (pre-flight, captured before any code)
+
+| Gate | Baseline |
+|---|---|
+| `go test ./...` | **PASS** — all packages `ok`, 0 failures |
+| `flutter analyze` | **0 issues** ("No issues found!") |
+| `flutter test` | **+402 / -49** — all 49 failures are golden-class (LoginRequiredSheet, auth_card_goldens, …); repo goldens are baselined on ubuntu-latest CI and fail on local macOS by design. No non-golden failures. |
+| `flutter build web --release` | **SUCCESS** — `build/web/main.dart.js` = **4,533,143 B** (+5% budget ⇒ ≤ 4,759,800 B) |
+| `flutter test integration_test` | Deferred — requires a device/driver; integration flows run in CI. Captured at §8. |
+| Containers | All healthy: core-svc, fin-svc, jobs-svc, postgres-ecom, postgres-ledger, redis, meilisearch, caddy, pgbouncer×2 |
+| CI | Captured on WIP push (below). |
+
+### Schema reality vs. prompt (§2.1 adaptation)
+The prompt assumed brand-new `reviews_helpful_votes` table + new `helpful_count`
+column. In reality migration `0064_home_features` **already** created
+`catalog_schema.product_reviews` (with `helpful_count INT NOT NULL DEFAULT 0`,
+`UNIQUE(product_id,user_id)`) and `catalog_schema.review_helpful_votes` (with
+`PRIMARY KEY (review_id, user_id)` + FK cascade). Creating a parallel
+`reviews_helpful_votes` table is forbidden (CLAUDE.md §11). **Adaptation:** reuse
+`review_helpful_votes`; migration `0069` is additive only (add `created_at` +
+`COMMENT` naming the authoritative source — mirrors existing
+`0079_payments_made_cache_comment`).
+
+### Module-location reality (§2.2 adaptation)
+There is no `internal/reviews` and CLAUDE.md §2.3 locks the module layout against
+adding one. Reviews are owned by `internal/catalog` (existing
+`catalog.Service.ListReviews`, `ProductReviewRow`). **Adaptation:** all backend
+work lands in `internal/catalog` + a hand-written POST handler in `cmd/core-svc`
+(mirrors existing `handleProductReviews`).
+
+### OpenAPI/DTO reality (§2.5 adaptation)
+Reviews endpoints are not in `api/openapi.yaml`; the GET is hand-written and the
+Dart side hand-parses JSON (no generated reviews DTO). **Decision (user-approved):**
+match existing convention — hand-write the handler + hand-parse the new fields in
+Dart; no codegen. `api-check-sync` unaffected (reviews never were in the spec).
+
+## Reviews PR — Results
+
+Commits (one per section, on `feat/reviews-helpful-sort-pagination`):
+- `docs(report)` — baselines + adaptation notes.
+- `feat(api): reviews helpful vote + sort + pagination + summary + migration 0069`.
+- `feat(pdp): reviewsProvider with optimistic helpful + sort + pagination`.
+- `feat(pdp): histogram + sort dropdown + helpful button + Daha fazla …`.
+- `test(integration): flow T — …`.
+- `refactor(pdp): MoproTokens.ratingStar + histogram avg-stars + review dividers`.
+
+### 1. Baseline vs. final
+
+| Gate | Baseline | Final |
+|---|---|---|
+| `go test ./...` | PASS (30 ok) | **PASS** (30 ok, 0 fail) |
+| `flutter analyze` | 0 issues | **0 issues** |
+| `flutter test` | +402 / −49 (49 = Linux-golden) | **+419 / −55** (+17 new passes; −55 = 49 pre-existing + **6 new reviews goldens**, all Linux-baselined — no non-golden regressions) |
+| `flutter build web --release` | 4,533,143 B | **4,543,913 B** (+10,770 B = **+0.24%**, budget +5%) |
+| Containers | healthy | healthy |
+
+### 2. Hygiene-class fixes
+None required — `go test`, `flutter analyze`, build were all green at baseline, so
+no `chore(verify):` commit. (Local `flutter test` golden failures are the repo's
+documented Linux-baseline behaviour, not hygiene breaks.)
+
+### 3. Migration `0069` round-trip
+Isolated round-trip on a fresh PG16 (the full chain assumes externally-bootstrapped
+schemas/roles, so 0069 was tested against the 0064 baseline it modifies):
+
+```
+BEFORE : votes.created_at=false | helpful_count=0 (stale) | comment=<null> | reviews_rows=1 votes_rows=1
+UP     : votes.created_at=true  | helpful_count=1 (backfilled) | comment=Denormalized cache … review_helpful_votes is the source of truth … | reviews_rows=1 votes_rows=1
+DOWN   : votes.created_at=false | helpful_count=1 | comment=<null> | reviews_rows=1 votes_rows=1   ← 0064 table + rows survive
+RE-UP  : votes.created_at=true  | comment restored
+```
+Proves: additive column add/drop, `helpful_count` backfill from authoritative
+rows, comment add/clear, reversibility, idempotent re-up, and that `down` does NOT
+drop the 0064 table/data.
+
+### 4. Endpoints (implemented contract)
+
+`GET /products/123/reviews?sort=helpful&page=1&pageSize=10` →
+```json
+{
+  "items": [
+    {"id": 7, "userId": 42, "rating": 5, "title": "Harika", "body": "…",
+     "helpfulCount": 9, "votedByCurrentUser": false, "createdAt": "2026-01-01T…"}
+  ],
+  "total": 12, "page": 1, "pageSize": 10,
+  "summary": {"average": 4.3, "distribution": {"1":1,"2":1,"3":2,"4":3,"5":5}, "totalCount": 12}
+}
+```
+Invalid params → 400 (`sort=banana`, `page=0`, `pageSize=51`/`0`). `OptionalAuth`
+sets `votedByCurrentUser` for a signed-in viewer; always false for guests.
+
+`POST /products/123/reviews/7/helpful` (auth required):
+```
+vote on  → 200 {"helpfulCount": 1, "voted": true}
+vote off → 200 {"helpfulCount": 0, "voted": false}   (toggle)
+guest    → 401 {"error": "auth_required"}
+reviewId not under productId, or missing → 404
+```
+
+### 5. Concurrent-vote test (verbatim)
+```
+=== RUN   TestIntegration_ConcurrentToggle
+    reviews_integration_test.go:149: concurrent toggle: N=7 goroutines converged to 1 vote row(s); helpful_count=1 (no errors)
+--- PASS: TestIntegration_ConcurrentToggle (0.03s)
+```
+SERIALIZABLE tx + savepoint-guarded INSERT (23505→ErrAlreadyVoted→delete) + 40001
+retry → N goroutines converge to exactly `N%2` rows with a matching cache.
+
+### 6. Property test (verbatim)
+```
+=== RUN   TestProperty_HelpfulCountMatchesVoteRows
+    reviews_integration_test.go:176: property: helpful_count == COUNT(*) vote rows held across 200 random toggles
+--- PASS: TestProperty_HelpfulCountMatchesVoteRows (0.27s)
+```
+
+### 7. Frontend wiring
+Screenshots (375 + 1440, light) captured during golden generation; populated tab
+shows histogram (4.3 + avg-stars + 5★→1★ bars), "Yorumlar (N)" header, sort
+dropdown, review rows with "Faydalı" pills, and a full-width "Daha fazla" button;
+empty state shows the empty caption + header only. (Goldens render raw i18n keys +
+tofu icons — the repo's documented golden behaviour, identical to favorites/PLP/PDP
+goldens; real device shows Turkish + Inter.)
+
+### 8. Optimistic update verification
+`toggleHelpful` flips `votedByCurrentUser` + `helpfulCount` immediately, POSTs,
+then reconciles to the server's `{voted, helpfulCount}` (handles races). On error
+it rolls back to the pre-tap value and returns `false`; `ReviewRow` then shows a
+SnackBar — **"İşlem başarısız, tekrar deneyin."** (messenger captured before the
+await; no `context`-across-async). Verified by `reviews_provider_test` (rollback)
+and `pdp_reviews_tab_test` (rollback + SnackBar via `runAsync`).
+
+### 9. Goldens
+6 new baselines (generated locally to confirm render, then removed; baselined on
+Linux CI via the `golden-rebaseline` workflow):
+`pdp_reviews_tab_populated_{375,1440}_{light,dark}.png` (+ `.meta`) and
+`pdp_reviews_tab_empty_{375,1440}_light.png` (+ `.meta`).
+Rebaseline workflow run: https://github.com/s4l1hs/Mopro-Shop/actions/runs/26677338831
+(committed to the branch as `06c71270 test(goldens): re-baseline on ubuntu-latest …`).
+PR: https://github.com/s4l1hs/Mopro-Shop/pull/18 (base `feat/account-login-reviews-a11y`).
+
+### 10. DTO regen impact
+None. Per the user-approved decision, reviews stay hand-written (not in
+`openapi.yaml`); the Dart `Review`/`ReviewsSummary` models hand-parse JSON. No
+`make api-gen-dart` diff; `api-check-sync` unaffected.
+
+### 11. Drive-by fixes
+- De-hardcoded the `0xFFFFB400` star color into `MoproTokens.ratingStar`, reused by
+  `product_card`, `ReviewRow`, and the histogram (was an inline literal in
+  `product_card`/the old review item).
+- Added `middleware.OptionalAuth` + `middleware.ContextWithUserID` (reusable).
+
+### 12. Backlog
+No new backlog. Pre-existing carried items unchanged (`sellerpayout_schema` split,
+Radio→RadioGroup, notifier-shapes lint, brand-count endpoint, CDN `?w=`).
+
+### 13. 5c carry list (still pending)
+Account two-pane / `ShellRoute`; A11y sweep; 1024 PLP golden; flows R/S/U. (This PR
+is stacked on the unmerged 5c branch and targets it, not `main`.)
+
+### 14. Risk notes
+- **`?sort=helpful` plan**: orders by the denormalized `helpful_count` (indexed
+  candidate); under very large review counts consider a `(product_id,
+  helpful_count DESC)` index — current `reviews_product_idx` covers newest only.
+- **Optimistic toggle under flaky network**: rollback + SnackBar covers failures;
+  rapid double-taps reconcile to the server value (no double-increment).
+- **Browser back inside the login dialog** (`/auth/login` route) does not re-fire
+  the resume callback — pre-existing 5c behaviour, unchanged.
+- **Denormalized cache drift**: any future write path to `review_helpful_votes`
+  MUST call `RefreshHelpfulCountCache` in the same SERIALIZABLE tx (the comment on
+  `helpful_count` names `review_helpful_votes` authoritative).
+- **Goldens** render raw i18n keys (EasyLocalization doesn't load assets under
+  `flutter test`) — cosmetic only, repo-wide.

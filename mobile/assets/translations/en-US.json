@@ -190,6 +190,19 @@
     "qa_tab": "Q&A",
     "related_title": "Similar Products"
   },
+  "reviews": {
+    "header": "Reviews ({count})",
+    "helpful_count": "Helpful ({count})",
+    "load_more": "Load more reviews",
+    "empty": "No reviews yet.",
+    "action_failed": "Something went wrong, please try again.",
+    "load_error": "Couldn't load reviews.",
+    "login_to_vote": "Sign in to mark reviews helpful.",
+    "sort_newest": "Newest",
+    "sort_highest": "Highest rated",
+    "sort_lowest": "Lowest rated",
+    "sort_helpful": "Most helpful"
+  },
   "cashback": {
     "preview_title": "Mopro Cashback",
     "cashback_preview": "You'll receive {monthly} Mopro Coin per month from this product — FOREVER.",
