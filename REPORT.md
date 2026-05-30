@@ -1925,3 +1925,49 @@ is stacked on the unmerged 5c branch and targets it, not `main`.)
   `helpful_count` names `review_helpful_votes` authoritative).
 - **Goldens** render raw i18n keys (EasyLocalization doesn't load assets under
   `flutter test`) — cosmetic only, repo-wide.
+
+---
+
+# Account Two-Pane PR — ShellRoute + Left Rail + Right Pane
+
+Branch `feat/account-two-pane-shellroute`, **fresh off `main`** (PR #17 + #18 both
+merged — verified `HEAD` ancestor of `origin/main`). Targets `main`.
+
+## Account Two-Pane PR — Baseline (pre-flight)
+
+| Gate | Baseline |
+|---|---|
+| `go test ./...` | **PASS** — 30 ok, 0 fail |
+| `flutter analyze` | **0 issues** |
+| `flutter test` | **+419 / −55** — the 55 are Linux-baselined goldens (incl. the reviews goldens now on main) that fail on local macOS by design; no non-golden failures |
+| `flutter build web --release` | **4,544,296 B** (`main.dart.js`) — +5% budget ⇒ ≤ 4,771,510 B |
+| Containers | healthy |
+
+### §2.1 Router audit (pre-code findings)
+- Router: `lib/core/router/app_router.dart` — single `GoRouter` with `rootNavigatorKey`.
+- Auth guard: `computeAuthRedirect(auth, location)` in the top-level `redirect`;
+  hard-gates `/checkout`, `/wallet`, `/orders`, `/profile/addresses`,
+  `/account/{profile,security,cards}` → `/auth/login?next=`. The shell adds **no**
+  second guard.
+- **`/account`** is the 5th branch of a `StatefulShellRoute.indexedStack`
+  (`AppShell` = mobile bottom-nav / desktop `WebHeader`+`MegaMenuBar`). So it's a
+  bottom-nav tab on mobile and carries the web header on desktop.
+- **Sub-pages** (`/account/profile`, `/account/security`, `/account/cards`,
+  `/orders`(+`:id`), `/wallet`(+`plans/:id`), `/profile/addresses`(+sub)) are
+  **top-level** routes on `rootNavigatorKey` → full-screen, **no** web header,
+  their own `Scaffold` + `AppBar`. No `/account/notifications` or `/help` routes
+  exist yet.
+- Mega menu (`mega_menu_bar.dart:157`) reads `GoRouterState.of(context).uri` in
+  `build` — **no `NavigatorObserver`**, so nothing to break; account routes match
+  no category so none highlights.
+- No deep-link tests currently exercise `/account/*` beyond auth-guard tests.
+
+### §2 architecture decision (user-approved: Option A)
+`/account` stays the bottom-nav tab; `AccountScreen` becomes responsive (desktop =
+rail + welcome under the existing `WebHeader`). Sub-pages are wrapped in a NEW
+top-level width-aware `ShellRoute` (`AccountShellRoute`): **mobile = pass-through**
+(bare child + its own app bar, 100% unchanged), **desktop/tablet = `WebHeader` +
+rail + pane** with the child's app bar suppressed. Lowest mobile-regression risk;
+desktop consistent (header + two-pane across all account routes). Chrome
+suppression = **Approach A** (a `showAppBar`/`showChrome` arg defaulting to `true`),
+since the sub-screens are plain `Scaffold`+`AppBar`.
