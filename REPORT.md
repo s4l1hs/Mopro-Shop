@@ -1889,7 +1889,9 @@ and `pdp_reviews_tab_test` (rollback + SnackBar via `runAsync`).
 Linux CI via the `golden-rebaseline` workflow):
 `pdp_reviews_tab_populated_{375,1440}_{light,dark}.png` (+ `.meta`) and
 `pdp_reviews_tab_empty_{375,1440}_light.png` (+ `.meta`).
-Rebaseline workflow run: _<filled in after dispatch>_.
+Rebaseline workflow run: https://github.com/s4l1hs/Mopro-Shop/actions/runs/26677338831
+(committed to the branch as `06c71270 test(goldens): re-baseline on ubuntu-latest …`).
+PR: https://github.com/s4l1hs/Mopro-Shop/pull/18 (base `feat/account-login-reviews-a11y`).
 
 ### 10. DTO regen impact
 None. Per the user-approved decision, reviews stay hand-written (not in
