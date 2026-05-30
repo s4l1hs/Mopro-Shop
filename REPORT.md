@@ -1969,5 +1969,88 @@ top-level width-aware `ShellRoute` (`AccountShellRoute`): **mobile = pass-throug
 (bare child + its own app bar, 100% unchanged), **desktop/tablet = `WebHeader` +
 rail + pane** with the child's app bar suppressed. Lowest mobile-regression risk;
 desktop consistent (header + two-pane across all account routes). Chrome
-suppression = **Approach A** (a `showAppBar`/`showChrome` arg defaulting to `true`),
-since the sub-screens are plain `Scaffold`+`AppBar`.
+suppression = **Approach B** (`AccountChromeScope` InheritedWidget) — chosen over
+Approach A once it was clear 9 screens (incl. StatefulWidgets) needed gating:
+the shell provides the scope once and each screen gates its `appBar:` in one line,
+avoiding a constructor arg threaded through every route builder.
+
+## Account Two-Pane PR — Results
+
+Commits (one logical commit per section, on `feat/account-two-pane-shellroute`):
+`docs(report)` baselines → `feat(account): ShellRoute …` (§2) →
+`feat(account): AccountLeftRail …` (§3) → `feat(account): AccountWelcomePanel …`
+(§4) → `feat(account): two-pane composition …` (§5) → `test(plp): 1024 sidebar
+goldens` (§6) → `docs(contributing): …` (§8) → `test(integration): flow U …` (§7).
+
+### 1. Baseline vs. final
+| Gate | Baseline | Final |
+|---|---|---|
+| `go test ./...` | 30 ok | **30 ok, 0 fail** (no backend changes) |
+| `flutter analyze` | 0 | **0** |
+| `flutter test` | +419 / −55 | **+437 / −71** (+18 new passes; −71 = 55 pre-existing Linux goldens + **16 new** account/PLP-1024 goldens, all Linux-baselined — no non-golden failures) |
+| `flutter build web` | 4,544,296 B | **4,563,431 B** (+19,135 = **+0.42%**, budget +5%) |
+
+### 3. Router audit
+See the baseline section above (split routing: `/account` in the StatefulShellRoute,
+sub-pages top-level; auth guard `computeAuthRedirect`; mega menu reads location in
+`build`, no observer).
+
+### 4. ShellRoute structure
+New top-level `ShellRoute(navigatorKey: _accountShellNavKey, builder: AccountShell)`
+wrapping `/account/profile`, `/account/security`, `/account/cards`,
+`/account/notifications` (placeholder), `/help` (placeholder), `/orders`(+`:id`),
+`/wallet`(+`plans/:id`), `/profile/addresses`(+`new`,`:id/edit`). `/account` left in
+the StatefulShellRoute (AccountScreen handles its own desktop two-pane). Chrome
+suppression: Approach B (`AccountChromeScope`), applied to all 9 wrapped screens.
+
+### 5–8. Rail / welcome / highlight / breakpoint
+Verified by the golden suite (12 account goldens) + flow U: authed rail (user card
++ 12 rows + inline Tema/Dil + logout) and guest rail (3 rows); welcome authed
+(3 quick-action cards) and guest (3 reasons + CTAs); active highlight on
+`/account/security` (orange left-bar + bold), `/orders`, `/wallet`; mobile (375)
+renders the unchanged list-then-detail menu (rail absent, screens keep their app
+bars) while desktop (1440) shows the two-pane — same route, breakpoint switch
+asserted in flow U steps 8–9.
+
+### 9. PLP 1024 goldens
+`plp_sidebar_no_filters_1024_{light,dark}.png` and
+`plp_sidebar_with_filters_1024_{light,dark}.png` (carry from 5c §7.1; same fixture,
+width 1024). Baselined on Linux CI.
+
+All 16 new goldens (12 account + 4 PLP-1024) baselined via the `golden-rebaseline`
+workflow run https://github.com/s4l1hs/Mopro-Shop/actions/runs/26695498965 (bot
+commit `2d672301`).
+
+### 10. Flow U
+**PASS** — `test/integration/flow_u_account_two_pane_test.dart` (real router; two-pane,
+rail nav, back-to-/account, /orders, deep link /account/profile, 375↔1440 resize).
+
+### 11. Drive-by fixes
+- `theme_picker_test` pinned to a mobile viewport (the theme tile it targets now
+  lives only in the `<600` account menu after the responsive split).
+- Added `middleware`-free `AccountChromeScope` + `accountRailItemFor` helper.
+
+### 12. Backlog
+Notifications screen (placeholder route added; not implemented). Help screen
+(placeholder route added; not implemented). `WithRetryOnSerialization` extraction
+into `internal/shared/db`. Plus carried: `sellerpayout_schema` split,
+Radio→RadioGroup, notifier-shapes lint script, brand-count endpoint, CDN `?w=`.
+
+### 13. Carry list remaining
+A11y sweep (next PR); integration flows R + S (depend on a11y work).
+
+### 14. Risk notes
+- **Two shells for the account area**: `/account` renders its two-pane via
+  AccountScreen inside the StatefulShellRoute (AppShell WebHeader); sub-routes via
+  the new top-level AccountShell (which re-renders WebHeader + MegaMenuBar). Both
+  paths are visually consistent but the header is built by two sites.
+- **Browser back between rail items**: rail uses `context.go` (replace), so in-app
+  back can't pop between rail items — browser history is the back affordance on web
+  (flow U drives the destination URL since the widget harness can't replay history).
+- **Deep-link timing**: `currentUserProvider` is async; on first navigation to a
+  rail route the user card may show the guest variant for one frame until it
+  resolves. Not observed as a flake in flow U (pumpAndSettle resolves it).
+- **Mega menu under `/account/*`**: reads location in `build`; no category matches
+  an account route, so none highlights (confirmed; no observer to break).
+- **Goldens** render raw i18n keys (EasyLocalization doesn't load assets under
+  `flutter test`) — repo-wide cosmetic, consistent with prior goldens.
