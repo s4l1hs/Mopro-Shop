@@ -14,6 +14,10 @@
   },
   "auth": {
     "login_title": "Giriş Yap",
+    "login_required_title": "Bu özelliği kullanmak için giriş yapın",
+    "login": "Giriş Yap",
+    "register": "Üye Ol",
+    "continue_as_guest": "Misafir olarak devam et",
     "phone_title": "Telefon Numaranız",
     "phone_subtitle": "+90 ile başlayan 10 haneli numara girin",
     "phone_hint": "5XX XXX XX XX",

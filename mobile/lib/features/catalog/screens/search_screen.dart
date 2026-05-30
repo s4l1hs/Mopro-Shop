@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/design/responsive/responsive.dart';
+import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
+import 'package:mopro/features/catalog/plp/widgets/filter_panel.dart';
+import 'package:mopro/features/catalog/plp/widgets/plp_filter_chips.dart';
 import 'package:mopro/features/catalog/providers/categories_provider.dart';
 import 'package:mopro/features/catalog/providers/recent_searches_provider.dart';
 import 'package:mopro/features/catalog/providers/search_provider.dart';
@@ -62,17 +66,80 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ref.read(searchProvider.notifier).setQuery(q);
               },
             )
-          : CatalogShell(
-              products: state.results.valueOrNull ?? [],
-              isLoading: state.results.isLoading,
-              hasMore: state.hasMore,
-              loadingMore: state.loadingMore,
-              loadMoreError: state.loadMoreError,
-              onLoadMore: () =>
-                  ref.read(searchProvider.notifier).loadMore(),
-              currentSort: _sort,
-              onSort: _showSortSheet,
+          : _results(context, state, query),
+    );
+  }
+
+  Widget _shell(SearchState state, {bool wide = false}) => CatalogShell(
+        products: state.results.valueOrNull ?? [],
+        isLoading: state.results.isLoading,
+        hasMore: state.hasMore,
+        loadingMore: state.loadingMore,
+        loadMoreError: state.loadMoreError,
+        onLoadMore: () => ref.read(searchProvider.notifier).loadMore(),
+        currentSort: _sort,
+        onSort: wide ? null : _showSortSheet,
+        gridCrossAxisCount: wide ? (context.isDesktop ? 5 : 3) : 2,
+      );
+
+  Widget _results(BuildContext context, SearchState state, String query) {
+    if (context.isMobile) return _shell(state);
+
+    // Tablet/desktop: FilterPanel sidebar (no category tree) + a query chip +
+    // filter chips + the results grid. Filters write the plp substrate keyed by
+    // the query; like PLP, they don't yet affect the search fetch (REPORT §5).
+    final plpKey = plpKeyForSearch(query);
+    final sidebarW = context.isDesktop ? 280.0 : 260.0;
+    final pad = context.isDesktop ? 32.0 : 24.0;
+
+    return LayoutBuilder(
+      builder: (ctx, c) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1240),
+          child: SizedBox(
+            height: c.maxHeight,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: pad),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: sidebarW,
+                    child: FilterPanel(
+                      plpKey: plpKey,
+                      currentCategoryId: -1,
+                      showCategoryTree: false,
+                    ),
+                  ),
+                  const VerticalDivider(width: 1),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              child: Chip(
+                                avatar: const Icon(Icons.search, size: 16),
+                                label: Text('"$query"'),
+                              ),
+                            ),
+                            Expanded(child: PlpFilterChips(plpKey: plpKey)),
+                          ],
+                        ),
+                        Expanded(child: _shell(state, wide: true)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
+          ),
+        ),
+      ),
     );
   }
 

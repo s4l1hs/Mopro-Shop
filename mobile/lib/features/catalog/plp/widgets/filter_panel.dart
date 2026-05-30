@@ -16,12 +16,16 @@ class FilterPanel extends ConsumerStatefulWidget {
     required this.plpKey,
     required this.currentCategoryId,
     this.brands = const [],
+    this.showCategoryTree = true,
     super.key,
   });
 
   final String plpKey;
   final int currentCategoryId;
   final List<String> brands;
+
+  /// Hidden on SearchScreen — results aren't scoped to a single category (§5.2).
+  final bool showCategoryTree;
 
   /// Slider domain ceiling when no price aggregate is available (minor units).
   static const int priceCeilingMinor = 1000000;
@@ -60,8 +64,10 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 12),
             children: [
-              _section('plp.filter_category', _categoryTree(cs)),
-              const Divider(height: 1),
+              if (widget.showCategoryTree) ...[
+                _section('plp.filter_category', _categoryTree(cs)),
+                const Divider(height: 1),
+              ],
               _section('plp.filter_brand', _brandList(filters)),
               const Divider(height: 1),
               _section('plp.filter_price', _priceRange(filters)),

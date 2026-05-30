@@ -63,6 +63,12 @@ Future<void> _pump(
   AuthState initialAuth = const AuthUnauthenticated(),
   _FakeAuthNotifier? authNotifier,
 }) async {
+  // Force mobile so the adaptive presenter shows the bottom sheet (the dialog
+  // path is covered by login_required_presenter_test.dart).
+  tester.view.physicalSize = const Size(400, 800);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
   final prefs = await SharedPreferences.getInstance();
   final notifier = authNotifier ?? _FakeAuthNotifier(initialAuth);
   await tester.pumpWidget(
@@ -92,9 +98,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Test reason'), findsOneWidget);
-      expect(find.text('Giriş Yap'), findsOneWidget);
-      expect(find.text('Üye Ol'), findsOneWidget);
-      expect(find.text('Misafir olarak devam et'), findsOneWidget);
+      expect(find.text('auth.login'), findsOneWidget);
+      expect(find.text('auth.register'), findsOneWidget);
+      expect(find.text('auth.continue_as_guest'), findsOneWidget);
     });
 
     testWidgets('Giriş Yap navigates to /auth/login', (tester) async {
@@ -102,7 +108,7 @@ void main() {
       await tester.tap(find.text('OPEN_SHEET'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Giriş Yap'));
+      await tester.tap(find.text('auth.login'));
       await tester.pumpAndSettle();
 
       expect(find.text('LOGIN_PAGE'), findsOneWidget);
@@ -113,7 +119,7 @@ void main() {
       await tester.tap(find.text('OPEN_SHEET'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Üye Ol'));
+      await tester.tap(find.text('auth.register'));
       await tester.pumpAndSettle();
 
       expect(find.text('REGISTER_PAGE'), findsOneWidget);
@@ -125,7 +131,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Test reason'), findsOneWidget);
 
-      await tester.tap(find.text('Misafir olarak devam et'));
+      await tester.tap(find.text('auth.continue_as_guest'));
       await tester.pumpAndSettle();
       expect(find.text('Test reason'), findsNothing);
     });
@@ -146,7 +152,6 @@ void main() {
 
   group('LoginRequiredSheet golden', () {
     testWidgets('light theme', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(400, 560));
       await _pump(tester);
       await tester.tap(find.text('OPEN_SHEET'));
       await tester.pumpAndSettle();
@@ -158,7 +163,6 @@ void main() {
     });
 
     testWidgets('dark theme', (tester) async {
-      await tester.binding.setSurfaceSize(const Size(400, 560));
       await _pump(tester, brightness: Brightness.dark);
       await tester.tap(find.text('OPEN_SHEET'));
       await tester.pumpAndSettle();

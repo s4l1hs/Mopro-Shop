@@ -14,6 +14,10 @@
   },
   "auth": {
     "login_title": "Sign In",
+    "login_required_title": "Sign in to use this feature",
+    "login": "Sign In",
+    "register": "Sign Up",
+    "continue_as_guest": "Continue as guest",
     "phone_title": "Your Phone Number",
     "phone_subtitle": "Enter your 10-digit number starting with +90",
     "phone_hint": "5XX XXX XX XX",

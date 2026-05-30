@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/utils/debouncer.dart';
+import 'package:mopro/core/utils/uri_ext.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/features/catalog/plp/plp_filters.dart';
@@ -70,11 +71,11 @@ class _CategoryProductsScreenState
       if (!mounted) return;
       final q = _codec.encode(next);
       final base = GoRouterState.of(context).uri;
-      // NB: Uri.replace(queryParameters: null) KEEPS the existing query, so to
-      // clear all filters we must navigate to the bare path.
-      final location =
-          q.isEmpty ? base.path : base.replace(queryParameters: q).toString();
-      context.go(location);
+      // clearQueryParameters() is the safe clear — Uri.replace(queryParameters:
+      // null) is a no-op (keeps the existing query). See lib/core/utils/uri_ext.
+      final next0 =
+          q.isEmpty ? base.clearQueryParameters() : base.replace(queryParameters: q);
+      context.go(next0.toString());
     });
   }
 
