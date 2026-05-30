@@ -408,5 +408,25 @@
     "privacy": "Privacy",
     "terms": "Terms",
     "language": "Language"
+  },
+  "welcome": {
+    "greeting": "Welcome, {name}.",
+    "card_last_order": "Last order",
+    "no_orders": "No orders yet.",
+    "start_shopping": "Start shopping",
+    "detail": "Details",
+    "card_wallet": "Wallet balance",
+    "wallet_cta": "My wallet",
+    "card_campaigns": "Active campaigns",
+    "active_count": "{count} active",
+    "campaigns_cta": "View",
+    "guest_title": "Welcome to Mopro",
+    "guest_subtitle": "Sign in to personalize your shopping experience.",
+    "reason_reco_title": "Personalized picks",
+    "reason_reco_desc": "We rank products you'll love just for you.",
+    "reason_fav_title": "Favorites synced",
+    "reason_fav_desc": "Same favorites on all your devices.",
+    "reason_orders_title": "Order tracking",
+    "reason_orders_desc": "Track all your orders in one place."
   }
 }

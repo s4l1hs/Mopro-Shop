@@ -67,5 +67,25 @@
     "sort_highest": "Beste Bewertung",
     "sort_lowest": "Schlechteste Bewertung",
     "sort_helpful": "Hilfreichste"
+  },
+  "welcome": {
+    "greeting": "Willkommen, {name}.",
+    "card_last_order": "Letzte Bestellung",
+    "no_orders": "Noch keine Bestellungen.",
+    "start_shopping": "Jetzt einkaufen",
+    "detail": "Details",
+    "card_wallet": "Guthaben",
+    "wallet_cta": "Mein Wallet",
+    "card_campaigns": "Aktive Kampagnen",
+    "active_count": "{count} aktiv",
+    "campaigns_cta": "Ansehen",
+    "guest_title": "Willkommen bei Mopro",
+    "guest_subtitle": "Melde dich an, um dein Einkaufserlebnis zu personalisieren.",
+    "reason_reco_title": "Personalisierte Vorschläge",
+    "reason_reco_desc": "Wir sortieren Produkte nach deinem Geschmack.",
+    "reason_fav_title": "Favoriten synchron",
+    "reason_fav_desc": "Dieselben Favoriten auf allen Geräten.",
+    "reason_orders_title": "Bestellverfolgung",
+    "reason_orders_desc": "Verfolge alle Bestellungen an einem Ort."
   }
 }

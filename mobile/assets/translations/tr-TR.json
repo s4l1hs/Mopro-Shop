@@ -488,5 +488,25 @@
     "privacy": "Gizlilik",
     "terms": "Koşullar",
     "language": "Dil"
+  },
+  "welcome": {
+    "greeting": "Hoş geldin, {name}.",
+    "card_last_order": "Son sipariş",
+    "no_orders": "Henüz sipariş yok.",
+    "start_shopping": "Alışverişe başla",
+    "detail": "Detay",
+    "card_wallet": "Cüzdan bakiyesi",
+    "wallet_cta": "Cüzdanım",
+    "card_campaigns": "Aktif kampanyalar",
+    "active_count": "{count} aktif",
+    "campaigns_cta": "İncele",
+    "guest_title": "Mopro'ya hoş geldiniz",
+    "guest_subtitle": "Hesabınıza giriş yaparak alışveriş deneyiminizi kişiselleştirin.",
+    "reason_reco_title": "Kişiselleştirilmiş öneriler",
+    "reason_reco_desc": "Beğenebileceğin ürünleri sana özel sıralarız.",
+    "reason_fav_title": "Favoriler senkronize",
+    "reason_fav_desc": "Tüm cihazlarında aynı favoriler.",
+    "reason_orders_title": "Sipariş takibi",
+    "reason_orders_desc": "Siparişlerini tek bir yerden izle."
   }
 }
