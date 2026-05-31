@@ -192,7 +192,68 @@ re-delivery is idempotent on `event_id`.
 
 ## 4. Decision 3 — Consent model
 
-_(pending decision)_
+**Chosen: Binary opt-in.** Nothing in the analytics taxonomy fires until the user
+accepts; a first-visit banner asks once, and a settings switch can flip the
+choice later.
+
+**Rationale.** The architecture is explicitly "global-ready" and names EU as a
+future market (`CLAUDE.md §1`), so the safe regulatory default — the one that is
+correct under *both* KVKK and GDPR — is opt-in, not opt-out. That eliminates the
+two opt-out options regardless of launch geography: choosing opt-out now would
+mean a consent-model migration (and a window of non-compliant data) the first
+time an EU user is served. Between the two compliant options, **binary** is
+chosen over **granular** because there is exactly *one* tracking purpose today:
+analytics that powers personalization. Marketing sends are a separate, already
+consent-gated system (notification preferences shipped in Tranche 2a), and
+"Functional" (recently-viewed) is, in this design, a *consumer of the same
+analytics pipeline* rather than an independent purpose — so granular categories
+would be UX and code surface guarding distinctions that do not yet exist. The
+consent record is modeled to **upgrade cleanly to granular later** (a category
+enum with a single `analytics` member today; see Glossary) so adding `marketing`
+analytics is an append, not a rewrite. The decision the choice resolves:
+**compliant-everywhere from day one, with the least UX and code surface that
+satisfies it.**
+
+**UX implications.**
+- A first-visit consent banner (adaptive: bottom sheet < 600, dialog ≥ 600 —
+  reuse the `showAdaptiveModal` presenter from Tranche 3) with `Reddet` / `Kabul`
+  and a one-line privacy summary linking to a policy page. New `consent.*` locale
+  keys across tr/en/de/ar (none exist today — see §1).
+- A persistent toggle in `/account` settings ("Veri ve gizlilik" / analytics
+  on-off) so the choice is revocable, satisfying the KVKK/GDPR withdrawal right.
+- Consent state is **stored server-side per user** (so it follows the account
+  across devices) *and* mirrored to a local `SharedPreferences` flag (so a guest
+  / pre-login session can be gated before any account exists). On login the local
+  decision is reconciled with the server record (server wins if both exist).
+- The client **hard-gates emission**: `analyticsService.track()` is a no-op when
+  consent != accepted. The banner decision is itself an *essential* interaction
+  and is never an analytics event.
+
+**Consent state machine.**
+
+```mermaid
+stateDiagram-v2
+  [*] --> Unknown
+  Unknown --> Accepted: taps Kabul
+  Unknown --> Declined: taps Reddet / dismiss
+  Accepted --> Declined: settings toggle off
+  Declined --> Accepted: settings toggle on
+  Accepted --> Accepted: login (reconcile,\nserver wins)
+  Declined --> Declined: login (reconcile,\nserver wins)
+  note right of Unknown
+    No analytics events emitted.
+    Banner shown once per session
+    until a choice is made.
+  end note
+  note right of Declined
+    track() is a no-op.
+    Existing derived data is
+    purge-eligible (see Decision 5).
+  end note
+```
+
+Transitioning Accepted → Declined stops future emission immediately and flags the
+user's already-derived projections for purge per Decision 5.
 
 ## 5. Decision 4 — Identity model
 
