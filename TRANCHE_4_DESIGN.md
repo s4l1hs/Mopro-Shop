@@ -351,7 +351,56 @@ raw counts — an intentional bound, not a defect.
 
 ## 7. Decision 6 — Instrumentation pattern
 
-_(pending decision)_
+**Chosen: hybrid.** Mechanical signals are auto-emitted by observers; semantic
+business events are emitted by explicit `track()` call sites. All emission funnels
+through one consent gate and one batching client.
+
+**Rationale.** The taxonomy itself is split-natured: `page_view`, `session_*`,
+`scroll_depth`, `time_on_page` are *mechanical* (derivable from navigation and
+scroll state with zero business knowledge), while `add_to_cart`, `purchase`,
+`pdp_variant_selected` carry *semantics and payload* (qty, order total, variant)
+that are fragile to infer from state diffs. Pure manual would let the mechanical
+events drift — every new screen is a chance to forget `page_view`. Pure
+observer-driven would force `purchase`/`add_to_cart` to be reverse-engineered from
+provider deltas, which is exactly where inference breaks. Hybrid puts each event
+where it is cheapest and most reliable, and it matches the codebase's existing
+observability posture (it already wraps middleware with `TraceAndLog`; an
+analytics observer is the client-side analogue). The decision the choice
+resolves: **complete, drift-resistant coverage for mechanical events plus exact,
+enrichable payloads for business events — one pattern, two registration styles.**
+
+**Concrete split.**
+
+| Auto (observers) | Mechanism |
+|---|---|
+| `page_view` | a `NavigatorObserver` on go_router → emits on `didPush`/`didReplace` with the matched route. |
+| `session_start` / `session_end` | app-lifecycle (`WidgetsBindingObserver`) + an idle timeout (e.g. 30 min) rotating `session_id`. |
+| `scroll_depth` | a shared scroll-listener mixin on long screens (PLP/PDP/home) emitting once per bucket crossed. |
+| `time_on_page` | computed on route-leave from the `page_view` timestamp, emitted binned. |
+
+| Manual (`track()` call sites) | Where |
+|---|---|
+| `add_to_cart` / `remove_from_cart` | cart notifier mutation methods. |
+| `purchase` | checkout-success handler (has `order_id`, totals). |
+| `product_view` / `pdp_variant_selected` | PDP open + variant selector. |
+| `search` | the search submit path (alongside `RecentSearchesNotifier.add`). |
+| `filter_applied` / `sort_changed` | PLP filter/sort callbacks. |
+| `category_view` / `mega_menu_opened` | category landing + mega-menu open. |
+
+**Shared plumbing (both styles route through it).**
+- A single `analyticsService.track(AnalyticsEvent)` API. Auto observers and manual
+  call sites both call it; neither talks to the network directly.
+- **Consent gate first.** `track()` returns immediately (no-op) unless consent ==
+  Accepted (Decision 3). The gate is the one place emission is allowed or denied.
+- **Client-side batching.** Events accumulate in an in-memory queue, flushed to
+  `POST /events` on a size/time threshold (e.g. 20 events or 10 s) and on app
+  background, to avoid a request per tap. Each event carries a client-generated
+  `event_id` (UUID) for idempotent ingest (Decision 2).
+- **A Riverpod provider** owns the service so it is overridable in tests with a
+  fake (recording) sink — the same shape the flow tests already use for `dio`.
+
+Manual call sites are few and live next to the business logic that already knows
+the payload; the observers are written once and cover every screen automatically.
 
 ## 8. Decision 7 — Bundle shape
 
