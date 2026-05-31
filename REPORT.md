@@ -2320,3 +2320,24 @@ separate `internal/help` (help_schema, public) + `internal/support`
 **Backlog (2b-surfaced):** ticket reply threading, agent inbox / live chat, article CMS/editor, article translation pipeline, article-feedback analytics, **ticket→notification bridge** (architecture path: a ticket-status-change event consumed by the PR #23 inbox to create a `system` notification), markdown image embedding, contact-form rate limiting.
 
 **Risk notes:** shared-IP rate-limit edge cases once throttling lands; markdown XSS surface if inline-HTML support is ever added (currently disabled); locale-fallback metric noise until de/ar articles are seeded; ILIKE search plan performance under large article counts (fine at 24, revisit with FTS at scale).
+
+## Tranche 3 PR — Review Submission + Q&A
+
+### Baseline (branched off `main` @ ff9a1cff; PR #24 merged)
+
+| Metric | Baseline |
+|---|---|
+| `flutter analyze` | No issues (0/0/0) |
+| `flutter test` | +521 / −94 (94 = Linux-baselined goldens on macOS) |
+| `flutter build web --release` | `main.dart.js` = 4,652,517 B |
+| `go test ./...` | 33 ok / 0 fail |
+| Audit parity (post-2b) | ≈ 45% |
+
+### §2 audit + decisions
+See `tool/audit/tranche3_baseline.md`. `product_reviews` already has the
+`(product_id,user_id)` unique + title/updated_at (0064) — write-side is purely
+additive (status + submitted_locale + revisions table). Reviews service is in
+`internal/catalog`. Q&A is greenfield; the PDP "Sorular" tab is a `_StubTab`
+placeholder (one-line swap). **§1.6 escape hatch NOT triggered — shipping one PR.**
+**Q&A module decision (AskUserQuestion): `internal/catalog` / `catalog_schema`**
+(alongside reviews).
