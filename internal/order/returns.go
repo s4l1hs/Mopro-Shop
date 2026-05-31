@@ -24,6 +24,8 @@ var (
 	ErrReturnAlreadyExists   = errors.New("order: item already has a return")
 	ErrNoReturnableItems     = errors.New("order: no returnable items")
 	ErrInvalidReturnReason   = errors.New("order: invalid return reason")
+	ErrReturnNotPending      = errors.New("order: return is not pending; cannot transition")
+	ErrReturnNotOwned        = errors.New("order: return does not belong to this seller")
 )
 
 // ReturnStatus is the per-return lifecycle (distinct from OrderStatus).
@@ -120,6 +122,15 @@ type ReturnRepository interface {
 	ListReturnsByUser(ctx context.Context, userID int64, limit, offset int) ([]Return, error)
 	// ReturnedQtyByOrder returns order_item_id -> already-returned quantity.
 	ReturnedQtyByOrder(ctx context.Context, orderID int64) (map[int64]int, error)
+	// ListReturnsByProductIDs lists returns containing items from the given
+	// products (seller scoping, Tranche 5a). Empty status = all statuses.
+	ListReturnsByProductIDs(ctx context.Context, productIDs []int64, status string, limit, offset int) ([]Return, error)
+	// ReturnProductIDs lists the product ids referenced by a return's items
+	// (return_items → order_items, both order_schema; used to scope a seller's
+	// approve/reject to returns that contain one of their products).
+	ReturnProductIDs(ctx context.Context, returnID int64) ([]int64, error)
+	// UpdateReturnStatus transitions a return's status within a tx.
+	UpdateReturnStatus(ctx context.Context, tx pgx.Tx, returnID int64, status string) error
 }
 
 // ReturnService is the public return surface. Kept separate from Service so the
@@ -131,6 +142,18 @@ type ReturnService interface {
 	ListReturns(ctx context.Context, userID int64, limit, offset int) ([]Return, error)
 	// ComputeActions derives the eligibility block for an order + its items.
 	ComputeActions(ctx context.Context, o Order, items []OrderItem) (OrderActions, error)
+
+	// ── Seller-side approval (Tranche 5a) ────────────────────────────────────
+	// ListSellerReturns lists returns on the given (seller-owned) product ids.
+	ListSellerReturns(ctx context.Context, productIDs []int64, status string, limit, offset int) ([]Return, error)
+	// SellerApprove transitions a pending return → approved (refund amount was
+	// recorded at creation). sellerProductIDs scopes the action to the seller's
+	// own products: ErrReturnNotOwned if the return references none of them,
+	// ErrReturnNotPending if not pending.
+	SellerApprove(ctx context.Context, returnID int64, sellerProductIDs []int64) (Return, error)
+	// SellerReject transitions a pending return → rejected (no refund), scoped to
+	// the seller's products like SellerApprove.
+	SellerReject(ctx context.Context, returnID int64, sellerProductIDs []int64, reasonCode, note string) (Return, error)
 }
 
 type returnService struct {
@@ -304,4 +327,83 @@ func (s *returnService) ListReturns(ctx context.Context, userID int64, limit, of
 		offset = 0
 	}
 	return s.returns.ListReturnsByUser(ctx, userID, limit, offset)
+}
+
+// ── Seller-side approval (Tranche 5a) ────────────────────────────────────────
+
+func (s *returnService) ListSellerReturns(ctx context.Context, productIDs []int64, status string, limit, offset int) ([]Return, error) {
+	if len(productIDs) == 0 {
+		return []Return{}, nil
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	return s.returns.ListReturnsByProductIDs(ctx, productIDs, status, limit, offset)
+}
+
+func (s *returnService) SellerApprove(ctx context.Context, returnID int64, sellerProductIDs []int64) (Return, error) {
+	return s.transition(ctx, returnID, sellerProductIDs, string(ReturnApproved), "seller approved")
+}
+
+func (s *returnService) SellerReject(ctx context.Context, returnID int64, sellerProductIDs []int64, reasonCode, note string) (Return, error) {
+	msg := "seller rejected: " + reasonCode
+	if note != "" {
+		msg += " — " + note
+	}
+	return s.transition(ctx, returnID, sellerProductIDs, string(ReturnRejected), msg)
+}
+
+// transition verifies the return belongs to one of the seller's products, then
+// guards pending→{approved,rejected} and records the status history.
+func (s *returnService) transition(ctx context.Context, returnID int64, sellerProductIDs []int64, status, note string) (Return, error) {
+	rec, _, err := s.returns.GetReturn(ctx, returnID)
+	if err != nil {
+		return Return{}, err
+	}
+	owns, err := s.returnOwnedBySeller(ctx, returnID, sellerProductIDs)
+	if err != nil {
+		return Return{}, err
+	}
+	if !owns {
+		return Return{}, ErrReturnNotOwned // do not leak existence to other sellers
+	}
+	if rec.Status != ReturnPending {
+		return Return{}, ErrReturnNotPending
+	}
+	err = s.returns.WithTx(ctx, func(tx pgx.Tx) error {
+		if e := s.returns.UpdateReturnStatus(ctx, tx, returnID, status); e != nil {
+			return e
+		}
+		return s.returns.InsertReturnStatusHistory(ctx, tx, returnID, status, note)
+	})
+	if err != nil {
+		return Return{}, err
+	}
+	rec.Status = ReturnStatus(status)
+	return rec, nil
+}
+
+// returnOwnedBySeller reports whether the return references at least one of the
+// seller's products.
+func (s *returnService) returnOwnedBySeller(ctx context.Context, returnID int64, sellerProductIDs []int64) (bool, error) {
+	if len(sellerProductIDs) == 0 {
+		return false, nil
+	}
+	pids, err := s.returns.ReturnProductIDs(ctx, returnID)
+	if err != nil {
+		return false, err
+	}
+	owned := make(map[int64]struct{}, len(sellerProductIDs))
+	for _, id := range sellerProductIDs {
+		owned[id] = struct{}{}
+	}
+	for _, id := range pids {
+		if _, ok := owned[id]; ok {
+			return true, nil
+		}
+	}
+	return false, nil
 }

@@ -39,6 +39,7 @@ import (
 	"github.com/mopro/platform/internal/outbox"
 	"github.com/mopro/platform/internal/payment"
 	"github.com/mopro/platform/internal/payment/sipay"
+	"github.com/mopro/platform/internal/seller"
 	"github.com/mopro/platform/internal/shipping"
 	"github.com/mopro/platform/internal/shipping/hepsijet"
 	"github.com/mopro/platform/internal/shipping/mng"
@@ -162,6 +163,10 @@ func main() {
 	supportSvc := support.NewService(support.NewRepository(pool))
 	ugcSvc := catalog.NewUGCService(catalog.NewUGCRepository(pool)) // ReviewWriteService + QAService
 	analyticsSvc := analytics.NewService(analytics.NewRepository(pool))
+	// Seller storefronts + seller-role binding (Tranche 5a). storefrontReader is
+	// the catalog-side read surface used by the storefront + dashboard handlers.
+	sellerSvc := seller.NewService(seller.NewRepository(pool))
+	storefrontReader := catalog.NewStorefrontReader(pool)
 
 	// Payment module wired before order so orderSvc can receive the PSP reference.
 	paymentRepo := payment.NewRepository(pool)
@@ -362,6 +367,9 @@ func main() {
 	// Identity / auth routes
 	requireAuth := middleware.RequireAuth(jwtSigner)
 	optionalAuth := middleware.OptionalAuth(jwtSigner)
+	// requireSellerRole gates the seller dashboard: RequireAuth resolves the user,
+	// then this resolves their seller binding (403 if none) and puts seller_id in ctx.
+	requireSellerRole := middleware.RequireSellerRole(sellerSvc.ResolveSellerForUser)
 	// onUserDeleted cascades account deletion to the analytics tables (blocker #3,
 	// §2.4). DELETE /me is a soft delete and emits no event yet, so erasure is
 	// orchestrated here synchronously rather than via a consumer.
@@ -628,10 +636,33 @@ func main() {
 		httpTrace(http.HandlerFunc(handleGetQuestion(ugcSvc))),
 	)
 	mux.Handle("POST /products/{productId}/questions/{questionId}/answers",
-		httpTrace(requireAuth(http.HandlerFunc(handleCreateAnswer(ugcSvc, identitySvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleCreateAnswer(ugcSvc, identitySvc, sellerSvc, storefrontReader)))),
 	)
 	mux.Handle("GET /me/questions",
 		httpTrace(requireAuth(http.HandlerFunc(handleListUserQuestions(ugcSvc)))),
+	)
+
+	// ── Seller storefronts (public) + seller dashboard (role-gated) — Tranche 5a ──
+	mux.Handle("GET /sellers/{slug}",
+		httpTrace(http.HandlerFunc(handleSellerStorefront(sellerSvc, storefrontReader, defaultLocale))),
+	)
+	mux.Handle("GET /sellers/{slug}/products",
+		httpTrace(http.HandlerFunc(handleSellerStorefrontProducts(sellerSvc, storefrontReader, defaultLocale, cashbackCurrency))),
+	)
+	mux.Handle("GET /sellers/{slug}/reviews",
+		httpTrace(http.HandlerFunc(handleSellerStorefrontReviews(sellerSvc, storefrontReader, defaultLocale))),
+	)
+	mux.Handle("GET /seller/returns",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleSellerReturns(storefrontReader, returnSvc))))),
+	)
+	mux.Handle("POST /seller/returns/{id}/approve",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleSellerApproveReturn(storefrontReader, returnSvc))))),
+	)
+	mux.Handle("POST /seller/returns/{id}/reject",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleSellerRejectReturn(storefrontReader, returnSvc))))),
+	)
+	mux.Handle("GET /seller/questions",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleSellerQuestions(storefrontReader, ugcSvc))))),
 	)
 
 	// ── Analytics pipeline (Tranche 4a) ─────────────────────────────────────────

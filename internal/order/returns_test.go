@@ -31,6 +31,7 @@ type fakeReturnRepo struct {
 	created     Return
 	items       []ReturnItem
 	nextID      int64
+	productIDs  []int64 // returned by ReturnProductIDs (seller-scope tests)
 }
 
 func (f *fakeReturnRepo) WithTx(ctx context.Context, fn func(pgx.Tx) error) error {
@@ -66,6 +67,19 @@ func (f *fakeReturnRepo) ReturnedQtyByOrder(_ context.Context, _ int64) (map[int
 		return map[int64]int{}, nil
 	}
 	return f.returnedQty, nil
+}
+func (f *fakeReturnRepo) ListReturnsByProductIDs(_ context.Context, _ []int64, status string, _, _ int) ([]Return, error) {
+	if status != "" && string(f.created.Status) != status {
+		return []Return{}, nil
+	}
+	return []Return{f.created}, nil
+}
+func (f *fakeReturnRepo) ReturnProductIDs(_ context.Context, _ int64) ([]int64, error) {
+	return f.productIDs, nil
+}
+func (f *fakeReturnRepo) UpdateReturnStatus(_ context.Context, _ pgx.Tx, _ int64, status string) error {
+	f.created.Status = ReturnStatus(status)
+	return nil
 }
 
 func deliveredOrder(daysAgo int) Order {
@@ -197,5 +211,82 @@ func TestCreateReturn_Rejections(t *testing.T) {
 				t.Errorf("got %v want %v", err, tc.want)
 			}
 		})
+	}
+}
+
+// ── Seller-side approve / reject (Tranche 5a) ─────────────────────────────────
+
+func pendingReturn() Return {
+	return Return{ID: 5, OrderID: 1, UserID: 7, Status: ReturnPending, Reason: ReasonDamaged}
+}
+
+func TestSellerApprove_TransitionsPendingToApproved(t *testing.T) {
+	rr := &fakeReturnRepo{created: pendingReturn(), productIDs: []int64{10, 11}}
+	s := svcWith(deliveredOrder(2), nil, rr)
+	rec, err := s.SellerApprove(context.Background(), 5, []int64{11, 99}) // 11 overlaps
+	if err != nil {
+		t.Fatalf("SellerApprove: %v", err)
+	}
+	if rec.Status != ReturnApproved {
+		t.Errorf("status=%s want approved", rec.Status)
+	}
+}
+
+func TestSellerReject_TransitionsPendingToRejected(t *testing.T) {
+	rr := &fakeReturnRepo{created: pendingReturn(), productIDs: []int64{10}}
+	s := svcWith(deliveredOrder(2), nil, rr)
+	rec, err := s.SellerReject(context.Background(), 5, []int64{10}, "out_of_policy", "too late")
+	if err != nil {
+		t.Fatalf("SellerReject: %v", err)
+	}
+	if rec.Status != ReturnRejected {
+		t.Errorf("status=%s want rejected", rec.Status)
+	}
+}
+
+func TestSellerApprove_RejectsWhenReturnNotOwned(t *testing.T) {
+	rr := &fakeReturnRepo{created: pendingReturn(), productIDs: []int64{10}}
+	s := svcWith(deliveredOrder(2), nil, rr)
+	// Seller owns {77}, return references {10} → no overlap.
+	if _, err := s.SellerApprove(context.Background(), 5, []int64{77}); !errors.Is(err, ErrReturnNotOwned) {
+		t.Fatalf("want ErrReturnNotOwned, got %v", err)
+	}
+	// Empty seller product set is likewise not owned.
+	if _, err := s.SellerApprove(context.Background(), 5, nil); !errors.Is(err, ErrReturnNotOwned) {
+		t.Fatalf("empty scope: want ErrReturnNotOwned, got %v", err)
+	}
+}
+
+func TestSellerApprove_RejectsWhenNotPending(t *testing.T) {
+	r := pendingReturn()
+	r.Status = ReturnApproved // already transitioned
+	rr := &fakeReturnRepo{created: r, productIDs: []int64{10}}
+	s := svcWith(deliveredOrder(2), nil, rr)
+	if _, err := s.SellerApprove(context.Background(), 5, []int64{10}); !errors.Is(err, ErrReturnNotPending) {
+		t.Fatalf("want ErrReturnNotPending, got %v", err)
+	}
+}
+
+func TestListSellerReturns_EmptyProductsShortCircuits(t *testing.T) {
+	s := svcWith(deliveredOrder(2), nil, &fakeReturnRepo{})
+	got, err := s.ListSellerReturns(context.Background(), nil, "", 20, 0)
+	if err != nil {
+		t.Fatalf("ListSellerReturns: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("want empty, got %d", len(got))
+	}
+}
+
+func TestListSellerReturns_StatusFilter(t *testing.T) {
+	rr := &fakeReturnRepo{created: pendingReturn()}
+	s := svcWith(deliveredOrder(2), nil, rr)
+	// matching status returns the row
+	if got, _ := s.ListSellerReturns(context.Background(), []int64{10}, "pending", 20, 0); len(got) != 1 {
+		t.Errorf("status=pending: want 1, got %d", len(got))
+	}
+	// non-matching status filters it out
+	if got, _ := s.ListSellerReturns(context.Background(), []int64{10}, "approved", 20, 0); len(got) != 0 {
+		t.Errorf("status=approved: want 0, got %d", len(got))
 	}
 }

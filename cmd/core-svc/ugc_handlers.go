@@ -11,6 +11,7 @@ import (
 	"github.com/mopro/platform/internal/identity"
 	"github.com/mopro/platform/internal/identity/middleware"
 	"github.com/mopro/platform/internal/order"
+	"github.com/mopro/platform/internal/seller"
 )
 
 // ── Reviews write-side ────────────────────────────────────────────────────────
@@ -268,7 +269,7 @@ func handleGetQuestion(svc catalog.QAService) http.HandlerFunc {
 	}
 }
 
-func handleCreateAnswer(svc catalog.QAService, idSvc identity.Service) http.HandlerFunc {
+func handleCreateAnswer(svc catalog.QAService, idSvc identity.Service, sellerSvc seller.Service, reader catalog.SellerStorefrontReader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		questionID, err := strconv.ParseInt(r.PathValue("questionId"), 10, 64)
 		if err != nil {
@@ -286,6 +287,7 @@ func handleCreateAnswer(svc catalog.QAService, idSvc identity.Service) http.Hand
 		a, err := svc.CreateAnswer(r.Context(), catalog.AnswerInput{
 			QuestionID: questionID, UserID: userID, AuthorName: displayName(r, idSvc, userID),
 			Body: body.Body, SubmittedLocale: localeOrDefault(body.SubmittedLocale),
+			IsSeller: answerIsFromSeller(r, svc, sellerSvc, reader, userID, questionID),
 		})
 		if err != nil {
 			if isReviewValidationErr(err) {
@@ -316,6 +318,24 @@ func handleListUserQuestions(svc catalog.QAService) http.HandlerFunc {
 		}
 		jsonOK(w, http.StatusOK, map[string]any{"data": items, "total": total, "page": page, "hasMore": page*pageSize < total})
 	}
+}
+
+// answerIsFromSeller reports whether the answering user is the seller who owns
+// the product the question is about (drives the "Satıcı" badge on the answer).
+func answerIsFromSeller(r *http.Request, qaSvc catalog.QAService, sellerSvc seller.Service, reader catalog.SellerStorefrontReader, userID, questionID int64) bool {
+	sellerID, isSeller, err := sellerSvc.ResolveSellerForUser(r.Context(), userID)
+	if err != nil || !isSeller {
+		return false
+	}
+	q, _, err := qaSvc.GetQuestion(r.Context(), questionID)
+	if err != nil {
+		return false
+	}
+	productSellerID, err := reader.ProductSellerID(r.Context(), q.ProductID)
+	if err != nil {
+		return false
+	}
+	return productSellerID == sellerID
 }
 
 func isReviewValidationErr(err error) bool {
