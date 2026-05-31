@@ -2482,3 +2482,73 @@ nightly rebuild (rebuild is the backstop). Prune lock contention bounded by the
 100k-row cap + iterate. Analytics shares the postgres-ecom pool; high event
 volume is a future concern (design Option C escape, not pre-built). Normalized-
 only search reduces some recommendation signal (accepted; raw-opt-in is Backlog).
+
+## Tranche 4b PR — Consent UX + Instrumentation (consumer → 4c)
+
+### Baseline (branched off `main` @ PR #27 merged)
+`go test ./...` 34 ok · `flutter analyze` clean · integration 35/35 · audit parity ≈49%.
+
+### Backend inputs (4a contracts consumed, no backend change)
+6 endpoints (`POST /analytics/events` OptionalAuth, identify, GET/PUT `/me/consent`,
+DELETE `/me/analytics-data`, GET `/me/recently-viewed`); 20-event taxonomy; binary
+opt-in consent enforced server-side. **§3 was a no-op** — 4a contracts sufficed.
+
+### §1.6 split invoked (user-chosen) — consent UX + instrumentation
+Audit (`tranche4b_baseline.md`) confirmed the recently-viewed consumer is
+build-from-scratch (`ProductRail` is sort-key-driven, not list-driven; no
+`recentlyViewedProvider`) and the instrumentation needs new app-boot observers
+(trigger #3). ~2 sessions. User chose **consent UX + instrumentation** this turn;
+the recently-viewed rail consumer + merge (DD) + full RTBF (EE) + rail (CC) flows
+carry to **4c**.
+
+### Delivered (green)
+- **Privacy copy + article + build flag** (§4): `consent.*` keys ×4 (de/ar = EN
+  fallback, DRAFT-flagged); `consent_copy_DRAFT.dart` (legal-review index);
+  privacy article `privacy-and-tracking` (migration `0076`, round-trip verified,
+  DRAFT body notice); `kAnalyticsConsentEnabled` (`feature_flags.dart`).
+- **Consent UX** (§5): `userConsentProvider` (GET/PUT consent, optimistic, RTBF);
+  `ConsentBanner` (first-visit bottom bar, build-flag+decided+guest gated,
+  focus-traversal, no-Escape) mounted under AppShell; `/account/privacy`
+  (toggle + "Tüm verilerimi sil" → DELETE; policy link); `AccountRailItem.privacy`
+  + rail row + mobile menu + `Mopro · Gizlilik` title. 6 widget tests + 6 goldens.
+- **Hybrid instrumentation** (§6, design §7): `AnalyticsService` (queue, 20/5s
+  batch, consent-gate-at-enqueue, session-id persistence, 3-try retry,
+  session_start/end + flush-on-pause); `AnalyticsNavObserver` auto `page_view`
+  wired into GoRouter; manual `track()` at PDP `product_view` + cart `add_to_cart`.
+  6 unit tests.
+- **Flow FF** (§7): consent ON → `product_view` reaches ingest with payload; OFF +
+  guest → dropped at the gate (ProviderContainer-level, deterministic).
+
+### Reconciliations (locked design > prompt wording)
+- The prompt's auto-ProviderObserver allowlist (cart/favorites/productDetail)
+  contradicts design doc §7, which assigns business events to **manual** `track()`
+  and only `page_view`/`session_*` to auto. Followed the design —
+  `NavigatorObserver` for `page_view`, manual for the rest — which also sidesteps
+  §1.6 trigger #3 (fragile provider-diff inference).
+- The flow test moved from widget+navigator (timer/pumpAndSettle flakiness →
+  10-min timeout) to a deterministic ProviderContainer test.
+
+### Deferred to 4c (with the consumer)
+`recentlyViewedProvider` + list-driven "Son baktıkların" rail (build-from-scratch);
+flows CC (rail end-to-end) / DD (merge-on-auth) / EE (full RTBF); rail goldens.
+Manual sites `login`/`logout`/`identify` (merge hook), `search` (needs debounced
+submit), `purchase`, `remove_from_cart` (needs variantId), `filter`/`sort`/
+`mega_menu`/`favorites` — additive, no observable effect without the consumer.
+
+### Pending legal review (carried from 4a)
+Consent banner copy, settings descriptions, privacy article body — all DRAFT,
+gated by `kAnalyticsConsentEnabled` (dev-on / prod-off). Follow-up PR
+`chore/analytics-legal-copy-finalized` flips the prod default + drops DRAFT marks.
+Owner: product/legal.
+
+### Parity update
+SYSTEM_AUDIT §12: Consent/privacy-controls Partial→**Complete** (+1); Event
+tracking pipeline stays Complete (client instrumentation added). Roll-up ≈49% →
+**≈51%** (4c's rail lifts Browsing history → ~52%).
+
+### Risk notes
+Banner sits beneath the shell (below the mobile bottom-nav) — acceptable for a
+one-time prompt; revisit if UX wants it above the nav. Consent gate is enforced
+both client (enqueue) and server (ingest). The `AnalyticsService` 5s timer is
+cancelled via `ref.onDispose`; golden/widget tests stub the consent notifier so
+no timer leaks. Build flag must be flipped off for prod until legal signs off.
