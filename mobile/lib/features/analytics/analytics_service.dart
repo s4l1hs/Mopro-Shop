@@ -37,7 +37,14 @@ class AnalyticsService with WidgetsBindingObserver {
     this.maxQueue = 200,
   })  : _gate = gate,
         _sink = sink {
-    WidgetsBinding.instance.addObserver(this);
+    // Guarded: a plain (non-widget) test has no initialized binding. Lifecycle
+    // flush is a best-effort nicety, never a hard dependency.
+    try {
+      WidgetsBinding.instance.addObserver(this);
+      _observing = true;
+    } catch (_) {
+      _observing = false;
+    }
   }
 
   final String sessionId;
@@ -50,6 +57,7 @@ class AnalyticsService with WidgetsBindingObserver {
   final List<AnalyticsEvent> _queue = [];
   Timer? _timer;
   bool _sessionStarted = false;
+  bool _observing = false;
   int _consecutiveFailures = 0;
 
   /// Enqueues an event if all consent gates pass (build flag, auth, consent).
@@ -115,19 +123,30 @@ class AnalyticsService with WidgetsBindingObserver {
 
   void dispose() {
     _timer?.cancel();
-    WidgetsBinding.instance.removeObserver(this);
+    if (_observing) {
+      try {
+        WidgetsBinding.instance.removeObserver(this);
+      } catch (_) {/* binding gone */}
+    }
   }
 }
 
 /// Persistent analytics session id (UUID v4), regenerated on logout so the next
 /// session is fresh; merge-on-auth handles continuity for authed users.
 String _readOrCreateSessionId(Ref ref) {
-  final prefs = ref.read(sharedPreferencesProvider);
-  final existing = prefs.getString(_sharedPrefsSessionKey);
-  if (existing != null && existing.isNotEmpty) return existing;
-  final id = const Uuid().v4();
-  prefs.setString(_sharedPrefsSessionKey, id);
-  return id;
+  // Resilient: analytics must never break a business flow (e.g. the cart's
+  // add_to_cart track site reads this provider). If SharedPreferences isn't
+  // wired (some tests), fall back to an ephemeral in-memory session id.
+  try {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final existing = prefs.getString(_sharedPrefsSessionKey);
+    if (existing != null && existing.isNotEmpty) return existing;
+    final id = const Uuid().v4();
+    prefs.setString(_sharedPrefsSessionKey, id);
+    return id;
+  } catch (_) {
+    return const Uuid().v4();
+  }
 }
 
 final analyticsServiceProvider = Provider<AnalyticsService>((ref) {
