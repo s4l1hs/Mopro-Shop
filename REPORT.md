@@ -2274,3 +2274,23 @@ badge surface support's future "ticket reply" notification will use).
 **Backlog (2a-surfaced + carried):** live push delivery (FCM/APNs), 60s background poll, websocket real-time, marketing-send pipeline, **all of customer support (2b: help articles/FAQ, contact form, support tickets, flow Z, `flutter_markdown`)**, ticket reply threading, live chat, article CMS, article-feedback analytics, notification grouping.
 
 **Risk notes:** preference write-through is best-effort (debounced PUT; a failed flush surfaces an error but isn't retried); forced-on is enforced client-side (backend upserts what it receives) — a hardened backend guard is Backlog; on-demand badge can lag a notification created server-side between actions (no poll).
+
+## Tranche 2b PR — Customer Support (Help/FAQ + Contact Form + Tickets)
+
+### Baseline (branched off `main` @ da35ecfc; PR #23 merged)
+
+| Metric | Baseline |
+|---|---|
+| `flutter analyze` | No issues (0/0/0) |
+| `flutter test` | +511 / −86 (86 = Linux-baselined goldens on macOS) |
+| `flutter build web --release` | `main.dart.js` = 4,626,918 B |
+| `go test ./...` | 31 ok / 0 fail |
+| Audit parity (post-2a) | ≈ 42% |
+
+### §2 audit + module decision
+See `tool/audit/tranche2b_baseline.md`. Help is fully greenfield; `internal/support`
++ `support_schema` are empty placeholders (schema/role/grants exist, no tables);
+`/help` is a PR #19 placeholder. **`flutter_markdown ^0.7.0` is already present +
+used** (product detail) — no new package. **Module decision (AskUserQuestion):
+separate `internal/help` (help_schema, public) + `internal/support`
+(support_schema, tickets)** — cleanest separation, matches the 2a inbox precedent.
