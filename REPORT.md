@@ -2656,3 +2656,83 @@ features, no parity change.
 - **Pending-legal-review entries** (4a/4b/4c) marked **✅ CLOSED** pointing here.
 
 The analytics arc (PRs #27/#28/#29) is now fully production-ready.
+
+## Tranche 5a PR — Seller-Facing: Storefronts + Return Approval + Q&A Inbox
+
+**Branch:** `feat/reviews-helpful-sort-pagination` (Tranche 5 split per §1.6).
+Scope chosen via `AskUserQuestion`: ship **5a Seller-facing** this turn (5b
+platform-growth deferred); architecture **Option C** (single consumer app —
+storefronts are public consumer routes, the seller dashboard is a role-gated
+`/seller/*` surface); **full 5a** attempted.
+
+### Baseline (`tool/audit/tranche5_baseline.md`, committed in §2)
+Pre-existing: `/seller/orders/{id}/breakdown` (seller payout transparency,
+read-only) and the `seller_id` soft column on products — no seller _module_, no
+storefront, no role gating. Built the module from the stub.
+
+### §3 Backend — `feat(api): seller storefronts + return approval + Q&A inbox + migration 0078`
+- **Migration 0078** (`seller_schema`): `sellers` (slug-unique, `bio_translations`
+  JSONB, status active|suspended) + `seller_users` (seller_id FK, `user_id` soft
+  ref, role). Seeds 3 sellers + binds user 1 → seller 1. Round-trip verified.
+- **`internal/seller`**: `Service`/`Repository` — `GetBySlug`/`GetByID` (active-only,
+  `ErrSellerNotFound` for unknown/suspended) + `ResolveSellerForUser`.
+- **`catalog.SellerStorefrontReader`** (separate from `catalog.Service`):
+  products/review-summary/reviews by seller + `ProductIDsBySeller` /
+  `ProductSellerID`. Review reads filter `status='published'`.
+- **`order.ReturnService`** += `ListSellerReturns` + `SellerApprove`/`SellerReject`,
+  **seller-scoped** (`ReturnProductIDs` ∩ seller product ids, all within
+  order_schema), pending-only guard, `ErrReturnNotOwned`→404 (no id-probing).
+- **`catalog` Q&A** += `ListSellerQuestions` (inbox; `unanswered` = NOT EXISTS a
+  seller answer) and `AnswerInput.IsSeller` threaded.
+- **`middleware.RequireSellerRole`** (lookup-func, no identity→seller import):
+  resolves the binding after `RequireAuth`, 403s non-sellers, puts `seller_id` in ctx.
+- **Routes**: `GET /sellers/{slug}[/products|/reviews]` (public);
+  `GET /seller/returns`, `POST /seller/returns/{id}/{approve,reject}`,
+  `GET /seller/questions` (role-gated). `handleCreateAnswer` computes `is_seller`.
+- **Tests**: migration round-trip + seller repo (suspended hidden, slug 404,
+  user→seller binding); storefront reader (active-only list, summary excludes
+  soft-deleted, product_title join); seller return approve/reject/scoping/
+  not-owned/already-transitioned; Q&A inbox unanswered filter. All green
+  (`go test -race`), boundaries OK, 3 binaries build.
+
+### §4 Frontend — `feat(mobile): seller storefront screen + /sellers/:slug`
+- Deep-linkable `SellerStorefrontScreen` (3 tabs: Hakkımızda / Ürünler / Yorumlar),
+  repo + DTOs over the public endpoints, profile FutureProvider + paginated
+  products/reviews notifiers (load-more on scroll), `GET /sellers/:slug` route +
+  page title, `seller_storefront.*` i18n (tr-TR + en-US; de/ar fall back per 2b).
+- Golden: about-tab mobile 375 + desktop 1440 (Linux-baselined via rebaseline
+  workflow). `flutter analyze lib` clean; router/title tests green.
+
+### Reconciliations (locked design / CONTRIBUTING > prompt)
+- Separate `SellerStorefrontReader`/`ReturnService` interfaces over widening
+  `catalog.Service`/`order.Service` (mock-churn avoidance, per CONTRIBUTING).
+- Seller-write authorization scopes by product-id intersection inside
+  order_schema — no cross-schema JOIN, no trust of the path id.
+- Reused the recently-viewed cashback field-name mapper (`monthly_amount_minor`
+  → `monthlyCoinMinor`) for the storefront products tab.
+
+### Carried to 5a-2 (partial-and-green per §1.6)
+- **Seller dashboard UI** (returns inbox + Q&A inbox screens + "Satıcı Paneli"
+  account-rail entry). The backend (role gating + all endpoints) is shipped and
+  tested; only the Flutter dashboard surface is carried.
+- **PDP "Mağazaya git" wiring**: needs the seller **slug** on the product-detail
+  payload (generated `Product` has only `sellerId`/`sellerName`) → an OpenAPI
+  codegen change. Storefront is fully deep-linkable by slug meanwhile.
+
+### Deferred to 5b (next tranche, pre-authorized)
+Share infra, SEO meta tags, JSON-LD, sitemap/robots, Recently-Viewed see-all.
+
+### Parity
+Backend for all of 5a + storefront frontend ship; ~52% → ~56% (full 5a incl. the
+carried dashboard UI targets ~58%).
+
+### Goldens
+2 new (`seller_storefront_about_{mobile_375,desktop_1440}.png`) — baseline on
+Linux via the rebaseline workflow; no existing goldens changed.
+
+### Risk notes
+- POST approve/reject call `requireIdempotencyKey` inline; the audit's
+  "Idempotent?" column reads "no" because it detects a middleware wrapper, not the
+  inline guard — enforcement is present in the handler.
+- de/ar storefront strings fall back to the configured `tr-TR` fallback (the de/ar
+  files are curated subsets), consistent with the existing `seller.*` block.

@@ -280,6 +280,40 @@ render, no network). Tracked in REPORT.md "Pending legal review".
 Precedent: `kAnalyticsConsentEnabled` (`lib/core/feature_flags.dart`, Tranche
 4a/4b) gates the analytics consent banner + settings + the instrumentation layer.
 
+## Seller storefront + role-gated dashboard (Tranche 5a)
+
+Seller surfaces span three modules without widening their core interfaces:
+
+- **Separate read interfaces, not `Service` widening.** Storefront reads live on
+  `catalog.SellerStorefrontReader` and seller-side returns on
+  `order.ReturnService` — distinct from `catalog.Service` / `order.Service` so
+  existing mocks don't churn (same rationale as the Tranche 3 UGC interfaces and
+  the checkout-session repo). Prefer a new narrow interface over a method on a
+  widely-mocked one.
+- **Cross-schema stays soft + JOIN-free.** `products.seller_id` (catalog_schema)
+  and `seller_users.user_id` (seller_schema) are plain BIGINT soft references —
+  **no** FK (same convention as `analytics_events.user_id`,
+  `product_questions.user_id`). Seller-scoped reads/writes get the seller's
+  product-id set from catalog, then scope **within** order_schema
+  (`ReturnProductIDs` ∩ `sellerProductIDs`); there is no cross-schema JOIN.
+- **Never trust the path id for seller writes.** `SellerApprove`/`SellerReject`
+  verify the target return references one of the caller's products and return
+  `ErrReturnNotOwned` (mapped to 404, not 403, so a seller can't probe another
+  seller's return ids) before the pending-state guard. The `seller_id` comes from
+  `RequireSellerRole` (ctx), never the request body.
+- **is_seller is computed at answer time**, in the handler, from
+  `seller.ResolveSellerForUser(user)` ∩ `catalog.ProductSellerID(question→product)`
+  — not stored on the user. The service layer just threads `AnswerInput.IsSeller`.
+
+Mobile: the storefront products tab reuses the shared `buildProductSummaryJSON`
+shape, so it hits the **same cashback field-name trap** as the recently-viewed
+rail — the wire key is `cashback_preview.monthly_amount_minor` but the generated
+`ProductSummary.fromJson` expects `monthly_coin_minor`. Map explicitly
+(`sellerProductFromApi`); do **not** call `ProductSummary.fromJson` on these
+hand-written endpoints. The generated `Product`/`ProductSummary` models carry
+`sellerId`/`sellerName` but **no slug**, so PDP→storefront deep-linking needs the
+slug added to the product-detail payload (an OpenAPI codegen change) — carried.
+
 ## PostgreSQL serialization retries
 
 `SERIALIZABLE` isolation can return `40001` (`serialization_failure`) when
