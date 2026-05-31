@@ -103,7 +103,92 @@ must be justified in a follow-up ADR.
 
 ## 3. Decision 2 — Storage shape
 
-_(pending decision)_
+**Chosen: Append-only log + derived projection tables.**
+
+**Rationale.** This is the shape the codebase is already built for. The
+denormalized-cache discipline (`helpful_count`, `answer_count` refreshed in-tx,
+documented in CONTRIBUTING "Storage-layer idempotency") is the same idea applied
+to analytics: an immutable source of truth plus cheap-to-read derived state.
+Option A (log-only) ships a day sooner but makes every personalization read a
+live scan/aggregate over an unbounded table — the `GET /recommendations` query
+would get slower every week. Option C (external broker) is the right shape *only*
+if real-time recommendations or BI tooling were imminent; they are not, and a
+Kafka/Redpanda container does not fit the 6-vCPU / 24 GB single-VDS budget
+(`CLAUDE.md §7` — "the headroom IS the design"). Standard volume at this stage is
+comfortably served by Postgres + a scheduled aggregator on the existing jobs-svc.
+The decision the choice resolves: **cheap, bounded-cost reads for every
+personalization surface, without new infrastructure.**
+
+**Schema sketch.** Lives in its own `analytics_schema` in `postgres-ecom`
+(jobs-svc owns the aggregator; writes arrive via the existing outbox → Redis
+Streams path so no module reaches across a boundary). Cross-schema JOINs stay
+forbidden — projections store denormalized display fields, like `UserReview` does.
+
+```sql
+-- Source of truth: append-only, never UPDATE/DELETE except retention prune.
+CREATE TABLE analytics_schema.analytics_events (
+  id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  event_id    UUID        NOT NULL UNIQUE,         -- producer-supplied, idempotent
+  user_id     BIGINT,                              -- NULL for guests
+  session_id  TEXT        NOT NULL,                -- guest+authed both carry one
+  type        TEXT        NOT NULL,                -- one of the locked taxonomy
+  payload     JSONB       NOT NULL DEFAULT '{}',
+  market      TEXT        NOT NULL,
+  occurred_at TIMESTAMPTZ NOT NULL,                -- client/event time
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()   -- ingest time (retention anchor)
+);
+CREATE INDEX ON analytics_schema.analytics_events (user_id, occurred_at DESC);
+CREATE INDEX ON analytics_schema.analytics_events (session_id, occurred_at);
+CREATE INDEX ON analytics_schema.analytics_events (type, created_at);
+
+-- Derived projections (refreshed by the jobs-svc aggregator; cheap to read).
+CREATE TABLE analytics_schema.user_browsing_history (
+  user_id      BIGINT NOT NULL,
+  product_id   BIGINT NOT NULL,
+  last_viewed  TIMESTAMPTZ NOT NULL,
+  view_count   INT NOT NULL DEFAULT 1,
+  PRIMARY KEY (user_id, product_id)
+);
+CREATE TABLE analytics_schema.user_search_history (
+  user_id      BIGINT NOT NULL,
+  query_hash   TEXT NOT NULL,
+  query_sample TEXT,                               -- last raw query, only if consent allows
+  last_searched TIMESTAMPTZ NOT NULL,
+  search_count INT NOT NULL DEFAULT 1,
+  PRIMARY KEY (user_id, query_hash)
+);
+CREATE TABLE analytics_schema.user_category_affinity (
+  user_id     BIGINT NOT NULL,
+  category_id BIGINT NOT NULL,
+  score       NUMERIC NOT NULL,                    -- decayed interaction weight
+  updated_at  TIMESTAMPTZ NOT NULL,
+  PRIMARY KEY (user_id, category_id)
+);
+```
+
+**Event flow.**
+
+```mermaid
+flowchart LR
+  subgraph client[Flutter app]
+    OBS[Riverpod observer<br/>+ manual call sites]
+    GATE{consent<br/>gate}
+    OBS --> GATE
+  end
+  GATE -- allowed --> ING["POST /events (batch)<br/>core-svc ingest"]
+  GATE -- denied --> DROP[(dropped<br/>client-side)]
+  ING --> OUT[(outbox<br/>same tx)]
+  OUT --> XADD[Redis Stream<br/>analytics.events.v1]
+  XADD --> CONS[jobs-svc<br/>analytics consumer]
+  CONS --> EVT[(analytics_events<br/>append-only)]
+  CONS --> AGG[scheduled aggregator]
+  AGG --> PROJ[(projection tables:<br/>browsing / search / affinity)]
+  PROJ --> REC["GET /recommendations<br/>+ history reads"]
+```
+
+The ingest endpoint writes to `analytics_events` and the outbox in one
+transaction (the §4.5 outbox rule), so a consumer crash never loses events and
+re-delivery is idempotent on `event_id`.
 
 ## 4. Decision 3 — Consent model
 
