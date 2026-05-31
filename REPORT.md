@@ -2227,3 +2227,26 @@ documented there (return model follows the OpenAPI contract).
 **Backlog (surfaced):** seller-side return approval; return-reason photo upload (needs object storage); notification on return/refund status (Tranche 2); refund-method switching; reorder; invoice download; carrier-integrated live tracking; full browser-back-per-step history in the return flow (URL reflects step; in-flow back + PopScope drive transitions); per-id browser title for `/returns/:id` (generic, matching `/orders/:id`).
 
 **Risk notes:** return-window edge cases at tz boundaries (14-day window computed from `delivered_at` in UTC via `AddDate`); eligibility race if an order ships mid-flow (server re-validates on submit → 422); refund DTO assumes a single payment per order (existing `FindPaymentByOrderID`).
+
+## Tranche 2 PR — Notifications + Customer Support
+
+### Baseline (branched off `main` @ 014ec82d; PR #21 + #22 merged)
+
+| Metric | Baseline |
+|---|---|
+| `flutter analyze` | No issues (0/0/0) |
+| `flutter test` | +498 / −81 (81 = Linux-baselined goldens on macOS; CI-green) |
+| `flutter build web --release` | `main.dart.js` = 4,605,498 B |
+| `go test ./...` | 30 ok / 0 fail |
+| Audit parity (post-Tranche 1) | ≈ 40% |
+
+### §2 audit + §1.6 SCOPE SPLIT
+See `tool/audit/tranche2_baseline.md`. Both notifications and customer-support
+are **greenfield** (no user-facing tables; `internal/notification` +
+`internal/support` are empty placeholder modules; both routes are PR #19
+placeholders). Push registration is **Partial** (`identity_schema.devices` via
+`POST /me/devices`). Two greenfield domains ≈ 2× Tranche 1, which consumed a full
+session — so the **§1.6 escape hatch is invoked**: this PR ships **2a
+(notifications)** fully green; **2b (customer support)** is carried to a fresh
+`feat/customer-support` PR (notifications first, per §1.6, as it provides the
+badge surface support's future "ticket reply" notification will use).
