@@ -10,6 +10,7 @@ enum AccountRailItem {
   addresses,
   cards,
   security,
+  privacy,
   notifications,
   help,
 
@@ -23,6 +24,7 @@ AccountRailItem accountRailItemFor(String location) {
   if (location.startsWith('/account/profile')) return AccountRailItem.profile;
   if (location.startsWith('/account/security')) return AccountRailItem.security;
   if (location.startsWith('/account/cards')) return AccountRailItem.cards;
+  if (location.startsWith('/account/privacy')) return AccountRailItem.privacy;
   if (location.startsWith('/account/notifications')) {
     return AccountRailItem.notifications;
   }

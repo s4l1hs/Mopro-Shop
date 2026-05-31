@@ -198,6 +198,11 @@ class _AccountMobileBody extends ConsumerWidget {
                   label: 'account.security'.tr(),
                   onTap: () => context.push('/account/security'),
                 ),
+                _Tile(
+                  icon: Icons.shield_outlined,
+                  label: 'account.rail_privacy'.tr(),
+                  onTap: () => context.push('/account/privacy'),
+                ),
               ],
             ),
           ),
