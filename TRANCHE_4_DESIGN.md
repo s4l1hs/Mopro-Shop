@@ -438,7 +438,37 @@ The concrete PR breakdown is in [§9](#9-implementation-tranche-split).
 
 ## 9. Implementation tranche split
 
-_(derived from Decision 7)_
+Derived from Decision 7 (infra + one consumer). Two PRs: **4a** is the substantial
+end-to-end PR; **4b** is an optional follow-up. The §1.6 escape hatch (Decision 7)
+can retroactively split 4a's consumer into 4b if scope walls appear.
+
+### Tranche 4a — analytics pipeline + recently-viewed (the validating consumer)
+
+| Field | Detail |
+|---|---|
+| **Scope** | The full pipeline (consent-gated ingest → outbox → Redis Stream → jobs-svc consumer → `analytics_events` → aggregator → projections → retention) **plus one** consumer: the server-backed "Son baktıkların" recently-viewed rail, proving every layer end-to-end. |
+| **New schema** | `analytics_schema` in `postgres-ecom`: `analytics_events`, `user_browsing_history`, `user_search_history` (table created; search consumer is 4b), `user_category_affinity` (table created; affinity scoring is 4b), `session_identity`. Migrations `0075`/`0076` (next free numbers after Tranche 3's `0074`; verify at kickoff). New Redis Stream `analytics.events.v1` + consumer group (separate from financial streams). |
+| **Backend** | `internal/analytics` (jobs-svc): consumer, aggregator, retention cron. `POST /events` (batch ingest, `OptionalAuth`, outbox-in-tx), `POST /events/identify` (merge, auth), `GET /me/analytics` + `DELETE /me/analytics` (auth), `GET /me/browsing-history` (auth) backing the rail. Consent record on the identity/profile side (server-stored flag). |
+| **Frontend surfaces** | New: `analyticsService` + consent gate + batching client (provider, test-fakeable); go_router `NavigatorObserver` + lifecycle/scroll observers (auto events); manual `track()` call sites per §7; first-visit consent banner (reuses `showAdaptiveModal`); `/account` "Veri ve gizlilik" toggle + "Geçmişimi sil"; **"Son baktıkların" home rail** (hide-when-empty) backed by `recentlyViewedProvider`. Modified: cart/checkout/PDP/PLP/search call sites; home screen (rail); account settings. New `consent.*` + `analytics.*` locale keys ×4 locales. |
+| **Prerequisites** | All seven decisions in this doc (locked). Confirm next migration numbers. Confirm/lookup the account-deletion path (§10 ★). Privacy-policy copy + legal sign-off on the banner (§10 ★) before *merge*. Separate Redis stream/consumer-group naming agreed. |
+| **Est. sessions** | **~2 sessions** (one chunky PR). It is the largest single Tranche 4 PR; the §1.6 split to infra-only + 4b-consumer is pre-authorized if a wall is hit. |
+| **Acceptance ("shipped green")** | `go test -race ./...` incl. analytics consumer/aggregator integration + a property test (projection count == event-derived count, mirroring the helpful/answer pattern); `golangci-lint` + module-boundary check clean; migrations round-trip on `pg-ecom-test`. `flutter analyze` clean; integration flows for (a) consent gate blocks emission until opt-in, (b) opt-in → `add_to_cart`/`product_view` emitted, (c) recently-viewed rail populates from a viewed product, (d) erase clears history; ~6–10 new goldens (consent banner, settings toggle, recently-viewed rail populated + hidden) baselined via golden-rebaseline CI. `make verify` green; `make audit` updated. REPORT entry + SYSTEM_AUDIT §12 parity bump (Browsing history Missing→Complete, Event tracking pipeline Missing→Complete, Search history Partial→Complete or noted). |
+
+### Tranche 4b — additional consumers (optional follow-up)
+
+| Field | Detail |
+|---|---|
+| **Scope** | Build on the proven 4a pipeline: server-backed **recent-search autocomplete** (from `user_search_history`) and/or **back `GET /recommendations`** with `user_category_affinity` + co-view signal. Pick one or both per appetite. |
+| **New schema** | None expected — 4a creates the tables. May add aggregator logic and indexes; possibly a `recommendation_*` projection if the recommender needs a precomputed slate. |
+| **Backend** | Implement the `search` consumer + affinity scoring in the 4a aggregator; replace the `GET /recommendations` 501 stub with a projection-backed handler. |
+| **Frontend surfaces** | Recent-search suggestions in the search dropdown (extends the existing `RecentSearchesNotifier` UI with a server source); a "Senin için" recommendation rail consuming `/recommendations`. |
+| **Prerequisites** | 4a merged and validated in production (the whole point of Decision 7). Decision-2 revisit only if real-time is required (§10). |
+| **Est. sessions** | **~1 session** per consumer. |
+| **Acceptance** | New consumer’s integration + property tests green; `/recommendations` returns projection-backed data with a graceful empty state; goldens for the new surfaces; parity bump (Recommendation data flow Missing→Partial/Complete). |
+
+A future "Tranche 4a" implementation prompt is essentially the 4a row above
+expanded into the established self-contained-PR shape (audit-first → migrations →
+backend → tests → frontend → flows → goldens → docs → PR).
 
 ## 10. Open questions
 
