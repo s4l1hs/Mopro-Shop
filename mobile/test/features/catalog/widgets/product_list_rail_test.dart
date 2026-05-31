@@ -36,7 +36,7 @@ void main() {
   testWidgets('renders one ProductCard per product', (tester) async {
     await tester.pumpWidget(_wrap(
       ProductListRail(products: [_p(1), _p(2), _p(3)], title: 'Son baktıkların'),
-    ));
+    ),);
     await tester.pump();
     expect(find.byType(ProductCard), findsNWidgets(3));
     expect(find.text('Son baktıkların'), findsOneWidget);
@@ -45,7 +45,7 @@ void main() {
   testWidgets('empty list renders nothing', (tester) async {
     await tester.pumpWidget(_wrap(
       const ProductListRail(products: [], title: 'Son baktıkların'),
-    ));
+    ),);
     await tester.pump();
     expect(find.byType(ProductCard), findsNothing);
     expect(find.text('Son baktıkların'), findsNothing);
@@ -55,13 +55,13 @@ void main() {
   testWidgets('see-all link shows only when onSeeAll provided', (tester) async {
     await tester.pumpWidget(_wrap(
       ProductListRail(products: [_p(1)], title: 'T', onSeeAll: () {}),
-    ));
+    ),);
     await tester.pump();
     expect(find.text('home.see_all'), findsOneWidget);
 
     await tester.pumpWidget(_wrap(
       ProductListRail(products: [_p(1)], title: 'T'),
-    ));
+    ),);
     await tester.pump();
     expect(find.text('home.see_all'), findsNothing);
   });
