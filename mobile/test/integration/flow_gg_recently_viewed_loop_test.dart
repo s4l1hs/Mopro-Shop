@@ -96,8 +96,19 @@ Future<(ProviderContainer, _Adapter, ProviderSubscription)> _eligibleContainer()
   ],);
   final sub = c.listen(recentlyViewedProvider, (_, __) {}, fireImmediately: true);
   await c.read(authNotifierProvider.future);
-  await Future<void>.delayed(const Duration(milliseconds: 30));
+  // Rebuild now that auth is authed, then wait deterministically for the fetch
+  // to land (a fixed delay is racy on slow CI runners).
+  c.invalidate(recentlyViewedProvider);
+  await _settle(c);
   return (c, adapter, sub);
+}
+
+/// Polls until the provider leaves the loading state (the fake fetch resolved),
+/// independent of wall-clock — deterministic on any runner.
+Future<void> _settle(ProviderContainer c) async {
+  for (var i = 0; i < 600 && c.read(recentlyViewedProvider).isLoading; i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
 }
 
 void main() {
@@ -134,7 +145,7 @@ void main() {
     expect(ok, isTrue);
     expect(adapter.deleteCalls, 1);
     c.invalidate(recentlyViewedProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 30));
+    await _settle(c);
     expect(c.read(recentlyViewedProvider).valueOrNull, isEmpty);
     sub.close();
     c.dispose();

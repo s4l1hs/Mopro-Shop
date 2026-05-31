@@ -83,7 +83,12 @@ Future<List<dynamic>> _resolve(ProviderContainer c) async {
   // resolves (a bare read() establishes no subscription).
   final sub = c.listen(recentlyViewedProvider, (_, __) {}, fireImmediately: true);
   await c.read(authNotifierProvider.future);
-  await Future<void>.delayed(const Duration(milliseconds: 30));
+  c.invalidate(recentlyViewedProvider);
+  // Deterministic wait for the (eligible) fetch to settle; ineligible paths
+  // never enter loading, so the loop is a no-op for them.
+  for (var i = 0; i < 600 && c.read(recentlyViewedProvider).isLoading; i++) {
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
   final v = c.read(recentlyViewedProvider).valueOrNull ?? const [];
   sub.close();
   return v;
