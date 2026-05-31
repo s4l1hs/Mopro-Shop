@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/design/tokens.dart';
-import 'package:mopro/features/account/account_placeholder_screen.dart';
 import 'package:mopro/features/account/account_screen.dart';
 import 'package:mopro/features/account/cards_screen.dart';
 import 'package:mopro/features/account/profile_screen.dart';
@@ -31,6 +30,11 @@ import 'package:mopro/features/checkout/presentation/checkout_redirect_screen.da
 import 'package:mopro/features/checkout/presentation/checkout_result_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_review_screen.dart';
 import 'package:mopro/features/favorites/favorites_screen.dart';
+import 'package:mopro/features/help/contact_form_screen.dart';
+import 'package:mopro/features/help/help_article_screen.dart';
+import 'package:mopro/features/help/help_category_screen.dart';
+import 'package:mopro/features/help/help_index_screen.dart';
+import 'package:mopro/features/help/help_search_screen.dart';
 import 'package:mopro/features/not_found/not_found_screen.dart';
 import 'package:mopro/features/notifications/notification_preferences_screen.dart';
 import 'package:mopro/features/notifications/notifications_screen.dart';
@@ -109,6 +113,13 @@ String moproPageTitle(String location, {String? name}) {
   if (location == '/auth/forgot-password') return t('Şifre Sıfırlama');
   if (location == '/auth/mfa') return t('İki Faktör');
   if (location == '/auth/profile') return t('Profil Tamamlama');
+  if (location == '/help/contact') return t('Bize Ulaş');
+  if (location == '/help/search') {
+    return name == null || name.isEmpty ? t('Arama') : t('Arama: "$name"');
+  }
+  if (location.startsWith('/help/category/') || location.startsWith('/help/article/')) {
+    return name == null ? t('Yardım') : t(name);
+  }
   if (location == '/help') return t('Yardım');
   if (location == '/' || location == '/splash') return 'Mopro';
   return t('Sayfa Bulunamadı');
@@ -349,10 +360,35 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/help',
-            builder: (_, __) => const AccountPlaceholderScreen(
-              titleKey: 'account.menu_help',
-              icon: Icons.help_outline_rounded,
-            ),
+            builder: (_, __) => const HelpIndexScreen(),
+            routes: [
+              GoRoute(
+                path: 'category/:slug',
+                builder: (_, state) =>
+                    HelpCategoryScreen(slug: state.pathParameters['slug'] ?? ''),
+              ),
+              GoRoute(
+                path: 'article/:slug',
+                builder: (_, state) =>
+                    HelpArticleScreen(slug: state.pathParameters['slug'] ?? ''),
+              ),
+              GoRoute(
+                path: 'search',
+                builder: (_, state) => HelpSearchScreen(
+                  query: state.uri.queryParameters['q'] ?? '',
+                ),
+              ),
+              GoRoute(
+                path: 'contact',
+                builder: (_, state) {
+                  final orderRaw = state.uri.queryParameters['order'];
+                  return ContactFormScreen(
+                    articleSlug: state.uri.queryParameters['article'],
+                    orderId: orderRaw != null ? int.tryParse(orderRaw) : null,
+                  );
+                },
+              ),
+            ],
           ),
           GoRoute(
             path: '/orders',

@@ -2274,3 +2274,49 @@ badge surface support's future "ticket reply" notification will use).
 **Backlog (2a-surfaced + carried):** live push delivery (FCM/APNs), 60s background poll, websocket real-time, marketing-send pipeline, **all of customer support (2b: help articles/FAQ, contact form, support tickets, flow Z, `flutter_markdown`)**, ticket reply threading, live chat, article CMS, article-feedback analytics, notification grouping.
 
 **Risk notes:** preference write-through is best-effort (debounced PUT; a failed flush surfaces an error but isn't retried); forced-on is enforced client-side (backend upserts what it receives) — a hardened backend guard is Backlog; on-demand badge can lag a notification created server-side between actions (no poll).
+
+## Tranche 2b PR — Customer Support (Help/FAQ + Contact Form + Tickets)
+
+### Baseline (branched off `main` @ da35ecfc; PR #23 merged)
+
+| Metric | Baseline |
+|---|---|
+| `flutter analyze` | No issues (0/0/0) |
+| `flutter test` | +511 / −86 (86 = Linux-baselined goldens on macOS) |
+| `flutter build web --release` | `main.dart.js` = 4,626,918 B |
+| `go test ./...` | 31 ok / 0 fail |
+| Audit parity (post-2a) | ≈ 42% |
+
+### §2 audit + module decision
+See `tool/audit/tranche2b_baseline.md`. Help is fully greenfield; `internal/support`
++ `support_schema` are empty placeholders (schema/role/grants exist, no tables);
+`/help` is a PR #19 placeholder. **`flutter_markdown ^0.7.0` is already present +
+used** (product detail) — no new package. **Module decision (AskUserQuestion):
+separate `internal/help` (help_schema, public) + `internal/support`
+(support_schema, tickets)** — cleanest separation, matches the 2a inbox precedent.
+
+### Tranche 2b COMPLETE — Customer Support
+
+**Module decision (§2.2, AskUserQuestion): separate `internal/help` (help_schema, public content) + `internal/support` (support_schema, tickets).** Cleanest separation; matches the 2a inbox precedent.
+
+**Backend (§3):** migration `0072` (help_categories + help_articles + support_tickets; round-trip verified; help_schema bootstrap role/grants); seed **4 categories × 6 articles (24, tr+en)**. `internal/help`: ListCategories/ListArticles/GetArticle/Search with **locale resolution** (requested → tr → en → first; logs missing-translation hits via slog) and ILIKE search returning `**bolded**` snippets. `internal/support`: CreateTicket (guest + authed via OptionalAuth; validates email/subject≤100/body≤2000/category), ListTickets + GetTicket (ownership-scoped). Endpoints: 4 public `/help/*` + `POST /support/tickets` (OptionalAuth) + `GET /support/tickets[/id]` (RequireAuth).
+
+**Locale resolution:** requested → `tr` → `en` → first available; a `slog.Warn("help: missing translation", locale, slug)` fires on each miss so the translation-coverage Backlog has a real number.
+
+**flutter_markdown:** already in `pubspec` (used by product detail) — **no new package**. External links render as styled text (no `url_launcher`); internal app-path links route via go_router.
+
+**Frontend (§4–§5):** `HelpCategoryCard`, `ContactFormContent` (prefill, conditional order picker, char counters, success state); `/help` index (responsive 1/2/3-col grid + search + Bize Ulaş, **replaces the PR #19 placeholder**), category list, article (markdown + visual 👍/👎), search (300ms debounce, bolded snippets), contact form (`?article=`/`?order=` prefill). Routes nested under `/help` in the account shell so the rail **Yardım** row highlights; page titles for all new routes.
+
+**Account rail:** "Yardım" now resolves to the live `HelpIndexScreen` (no rail change needed — route registration only).
+
+**Contact form mechanics:** guest path (email only) + authed (email prefilled, editable); `?article=slug` prefills subject + sends `related_article_slug`; `?order=id` prefills category `order_issue` + `related_order_id`. **Rate limiting deferred** (no HTTP rate-limit middleware in the codebase — Backlog).
+
+**Flow Z:** guest 390 → /help → search → article → Bize Ulaş (prefilled) → submit → success; 1440 grid render. Green; all prior flows pass.
+
+**Goldens:** 8 help goldens (card, index light/dark/375, article, search, contact 1440/375) baselined on Linux.
+
+**Parity:** Ticket backend + FAQ/help center + Contact form → **Complete**. ≈42% → **≈45%** (SYSTEM_AUDIT §10 updated; inventory regenerated via `make audit`: +8 endpoints, +3 tables, master 593 keys).
+
+**Backlog (2b-surfaced):** ticket reply threading, agent inbox / live chat, article CMS/editor, article translation pipeline, article-feedback analytics, **ticket→notification bridge** (architecture path: a ticket-status-change event consumed by the PR #23 inbox to create a `system` notification), markdown image embedding, contact-form rate limiting.
+
+**Risk notes:** shared-IP rate-limit edge cases once throttling lands; markdown XSS surface if inline-HTML support is ever added (currently disabled); locale-fallback metric noise until de/ar articles are seeded; ILIKE search plan performance under large article counts (fine at 24, revisit with FTS at scale).

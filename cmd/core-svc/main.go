@@ -21,6 +21,7 @@ import (
 	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/eventbus"
+	"github.com/mopro/platform/internal/help"
 	"github.com/mopro/platform/internal/idempotency"
 	"github.com/mopro/platform/internal/identity"
 	"github.com/mopro/platform/internal/identity/cleanup"
@@ -41,6 +42,7 @@ import (
 	"github.com/mopro/platform/internal/shipping/hepsijet"
 	"github.com/mopro/platform/internal/shipping/mng"
 	"github.com/mopro/platform/internal/shipping/surat"
+	"github.com/mopro/platform/internal/support"
 	"github.com/mopro/platform/pkg/logx"
 	"github.com/mopro/platform/pkg/metrics"
 	"github.com/mopro/platform/pkg/otelx"
@@ -155,6 +157,8 @@ func main() {
 	returnRepo := order.NewReturnRepository(pool)
 	returnSvc := order.NewReturnService(orderRepo, returnRepo)
 	inboxSvc := inbox.NewService(inbox.NewRepository(pool))
+	helpSvc := help.NewService(help.NewRepository(pool), slog.Default())
+	supportSvc := support.NewService(support.NewRepository(pool))
 
 	// Payment module wired before order so orderSvc can receive the PSP reference.
 	paymentRepo := payment.NewRepository(pool)
@@ -563,6 +567,29 @@ func main() {
 	)
 	mux.Handle("DELETE /push-tokens",
 		httpTrace(requireAuth(http.HandlerFunc(handleDeletePushToken(inboxSvc)))),
+	)
+	// ── Help / FAQ (public) ───────────────────────────────────────────────────
+	mux.Handle("GET /help/categories",
+		httpTrace(http.HandlerFunc(handleHelpCategories(helpSvc, defaultLocale))),
+	)
+	mux.Handle("GET /help/categories/{slug}/articles",
+		httpTrace(http.HandlerFunc(handleHelpArticles(helpSvc, defaultLocale))),
+	)
+	mux.Handle("GET /help/articles/{slug}",
+		httpTrace(http.HandlerFunc(handleHelpArticle(helpSvc, defaultLocale))),
+	)
+	mux.Handle("GET /help/search",
+		httpTrace(http.HandlerFunc(handleHelpSearch(helpSvc, defaultLocale))),
+	)
+	// ── Support tickets (create = OptionalAuth; list/detail = RequireAuth) ────
+	mux.Handle("POST /support/tickets",
+		httpTrace(optionalAuth(http.HandlerFunc(handleCreateTicket(supportSvc)))),
+	)
+	mux.Handle("GET /support/tickets",
+		httpTrace(requireAuth(http.HandlerFunc(handleListTickets(supportSvc)))),
+	)
+	mux.Handle("GET /support/tickets/{id}",
+		httpTrace(requireAuth(http.HandlerFunc(handleGetTicket(supportSvc)))),
 	)
 	mux.Handle("GET /seller/orders/{id}/breakdown",
 		httpTrace(http.HandlerFunc(handleSellerBreakdown(orderSvc))),
