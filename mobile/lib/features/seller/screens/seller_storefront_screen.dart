@@ -150,15 +150,8 @@ class _AboutTab extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 20),
-        if (profile.bio.isNotEmpty) ...[
-          Text(
-            'seller_storefront.tab_about'.tr(),
-            style: theme.textTheme.titleSmall
-                ?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
+        if (profile.bio.isNotEmpty)
           Text(profile.bio, style: theme.textTheme.bodyMedium),
-        ],
       ],
     );
   }
