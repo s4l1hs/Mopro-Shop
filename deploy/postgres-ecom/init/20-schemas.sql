@@ -10,6 +10,7 @@ CREATE SCHEMA IF NOT EXISTS order_schema        AUTHORIZATION order_user;
 CREATE SCHEMA IF NOT EXISTS payment_schema      AUTHORIZATION payment_user;
 CREATE SCHEMA IF NOT EXISTS seller_schema       AUTHORIZATION seller_user;
 CREATE SCHEMA IF NOT EXISTS search_schema       AUTHORIZATION search_user;
+CREATE SCHEMA IF NOT EXISTS inbox_schema        AUTHORIZATION inbox_user;
 
 -- jobs-svc module schemas
 CREATE SCHEMA IF NOT EXISTS notification_schema AUTHORIZATION notification_user;

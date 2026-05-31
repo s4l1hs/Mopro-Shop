@@ -22,6 +22,7 @@ import 'package:mopro/features/order/application/orders_provider.dart';
 import 'package:mopro/features/wallet/providers/cashback_plans_provider.dart';
 import 'package:mopro/features/wallet/providers/wallet_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../_support/stub_unread_count.dart';
 
 // Baselines generated on Linux/CI via the golden-rebaseline workflow.
 
@@ -95,6 +96,7 @@ Future<void> _pump(
       child: ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
+          stubUnreadCountOverride,
           currentUserProvider.overrideWith((ref) async => user),
           authNotifierProvider.overrideWith(
             () => _FakeAuth(

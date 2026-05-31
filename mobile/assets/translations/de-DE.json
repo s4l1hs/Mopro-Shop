@@ -175,5 +175,40 @@
     "original_order": "View order",
     "reviewing": "Under review",
     "detail_title": "Return #{}"
+  },
+  "time": {
+    "just_now": "gerade eben",
+    "minutes_ago": "vor {} Minuten",
+    "hours_ago": "vor {} Stunden",
+    "yesterday": "gestern",
+    "days_ago": "vor {} Tagen"
+  },
+  "notifications": {
+    "title": "Benachrichtigungen",
+    "unread_badge": "{} unread notifications",
+    "filter_all": "Alle",
+    "filter_unread": "Ungelesen",
+    "mark_all_read": "Alle als gelesen markieren",
+    "empty": "Noch keine Benachrichtigungen.",
+    "empty_sub": "Your new notifications will appear here.",
+    "go_home": "Zur Startseite",
+    "load_more": "Mehr laden",
+    "settings_link": "Benachrichtigungseinstellungen",
+    "prefs_title": "Benachrichtigungseinstellungen",
+    "cat_order_status": "Bestellungen",
+    "cat_return_update": "Rücksendungen",
+    "cat_security": "Sicherheit",
+    "cat_marketing": "Marketing",
+    "cat_general": "Allgemein",
+    "ch_in_app": "In-App",
+    "ch_email": "E-Mail",
+    "ch_push": "Push",
+    "forced_on_warning": "Diese Benachrichtigung kann nicht deaktiviert werden.",
+    "sample_order_title": "Your order has shipped",
+    "sample_order_body": "Order #{id} is on its way.",
+    "sample_return_title": "Return request received",
+    "sample_return_body": "Your return #{id} is under review.",
+    "sample_security_title": "New sign-in detected",
+    "sample_security_body": "Your account was accessed from a new device."
   }
 }

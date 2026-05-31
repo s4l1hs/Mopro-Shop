@@ -138,3 +138,10 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+-- inbox (user notification inbox — core-svc)
+GRANT USAGE ON SCHEMA inbox_schema TO inbox_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA inbox_schema
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO inbox_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA inbox_schema
+  GRANT USAGE, SELECT ON SEQUENCES TO inbox_user;

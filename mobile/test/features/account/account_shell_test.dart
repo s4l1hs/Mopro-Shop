@@ -18,6 +18,7 @@ import 'package:mopro/features/account/widgets/account_left_rail.dart';
 import 'package:mopro/features/account/widgets/account_rail_item.dart';
 import 'package:mopro/features/account/widgets/account_shell.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../_support/stub_unread_count.dart';
 
 class _FakeAuth extends AuthNotifier {
   _FakeAuth(this._initial);
@@ -62,6 +63,7 @@ Future<void> _pumpShell(
       child: ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
+          stubUnreadCountOverride,
           currentUserProvider.overrideWith((ref) async => null),
           authNotifierProvider.overrideWith(() => _FakeAuth(auth)),
         ],

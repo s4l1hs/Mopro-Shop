@@ -32,6 +32,8 @@ import 'package:mopro/features/checkout/presentation/checkout_result_screen.dart
 import 'package:mopro/features/checkout/presentation/checkout_review_screen.dart';
 import 'package:mopro/features/favorites/favorites_screen.dart';
 import 'package:mopro/features/not_found/not_found_screen.dart';
+import 'package:mopro/features/notifications/notification_preferences_screen.dart';
+import 'package:mopro/features/notifications/notifications_screen.dart';
 import 'package:mopro/features/order/presentation/order_detail_screen.dart';
 import 'package:mopro/features/order/presentation/order_history_screen.dart';
 import 'package:mopro/features/order/presentation/order_return_flow_screen.dart';
@@ -90,6 +92,9 @@ String moproPageTitle(String location, {String? name}) {
   if (location == '/account/profile') return t('Profilim');
   if (location == '/account/security') return t('Güvenlik');
   if (location == '/account/cards') return t('Kartlarım');
+  if (location == '/account/notifications/preferences') {
+    return t('Bildirim Ayarları');
+  }
   if (location == '/account/notifications') return t('Bildirimler');
   if (location == '/account') return t('Hesabım');
   if (location == '/categories') return t('Kategoriler');
@@ -334,10 +339,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/account/notifications',
-            builder: (_, __) => const AccountPlaceholderScreen(
-              titleKey: 'account.notifications',
-              icon: Icons.notifications_outlined,
-            ),
+            builder: (_, __) => const NotificationsScreen(),
+            routes: [
+              GoRoute(
+                path: 'preferences',
+                builder: (_, __) => const NotificationPreferencesScreen(),
+              ),
+            ],
           ),
           GoRoute(
             path: '/help',

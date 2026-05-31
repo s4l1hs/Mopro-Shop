@@ -15,6 +15,7 @@ DECLARE
     'notification_user',
     'support_user',
     'media_user',
+    'inbox_user',       -- core-svc: user notification inbox
     'sizefinder_user',
     'antifraud_user',   -- v7: core-svc ML scoring decision module
     'einvoice_user'     -- v7: jobs-svc GİB e-fatura/e-arşiv via Foriba
