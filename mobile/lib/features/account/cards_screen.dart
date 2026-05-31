@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 
 class CardsScreen extends ConsumerWidget {
   const CardsScreen({super.key});
@@ -12,7 +13,9 @@ class CardsScreen extends ConsumerWidget {
 
     // Stub: no saved cards yet
     return Scaffold(
-      appBar: AppBar(title: Text('account.saved_cards'.tr())),
+      appBar: AccountChromeScope.suppressed(context)
+          ? null
+          : AppBar(title: Text('account.saved_cards'.tr())),
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,

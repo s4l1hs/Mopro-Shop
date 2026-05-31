@@ -31,6 +31,14 @@ void main() {
     };
     addTearDown(() => FlutterError.onError = originalOnError);
 
+    // The theme tile under test lives in the mobile (<600) account menu; the
+    // screen is now responsive (tablet/desktop renders the two-pane rail), so
+    // force a mobile viewport.
+    tester.view.physicalSize = const Size(390, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final prefs = await SharedPreferences.getInstance();
 

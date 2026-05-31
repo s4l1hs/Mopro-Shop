@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 
 class AccountProfileScreen extends ConsumerStatefulWidget {
   const AccountProfileScreen({super.key});
@@ -41,7 +42,9 @@ class _AccountProfileScreenState extends ConsumerState<AccountProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('account.profile'.tr())),
+      appBar: AccountChromeScope.suppressed(context)
+          ? null
+          : AppBar(title: Text('account.profile'.tr())),
       body: Form(
         key: _formKey,
         child: ListView(

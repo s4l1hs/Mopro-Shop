@@ -28,7 +28,14 @@
     "logout": "تسجيل الخروج",
     "menu_login_prompt": "سجّل الدخول إلى حسابك",
     "menu_register": "إنشاء حساب",
-    "menu_help": "المساعدة"
+    "menu_help": "المساعدة",
+    "rail_profile": "ملفي",
+    "notifications": "الإشعارات",
+    "theme": "المظهر",
+    "theme_light": "فاتح",
+    "theme_dark": "داكن",
+    "language": "اللغة",
+    "coming_soon": "هذا القسم قريباً."
   },
   "mega_menu": {
     "see_all": "عرض الكل",
@@ -60,5 +67,25 @@
     "sort_highest": "الأعلى تقييماً",
     "sort_lowest": "الأدنى تقييماً",
     "sort_helpful": "الأكثر فائدة"
+  },
+  "welcome": {
+    "greeting": "مرحباً، {name}.",
+    "card_last_order": "آخر طلب",
+    "no_orders": "لا توجد طلبات بعد.",
+    "start_shopping": "ابدأ التسوق",
+    "detail": "التفاصيل",
+    "card_wallet": "رصيد المحفظة",
+    "wallet_cta": "محفظتي",
+    "card_campaigns": "الحملات النشطة",
+    "active_count": "{count} نشطة",
+    "campaigns_cta": "عرض",
+    "guest_title": "مرحباً بك في موبرو",
+    "guest_subtitle": "سجّل الدخول لتخصيص تجربة التسوق.",
+    "reason_reco_title": "اقتراحات مخصصة",
+    "reason_reco_desc": "نرتب لك المنتجات التي قد تعجبك.",
+    "reason_fav_title": "مزامنة المفضلة",
+    "reason_fav_desc": "نفس المفضلة على كل أجهزتك.",
+    "reason_orders_title": "تتبع الطلبات",
+    "reason_orders_desc": "تابع كل طلباتك من مكان واحد."
   }
 }

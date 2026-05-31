@@ -213,3 +213,41 @@ safe helper `uri.clearQueryParameters()` from `lib/core/utils/uri_ext.dart`
 (`Uri.replace(queryParameters: const {})`). The extension prevents the recurrence
 by API shape; `test/core/utils/uri_ext_test.dart` includes a contrast test
 asserting the `null` form does NOT clear.
+
+## Storage-layer idempotency
+
+Two domains now follow this pattern (cashback `payments_made` and reviews
+`helpful_count`):
+
+1. A junction table with `PRIMARY KEY (parent_id, user_id)` (or equivalent
+   composite key) catches concurrent inserts at the database via 23505
+   unique-constraint violation.
+2. A denormalized count column on the parent table, refreshed inside the same
+   SERIALIZABLE transaction as the junction-table write. Doc comment on the column
+   flags it as "denormalized cache, do not treat as authoritative."
+3. A `Refresh<Domain>Cache` function with a doc comment naming the junction table
+   as authoritative.
+4. A concurrent-write integration test that asserts N goroutines converge to the
+   expected row count.
+5. A property test that asserts the cache column matches `COUNT(*)` across a random
+   sequence of operations.
+
+Implementations: `internal/cashback/RefreshPaymentsMadeCache`,
+`internal/catalog/RefreshHelpfulCountCache`. Add new domains to this list as they
+land.
+
+## PostgreSQL serialization retries
+
+`SERIALIZABLE` isolation can return `40001` (`serialization_failure`) when
+transactions conflict. This is normal under contention, not an error condition —
+the application is expected to retry. The reviews `ToggleHelpfulVote`
+implementation uses a savepoint + retry loop. If a third domain needs this pattern,
+extract `WithRetryOnSerialization(ctx, tx, fn, maxRetries int)` into
+`internal/shared/db` rather than copy the loop again. Tracked as backlog.
+
+## Formatting
+
+The `require_trailing_commas` lint and `dart format`'s output disagree on
+multi-argument calls when the line would fit without a trailing comma. Hand-format
+the trailing comma in — do not rely on `dart format` to add it. Pre-commit hook
+does not auto-fix this; CI lint catches it.

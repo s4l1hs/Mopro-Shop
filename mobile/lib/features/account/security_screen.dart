@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/di/providers.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 import 'package:mopro/features/auth/auth_widgets.dart';
 
 class SecurityScreen extends ConsumerStatefulWidget {
@@ -45,7 +46,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: Text('account.security'.tr())),
+      appBar: AccountChromeScope.suppressed(context)
+          ? null
+          : AppBar(title: Text('account.security'.tr())),
       backgroundColor: cs.surfaceContainerHighest,
       body: _loading
           ? const Center(child: CircularProgressIndicator())
