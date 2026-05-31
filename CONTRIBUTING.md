@@ -270,10 +270,15 @@ crons), Tranche 4a.
 
 ## Build-flag gating for legal-review surfaces
 
-_(Lands with Tranche 4b's consent UX.)_ Production surfaces that depend on legal
-review (privacy copy, consent flows, regulatory disclaimers) ship behind a
-build-time constant defaulting dev-on / prod-off; the flag is removed when legal
-approves. Tracked in REPORT.md "Pending legal review".
+Production surfaces that depend on legal review (privacy copy, consent flows,
+regulatory disclaimers) ship behind a build-time constant defaulting to
+dev/staging-on, prod-configurable-off; the flag is the gate, and legal sign-off
+triggers the prod-default flip in a focused follow-up PR (which also removes any
+`DRAFT`-suffixed files). When the flag is off the surface must fully no-op (no
+render, no network). Tracked in REPORT.md "Pending legal review".
+
+Precedent: `kAnalyticsConsentEnabled` (`lib/core/feature_flags.dart`, Tranche
+4a/4b) gates the analytics consent banner + settings + the instrumentation layer.
 
 ## PostgreSQL serialization retries
 
@@ -322,6 +327,17 @@ the A11y sweep built an audit harness + baseline before fixing a single label.
 `SYSTEM_AUDIT.md` and the `tool/audit/` scripts are the largest instance — they
 generate the inventory deterministically so the "before" is reproducible. For a
 non-trivial change, prefer a measured baseline over a guess.
+
+**Re-verify referenced foundations.** When a task references prior-session
+deliverables as foundation (widgets, providers, schema, endpoints), the
+audit-first step explicitly re-verifies each one (`file:line`) before
+implementation proceeds. Earlier reports occasionally describe surfaces that were
+never fully wired through — Session 5a's "Son baktıkların" rail was referenced
+but only a placeholder column existed; Tranche 4a's prompt assumed a
+`recentlyViewedProvider` that did not exist; the 4b prompt's auto-observer
+allowlist contradicted the locked design doc's manual-event decision. Catching
+these in the audit (and reconciling toward the locked design, not the prompt's
+incidental wording) prevents wrong assumptions from cascading into implementation.
 
 ## Adaptive presenter
 
