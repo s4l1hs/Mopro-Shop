@@ -592,5 +592,40 @@
     "original_order": "Siparişe git",
     "reviewing": "İnceleniyor",
     "detail_title": "İade #{}"
+  },
+  "time": {
+    "just_now": "az önce",
+    "minutes_ago": "{} dakika önce",
+    "hours_ago": "{} saat önce",
+    "yesterday": "dün",
+    "days_ago": "{} gün önce"
+  },
+  "notifications": {
+    "title": "Bildirimler",
+    "unread_badge": "{} okunmamış bildirim",
+    "filter_all": "Tümü",
+    "filter_unread": "Okunmamış",
+    "mark_all_read": "Tümünü okundu işaretle",
+    "empty": "Henüz bildirim yok.",
+    "empty_sub": "Yeni bildirimlerin burada görünecek.",
+    "go_home": "Ana sayfaya dön",
+    "load_more": "Daha fazla",
+    "settings_link": "Bildirim ayarları",
+    "prefs_title": "Bildirim Ayarları",
+    "cat_order_status": "Siparişler",
+    "cat_return_update": "İadeler",
+    "cat_security": "Güvenlik",
+    "cat_marketing": "Pazarlama",
+    "cat_general": "Genel",
+    "ch_in_app": "Uygulama içi",
+    "ch_email": "E-posta",
+    "ch_push": "Anlık bildirim",
+    "forced_on_warning": "Bu bildirim kapatılamaz.",
+    "sample_order_title": "Siparişin kargoya verildi",
+    "sample_order_body": "#{id} numaralı siparişin yola çıktı.",
+    "sample_return_title": "İade talebin alındı",
+    "sample_return_body": "İade #{id} talebin inceleniyor.",
+    "sample_security_title": "Yeni giriş algılandı",
+    "sample_security_body": "Hesabına yeni bir cihazdan giriş yapıldı."
   }
 }

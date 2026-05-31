@@ -512,5 +512,40 @@
     "original_order": "View order",
     "reviewing": "Under review",
     "detail_title": "Return #{}"
+  },
+  "time": {
+    "just_now": "just now",
+    "minutes_ago": "{} minutes ago",
+    "hours_ago": "{} hours ago",
+    "yesterday": "yesterday",
+    "days_ago": "{} days ago"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "unread_badge": "{} unread notifications",
+    "filter_all": "All",
+    "filter_unread": "Unread",
+    "mark_all_read": "Mark all as read",
+    "empty": "No notifications yet.",
+    "empty_sub": "Your new notifications will appear here.",
+    "go_home": "Back to home",
+    "load_more": "Load more",
+    "settings_link": "Notification settings",
+    "prefs_title": "Notification Settings",
+    "cat_order_status": "Orders",
+    "cat_return_update": "Returns",
+    "cat_security": "Security",
+    "cat_marketing": "Marketing",
+    "cat_general": "General",
+    "ch_in_app": "In-app",
+    "ch_email": "Email",
+    "ch_push": "Push",
+    "forced_on_warning": "This notification can't be turned off.",
+    "sample_order_title": "Your order has shipped",
+    "sample_order_body": "Order #{id} is on its way.",
+    "sample_return_title": "Return request received",
+    "sample_return_body": "Your return #{id} is under review.",
+    "sample_security_title": "New sign-in detected",
+    "sample_security_body": "Your account was accessed from a new device."
   }
 }

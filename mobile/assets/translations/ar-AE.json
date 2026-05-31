@@ -175,5 +175,40 @@
     "original_order": "View order",
     "reviewing": "Under review",
     "detail_title": "Return #{}"
+  },
+  "time": {
+    "just_now": "الآن",
+    "minutes_ago": "قبل {} دقيقة",
+    "hours_ago": "قبل {} ساعة",
+    "yesterday": "أمس",
+    "days_ago": "قبل {} أيام"
+  },
+  "notifications": {
+    "title": "الإشعارات",
+    "unread_badge": "{} unread notifications",
+    "filter_all": "الكل",
+    "filter_unread": "غير المقروءة",
+    "mark_all_read": "تحديد الكل كمقروء",
+    "empty": "لا توجد إشعارات بعد.",
+    "empty_sub": "Your new notifications will appear here.",
+    "go_home": "العودة للرئيسية",
+    "load_more": "تحميل المزيد",
+    "settings_link": "إعدادات الإشعارات",
+    "prefs_title": "إعدادات الإشعارات",
+    "cat_order_status": "الطلبات",
+    "cat_return_update": "المرتجعات",
+    "cat_security": "الأمان",
+    "cat_marketing": "التسويق",
+    "cat_general": "عام",
+    "ch_in_app": "داخل التطبيق",
+    "ch_email": "البريد",
+    "ch_push": "الإشعارات الفورية",
+    "forced_on_warning": "لا يمكن إيقاف هذا الإشعار.",
+    "sample_order_title": "Your order has shipped",
+    "sample_order_body": "Order #{id} is on its way.",
+    "sample_return_title": "Return request received",
+    "sample_return_body": "Your return #{id} is under review.",
+    "sample_security_title": "New sign-in detected",
+    "sample_security_body": "Your account was accessed from a new device."
   }
 }
