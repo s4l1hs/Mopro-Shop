@@ -64,7 +64,12 @@
     "trust_secure_payment": "Secure Payment",
     "trust_easy_return": "Easy Returns",
     "trust_perpetual_cashback": "Perpetual Cashback",
-    "flash_deals_ended": "Deal ended"
+    "flash_deals_ended": "Deal ended",
+    "rails": {
+      "recently_viewed": {
+        "title": "Recently viewed"
+      }
+    }
   },
   "plp": {
     "filter_category": "Category",

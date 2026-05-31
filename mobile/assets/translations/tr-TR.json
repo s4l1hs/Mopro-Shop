@@ -86,7 +86,12 @@
     "trust_secure_payment": "Güvenli Ödeme",
     "trust_easy_return": "Kolay İade",
     "trust_perpetual_cashback": "Sürekli Cashback",
-    "flash_deals_ended": "Fırsat sona erdi"
+    "flash_deals_ended": "Fırsat sona erdi",
+    "rails": {
+      "recently_viewed": {
+        "title": "Son baktıkların"
+      }
+    }
   },
   "plp": {
     "filter_category": "Kategori",

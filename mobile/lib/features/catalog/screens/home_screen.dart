@@ -13,11 +13,13 @@ import 'package:mopro/features/catalog/providers/products_rail_provider.dart';
 import 'package:mopro/features/catalog/widgets/home_category_grid.dart';
 import 'package:mopro/features/catalog/widgets/home_footer.dart';
 import 'package:mopro/features/catalog/widgets/mood_stories_strip.dart';
+import 'package:mopro/features/catalog/widgets/product_list_rail.dart';
 import 'package:mopro/features/catalog/widgets/product_rail.dart';
 import 'package:mopro/features/catalog/widgets/trust_bar.dart';
 import 'package:mopro/features/home/providers/flash_deals_provider.dart';
 // ignore: lines_longer_than_80_chars
 import 'package:mopro/features/home/providers/home_wallet_summary_provider.dart';
+import 'package:mopro/features/home/recently_viewed_provider.dart';
 import 'package:mopro/features/home/widgets/flash_deals_rail.dart';
 import 'package:mopro/features/wallet/widgets/coin_balance_pill.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
@@ -106,10 +108,13 @@ class CatalogHomeScreen extends ConsumerWidget {
                   .toList(),
             ),
 
-            // ── Desktop-only "Editor's picks / Recently viewed" sub-section ──
-            // Two 50% columns, 32dp gap. Recently-viewed has no local-history
-            // provider yet, so it is always empty and hidden — the row collapses
-            // to a single full-width Editor's picks column (§6.1).
+            // ── "Son baktıkların" — analytics-driven recently-viewed rail ──
+            // Client-driven (not a server rail). Hidden (zero space) when the
+            // build flag is off, the user is a guest, consent is off, history is
+            // empty, or the fetch fails (Tranche 4c).
+            const SliverToBoxAdapter(child: _RecentlyViewedSliver()),
+
+            // ── Desktop-only "Editor's picks" sub-section ──
             if (context.isDesktop)
               const SliverToBoxAdapter(child: _EditorsPicksSection()),
 
@@ -129,6 +134,28 @@ class CatalogHomeScreen extends ConsumerWidget {
 /// centered content column. The companion "Recently viewed" column is omitted
 /// while there is no local recently-viewed history provider (hide-when-empty,
 /// §6.1) — the row is therefore single-column / full-width.
+/// "Son baktıkların" rail, gated by [recentlyViewedProvider]. Renders zero space
+/// when the provider yields an empty list (ineligible / no history / error), so
+/// the home layout is unchanged in the common case (Tranche 4c).
+class _RecentlyViewedSliver extends ConsumerWidget {
+  const _RecentlyViewedSliver();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final products = ref.watch(recentlyViewedProvider).valueOrNull ?? const [];
+    if (products.isEmpty) return const SizedBox.shrink();
+    final rail = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: ProductListRail(
+        products: products,
+        title: 'home.rails.recently_viewed.title'.tr(),
+        // No /account/browsing-history screen yet — "Tümünü gör" omitted (Backlog).
+      ),
+    );
+    return context.isMobile ? rail : CenteredContentColumn(child: rail);
+  }
+}
+
 class _EditorsPicksSection extends StatelessWidget {
   const _EditorsPicksSection();
 
