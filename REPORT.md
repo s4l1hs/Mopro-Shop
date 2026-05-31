@@ -2054,3 +2054,33 @@ A11y sweep (next PR); integration flows R + S (depend on a11y work).
   an account route, so none highlights (confirmed; no observer to break).
 - **Goldens** render raw i18n keys (EasyLocalization doesn't load assets under
   `flutter test`) — repo-wide cosmetic, consistent with prior goldens.
+
+---
+
+# A11y Sweep PR — measure → fix → guard
+
+Branch `feat/a11y-sweep`, fresh off `main` (PR #19 merged — verified).
+
+## A11y Sweep PR — Baseline (pre-flight)
+
+| Gate | Baseline |
+|---|---|
+| `go test ./...` | **30 ok, 0 fail** |
+| `flutter analyze` | **0 issues** |
+| `flutter test` | **+437 / −71** (−71 = Linux-baselined goldens that fail on local macOS by design; no non-golden failures) |
+| `flutter build web --release` | **4,563,431 B** (`main.dart.js`) — +3% budget ⇒ ≤ 4,700,334 B |
+
+### Harness severity calibration (design note)
+The §10 strict guard asserts **zero error-severity** violations across 18 screen
+configs (warnings/info are logged, not blocking — per the prompt). So
+`A11yAuditHarness` calibrates severity to what is comprehensively fixable:
+- **error** = `missingSemanticLabel` (tappable with no label *and* no tooltip).
+- **warning** = `smallHitTarget` (<44×44).
+- **info** = `missingButtonRole`.
+
+The harness walks the **outermost** tappable in each nested chain (an IconButton's
+inner InkResponse is skipped) and treats a widget as named if its merged semantics
+exposes a `label` **or** a `tooltip` (Flutter routes `IconButton.tooltip` to
+`SemanticsData.tooltip`, which screen readers announce). The explicit fix pattern
+for unnamed custom tappables is `MergeSemantics(Semantics(label:…, button:true,
+child:…))` (verified to land the name on the tap node).
