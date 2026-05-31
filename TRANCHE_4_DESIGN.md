@@ -404,7 +404,37 @@ the payload; the observers are written once and cover every screen automatically
 
 ## 8. Decision 7 — Bundle shape
 
-_(pending decision)_
+**Chosen: infrastructure + one concrete consumer in 4a.** Tranche 4a ships the
+full pipeline (ingest, `analytics_events`, projections, consent banner/settings,
+retention crons, merge) *plus one* visible surface: a **server-backed
+"Son baktıkların" recently-viewed rail** driven by `product_view` →
+`user_browsing_history`. Tranche 4b is an optional follow-up (recent-search
+autocomplete and/or backing `GET /recommendations`).
+
+**Rationale.** Infrastructure-only (Option A) is the tidiest split, but analytics
+plumbing with *no consumer* is the one kind of code that can pass every test and
+still be subtly wrong — projections shaped for queries nobody runs yet, payloads
+missing a field the first consumer needs. Bundling exactly one consumer forces
+the pipeline to prove itself end-to-end (event emitted → ingested → projected →
+read back on a screen) before 4b builds on those assumptions, which is the
+strongest guard against designing the projection wrong. Multiple consumers
+(Option C) would re-introduce the partial-and-red risk the §1.6 escape hatch
+exists to prevent. One consumer is also the *cheapest* end-to-end proof: the
+recently-viewed rail is already a known backlog item ("Son baktıkların",
+hide-when-empty), reuses the home-rail layout that exists, and exercises every
+layer of the new stack with minimal new product surface. The decision the choice
+resolves: **the infrastructure is validated by a real, shippable feature in 4a,
+while scope stays single-domain and the §1.6 split remains available if 4a grows
+mid-build.**
+
+**§1.6 escape hatch (explicit).** If, during 4a implementation, the bundle hits a
+scope wall (e.g. the consent UX or the merge mechanics balloon), the audit-data-
+justified split is pre-authorized: carve the recently-viewed consumer out into
+4b and ship 4a as infrastructure-only. The decision to split must be recorded the
+same way Tranche 3 recorded *not* splitting — a one-paragraph note in that PR's
+report citing the concrete wall.
+
+The concrete PR breakdown is in [§9](#9-implementation-tranche-split).
 
 ## 9. Implementation tranche split
 
