@@ -244,6 +244,37 @@ tx as the answer insert; covered by `TestProperty_AnswerCountMatchesRows` +
 in `internal/catalog`'s `InsertReview` (23505 → `ErrReviewExists`). Add new domains
 to this list as they land.
 
+## Append-only event log + derived projections
+
+Source-of-truth events live in an append-only table (`analytics_schema.analytics_events`);
+reads are served from derived **projection** tables (`user_recently_viewed`, and
+future `user_search_history` / affinity). Projections refresh incrementally on
+ingest (the cheap path — upsert inside the ingest write) plus a periodic full
+rebuild safety net (jobs-svc cron) that backstops drift. Same denormalized-cache
+discipline as `helpful_count` / `answer_count`: refresh as close to the producing
+write as practical; the cron rebuild is the backstop, not the primary path.
+
+Raw events are bounded by a retention prune (90 days); projections persist (and
+are user-erasable for RTBF). The log is never UPDATEd — the only deletes are the
+retention prune and per-user erasure.
+
+Cross-schema soft references: `analytics_events.user_id` / `user_recently_viewed.*`
+are plain BIGINT columns with **no** FK to `identity_schema.users` /
+`catalog_schema.products` (same convention as `inbox_schema.notifications.user_id`,
+`product_questions.user_id`). Integrity is enforced at the application layer;
+account-deletion erasure is wired explicitly (a `DELETE /me` handler hook), not via
+`ON DELETE CASCADE` — which would not fire anyway, since `DELETE /me` is a soft delete.
+
+Implementation: `internal/analytics` (shared by core-svc ingest + jobs-svc
+crons), Tranche 4a.
+
+## Build-flag gating for legal-review surfaces
+
+_(Lands with Tranche 4b's consent UX.)_ Production surfaces that depend on legal
+review (privacy copy, consent flows, regulatory disclaimers) ship behind a
+build-time constant defaulting dev-on / prod-off; the flag is removed when legal
+approves. Tracked in REPORT.md "Pending legal review".
+
 ## PostgreSQL serialization retries
 
 `SERIALIZABLE` isolation can return `40001` (`serialization_failure`) when
@@ -267,6 +298,7 @@ expected in new work. The full system inventory and gap analysis live in
 [`SYSTEM_AUDIT.md`](SYSTEM_AUDIT.md).
 
 - [Storage-layer idempotency](#storage-layer-idempotency)
+- [Append-only event log + derived projections](#append-only-event-log--derived-projections)
 - [PostgreSQL serialization retries](#postgresql-serialization-retries)
 - [URL state](#url-state)
 - [Adding a Notifier (Riverpod)](#adding-a-notifier-riverpod)
