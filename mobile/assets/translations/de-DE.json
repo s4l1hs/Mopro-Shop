@@ -92,5 +92,10 @@
     "skip_to_content": "Zum Inhalt springen",
     "loading": "Wird geladen",
     "page_not_found": "Seite nicht gefunden"
+  },
+  "product": {
+    "remove_from_favorites": "Aus Favoriten entfernen",
+    "decrease_qty": "Menge verringern",
+    "increase_qty": "Menge erhöhen"
   }
 }

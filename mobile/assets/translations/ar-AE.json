@@ -92,5 +92,10 @@
     "skip_to_content": "تخطَّ إلى المحتوى",
     "loading": "جارٍ التحميل",
     "page_not_found": "الصفحة غير موجودة"
+  },
+  "product": {
+    "remove_from_favorites": "إزالة من المفضلة",
+    "decrease_qty": "تقليل الكمية",
+    "increase_qty": "زيادة الكمية"
   }
 }

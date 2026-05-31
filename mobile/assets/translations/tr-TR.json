@@ -225,7 +225,10 @@
     "specs_tab": "Özellikler",
     "reviews_tab": "Değerlendirmeler",
     "qa_tab": "Soru & Cevap",
-    "related_title": "Benzer Ürünler"
+    "related_title": "Benzer Ürünler",
+    "remove_from_favorites": "Favorilerden çıkar",
+    "decrease_qty": "Adet azalt",
+    "increase_qty": "Adet artır"
   },
   "reviews": {
     "header": "Yorumlar ({count})",

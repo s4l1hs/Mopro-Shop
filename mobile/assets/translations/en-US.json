@@ -195,7 +195,10 @@
     "specs_tab": "Specifications",
     "reviews_tab": "Reviews",
     "qa_tab": "Q&A",
-    "related_title": "Similar Products"
+    "related_title": "Similar Products",
+    "remove_from_favorites": "Remove from favorites",
+    "decrease_qty": "Decrease quantity",
+    "increase_qty": "Increase quantity"
   },
   "reviews": {
     "header": "Reviews ({count})",
