@@ -185,7 +185,8 @@
     "coming_soon": "Bu bölüm yakında.",
     "returns": "İadelerim",
     "rail_reviews": "Yorumlarım",
-    "rail_questions": "Sorularım"
+    "rail_questions": "Sorularım",
+    "rail_privacy": "Gizlilik"
   },
   "address": {
     "list_title": "Adreslerim",
@@ -709,5 +710,27 @@
     "detail_title": "Soru",
     "ask_success": "Sorunuz gönderildi.",
     "answer_success": "Yanıtınız gönderildi."
+  },
+  "consent": {
+    "banner_headline": "Verilerinizi nasıl kullandığımızı seçin",
+    "banner_body_1": "Hangi ürünleri görüntülediğin, aradığın kelimeler, sepete eklediklerin gibi alışveriş etkileşimlerini topluyoruz.",
+    "banner_body_2": "Bu veriler, sana daha iyi öneriler sunmamıza ve uygulama deneyimini iyileştirmemize yardımcı olur.",
+    "banner_body_3": "Verilerin 90 gün boyunca saklanır; istediğin zaman silebilir veya bu izni iptal edebilirsin.",
+    "accept": "Kabul Ediyorum",
+    "decline": "Reddediyorum",
+    "more_info": "Daha fazla bilgi",
+    "settings_title": "Gizlilik",
+    "setting_title": "Analitik İzleme",
+    "setting_desc": "Alışveriş etkileşimlerinin daha iyi öneriler için kullanılmasına izin ver.",
+    "setting_on_help": "İzleme açık. Verilerin 90 gün boyunca saklanır.",
+    "setting_off_help": "İzleme kapalı. Yeni veri toplanmayacak.",
+    "manage_section": "Verilerini Yönet",
+    "delete_all": "Tüm verilerimi sil",
+    "delete_confirm_title": "Tüm verilerimi sil",
+    "delete_confirm_body": "Tüm analitik verilerini silmek istediğine emin misin? Bu işlem geri alınamaz.",
+    "deleted_toast": "Tüm analitik verilerin silindi.",
+    "delete_error": "Silme işlemi başarısız oldu, lütfen tekrar dene.",
+    "more_section": "Daha Fazla Bilgi",
+    "read_policy": "Gizlilik politikasını oku"
   }
 }
