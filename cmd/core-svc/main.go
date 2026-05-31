@@ -18,8 +18,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/analytics"
+	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/eventbus"
 	"github.com/mopro/platform/internal/help"
