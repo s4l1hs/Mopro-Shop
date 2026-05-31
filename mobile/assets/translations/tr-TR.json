@@ -183,7 +183,9 @@
     "theme_dark": "Koyu",
     "language": "Dil",
     "coming_soon": "Bu bölüm yakında.",
-    "returns": "İadelerim"
+    "returns": "İadelerim",
+    "rail_reviews": "Yorumlarım",
+    "rail_questions": "Sorularım"
   },
   "address": {
     "list_title": "Adreslerim",
@@ -242,7 +244,24 @@
     "sort_newest": "En yeniler",
     "sort_highest": "En yüksek puan",
     "sort_lowest": "En düşük puan",
-    "sort_helpful": "En faydalı"
+    "sort_helpful": "En faydalı",
+    "edit": "Düzenle",
+    "write_cta": "Değerlendir",
+    "form_title_new": "Değerlendirme yaz",
+    "form_title_edit": "Değerlendirmeyi düzenle",
+    "form_title_label": "Başlık (isteğe bağlı)",
+    "form_body_label": "Değerlendirmeniz",
+    "form_rating_required": "Lütfen bir puan seçin.",
+    "form_body_required": "Lütfen değerlendirmenizi yazın.",
+    "form_already_exists": "Bu ürünü zaten değerlendirdiniz.",
+    "form_submit_new": "Gönder",
+    "form_submit_edit": "Güncelle",
+    "my_title": "Yorumlarım",
+    "my_empty": "Henüz yorum yapmadınız.",
+    "delete_confirm_title": "Yorumu sil",
+    "delete_confirm_body": "Bu yorumu silmek istediğinizden emin misiniz?",
+    "delete_failed": "Silme başarısız, tekrar deneyin.",
+    "go_shopping": "Alışverişe başla"
   },
   "cashback": {
     "schedule_title": "Cashback Takvimi",
@@ -659,5 +678,33 @@
     "contact_ticket_no": "Talep No: #{}",
     "contact_success_sub": "48 saat içinde yanıt vereceğiz.",
     "contact_title": "Bize Ulaş"
+  },
+  "qa": {
+    "header": "Sorular ({count})",
+    "empty": "Henüz soru yok.",
+    "ask_cta": "Soru Sor",
+    "ask_title": "Soru sor",
+    "ask_hint": "Bu ürün hakkında ne sormak istersiniz?",
+    "ask_submit": "Soruyu gönder",
+    "answer_title": "Yanıtla",
+    "answer_hint": "Yanıtınızı yazın",
+    "answer_submit": "Yanıtı gönder",
+    "answer_cta": "Yanıtla",
+    "answer_count": "{count} yanıt",
+    "answers_header": "Yanıtlar",
+    "no_answers": "Henüz yanıt yok. İlk yanıtlayan siz olun.",
+    "body_required": "Lütfen bir metin yazın.",
+    "action_failed": "İşlem başarısız, tekrar deneyin.",
+    "seller_badge": "Satıcı",
+    "load_more": "Daha fazla soru yükle",
+    "load_error": "Sorular yüklenemedi.",
+    "sort_newest": "En yeniler",
+    "sort_most_answered": "En çok yanıtlanan",
+    "login_to_ask": "Soru sormak için giriş yapın.",
+    "login_to_answer": "Yanıtlamak için giriş yapın.",
+    "view_all": "Tüm soruları gör",
+    "my_title": "Sorularım",
+    "my_empty": "Henüz soru sormadınız.",
+    "detail_title": "Soru"
   }
 }

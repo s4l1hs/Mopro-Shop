@@ -153,7 +153,9 @@
     "theme_dark": "Dark",
     "language": "Language",
     "coming_soon": "This section is coming soon.",
-    "returns": "My Returns"
+    "returns": "My Returns",
+    "rail_reviews": "My reviews",
+    "rail_questions": "My questions"
   },
   "address": {
     "list_title": "My Addresses",
@@ -212,7 +214,24 @@
     "sort_newest": "Newest",
     "sort_highest": "Highest rated",
     "sort_lowest": "Lowest rated",
-    "sort_helpful": "Most helpful"
+    "sort_helpful": "Most helpful",
+    "edit": "Edit",
+    "write_cta": "Write a review",
+    "form_title_new": "Write a review",
+    "form_title_edit": "Edit your review",
+    "form_title_label": "Title (optional)",
+    "form_body_label": "Your review",
+    "form_rating_required": "Please select a rating.",
+    "form_body_required": "Please write your review.",
+    "form_already_exists": "You have already reviewed this product.",
+    "form_submit_new": "Submit",
+    "form_submit_edit": "Update",
+    "my_title": "My reviews",
+    "my_empty": "You haven't written any reviews yet.",
+    "delete_confirm_title": "Delete review",
+    "delete_confirm_body": "Are you sure you want to delete this review?",
+    "delete_failed": "Delete failed, please try again.",
+    "go_shopping": "Start shopping"
   },
   "cashback": {
     "preview_title": "Mopro Cashback",
@@ -579,5 +598,33 @@
     "contact_ticket_no": "Ticket No: #{}",
     "contact_success_sub": "We'll respond within 48 hours.",
     "contact_title": "Contact Us"
+  },
+  "qa": {
+    "header": "Questions ({count})",
+    "empty": "No questions yet.",
+    "ask_cta": "Ask a question",
+    "ask_title": "Ask a question",
+    "ask_hint": "What would you like to ask about this product?",
+    "ask_submit": "Submit question",
+    "answer_title": "Answer",
+    "answer_hint": "Write your answer",
+    "answer_submit": "Submit answer",
+    "answer_cta": "Answer",
+    "answer_count": "{count} answers",
+    "answers_header": "Answers",
+    "no_answers": "No answers yet. Be the first to answer.",
+    "body_required": "Please enter some text.",
+    "action_failed": "Action failed, please try again.",
+    "seller_badge": "Seller",
+    "load_more": "Load more questions",
+    "load_error": "Couldn't load questions.",
+    "sort_newest": "Newest",
+    "sort_most_answered": "Most answered",
+    "login_to_ask": "Sign in to ask a question.",
+    "login_to_answer": "Sign in to answer.",
+    "view_all": "See all questions",
+    "my_title": "My questions",
+    "my_empty": "You haven't asked any questions yet.",
+    "detail_title": "Question"
   }
 }

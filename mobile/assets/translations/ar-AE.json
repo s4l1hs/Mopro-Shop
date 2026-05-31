@@ -36,7 +36,9 @@
     "theme_dark": "داكن",
     "language": "اللغة",
     "coming_soon": "هذا القسم قريباً.",
-    "returns": "مرتجعاتي"
+    "returns": "مرتجعاتي",
+    "rail_reviews": "تقييماتي",
+    "rail_questions": "أسئلتي"
   },
   "mega_menu": {
     "see_all": "عرض الكل",
@@ -67,7 +69,24 @@
     "sort_newest": "الأحدث",
     "sort_highest": "الأعلى تقييماً",
     "sort_lowest": "الأدنى تقييماً",
-    "sort_helpful": "الأكثر فائدة"
+    "sort_helpful": "الأكثر فائدة",
+    "edit": "تعديل",
+    "write_cta": "اكتب تقييماً",
+    "form_title_new": "اكتب تقييماً",
+    "form_title_edit": "تعديل تقييمك",
+    "form_title_label": "العنوان (اختياري)",
+    "form_body_label": "تقييمك",
+    "form_rating_required": "يرجى اختيار تقييم.",
+    "form_body_required": "يرجى كتابة تقييمك.",
+    "form_already_exists": "لقد قمت بتقييم هذا المنتج بالفعل.",
+    "form_submit_new": "إرسال",
+    "form_submit_edit": "تحديث",
+    "my_title": "تقييماتي",
+    "my_empty": "لم تكتب أي تقييمات بعد.",
+    "delete_confirm_title": "حذف التقييم",
+    "delete_confirm_body": "هل أنت متأكد أنك تريد حذف هذا التقييم؟",
+    "delete_failed": "فشل الحذف، يرجى المحاولة مرة أخرى.",
+    "go_shopping": "ابدأ التسوق"
   },
   "welcome": {
     "greeting": "مرحباً، {name}.",
@@ -242,5 +261,33 @@
     "contact_ticket_no": "Ticket No: #{}",
     "contact_success_sub": "We'll respond within 48 hours.",
     "contact_title": "اتصل بنا"
+  },
+  "qa": {
+    "header": "الأسئلة ({count})",
+    "empty": "لا توجد أسئلة بعد.",
+    "ask_cta": "اطرح سؤالاً",
+    "ask_title": "اطرح سؤالاً",
+    "ask_hint": "ماذا تريد أن تسأل عن هذا المنتج؟",
+    "ask_submit": "إرسال السؤال",
+    "answer_title": "إجابة",
+    "answer_hint": "اكتب إجابتك",
+    "answer_submit": "إرسال الإجابة",
+    "answer_cta": "إجابة",
+    "answer_count": "{count} إجابات",
+    "answers_header": "الإجابات",
+    "no_answers": "لا توجد إجابات بعد. كن أول من يجيب.",
+    "body_required": "يرجى إدخال نص.",
+    "action_failed": "فشل الإجراء، يرجى المحاولة مرة أخرى.",
+    "seller_badge": "البائع",
+    "load_more": "تحميل المزيد من الأسئلة",
+    "load_error": "تعذر تحميل الأسئلة.",
+    "sort_newest": "الأحدث",
+    "sort_most_answered": "الأكثر إجابة",
+    "login_to_ask": "سجّل الدخول لطرح سؤال.",
+    "login_to_answer": "سجّل الدخول للإجابة.",
+    "view_all": "عرض كل الأسئلة",
+    "my_title": "أسئلتي",
+    "my_empty": "لم تطرح أي أسئلة بعد.",
+    "detail_title": "سؤال"
   }
 }
