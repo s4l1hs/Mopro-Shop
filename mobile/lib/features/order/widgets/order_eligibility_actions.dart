@@ -42,7 +42,9 @@ class OrderEligibilityActions extends ConsumerWidget {
         if (actions.canReturn) ...[
           OutlinedButton(
             style: outline,
-            onPressed: () => context.push('/orders/${order.id}/return'),
+            // go (not push): the return flow is a full-screen route on the root
+            // navigator; entering via go keeps location/back semantics clean.
+            onPressed: () => context.go('/orders/${order.id}/return?step=items'),
             child: Text('returns.create_cta'.tr()),
           ),
           const SizedBox(height: 8),
