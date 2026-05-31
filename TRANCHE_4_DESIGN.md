@@ -257,7 +257,55 @@ user's already-derived projections for purge per Decision 5.
 
 ## 5. Decision 4 — Identity model
 
-_(pending decision)_
+**Chosen: session-scoped guest tracking with merge-on-auth.** Guests who have
+opted in (Decision 3) are tracked against a `session_id`; on login their session
+is linked to the `user_id` and their projections are rebuilt to include the
+pre-login activity.
+
+**Rationale.** Pre-login browsing is a large, converting slice of an e-commerce
+funnel; authed-only tracking would throw it away and leave the recommender blind
+until after sign-in. The merge model is also the one the codebase already
+endorses — `mergeGuestCart` reattributes guest cart state on login and clears the
+local copy — so this is a *consistent* identity story, not a new concept. The
+re-identification surface that makes regulators wary is real, but it is bounded
+here by two facts: (a) nothing is tracked at all until the guest *explicitly
+opts in* (Decision 3), so the merge only ever touches data the user already
+consented to, and (b) the link is recorded in an auditable mapping rather than by
+silently rewriting history. The decision the choice resolves: **full-funnel
+attribution without orphaning guest data, while keeping the re-identification
+step explicit and consent-gated.**
+
+**Merge mechanics — append-only preserving.** Decision 2's `analytics_events` is
+append-only; the merge therefore does **not** `UPDATE` event rows. Instead a tiny
+mapping table records the identity link, and the aggregator resolves the
+effective user at projection time:
+
+```sql
+CREATE TABLE analytics_schema.session_identity (
+  session_id TEXT PRIMARY KEY,
+  user_id    BIGINT NOT NULL,
+  linked_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Effective owner of any event:
+--   COALESCE(e.user_id, si.user_id)
+-- via LEFT JOIN session_identity si ON si.session_id = e.session_id
+```
+
+Flow on login (reuses the `/cart/merge` timing — same post-auth hook):
+1. Client calls `POST /events/identify` with its current `session_id` (the
+   server already knows `user_id` from the bearer token).
+2. Handler `INSERT … ON CONFLICT (session_id) DO NOTHING` into `session_identity`
+   (idempotent; a session links to exactly one user).
+3. The handler enqueues a projection rebuild for that `user_id`; the aggregator
+   folds the now-linked guest events into `user_browsing_history` /
+   `user_search_history` / `user_category_affinity`.
+4. The client rotates to a fresh `session_id` post-login is **not** required —
+   the same session simply now carries a `user_id` on subsequent events.
+
+A session links to **one** user (PK on `session_id`); a user may own many
+sessions (many devices). This keeps the event log immutable, gives a clean audit
+trail of when each link was made, and lets a Decision-5 purge sever the link
+(delete the `session_identity` row) without rewriting events.
 
 ## 6. Decision 5 — Retention policy
 
