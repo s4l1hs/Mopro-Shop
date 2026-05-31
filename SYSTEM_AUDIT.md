@@ -391,52 +391,53 @@ guess, shell membership). Tab titles resolve through `moproPageTitle` (PR #20).
 <!-- BEGIN:gen:routes -->
 | Path | Source | Screen (guess) | Shell |
 |---|---|---|---|
-| `/splash` | `app_router.dart:208` | SplashScreen | — |
-| `/auth/login` | `app_router.dart:213` | SignInScreen | — |
-| `/auth/register` | `app_router.dart:217` | SignUpScreen | — |
-| `/auth/verify-email` | `app_router.dart:221` | EmailVerifyScreen | — |
-| `/auth/forgot-password` | `app_router.dart:227` | ForgotPasswordScreen | — |
-| `/auth/mfa` | `app_router.dart:231` | MFAChallengeScreen | — |
-| `/auth/profile` | `app_router.dart:241` | ProfileCompletionScreen | — |
-| `/search` | `app_router.dart:245` | SearchScreen | — |
-| `/products/:id` | `app_router.dart:254` | (builder) | — |
-| `/products/:id/questions` | `app_router.dart:274` | (builder) | — |
-| `:qid` | `app_router.dart:292` | (builder) | — |
-| `/orders/:id/return` | `app_router.dart:314` | (builder) | — |
-| `/categories/:id` | `app_router.dart:335` | (builder) | — |
-| `/checkout` | `app_router.dart:352` | CheckoutAddressScreen | — |
-| `payment` | `app_router.dart:357` | CheckoutPaymentScreen | — |
-| `review` | `app_router.dart:361` | CheckoutReviewScreen | — |
-| `redirect` | `app_router.dart:365` | CheckoutRedirectScreen | — |
-| `result` | `app_router.dart:372` | CheckoutResultScreen | — |
-| `/account/profile` | `app_router.dart:396` | AccountProfileScreen | ShellRoute |
-| `/account/security` | `app_router.dart:400` | SecurityScreen | ShellRoute |
-| `/account/cards` | `app_router.dart:404` | CardsScreen | ShellRoute |
-| `/account/reviews` | `app_router.dart:408` | MyReviewsScreen | ShellRoute |
-| `/account/questions` | `app_router.dart:412` | MyQuestionsScreen | ShellRoute |
-| `/account/notifications` | `app_router.dart:416` | NotificationsScreen | ShellRoute |
-| `preferences` | `app_router.dart:420` | NotificationPreferencesScreen | ShellRoute |
-| `/help` | `app_router.dart:426` | HelpIndexScreen | ShellRoute |
-| `category/:slug` | `app_router.dart:430` | HelpCategoryScreen | ShellRoute |
-| `article/:slug` | `app_router.dart:435` | HelpArticleScreen | ShellRoute |
-| `search` | `app_router.dart:440` | HelpSearchScreen | ShellRoute |
-| `contact` | `app_router.dart:446` | ContactFormScreen | ShellRoute |
-| `/orders` | `app_router.dart:458` | OrderHistoryScreen | ShellRoute |
-| `:id` | `app_router.dart:462` | (builder) | ShellRoute |
-| `/returns` | `app_router.dart:478` | ReturnsListScreen | ShellRoute |
-| `:id` | `app_router.dart:482` | (builder) | ShellRoute |
-| `/wallet` | `app_router.dart:498` | WalletScreen | ShellRoute |
-| `plans/:id` | `app_router.dart:502` | (builder) | ShellRoute |
-| `/profile/addresses` | `app_router.dart:518` | AddressListScreen | ShellRoute |
-| `new` | `app_router.dart:522` | AddressFormScreen | ShellRoute |
-| `:id/edit` | `app_router.dart:526` | AddressFormScreen | ShellRoute |
-| `/` | `app_router.dart:546` | CatalogHomeScreen | StatefulShellRoute |
-| `/categories` | `app_router.dart:556` | CategoryScreen | StatefulShellRoute |
-| `/favorites` | `app_router.dart:566` | FavoritesScreen | StatefulShellRoute |
-| `/cart` | `app_router.dart:576` | CartScreen | StatefulShellRoute |
-| `/account` | `app_router.dart:586` | AccountScreen | StatefulShellRoute |
+| `/splash` | `app_router.dart:216` | SplashScreen | — |
+| `/auth/login` | `app_router.dart:221` | SignInScreen | — |
+| `/auth/register` | `app_router.dart:225` | SignUpScreen | — |
+| `/auth/verify-email` | `app_router.dart:229` | EmailVerifyScreen | — |
+| `/auth/forgot-password` | `app_router.dart:235` | ForgotPasswordScreen | — |
+| `/auth/mfa` | `app_router.dart:239` | MFAChallengeScreen | — |
+| `/auth/profile` | `app_router.dart:249` | ProfileCompletionScreen | — |
+| `/search` | `app_router.dart:253` | SearchScreen | — |
+| `/products/:id` | `app_router.dart:262` | (builder) | — |
+| `/products/:id/questions` | `app_router.dart:282` | (builder) | — |
+| `:qid` | `app_router.dart:300` | (builder) | — |
+| `/orders/:id/return` | `app_router.dart:322` | (builder) | — |
+| `/categories/:id` | `app_router.dart:343` | (builder) | — |
+| `/checkout` | `app_router.dart:360` | CheckoutAddressScreen | — |
+| `payment` | `app_router.dart:365` | CheckoutPaymentScreen | — |
+| `review` | `app_router.dart:369` | CheckoutReviewScreen | — |
+| `redirect` | `app_router.dart:373` | CheckoutRedirectScreen | — |
+| `result` | `app_router.dart:380` | CheckoutResultScreen | — |
+| `/account/profile` | `app_router.dart:404` | AccountProfileScreen | ShellRoute |
+| `/account/security` | `app_router.dart:408` | SecurityScreen | ShellRoute |
+| `/account/cards` | `app_router.dart:412` | CardsScreen | ShellRoute |
+| `/account/reviews` | `app_router.dart:416` | MyReviewsScreen | ShellRoute |
+| `/account/questions` | `app_router.dart:420` | MyQuestionsScreen | ShellRoute |
+| `/account/privacy` | `app_router.dart:424` | PrivacySettingsScreen | ShellRoute |
+| `/account/notifications` | `app_router.dart:428` | NotificationsScreen | ShellRoute |
+| `preferences` | `app_router.dart:432` | NotificationPreferencesScreen | ShellRoute |
+| `/help` | `app_router.dart:438` | HelpIndexScreen | ShellRoute |
+| `category/:slug` | `app_router.dart:442` | HelpCategoryScreen | ShellRoute |
+| `article/:slug` | `app_router.dart:447` | HelpArticleScreen | ShellRoute |
+| `search` | `app_router.dart:452` | HelpSearchScreen | ShellRoute |
+| `contact` | `app_router.dart:458` | ContactFormScreen | ShellRoute |
+| `/orders` | `app_router.dart:470` | OrderHistoryScreen | ShellRoute |
+| `:id` | `app_router.dart:474` | (builder) | ShellRoute |
+| `/returns` | `app_router.dart:490` | ReturnsListScreen | ShellRoute |
+| `:id` | `app_router.dart:494` | (builder) | ShellRoute |
+| `/wallet` | `app_router.dart:510` | WalletScreen | ShellRoute |
+| `plans/:id` | `app_router.dart:514` | (builder) | ShellRoute |
+| `/profile/addresses` | `app_router.dart:530` | AddressListScreen | ShellRoute |
+| `new` | `app_router.dart:534` | AddressFormScreen | ShellRoute |
+| `:id/edit` | `app_router.dart:538` | AddressFormScreen | ShellRoute |
+| `/` | `app_router.dart:558` | CatalogHomeScreen | StatefulShellRoute |
+| `/categories` | `app_router.dart:568` | CategoryScreen | StatefulShellRoute |
+| `/favorites` | `app_router.dart:578` | FavoritesScreen | StatefulShellRoute |
+| `/cart` | `app_router.dart:588` | CartScreen | StatefulShellRoute |
+| `/account` | `app_router.dart:598` | AccountScreen | StatefulShellRoute |
 
-_Total: 44 route declarations._
+_Total: 45 route declarations._
 <!-- END:gen:routes -->
 
 Notable: `/account/notifications` and `/help` both resolve to
@@ -471,6 +472,7 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `_logoutFnProvider` | `Provider` | `mobile/lib/core/di/providers.dart:81` |
 | `addressApiProvider` | `Provider` | `mobile/lib/api/client.dart:48` |
 | `addressFormProvider` | `NotifierProviderFamily` | `mobile/lib/features/address/providers/address_form_controller.dart:84` |
+| `analyticsServiceProvider` | `Provider` | `mobile/lib/features/analytics/analytics_service.dart:133` |
 | `apiBaseUrlProvider` | `Provider` | `mobile/lib/core/di/providers.dart:13` |
 | `apiClientProvider` | `Provider` | `mobile/lib/api/client.dart:7` |
 | `authApiExtProvider` | `Provider` | `mobile/lib/core/di/providers.dart:73` |
@@ -480,7 +482,7 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `cartApiProvider` | `Provider` | `mobile/lib/api/client.dart:20` |
 | `cartCashbackCacheProvider` | `Provider` | `mobile/lib/features/cart/application/cart_cashback_cache.dart:61` |
 | `cartCountProvider` | `Provider` | `mobile/lib/features/cart/application/cart_count_provider.dart:5` |
-| `cartRepositoryProvider` | `Provider` | `mobile/lib/features/cart/application/cart_provider.dart:31` |
+| `cartRepositoryProvider` | `Provider` | `mobile/lib/features/cart/application/cart_provider.dart:32` |
 | `cashbackApiProvider` | `Provider` | `mobile/lib/api/client.dart:28` |
 | `catalogApiProvider` | `Provider` | `mobile/lib/api/client.dart:16` |
 | `categoryTreeProvider` | `Provider` | `mobile/lib/features/catalog/providers/category_tree_provider.dart:29` |
@@ -507,7 +509,7 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `questionThreadProvider` | `FutureProvider` | `mobile/lib/features/catalog/pdp/qa/qa_provider.dart:179` |
 | `returnDetailProvider` | `NotifierProviderFamily` | `mobile/lib/features/order/application/returns_provider.dart:43` |
 | `reviewWriteRepositoryProvider` | `Provider` | `mobile/lib/features/catalog/pdp/reviews/review_write_provider.dart:176` |
-| `routerProvider` | `Provider` | `mobile/lib/core/router/app_router.dart:191` |
+| `routerProvider` | `Provider` | `mobile/lib/core/router/app_router.dart:195` |
 | `searchApiProvider` | `Provider` | `mobile/lib/api/client.dart:36` |
 | `secureStorageProvider` | `Provider` | `mobile/lib/core/di/providers.dart:17` |
 | `sellerApiProvider` | `Provider` | `mobile/lib/api/client.dart:40` |
@@ -525,7 +527,7 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `AddressesNotifier` | `Notifier<AddressesState>` | `mobile/lib/features/address/providers/addresses_provider.dart:22` |
 | `AuthNotifier` | `AsyncNotifier<AuthState>` | `mobile/lib/core/auth/auth_notifier.dart:10` |
 | `AuthProfileNotifier` | `AutoDisposeNotifier<ProfileState>` | `mobile/lib/features/auth/auth_profile_notifier.dart:52` |
-| `CartNotifier` | `Notifier<CartState>` | `mobile/lib/features/cart/application/cart_provider.dart:63` |
+| `CartNotifier` | `Notifier<CartState>` | `mobile/lib/features/cart/application/cart_provider.dart:64` |
 | `CashbackPlansNotifier` | `Notifier<CashbackPlansState>` | `mobile/lib/features/wallet/providers/cashback_plans_provider.dart:54` |
 | `CategoriesNotifier` | `Notifier<CategoriesState>` | `mobile/lib/features/catalog/providers/categories_provider.dart:23` |
 | `CheckoutController` | `Notifier<CheckoutState>` | `mobile/lib/features/checkout/application/checkout_controller.dart:74` |
@@ -549,10 +551,11 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `SignUpNotifier` | `Notifier<SignUpState>` | `mobile/lib/features/auth/auth_signup_notifier.dart:33` |
 | `ThemeController` | `StateNotifier<ThemeMode>` | `mobile/lib/design/theme_controller.dart:14` |
 | `UnreadCountNotifier` | `Notifier<int>` | `mobile/lib/features/notifications/application/notifications_provider.dart:20` |
+| `UserConsentNotifier` | `Notifier<UserConsent>` | `mobile/lib/features/analytics/user_consent_provider.dart:51` |
 | `WalletNotifier` | `Notifier<WalletState>` | `mobile/lib/features/wallet/providers/wallet_provider.dart:56` |
-| `_AuthStateListenable` | `ChangeNotifier` | `mobile/lib/core/router/app_router.dart:598` |
+| `_AuthStateListenable` | `ChangeNotifier` | `mobile/lib/core/router/app_router.dart:610` |
 
-_Totals: 49 provider declarations; 29 Notifier subclasses._
+_Totals: 50 provider declarations; 30 Notifier subclasses._
 <!-- END:gen:providers -->
 
 ### 3.5 Routing-time concerns
@@ -571,14 +574,14 @@ tests, which don't load assets). Completeness audit by
 `tool/audit/check_i18n.sh`:
 
 <!-- BEGIN:gen:i18n -->
-### Translation completeness (master: `tr-TR.json`, 641 keys)
+### Translation completeness (master: `tr-TR.json`, 662 keys)
 
 | Locale | Keys | Missing vs master | Extra vs master | Completeness |
 |---|---|---|---|---|
-| `ar-AE.json` | 256 | 385 | 0 | 39% |
-| `de-DE.json` | 256 | 385 | 0 | 39% |
-| `en-US.json` | 567 | 74 | 0 | 88% |
-| `tr-TR.json` | 641 | — | — | master |
+| `ar-AE.json` | 277 | 385 | 0 | 41% |
+| `de-DE.json` | 277 | 385 | 0 | 41% |
+| `en-US.json` | 588 | 74 | 0 | 88% |
+| `tr-TR.json` | 662 | — | — | master |
 <!-- END:gen:i18n -->
 
 ### 3.7 Theme system
@@ -704,7 +707,7 @@ and their owning migration come from `migrations/{ecom,ledger}`. Generated by
 | `wallet_schema.system_state` | `67-system-state.sql` |
 | `wallet_schema.transactions` | `40-wallet-schema.sql` |
 
-_Totals: 22 schemas, 65 tables; 28 up / 28 down migrations._
+_Totals: 22 schemas, 65 tables; 29 up / 29 down migrations._
 <!-- END:gen:schema -->
 
 **Migrations:** golang-migrate-style numbered `XXXX_name.{up,down}.sql` under
@@ -1224,16 +1227,16 @@ article-feedback analytics, ticket→notification bridge, rate limiting.
 |---|---|---|---|
 | Profile preferences | Partial | account profile | Partial |
 | Search history | Partial | `RecentSearchesNotifier` (local only) | Partial |
-| Browsing history | Partial | `user_recently_viewed` projection + `GET /me/recently-viewed` (Tranche 4a); home rail/UI is 4b | Partial |
-| Event tracking pipeline | Complete | append-only `analytics_events` + ingest/identify + projections + prune/rebuild crons (Tranche 4a) | Complete |
-| Consent / privacy controls | Partial | binary opt-in `user_consent` + GET/PUT consent + RTBF `DELETE /me/analytics-data` + account-deletion cascade (Tranche 4a); consent UX is 4b | Partial |
+| Browsing history | Partial | `user_recently_viewed` projection + `GET /me/recently-viewed` (4a); home rail/UI is 4c | Partial |
+| Event tracking pipeline | Complete | append-only `analytics_events` + ingest/identify + projections + prune/rebuild crons (4a) + client `AnalyticsService` (page_view auto + manual track, consent-gated, batched) (4b) | Complete |
+| Consent / privacy controls | Complete | binary opt-in `user_consent` + GET/PUT/RTBF (4a) + consent banner + `/account/privacy` settings + erase flow, behind `kAnalyticsConsentEnabled` pending legal copy review (4b) | Complete |
 | A/B testing | Missing | — | Missing |
-| Recommendation data flow | Partial | pipeline + projections feed it; `GET /recommendations` still 501 until 4b | Partial |
+| Recommendation data flow | Partial | pipeline + projections feed it; `GET /recommendations` still 501 until a recommendation surface lands | Partial |
 
-*Highest-leverage gap:* **recently-viewed consumer + consent UX (4b)** — the
-Tranche 4a pipeline is shipped and dormant; 4b adds the client instrumentation,
-the consent banner/settings, and the "Son baktıkların" rail that turn browsing
-history + consent Complete.
+*Highest-leverage gap:* **recently-viewed consumer (4c)** — the pipeline +
+consent + instrumentation are live; 4c adds the `recentlyViewedProvider` + the
+"Son baktıkların" home rail (build-from-scratch — `ProductRail` is sort-driven)
+that turns browsing history Complete, plus the merge/RTBF closing flows.
 
 ### 13. Trust & safety
 | Capability | State | Evidence | Gap |
@@ -1275,8 +1278,8 @@ Counting the **91** capability rows across the 15 categories:
 
 | Classification | Count |
 |---|---|
-| Complete | 44 |
-| Partial | 18 |
+| Complete | 45 |
+| Partial | 17 |
 | Stubbed | 3 |
 | Missing | 24 |
 | Out of scope | 2 |
@@ -1289,10 +1292,11 @@ Tranche 3 added the review write-side and Q&A: +4 Complete, Seller responses
 Missing→Partial, split "review submission + photos" — net +2 rows (86→88
 in-scope). Tranche 4a (analytics pipeline, backend-only): Event tracking pipeline
 Missing→Complete (+1), Browsing history + Recommendation data flow Missing→Partial,
-new Consent/privacy-controls row (Partial) — net +1 row (88→89 in-scope)._
+new Consent/privacy-controls row (Partial) — net +1 row (88→89 in-scope). Tranche
+4b (consent UX + instrumentation): Consent/privacy-controls Partial→Complete (+1)._
 
-**Parity score (Complete ÷ in-scope 89) ≈ 49%.** (The 4b consumer + consent UX
-lift Browsing history + Consent to Complete, toward ~52%.) Orientation only, not a
+**Parity score (Complete ÷ in-scope 89) ≈ 51%.** (The 4c recently-viewed consumer
+lifts Browsing history to Complete, toward ~52%.) Orientation only, not a
 scoreboard: the *core differentiator* (perpetual-cashback coin wallet) and the
 hard financial/identity plumbing are Complete; most gaps are conventional
 commerce surface features that reuse existing patterns.

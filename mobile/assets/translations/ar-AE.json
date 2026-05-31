@@ -38,7 +38,8 @@
     "coming_soon": "هذا القسم قريباً.",
     "returns": "مرتجعاتي",
     "rail_reviews": "تقييماتي",
-    "rail_questions": "أسئلتي"
+    "rail_questions": "أسئلتي",
+    "rail_privacy": "Privacy"
   },
   "mega_menu": {
     "see_all": "عرض الكل",
@@ -292,5 +293,27 @@
     "detail_title": "سؤال",
     "ask_success": "تم إرسال سؤالك.",
     "answer_success": "تم إرسال إجابتك."
+  },
+  "consent": {
+    "banner_headline": "Choose how we use your data",
+    "banner_body_1": "We collect shopping interactions like which products you view, your search terms, and what you add to your cart.",
+    "banner_body_2": "This data helps us give you better recommendations and improve your experience.",
+    "banner_body_3": "Your data is kept for 90 days; you can delete it or revoke this permission anytime.",
+    "accept": "I Accept",
+    "decline": "Decline",
+    "more_info": "Learn more",
+    "settings_title": "Privacy",
+    "setting_title": "Analytics Tracking",
+    "setting_desc": "Allow your shopping interactions to be used for better recommendations.",
+    "setting_on_help": "Tracking is on. Your data is kept for 90 days.",
+    "setting_off_help": "Tracking is off. No new data will be collected.",
+    "manage_section": "Manage Your Data",
+    "delete_all": "Delete all my data",
+    "delete_confirm_title": "Delete all my data",
+    "delete_confirm_body": "Are you sure you want to delete all your analytics data? This cannot be undone.",
+    "deleted_toast": "All your analytics data has been deleted.",
+    "delete_error": "Deletion failed, please try again.",
+    "more_section": "More Information",
+    "read_policy": "Read the privacy policy"
   }
 }

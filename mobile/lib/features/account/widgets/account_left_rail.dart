@@ -67,6 +67,8 @@ class _AccountLeftRailState extends ConsumerState<AccountLeftRail> {
             'account.cards'.tr(), active, '/account/cards',),
         _row(AccountRailItem.security, Icons.security_outlined,
             'account.security'.tr(), active, '/account/security',),
+        _row(AccountRailItem.privacy, Icons.shield_outlined,
+            'account.rail_privacy'.tr(), active, '/account/privacy',),
         _row(AccountRailItem.notifications, Icons.notifications_outlined,
             'account.notifications'.tr(), active, '/account/notifications',
             withBadge: true,),

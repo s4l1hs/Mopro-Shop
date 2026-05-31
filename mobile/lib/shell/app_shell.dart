@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/design/widgets/skip_to_content_link.dart';
+import 'package:mopro/features/analytics/widgets/consent_banner.dart';
 import 'package:mopro/features/cart/application/cart_count_provider.dart';
 import 'package:mopro/features/web/mega_menu/mega_menu_bar.dart';
 import 'package:mopro/shell/web_header.dart';
@@ -22,10 +23,20 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ResponsiveBuilder(
+    final shell = ResponsiveBuilder(
       mobile: (_) => _MobileShell(navigationShell: navigationShell),
       tablet: (_) => _WebShell(navigationShell: navigationShell),
       desktop: (_) => _WebShell(navigationShell: navigationShell),
+    );
+    // The analytics consent prompt (Tranche 4b) sits beneath the shell as a
+    // sticky bottom bar. ConsentBanner returns shrink unless an authed user has
+    // an undecided consent state and the build flag is on — so the layout is
+    // unaffected in the common case.
+    return Column(
+      children: [
+        Expanded(child: shell),
+        const ConsentBanner(),
+      ],
     );
   }
 }

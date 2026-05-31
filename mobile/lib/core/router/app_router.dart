@@ -6,6 +6,7 @@ import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/account/account_screen.dart';
 import 'package:mopro/features/account/cards_screen.dart';
+import 'package:mopro/features/account/privacy/privacy_settings_screen.dart';
 import 'package:mopro/features/account/profile_screen.dart';
 import 'package:mopro/features/account/questions/my_questions_screen.dart';
 import 'package:mopro/features/account/reviews/my_reviews_screen.dart';
@@ -13,6 +14,7 @@ import 'package:mopro/features/account/security_screen.dart';
 import 'package:mopro/features/account/widgets/account_shell.dart';
 import 'package:mopro/features/address/screens/address_form_screen.dart';
 import 'package:mopro/features/address/screens/address_list_screen.dart';
+import 'package:mopro/features/analytics/analytics_service.dart';
 import 'package:mopro/features/auth/email_verify_screen.dart';
 import 'package:mopro/features/auth/forgot_password_screen.dart';
 import 'package:mopro/features/auth/mfa_challenge_screen.dart';
@@ -109,6 +111,7 @@ String moproPageTitle(String location, {String? name}) {
   if (location == '/account/cards') return t('Kartlarım');
   if (location == '/account/reviews') return t('Yorumlarım');
   if (location == '/account/questions') return t('Sorularım');
+  if (location == '/account/privacy') return t('Gizlilik');
   if (location == '/account/notifications/preferences') {
     return t('Bildirim Ayarları');
   }
@@ -163,7 +166,8 @@ String? computeAuthRedirect({
       location.startsWith('/account/security') ||
       location.startsWith('/account/cards') ||
       location.startsWith('/account/reviews') ||
-      location.startsWith('/account/questions');
+      location.startsWith('/account/questions') ||
+      location.startsWith('/account/privacy');
 
   return switch (auth) {
     null || AuthUnauthenticated() => isAuthRoute
@@ -192,6 +196,10 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/',
+    observers: [
+      // Auto-emits page_view on navigation (Tranche 4b instrumentation §6.2).
+      AnalyticsNavObserver(() => ref.read(analyticsServiceProvider)),
+    ],
     refreshListenable: _AuthStateListenable(ref),
     errorBuilder: (context, state) =>
         NotFoundScreen(attemptedPath: state.uri.toString()),
@@ -411,6 +419,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/account/questions',
             builder: (_, __) => const MyQuestionsScreen(),
+          ),
+          GoRoute(
+            path: '/account/privacy',
+            builder: (_, __) => const PrivacySettingsScreen(),
           ),
           GoRoute(
             path: '/account/notifications',
