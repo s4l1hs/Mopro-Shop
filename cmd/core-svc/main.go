@@ -151,6 +151,8 @@ func main() {
 	orderOutbox := outbox.NewRepository("order_schema.outbox")
 	orderRepo := order.NewRepository(pool)
 	checkoutSessionRepo := order.NewCheckoutSessionRepository(pool)
+	returnRepo := order.NewReturnRepository(pool)
+	returnSvc := order.NewReturnService(orderRepo, returnRepo)
 
 	// Payment module wired before order so orderSvc can receive the PSP reference.
 	paymentRepo := payment.NewRepository(pool)
@@ -509,7 +511,7 @@ func main() {
 		httpTrace(requireAuth(http.HandlerFunc(handleCreateOrder(orderSvc)))),
 	)
 	mux.Handle("GET /orders/{id}",
-		httpTrace(http.HandlerFunc(handleGetOrder(orderSvc))),
+		httpTrace(http.HandlerFunc(handleGetOrder(orderSvc, returnSvc, paymentRepo))),
 	)
 	mux.Handle("GET /orders",
 		httpTrace(requireAuth(http.HandlerFunc(handleListOrders(orderSvc)))),
@@ -525,6 +527,15 @@ func main() {
 	)
 	mux.Handle("POST /orders/{id}/refund",
 		httpTrace(http.HandlerFunc(handleRefundOrder(orderSvc, paymentSvc, paymentRepo, paymentOutbox, market, defaultCurrency))),
+	)
+	mux.Handle("POST /orders/{id}/returns",
+		httpTrace(requireAuth(http.HandlerFunc(handleCreateReturn(returnSvc)))),
+	)
+	mux.Handle("GET /returns",
+		httpTrace(requireAuth(http.HandlerFunc(handleListReturns(returnSvc)))),
+	)
+	mux.Handle("GET /returns/{id}",
+		httpTrace(requireAuth(http.HandlerFunc(handleGetReturn(returnSvc)))),
 	)
 	mux.Handle("GET /seller/orders/{id}/breakdown",
 		httpTrace(http.HandlerFunc(handleSellerBreakdown(orderSvc))),
@@ -1007,7 +1018,7 @@ func handleCreateOrder(svc order.Service) http.HandlerFunc {
 	}
 }
 
-func handleGetOrder(svc order.Service) http.HandlerFunc {
+func handleGetOrder(svc order.Service, returnSvc order.ReturnService, paymentRepo payment.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
@@ -1024,7 +1035,23 @@ func handleGetOrder(svc order.Service) http.HandlerFunc {
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		jsonOK(w, http.StatusOK, map[string]any{"order": o, "items": items})
+
+		// Server-computed eligibility + read-only refund visibility (§3.1/§3.4).
+		resp := map[string]any{"order": o, "items": items}
+		if actions, aErr := returnSvc.ComputeActions(r.Context(), o, items); aErr != nil {
+			slog.Warn("order: ComputeActions", "err", aErr, "order_id", id)
+		} else {
+			resp["actions"] = actions
+		}
+		pi, pErr := paymentRepo.FindPaymentByOrderID(r.Context(), id)
+		found := pErr == nil
+		if !found && !errors.Is(pErr, payment.ErrPaymentNotFound) {
+			slog.Warn("order: FindPaymentByOrderID for refund view", "err", pErr, "order_id", id)
+		}
+		if rv := buildOrderRefundView(o, pi, found); rv != nil {
+			resp["refund"] = rv
+		}
+		jsonOK(w, http.StatusOK, resp)
 	}
 }
 

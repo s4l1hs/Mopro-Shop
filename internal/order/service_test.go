@@ -414,8 +414,9 @@ func TestCancelOrder_FromPaid(t *testing.T) {
 }
 
 func TestCancelOrder_InvalidTransition(t *testing.T) {
+	// Post-shipment states cannot be cancelled.
 	for _, status := range []order.OrderStatus{
-		order.StatusShipped, order.StatusDelivered, order.StatusCancelled, order.StatusRefunded,
+		order.StatusShipped, order.StatusDelivered, order.StatusRefunded,
 	} {
 		st := status
 		repo := &mockRepo{
@@ -428,6 +429,19 @@ func TestCancelOrder_InvalidTransition(t *testing.T) {
 		if !errors.Is(err, order.ErrInvalidTransition) {
 			t.Errorf("status %q: expected ErrInvalidTransition, got %v", st, err)
 		}
+	}
+}
+
+// Re-cancelling an already-cancelled order is idempotent (§3.2): no error.
+func TestCancelOrder_IdempotentWhenAlreadyCancelled(t *testing.T) {
+	repo := &mockRepo{
+		getOrderFn: func(_ context.Context, id int64) (order.Order, []order.OrderItem, error) {
+			return order.Order{ID: id, Status: order.StatusCancelled}, nil, nil
+		},
+	}
+	if err := newTestService(repo, &mockCartSvc{}, &mockCatalogSvc{}, &mockOutbox{}).
+		CancelOrder(context.Background(), 1, "test"); err != nil {
+		t.Fatalf("re-cancel must be a no-op success, got %v", err)
 	}
 }
 
