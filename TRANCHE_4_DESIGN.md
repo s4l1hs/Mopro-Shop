@@ -58,7 +58,48 @@ those tradeoffs before code lands.
 
 ## 2. Decision 1 — Event taxonomy
 
-_(pending decision)_
+**Chosen: Standard (~20 events).**
+
+**Rationale.** The product intent is a *real recommendation surface* (the
+`GET /recommendations` stub is already on the roadmap to be backed), not just a
+recently-viewed rail — but not a heatmap/ML lab either. Minimal (8) cannot
+express category affinity or facet intent, so backing the recommender later would
+force a taxonomy migration — exactly the six-month rewrite this PR exists to
+avoid. Rich (40+) buys per-pixel fidelity nobody has asked for, at a privacy and
+maintenance cost that is wrong for the current stage. Standard is the smallest
+taxonomy that still carries the *intent* signals (filter/sort/category/variant +
+binned dwell) a recommender needs, while keeping every field coarse enough to
+stay defensible under KVKK/GDPR. It is the "decision the choice resolves":
+recommendation-capable without becoming surveillance-grade.
+
+**Concrete event list (the locked v1 taxonomy).** All names are
+`snake_case`; payloads are small typed JSON. Binning (not raw values) is a
+deliberate privacy choice carried into Decision 5.
+
+| Event | Key payload fields | Notes |
+|---|---|---|
+| `page_view` | `route`, `referrer?` | Every navigated route (auto-emitted, Decision 6). |
+| `product_view` | `product_id`, `variant_id?`, `source?` | PDP open; `source` = where the click came from. |
+| `category_view` | `category_id` | Category/PLP landing. |
+| `search` | `query_hash`, `result_count` | Query is **hashed**, not stored raw (privacy). |
+| `filter_applied` | `facet`, `value` | PLP filter (size/color/price-bucket/brand). |
+| `sort_changed` | `sort_key` | PLP/reviews/Q&A sort. |
+| `mega_menu_opened` | `menu_id` | Desktop discovery signal. |
+| `pdp_variant_selected` | `product_id`, `variant_id` | Variant intent. |
+| `scroll_depth` | `route`, `bucket` (10/25/50/75/100) | Binned; one event per bucket crossed. |
+| `time_on_page` | `route`, `bucket` (e.g. <5s/5-30s/30-120s/>120s) | Binned on page-leave. |
+| `add_to_cart` | `variant_id`, `qty` | Business event (manual, Decision 6). |
+| `remove_from_cart` | `variant_id`, `qty` | Business event. |
+| `purchase` | `order_id`, `item_count`, `total_minor`, `currency` | Business event; amounts in minor units. |
+| `login` | `method?` | Auth lifecycle. |
+| `logout` | — | Auth lifecycle. |
+| `session_start` | `session_id`, `platform` | Emitted on first event of a session. |
+| `session_end` | `session_id`, `duration_bucket` | Emitted on session timeout/close. |
+
+That is 17 named events; the `scroll_depth` buckets and a small reserve
+(`favorite_added`, `favorite_removed`, `notification_opened`) bring it to the
+~20 envelope. New events append to this table; **renames are migrations** and
+must be justified in a follow-up ADR.
 
 ## 3. Decision 2 — Storage shape
 
