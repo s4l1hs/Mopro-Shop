@@ -13,6 +13,8 @@ void main() {
         '/checkout': 'Mopro · Ödeme',
         '/checkout/result': 'Mopro · Sipariş Sonucu',
         '/orders': 'Mopro · Siparişlerim',
+        '/orders/123/return': 'Mopro · İade Talebi',
+        '/returns': 'Mopro · İadelerim',
         '/wallet': 'Mopro · Cüzdan',
         '/wallet/plans/9': 'Mopro · Kampanya Detayı',
         '/profile/addresses': 'Mopro · Adreslerim',
@@ -47,6 +49,8 @@ void main() {
         'Mopro · Elektronik',
       );
       expect(moproPageTitle('/orders/123', name: '123'), 'Mopro · Sipariş #123');
+      expect(moproPageTitle('/returns/7', name: '7'), 'Mopro · İade #7');
+      expect(moproPageTitle('/returns/7'), 'Mopro · İadelerim');
       expect(moproPageTitle('/search'), 'Mopro · Arama');
       expect(
         moproPageTitle('/search', name: 'ayakkabı'),

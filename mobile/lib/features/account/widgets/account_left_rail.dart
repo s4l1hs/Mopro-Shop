@@ -52,6 +52,8 @@ class _AccountLeftRailState extends ConsumerState<AccountLeftRail> {
             'account.rail_profile'.tr(), active, '/account/profile',),
         _row(AccountRailItem.orders, Icons.shopping_bag_outlined,
             'account.orders'.tr(), active, '/orders',),
+        _row(AccountRailItem.returns, Icons.assignment_return_outlined,
+            'account.returns'.tr(), active, '/returns',),
         _row(AccountRailItem.wallet, Icons.account_balance_wallet_outlined,
             'account.wallet'.tr(), active, '/wallet',),
         _row(AccountRailItem.addresses, Icons.location_on_outlined,
