@@ -2341,3 +2341,23 @@ additive (status + submitted_locale + revisions table). Reviews service is in
 placeholder (one-line swap). **§1.6 escape hatch NOT triggered — shipping one PR.**
 **Q&A module decision (AskUserQuestion): `internal/catalog` / `catalog_schema`**
 (alongside reviews).
+
+### §3 backend — DELIVERED (green, committed)
+Migrations 0073 (reviews write-side: status/submitted_locale + revisions; the
+(product_id,user_id) unique already existed) + 0074 (Q&A in catalog_schema:
+product_questions/product_answers, denormalized answer_count + author_name).
+`internal/catalog` ReviewWriteService + QAService (separate from the mocked
+catalog.Service): create/update(+revision)/soft-delete/list reviews, UserReviewID,
+Q&A create/list(sort)/detail/answer(+answer_count refresh)/my-questions; 9
+endpoints + GET /products/{id}/review-eligibility (order×catalog orchestration).
+Tests green: concurrent review → 1 row + ErrReviewExists; TestProperty_AnswerCountMatchesRows;
+review CRUD + ownership + revisions + soft-delete. is_seller=false in v1 (column/badge ready).
+
+### Remaining (frontend + flows + docs) — NOT yet done
+§4 leaf widgets (ReviewFormContent, QuestionFormContent, AnswerFormContent,
+QuestionRow, AnswerRow, ReviewRow edit-button) · §5 submission flow (3 entry
+points) · §6 /account/reviews + edit/delete + rail · §7 PDP Q&A tab + full list
++ question detail · §8 /account/questions + rail · §9 flows AA/BB · §10 ~16
+goldens · §11 CONTRIBUTING idempotency list · §12 REPORT/SYSTEM_AUDIT parity.
+The frontend reuses the existing Review DTO/reviewsProvider/ReviewRow and the
+PR #17 adaptive presenter; the PDP "Sorular" tab is a one-line _StubTab swap.
