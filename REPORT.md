@@ -2250,3 +2250,27 @@ session — so the **§1.6 escape hatch is invoked**: this PR ships **2a
 (notifications)** fully green; **2b (customer support)** is carried to a fresh
 `feat/customer-support` PR (notifications first, per §1.6, as it provides the
 badge surface support's future "ticket reply" notification will use).
+
+### Tranche 2a COMPLETE — Notifications (support = 2b, deferred per §1.6)
+
+**Scope decision:** §1.6 escape hatch invoked at the audit boundary (two greenfield domains ≈ 2× Tranche 1). Shipped notifications fully; customer support carried to a fresh `feat/customer-support` PR.
+
+**Backend (§3):** new core-svc module `internal/inbox` owning `inbox_schema`; migration `0071` (notifications + notification_preferences + push_tokens, round-trip verified, `UNIQUE(token)`); 8 endpoints (list/unread-count/read/read-all/preferences GET+PUT/push-tokens POST+DELETE). Read idempotency, preference default-matrix merge (transactional on, marketing off), push-token upsert. Unit + integration tests (incl. push-upsert convergence). `requireIdempotencyKey` already accepted `X-Idempotency-Key` (Tranche 1 drive-by).
+
+**Frontend (§4–§5):** `NotificationBadge` (dot/"9+", hidden at 0/guest), `NotificationRow` (unread bar + type icon + relativeTime), `NotificationsScreen` (filter chips, mark-all, pagination, empty state), `NotificationPreferencesScreen` (category×channel grid, forced-on security/orders/returns in-app + SnackBar, debounced write-through). Badge wired into `AccountLeftRail` + `WebHeader`. Routes + page titles (`/account/notifications` → Bildirimler, `…/preferences` → Bildirim Ayarları).
+
+**Notification preferences semantics:** missing rows default on for transactional categories (order_status/return_update/security/general), off for marketing; security/orders/returns in-app channels are forced on (UI shows SnackBar + keeps on).
+
+**Push tokens:** `push_tokens` table + register/delete endpoints ship; **delivery infrastructure (FCM/APNs worker) is Backlog**.
+
+**Flows:** flow Y (badge → list → mark-read → mark-all → preferences toggle + forced-on) green; all prior flows pass.
+
+**Badge polling:** simplified to on-demand (initial fetch + after-action refresh); the 60s background poll is **deferred (Backlog)** — it leaked a timer across widget tests and adds steady load; on-demand keeps the badge accurate for in-app actions.
+
+**Goldens:** 6 notification goldens (row, list populated 1440 light+dark, empty, preferences) baselined on Linux.
+
+**Parity:** In-app notification center + Notification settings UI → **Complete**; Marketing preferences → **Partial**. ≈40% → **≈42%** (SYSTEM_AUDIT §10 updated; inventory regenerated via `make audit`).
+
+**Backlog (2a-surfaced + carried):** live push delivery (FCM/APNs), 60s background poll, websocket real-time, marketing-send pipeline, **all of customer support (2b: help articles/FAQ, contact form, support tickets, flow Z, `flutter_markdown`)**, ticket reply threading, live chat, article CMS, article-feedback analytics, notification grouping.
+
+**Risk notes:** preference write-through is best-effort (debounced PUT; a failed flush surfaces an error but isn't retried); forced-on is enforced client-side (backend upserts what it receives) — a hardened backend guard is Backlog; on-demand badge can lag a notification created server-side between actions (no poll).

@@ -180,58 +180,66 @@ hand-registered route, whether the same method+path is declared in
 | POST | `/auth/step-up/request` | core-svc | `cmd/core-svc/auth_handlers.go:85` | no |
 | POST | `/auth/step-up/verify` | core-svc | `cmd/core-svc/auth_handlers.go:88` | no |
 | POST | `/me/devices` | core-svc | `cmd/core-svc/auth_handlers.go:91` | yes |
-| GET | `/healthz` | core-svc | `cmd/core-svc/main.go:348` | yes |
-| GET | `/__version` | core-svc | `cmd/core-svc/main.go:351` | no |
-| GET | `/dev/email-code` | core-svc | `cmd/core-svc/main.go:362` | no |
-| POST | `/products` | core-svc | `cmd/core-svc/main.go:378` | yes |
-| GET | `/products` | core-svc | `cmd/core-svc/main.go:381` | yes |
-| GET | `/products/{id}` | core-svc | `cmd/core-svc/main.go:384` | yes |
-| POST | `/products/{id}/variants` | core-svc | `cmd/core-svc/main.go:387` | no |
-| PUT | `/products/{id}/translations/{locale}` | core-svc | `cmd/core-svc/main.go:390` | no |
-| GET | `/categories` | core-svc | `cmd/core-svc/main.go:393` | yes |
-| GET | `/categories/{id}/commission` | core-svc | `cmd/core-svc/main.go:396` | yes |
-| GET | `/search` | core-svc | `cmd/core-svc/main.go:399` | yes |
-| GET | `/banners` | core-svc | `cmd/core-svc/main.go:402` | yes |
-| GET | `/recommendations` | core-svc | `cmd/core-svc/main.go:405` | yes |
-| GET | `/home/banners` | core-svc | `cmd/core-svc/main.go:410` | no |
-| GET | `/home/rails` | core-svc | `cmd/core-svc/main.go:413` | no |
-| GET | `/home/stories` | core-svc | `cmd/core-svc/main.go:416` | no |
-| GET | `/home/flash-deals` | core-svc | `cmd/core-svc/main.go:419` | no |
-| POST | `/products/batch` | core-svc | `cmd/core-svc/main.go:422` | no |
-| GET | `/products/{id}/reviews` | core-svc | `cmd/core-svc/main.go:426` | no |
-| POST | `/products/{id}/reviews/{reviewId}/helpful` | core-svc | `cmd/core-svc/main.go:430` | no |
-| GET | `/search/trending` | core-svc | `cmd/core-svc/main.go:433` | yes |
-| POST | `/favorites/sync` | core-svc | `cmd/core-svc/main.go:436` | no |
-| POST | `/cart/merge` | core-svc | `cmd/core-svc/main.go:440` | no |
-| GET | `/addresses` | core-svc | `cmd/core-svc/main.go:466` | yes |
-| POST | `/addresses` | core-svc | `cmd/core-svc/main.go:469` | yes |
-| GET | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:472` | no |
-| PUT | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:475` | yes |
-| DELETE | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:478` | yes |
-| POST | `/cart/items` | core-svc | `cmd/core-svc/main.go:483` | yes |
-| DELETE | `/cart/items/{variant_id}` | core-svc | `cmd/core-svc/main.go:486` | yes |
-| GET | `/cart` | core-svc | `cmd/core-svc/main.go:489` | yes |
-| POST | `/cart/reserve` | core-svc | `cmd/core-svc/main.go:492` | yes |
-| POST | `/cart/release` | core-svc | `cmd/core-svc/main.go:495` | yes |
-| POST | `/checkout/initiate` | core-svc | `cmd/core-svc/main.go:500` | no |
-| POST | `/orders` | core-svc | `cmd/core-svc/main.go:510` | yes |
-| GET | `/orders/{id}` | core-svc | `cmd/core-svc/main.go:513` | yes |
-| GET | `/orders` | core-svc | `cmd/core-svc/main.go:516` | yes |
-| POST | `/orders/{id}/status` | core-svc | `cmd/core-svc/main.go:519` | no |
-| POST | `/orders/{id}/deliver` | core-svc | `cmd/core-svc/main.go:522` | no |
-| POST | `/orders/{id}/cancel` | core-svc | `cmd/core-svc/main.go:525` | yes |
-| POST | `/orders/{id}/refund` | core-svc | `cmd/core-svc/main.go:528` | yes |
-| POST | `/orders/{id}/returns` | core-svc | `cmd/core-svc/main.go:531` | yes |
-| GET | `/returns` | core-svc | `cmd/core-svc/main.go:534` | no |
-| GET | `/returns/{id}` | core-svc | `cmd/core-svc/main.go:537` | no |
-| GET | `/seller/orders/{id}/breakdown` | core-svc | `cmd/core-svc/main.go:540` | yes |
-| POST | `/payments` | core-svc | `cmd/core-svc/main.go:545` | no |
-| GET | `/payments/{provider_ref}/status` | core-svc | `cmd/core-svc/main.go:548` | no |
-| GET | `/payments/{invoiceID}/intent-status` | core-svc | `cmd/core-svc/main.go:552` | no |
-| POST | `/payments/webhook/sipay` | core-svc | `cmd/core-svc/main.go:557` | no |
-| POST | `/shipping/webhook/surat` | core-svc | `cmd/core-svc/main.go:562` | no |
-| POST | `/shipping/webhook/mng` | core-svc | `cmd/core-svc/main.go:565` | no |
-| POST | `/shipping/webhook/hepsijet` | core-svc | `cmd/core-svc/main.go:568` | no |
+| GET | `/healthz` | core-svc | `cmd/core-svc/main.go:350` | yes |
+| GET | `/__version` | core-svc | `cmd/core-svc/main.go:353` | no |
+| GET | `/dev/email-code` | core-svc | `cmd/core-svc/main.go:364` | no |
+| POST | `/products` | core-svc | `cmd/core-svc/main.go:380` | yes |
+| GET | `/products` | core-svc | `cmd/core-svc/main.go:383` | yes |
+| GET | `/products/{id}` | core-svc | `cmd/core-svc/main.go:386` | yes |
+| POST | `/products/{id}/variants` | core-svc | `cmd/core-svc/main.go:389` | no |
+| PUT | `/products/{id}/translations/{locale}` | core-svc | `cmd/core-svc/main.go:392` | no |
+| GET | `/categories` | core-svc | `cmd/core-svc/main.go:395` | yes |
+| GET | `/categories/{id}/commission` | core-svc | `cmd/core-svc/main.go:398` | yes |
+| GET | `/search` | core-svc | `cmd/core-svc/main.go:401` | yes |
+| GET | `/banners` | core-svc | `cmd/core-svc/main.go:404` | yes |
+| GET | `/recommendations` | core-svc | `cmd/core-svc/main.go:407` | yes |
+| GET | `/home/banners` | core-svc | `cmd/core-svc/main.go:412` | no |
+| GET | `/home/rails` | core-svc | `cmd/core-svc/main.go:415` | no |
+| GET | `/home/stories` | core-svc | `cmd/core-svc/main.go:418` | no |
+| GET | `/home/flash-deals` | core-svc | `cmd/core-svc/main.go:421` | no |
+| POST | `/products/batch` | core-svc | `cmd/core-svc/main.go:424` | no |
+| GET | `/products/{id}/reviews` | core-svc | `cmd/core-svc/main.go:428` | no |
+| POST | `/products/{id}/reviews/{reviewId}/helpful` | core-svc | `cmd/core-svc/main.go:432` | no |
+| GET | `/search/trending` | core-svc | `cmd/core-svc/main.go:435` | yes |
+| POST | `/favorites/sync` | core-svc | `cmd/core-svc/main.go:438` | no |
+| POST | `/cart/merge` | core-svc | `cmd/core-svc/main.go:442` | no |
+| GET | `/addresses` | core-svc | `cmd/core-svc/main.go:468` | yes |
+| POST | `/addresses` | core-svc | `cmd/core-svc/main.go:471` | yes |
+| GET | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:474` | no |
+| PUT | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:477` | yes |
+| DELETE | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:480` | yes |
+| POST | `/cart/items` | core-svc | `cmd/core-svc/main.go:485` | yes |
+| DELETE | `/cart/items/{variant_id}` | core-svc | `cmd/core-svc/main.go:488` | yes |
+| GET | `/cart` | core-svc | `cmd/core-svc/main.go:491` | yes |
+| POST | `/cart/reserve` | core-svc | `cmd/core-svc/main.go:494` | yes |
+| POST | `/cart/release` | core-svc | `cmd/core-svc/main.go:497` | yes |
+| POST | `/checkout/initiate` | core-svc | `cmd/core-svc/main.go:502` | no |
+| POST | `/orders` | core-svc | `cmd/core-svc/main.go:512` | yes |
+| GET | `/orders/{id}` | core-svc | `cmd/core-svc/main.go:515` | yes |
+| GET | `/orders` | core-svc | `cmd/core-svc/main.go:518` | yes |
+| POST | `/orders/{id}/status` | core-svc | `cmd/core-svc/main.go:521` | no |
+| POST | `/orders/{id}/deliver` | core-svc | `cmd/core-svc/main.go:524` | no |
+| POST | `/orders/{id}/cancel` | core-svc | `cmd/core-svc/main.go:527` | yes |
+| POST | `/orders/{id}/refund` | core-svc | `cmd/core-svc/main.go:530` | yes |
+| POST | `/orders/{id}/returns` | core-svc | `cmd/core-svc/main.go:533` | yes |
+| GET | `/returns` | core-svc | `cmd/core-svc/main.go:536` | no |
+| GET | `/returns/{id}` | core-svc | `cmd/core-svc/main.go:539` | no |
+| GET | `/notifications` | core-svc | `cmd/core-svc/main.go:543` | no |
+| GET | `/notifications/unread-count` | core-svc | `cmd/core-svc/main.go:546` | no |
+| POST | `/notifications/{id}/read` | core-svc | `cmd/core-svc/main.go:549` | no |
+| POST | `/notifications/read-all` | core-svc | `cmd/core-svc/main.go:552` | no |
+| GET | `/notifications/preferences` | core-svc | `cmd/core-svc/main.go:555` | no |
+| PUT | `/notifications/preferences` | core-svc | `cmd/core-svc/main.go:558` | no |
+| POST | `/push-tokens` | core-svc | `cmd/core-svc/main.go:561` | no |
+| DELETE | `/push-tokens` | core-svc | `cmd/core-svc/main.go:564` | no |
+| GET | `/seller/orders/{id}/breakdown` | core-svc | `cmd/core-svc/main.go:567` | yes |
+| POST | `/payments` | core-svc | `cmd/core-svc/main.go:572` | no |
+| GET | `/payments/{provider_ref}/status` | core-svc | `cmd/core-svc/main.go:575` | no |
+| GET | `/payments/{invoiceID}/intent-status` | core-svc | `cmd/core-svc/main.go:579` | no |
+| POST | `/payments/webhook/sipay` | core-svc | `cmd/core-svc/main.go:584` | no |
+| POST | `/shipping/webhook/surat` | core-svc | `cmd/core-svc/main.go:589` | no |
+| POST | `/shipping/webhook/mng` | core-svc | `cmd/core-svc/main.go:592` | no |
+| POST | `/shipping/webhook/hepsijet` | core-svc | `cmd/core-svc/main.go:595` | no |
 
 ### B. OpenAPI operation catalogue (`api/openapi.yaml`)
 
@@ -283,7 +291,7 @@ hand-registered route, whether the same method+path is declared in
 | `POST /products` | CreateProduct |
 | `PUT /addresses/{id}` | UpdateAddress |
 
-_Totals: 73 code-registered routes; 45 OpenAPI operations._
+_Totals: 81 code-registered routes; 45 OpenAPI operations._
 <!-- END:gen:endpoints -->
 
 ### 2.4 OpenAPI and code generation
@@ -360,43 +368,44 @@ guess, shell membership). Tab titles resolve through `moproPageTitle` (PR #20).
 <!-- BEGIN:gen:routes -->
 | Path | Source | Screen (guess) | Shell |
 |---|---|---|---|
-| `/splash` | `app_router.dart:177` | SplashScreen | — |
-| `/auth/login` | `app_router.dart:182` | SignInScreen | — |
-| `/auth/register` | `app_router.dart:186` | SignUpScreen | — |
-| `/auth/verify-email` | `app_router.dart:190` | EmailVerifyScreen | — |
-| `/auth/forgot-password` | `app_router.dart:196` | ForgotPasswordScreen | — |
-| `/auth/mfa` | `app_router.dart:200` | MFAChallengeScreen | — |
-| `/auth/profile` | `app_router.dart:210` | ProfileCompletionScreen | — |
-| `/search` | `app_router.dart:214` | SearchScreen | — |
-| `/products/:id` | `app_router.dart:223` | (builder) | — |
-| `/orders/:id/return` | `app_router.dart:242` | (builder) | — |
-| `/categories/:id` | `app_router.dart:263` | (builder) | — |
-| `/checkout` | `app_router.dart:280` | CheckoutAddressScreen | — |
-| `payment` | `app_router.dart:285` | CheckoutPaymentScreen | — |
-| `review` | `app_router.dart:289` | CheckoutReviewScreen | — |
-| `redirect` | `app_router.dart:293` | CheckoutRedirectScreen | — |
-| `result` | `app_router.dart:300` | CheckoutResultScreen | — |
-| `/account/profile` | `app_router.dart:324` | AccountProfileScreen | ShellRoute |
-| `/account/security` | `app_router.dart:328` | SecurityScreen | ShellRoute |
-| `/account/cards` | `app_router.dart:332` | CardsScreen | ShellRoute |
-| `/account/notifications` | `app_router.dart:336` | AccountPlaceholderScreen | ShellRoute |
-| `/help` | `app_router.dart:343` | AccountPlaceholderScreen | ShellRoute |
-| `/orders` | `app_router.dart:350` | OrderHistoryScreen | ShellRoute |
-| `:id` | `app_router.dart:354` | (builder) | ShellRoute |
-| `/returns` | `app_router.dart:370` | ReturnsListScreen | ShellRoute |
-| `:id` | `app_router.dart:374` | (builder) | ShellRoute |
-| `/wallet` | `app_router.dart:390` | WalletScreen | ShellRoute |
-| `plans/:id` | `app_router.dart:394` | (builder) | ShellRoute |
-| `/profile/addresses` | `app_router.dart:410` | AddressListScreen | ShellRoute |
-| `new` | `app_router.dart:414` | AddressFormScreen | ShellRoute |
-| `:id/edit` | `app_router.dart:418` | AddressFormScreen | ShellRoute |
-| `/` | `app_router.dart:438` | CatalogHomeScreen | StatefulShellRoute |
-| `/categories` | `app_router.dart:448` | CategoryScreen | StatefulShellRoute |
-| `/favorites` | `app_router.dart:458` | FavoritesScreen | StatefulShellRoute |
-| `/cart` | `app_router.dart:468` | CartScreen | StatefulShellRoute |
-| `/account` | `app_router.dart:478` | AccountScreen | StatefulShellRoute |
+| `/splash` | `app_router.dart:182` | SplashScreen | — |
+| `/auth/login` | `app_router.dart:187` | SignInScreen | — |
+| `/auth/register` | `app_router.dart:191` | SignUpScreen | — |
+| `/auth/verify-email` | `app_router.dart:195` | EmailVerifyScreen | — |
+| `/auth/forgot-password` | `app_router.dart:201` | ForgotPasswordScreen | — |
+| `/auth/mfa` | `app_router.dart:205` | MFAChallengeScreen | — |
+| `/auth/profile` | `app_router.dart:215` | ProfileCompletionScreen | — |
+| `/search` | `app_router.dart:219` | SearchScreen | — |
+| `/products/:id` | `app_router.dart:228` | (builder) | — |
+| `/orders/:id/return` | `app_router.dart:247` | (builder) | — |
+| `/categories/:id` | `app_router.dart:268` | (builder) | — |
+| `/checkout` | `app_router.dart:285` | CheckoutAddressScreen | — |
+| `payment` | `app_router.dart:290` | CheckoutPaymentScreen | — |
+| `review` | `app_router.dart:294` | CheckoutReviewScreen | — |
+| `redirect` | `app_router.dart:298` | CheckoutRedirectScreen | — |
+| `result` | `app_router.dart:305` | CheckoutResultScreen | — |
+| `/account/profile` | `app_router.dart:329` | AccountProfileScreen | ShellRoute |
+| `/account/security` | `app_router.dart:333` | SecurityScreen | ShellRoute |
+| `/account/cards` | `app_router.dart:337` | CardsScreen | ShellRoute |
+| `/account/notifications` | `app_router.dart:341` | NotificationsScreen | ShellRoute |
+| `preferences` | `app_router.dart:345` | NotificationPreferencesScreen | ShellRoute |
+| `/help` | `app_router.dart:351` | AccountPlaceholderScreen | ShellRoute |
+| `/orders` | `app_router.dart:358` | OrderHistoryScreen | ShellRoute |
+| `:id` | `app_router.dart:362` | (builder) | ShellRoute |
+| `/returns` | `app_router.dart:378` | ReturnsListScreen | ShellRoute |
+| `:id` | `app_router.dart:382` | (builder) | ShellRoute |
+| `/wallet` | `app_router.dart:398` | WalletScreen | ShellRoute |
+| `plans/:id` | `app_router.dart:402` | (builder) | ShellRoute |
+| `/profile/addresses` | `app_router.dart:418` | AddressListScreen | ShellRoute |
+| `new` | `app_router.dart:422` | AddressFormScreen | ShellRoute |
+| `:id/edit` | `app_router.dart:426` | AddressFormScreen | ShellRoute |
+| `/` | `app_router.dart:446` | CatalogHomeScreen | StatefulShellRoute |
+| `/categories` | `app_router.dart:456` | CategoryScreen | StatefulShellRoute |
+| `/favorites` | `app_router.dart:466` | FavoritesScreen | StatefulShellRoute |
+| `/cart` | `app_router.dart:476` | CartScreen | StatefulShellRoute |
+| `/account` | `app_router.dart:486` | AccountScreen | StatefulShellRoute |
 
-_Total: 35 route declarations._
+_Total: 36 route declarations._
 <!-- END:gen:routes -->
 
 Notable: `/account/notifications` and `/help` both resolve to
@@ -434,8 +443,8 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `apiBaseUrlProvider` | `Provider` | `mobile/lib/core/di/providers.dart:13` |
 | `apiClientProvider` | `Provider` | `mobile/lib/api/client.dart:7` |
 | `authApiExtProvider` | `Provider` | `mobile/lib/core/di/providers.dart:73` |
-| `authApiProvider` | `Provider` | `mobile/lib/core/di/providers.dart:69` |
 | `authApiProvider` | `Provider` | `mobile/lib/api/client.dart:12` |
+| `authApiProvider` | `Provider` | `mobile/lib/core/di/providers.dart:69` |
 | `authInterceptorProvider` | `Provider` | `mobile/lib/core/di/providers.dart:31` |
 | `cartApiProvider` | `Provider` | `mobile/lib/api/client.dart:20` |
 | `cartCashbackCacheProvider` | `Provider` | `mobile/lib/features/cart/application/cart_cashback_cache.dart:61` |
@@ -454,13 +463,15 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `localeStateProvider` | `StateProvider` | `mobile/lib/core/di/providers.dart:27` |
 | `meApiProvider` | `Provider` | `mobile/lib/api/client.dart:44` |
 | `meApiProvider` | `Provider` | `mobile/lib/core/di/providers.dart:77` |
+| `notificationRepositoryProvider` | `Provider` | `mobile/lib/features/notifications/data/notification_repository.dart:90` |
+| `notificationsProvider` | `NotifierProviderFamily` | `mobile/lib/features/notifications/application/notifications_provider.dart:88` |
 | `orderRepositoryProvider` | `Provider` | `mobile/lib/features/order/application/orders_provider.dart:13` |
 | `ordersApiProvider` | `Provider` | `mobile/lib/api/client.dart:32` |
 | `planDetailProvider` | `AutoDisposeNotifierProviderFamily` | `mobile/lib/features/wallet/providers/plan_detail_provider.dart:51` |
 | `productsByCategoryProvider` | `NotifierProviderFamily` | `mobile/lib/features/catalog/providers/products_by_category_provider.dart:40` |
 | `productsRailProvider` | `FutureProvider` | `mobile/lib/features/catalog/providers/products_rail_provider.dart:5` |
 | `returnDetailProvider` | `NotifierProviderFamily` | `mobile/lib/features/order/application/returns_provider.dart:43` |
-| `routerProvider` | `Provider` | `mobile/lib/core/router/app_router.dart:160` |
+| `routerProvider` | `Provider` | `mobile/lib/core/router/app_router.dart:165` |
 | `searchApiProvider` | `Provider` | `mobile/lib/api/client.dart:36` |
 | `secureStorageProvider` | `Provider` | `mobile/lib/core/di/providers.dart:17` |
 | `sellerApiProvider` | `Provider` | `mobile/lib/api/client.dart:40` |
@@ -489,6 +500,7 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `OrderDetailNotifier` | `FamilyNotifier<AsyncValue<OrderDto>, int>` | `mobile/lib/features/order/application/order_detail_provider.dart:12` |
 | `OrdersNotifier` | `Notifier<OrdersState>` | `mobile/lib/features/order/application/orders_provider.dart:60` |
 | `PlpFiltersNotifier` | `FamilyNotifier<PlpFilters, String>` | `mobile/lib/features/catalog/plp/plp_filters_provider.dart:12` |
+| `PreferencesNotifier` | `Notifier<PreferencesState>` | `mobile/lib/features/notifications/application/notification_preferences_provider.dart:55` |
 | `RecentSearchesNotifier` | `StateNotifier<List<String>>` | `mobile/lib/features/catalog/providers/recent_searches_provider.dart:10` |
 | `ReturnFlowNotifier` | `FamilyNotifier<ReturnFlowState, int>` | `mobile/lib/features/order/application/return_flow_provider.dart:75` |
 | `ReturnsNotifier` | `Notifier<AsyncValue<List<ReturnListItemDto>>>` | `mobile/lib/features/order/application/returns_provider.dart:14` |
@@ -497,10 +509,11 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `SignInNotifier` | `Notifier<SignInState>` | `mobile/lib/features/auth/auth_signin_notifier.dart:40` |
 | `SignUpNotifier` | `Notifier<SignUpState>` | `mobile/lib/features/auth/auth_signup_notifier.dart:33` |
 | `ThemeController` | `StateNotifier<ThemeMode>` | `mobile/lib/design/theme_controller.dart:14` |
+| `UnreadCountNotifier` | `Notifier<int>` | `mobile/lib/features/notifications/application/notifications_provider.dart:20` |
 | `WalletNotifier` | `Notifier<WalletState>` | `mobile/lib/features/wallet/providers/wallet_provider.dart:56` |
-| `_AuthStateListenable` | `ChangeNotifier` | `mobile/lib/core/router/app_router.dart:490` |
+| `_AuthStateListenable` | `ChangeNotifier` | `mobile/lib/core/router/app_router.dart:498` |
 
-_Totals: 42 provider declarations; 24 Notifier subclasses._
+_Totals: 44 provider declarations; 26 Notifier subclasses._
 <!-- END:gen:providers -->
 
 ### 3.5 Routing-time concerns
@@ -519,14 +532,14 @@ tests, which don't load assets). Completeness audit by
 `tool/audit/check_i18n.sh`:
 
 <!-- BEGIN:gen:i18n -->
-### Translation completeness (master: `tr-TR.json`, 532 keys)
+### Translation completeness (master: `tr-TR.json`, 563 keys)
 
 | Locale | Keys | Missing vs master | Extra vs master | Completeness |
 |---|---|---|---|---|
-| `ar-AE.json` | 147 | 385 | 0 | 27% |
-| `de-DE.json` | 147 | 385 | 0 | 27% |
-| `en-US.json` | 458 | 74 | 0 | 86% |
-| `tr-TR.json` | 532 | — | — | master |
+| `ar-AE.json` | 178 | 385 | 0 | 31% |
+| `de-DE.json` | 178 | 385 | 0 | 31% |
+| `en-US.json` | 489 | 74 | 0 | 86% |
+| `tr-TR.json` | 563 | — | — | master |
 <!-- END:gen:i18n -->
 
 ### 3.7 Theme system
@@ -566,6 +579,7 @@ and their owning migration come from `migrations/{ecom,ledger}`. Generated by
 | `commission_schema` | `deploy/postgres-ledger/init/20-schemas.sql` |
 | `einvoice_schema` | `deploy/postgres-ecom/init/20-schemas.sql` |
 | `identity_schema` | `deploy/postgres-ecom/init/20-schemas.sql` |
+| `inbox_schema` | `deploy/postgres-ecom/init/20-schemas.sql` |
 | `media_schema` | `deploy/postgres-ecom/init/20-schemas.sql` |
 | `notification_schema` | `deploy/postgres-ecom/init/20-schemas.sql` |
 | `order_schema` | `deploy/postgres-ecom/init/20-schemas.sql` |
@@ -609,6 +623,9 @@ and their owning migration come from `migrations/{ecom,ledger}`. Generated by
 | `identity_schema.password_resets` | `0063_email_auth.up.sql` |
 | `identity_schema.refresh_tokens` | `0055_identity_schema.up.sql` |
 | `identity_schema.users` | `0055_identity_schema.up.sql` |
+| `inbox_schema.notification_preferences` | `0071_notifications.up.sql` |
+| `inbox_schema.notifications` | `0071_notifications.up.sql` |
+| `inbox_schema.push_tokens` | `0071_notifications.up.sql` |
 | `notification_schema.slack_sent` | `90-notification-schema.sql` |
 | `order_schema.checkout_sessions` | `0058_checkout_sessions.up.sql` |
 | `order_schema.order_items` | `65-order-schema.sql` |
@@ -636,7 +653,7 @@ and their owning migration come from `migrations/{ecom,ledger}`. Generated by
 | `wallet_schema.system_state` | `67-system-state.sql` |
 | `wallet_schema.transactions` | `40-wallet-schema.sql` |
 
-_Totals: 19 schemas, 52 tables; 23 up / 23 down migrations._
+_Totals: 20 schemas, 55 tables; 24 up / 24 down migrations._
 <!-- END:gen:schema -->
 
 **Migrations:** golang-migrate-style numbered `XXXX_name.{up,down}.sql` under
@@ -1125,13 +1142,14 @@ wallet for incentives at low marginal cost.
 | Capability | State | Evidence | Gap |
 |---|---|---|---|
 | Email / SMS transactional | Complete | email verify, OTP | Complete |
-| Push token registration | Partial | `POST /me/devices` (no sending) | Partial |
-| In-app notification center | Stubbed | `/account/notifications` placeholder | Stubbed |
-| Notification settings UI | Missing | — | Missing |
-| Marketing preferences | Missing | — | Missing |
+| Push token registration | Partial | `POST /me/devices` + `POST /push-tokens` (no delivery worker) | Partial |
+| In-app notification center | Complete | `inbox_schema` + `NotificationsScreen` (Tranche 2a) | Complete |
+| Notification settings UI | Complete | `NotificationPreferencesScreen` + prefs API (Tranche 2a) | Complete |
+| Marketing preferences | Partial | preference toggles persist; marketing-send pipeline deferred | Partial |
 
-*Highest-leverage gap:* **in-app notification center** — the route placeholder
-already exists; reads can be backed by existing order/cashback events cheaply.
+*Tranche 2a closed the in-app notification center + settings.* Live push
+delivery (FCM/APNs worker), the marketing-send pipeline, and a 60s background
+poll remain Backlog. Customer support (§11) is Tranche 2b (carried forward).
 
 ### 11. Customer support
 | Capability | State | Evidence | Gap |
@@ -1198,16 +1216,17 @@ Counting the **88** capability rows across the 15 categories:
 
 | Classification | Count |
 |---|---|
-| Complete | 34 |
-| Partial | 13 |
-| Stubbed | 6 |
-| Missing | 33 |
+| Complete | 36 |
+| Partial | 14 |
+| Stubbed | 5 |
+| Missing | 31 |
 | Out of scope | 2 |
 
-_Tranche 1 moved Cancellation, Refunds, and Returns/RMA from Partial/Stubbed to
-Complete (+3 Complete; original audit was 31/15/7/33/2)._
+_Tranche 1 moved Cancellation, Refunds, Returns/RMA to Complete (original audit
+31/15/7/33/2). Tranche 2a moved In-app notification center + Notification
+settings UI to Complete and Marketing preferences to Partial (+2 Complete)._
 
-**Parity score (Complete ÷ in-scope 86) ≈ 40%.** Orientation only, not a
+**Parity score (Complete ÷ in-scope 86) ≈ 42%.** Orientation only, not a
 scoreboard: the *core differentiator* (perpetual-cashback coin wallet) and the
 hard financial/identity plumbing are Complete; most gaps are conventional
 commerce surface features that reuse existing patterns.
