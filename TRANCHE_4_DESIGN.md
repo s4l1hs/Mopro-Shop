@@ -442,12 +442,103 @@ _(derived from Decision 7)_
 
 ## 10. Open questions
 
-_(populated during synthesis)_
+Each item names a suggested owner / gate. None blocks writing the 4a prompt; the
+starred (★) ones should be resolved before 4a *merges*.
+
+- **★ Privacy-policy page + consent copy review.** The opt-in banner needs final
+  legal copy and a linked policy page. _Owner: product/legal before 4a merges._
+- **★ Raw search-text storage (`query_sample`).** Confirm KVKK/GDPR stance on
+  retaining raw query text even post-consent; default to hash-only if uncertain.
+  _Owner: counsel; default-safe = drop `query_sample` until cleared._
+- **★ Account-deletion wire-up.** Verify the existing account-deletion path and
+  hook the analytics erase into it (Decision 5). _Owner: 4a audit-first step._
+- **Stream isolation / backpressure.** Analytics is far higher-volume than the
+  financial events sharing Redis Streams; 4a should use a **separate stream +
+  consumer group** so analytics can never starve the cashback/payout consumers.
+  _Owner: 4a infra design._
+- **Session model details.** `session_id` generation and the idle-timeout value
+  (assumed 30 min) are unspecified. _Owner: 4a; default 30 min unless product objects._
+- **Observability.** Should ingest rate / queue depth / DLQ feed the existing
+  Grafana Agent → Grafana Cloud? _Owner: 4a ops detail; recommend yes (cheap)._
+- **Revisit-Decision-2 trigger.** If real-time recommendations or BI tooling
+  become near-term, Option C (external broker) is the escape valve — but it
+  breaks the single-VDS RAM budget, so it needs an infra ADR first. _Owner:
+  Backlog; do not pre-build._
+- **A/B testing.** Out of Tranche 4 scope; the event store is its prerequisite.
+  _Owner: future tranche._
+
+**Drive-by hygiene surfaced by the §1 audit (do NOT fix this PR):**
+- Two REPORT backlog notes ("promo image errors silent — no telemetry"; "
+  `trendingSearchesProvider` error invisible — telemetry should fire from the
+  provider") are natural *first manual `track()` call sites* once the pipeline
+  exists. _Owner: fold into 4a/4b, not a refactor now._
+- Object storage is still unprovisioned (review/return photo backlog). Not on the
+  analytics path, but noted so it isn't conflated with this tranche. _Owner:
+  separate tranche._
 
 ## 11. Risk notes
 
-_(populated during synthesis)_
+Honest, not exhaustive.
+
+- **Re-identification (merge).** Linking guest sessions to a user is a surface
+  regulators scrutinize. Mitigated by: nothing tracked pre-consent (Decision 3),
+  an auditable `session_identity` link rather than rewritten events (Decision 4),
+  and on-demand erase (Decision 5). Counsel should still confirm the merge is
+  disclosed in the privacy policy.
+- **Low opt-in depresses data quality.** Binary opt-in (Decision 3) means a chunk
+  of users never get tracked, so the recommender trains on a biased sample. This
+  is the accepted cost of being compliant-everywhere; revisit copy/placement, not
+  the model, if opt-in rates are low.
+- **Search hashing vs. utility.** Hash-only queries (`query_hash`) lose
+  typo/synonym analytics; `query_sample` would restore it but reintroduces raw-PII
+  risk — kept consent-gated and flagged as an open question.
+- **Single-VDS scaling ceiling.** A Postgres-resident event log on a 6-vCPU/24 GB
+  box has a throughput ceiling. The 90-day prune (Decision 5) bounds storage, and
+  Decision 2's Option C is the documented escape valve — but it is *not* pre-built,
+  so a sudden volume spike is a known risk requiring an infra decision, not a
+  config flip.
+- **Client batching loss.** The in-memory flush queue (Decision 6) can lose its
+  tail on a hard crash. Acceptable for analytics (not financial data); do not
+  reuse this path for anything ledger-adjacent.
+- **Taxonomy drift.** New events are appends; **renames are migrations**. Without
+  discipline the taxonomy rots. Enforced by the locked table in §2 + an ADR
+  requirement for any rename.
+- **Consumer starvation.** If analytics shares the financial event stream it could
+  back up the cashback/payout consumers — hence the separate-stream open question;
+  treat it as a must-fix in 4a, not optional.
 
 ## 12. Glossary
 
-_(populated during synthesis)_
+**Events (the locked v1 taxonomy — §2):**
+`page_view` (route navigated) · `product_view` (PDP opened) · `category_view`
+(category/PLP landing) · `search` (query submitted; stored hashed) ·
+`filter_applied` (PLP facet) · `sort_changed` (sort key) · `mega_menu_opened`
+(desktop mega-menu) · `pdp_variant_selected` (variant chosen) · `scroll_depth`
+(binned 10/25/50/75/100%) · `time_on_page` (binned on leave) · `add_to_cart` ·
+`remove_from_cart` · `purchase` (order completed) · `login` · `logout` ·
+`session_start` · `session_end`. Reserve: `favorite_added`, `favorite_removed`,
+`notification_opened`.
+
+**Consent categories** (Decision 3 ships only the first active member; the enum
+exists so granular is a later append):
+- **Essential** — service operation; never an analytics event, never gated.
+- **Analytics** — the event pipeline in this design. The single gate v1 toggles.
+- **Functional** — preference/personalization surfaces; treated as a *consumer*
+  of Analytics in v1, not a separate gate.
+- **Marketing** — reserved; marketing sends are already gated by notification
+  preferences (Tranche 2a).
+
+**Infrastructure components:**
+- **`analytics_events`** — append-only source-of-truth table (`analytics_schema`).
+- **Projection tables** — `user_browsing_history`, `user_search_history`,
+  `user_category_affinity`; derived, cheap-read, rebuilt by the aggregator.
+- **`session_identity`** — guest-session → user link table enabling merge-on-auth
+  without mutating events (Decision 4).
+- **Analytics consumer** — jobs-svc reader of the `analytics.events.v1` Redis
+  Stream that appends to `analytics_events`.
+- **Aggregator** — scheduled jobs-svc job that folds raw events into projections.
+- **Retention cron** — daily jobs-svc job pruning raw events > 90 days (Decision 5).
+- **`analyticsService` / consent gate** — client API all emission routes through;
+  no-ops unless consent == Accepted; batches to `POST /events`.
+- **`/events`, `/events/identify`, `/me/analytics`** — ingest (batch), session
+  identity link (merge), and user erase (RTBF) endpoints.
