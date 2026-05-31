@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 import 'package:mopro/features/analytics/user_consent_provider.dart';
+import 'package:mopro/features/home/recently_viewed_provider.dart';
 
 /// `/account/privacy` — analytics consent toggle + RTBF erase + policy link
 /// (Tranche 4b, Decisions 3 & 5). Unlike the banner this screen is always
@@ -35,6 +36,10 @@ class PrivacySettingsScreen extends ConsumerWidget {
     );
     if (!(confirmed ?? false)) return;
     final ok = await ref.read(userConsentProvider.notifier).deleteAllData();
+    if (ok) {
+      // Visibly empty the "Son baktıkların" rail after erase (Tranche 4c).
+      ref.invalidate(recentlyViewedProvider);
+    }
     messenger.showSnackBar(
       SnackBar(
         content: Text(
