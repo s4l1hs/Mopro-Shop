@@ -134,11 +134,9 @@ class CreateReturnRequest {
         'reason': reason,
         if (description.isNotEmpty) 'description': description,
         if (items.isNotEmpty)
-          'items': items
-              .map((i) => {
-                    'order_item_id': i.orderItemId,
-                    'quantity': i.quantity,
-                  })
-              .toList(),
+          'items': [
+            for (final i in items)
+              {'order_item_id': i.orderItemId, 'quantity': i.quantity},
+          ],
       };
 }

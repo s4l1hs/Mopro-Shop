@@ -1,6 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/utils/money.dart';
 
@@ -86,14 +85,21 @@ class RefundStatusCard extends StatelessWidget {
                   ? 'returns.method_wallet'.tr()
                   : 'returns.method_original'.tr(),
             ),
-            if (refund.status == RefundStatus.issued && refund.issuedAt != null) ...[
+            if (refund.status == RefundStatus.issued &&
+                refund.issuedAt != null) ...[
               const SizedBox(height: 8),
-              _row(theme, 'returns.refund_issued_date'.tr(),
-                  dateFmt.format(refund.issuedAt!.toLocal())),
+              _row(
+                theme,
+                'returns.refund_issued_date'.tr(),
+                dateFmt.format(refund.issuedAt!.toLocal()),
+              ),
             ] else if (refund.estimatedAt != null) ...[
               const SizedBox(height: 8),
-              _row(theme, 'returns.refund_estimated'.tr(),
-                  dateFmt.format(refund.estimatedAt!.toLocal())),
+              _row(
+                theme,
+                'returns.refund_estimated'.tr(),
+                dateFmt.format(refund.estimatedAt!.toLocal()),
+              ),
             ],
             if (refund.status == RefundStatus.failed) ...[
               const SizedBox(height: 8),
@@ -112,12 +118,16 @@ class RefundStatusCard extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-        Text(value,
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          style: theme.textTheme.bodyMedium
+              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        Text(
+          value,
+          style: theme.textTheme.bodyMedium
+              ?.copyWith(fontWeight: FontWeight.w600),
+        ),
       ],
     );
   }

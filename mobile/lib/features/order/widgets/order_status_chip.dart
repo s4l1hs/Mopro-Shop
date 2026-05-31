@@ -1,6 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 
 class OrderStatusChip extends StatelessWidget {
@@ -80,7 +79,11 @@ class OrderStatusTimeline extends StatelessWidget {
 
     if (isCancelled) {
       return _terminalRow(
-          theme, Icons.cancel_outlined, cs.error, OrderStatus.label(status));
+        theme,
+        Icons.cancel_outlined,
+        cs.error,
+        OrderStatus.label(status),
+      );
     }
 
     return Row(
