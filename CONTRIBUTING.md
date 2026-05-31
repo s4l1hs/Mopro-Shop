@@ -267,7 +267,10 @@ expected in new work. The full system inventory and gap analysis live in
 - [Formatting](#formatting)
 - [Audit-before-code](#audit-before-code)
 - [Adaptive presenter](#adaptive-presenter)
-- [In-component composition over `Overlay` routing](#in-component-composition-over-overlay-routing)
+$1
+- [Module placement decisions](#module-placement-decisions)
+- [Goldens on authed state](#goldens-on-authed-state)
+- [Background polling vs. on-demand refresh](#background-polling-vs-on-demand-refresh)
 
 ## Audit-before-code
 
@@ -299,3 +302,33 @@ compose in-tree, and `AnchoredOverlayPanel`
 (search pill, account menu, mega-menu) to their trigger rather than routing a new
 page. This keeps focus management, dismissal, and lifecycle local to the
 component and avoids route-stack surprises.
+
+## Module placement decisions
+
+When backend gap-fill could plausibly live in two existing modules, surface the
+choice with the trade-offs **before** implementing. Use `AskUserQuestion` with
+named options + a one-line rationale for each. The wrong module assignment is
+cheap now and expensive to refactor later. Precedent: Tranche 2a inbox vs.
+`notification_schema` (PR #23, chose a new `internal/inbox`); Tranche 2b help
+vs. support (chose separate `internal/help` + `internal/support`).
+
+## Goldens on authed state
+
+Authed-state goldens have a higher risk of revealing platform-specific
+timer/async behavior. When adding goldens for screens that consume providers
+with timers (`Timer.periodic`, polling intervals, `FutureProvider.autoDispose`
+with `keepAlive`) or that fire a network request on build, prefer **stubbing the
+provider in the test harness** over letting the real provider's timer/request
+fire during golden capture. The macOS platform-guard sometimes masks Linux
+failures of this class — a golden that "passes" locally can fail CI with a
+pending-timer error once the golden assertion passes on Linux. Precedent: the
+notification-badge poller leaked into account goldens until stubbed (PR #23).
+
+## Background polling vs. on-demand refresh
+
+Background polls are a top source of test-suite timer leaks and a non-trivial
+source of mobile battery drain. Prefer **on-demand refresh** — after user
+actions, on screen open, on auth-state changes — over `Timer.periodic`. When
+real-time updates matter for a specific surface, the path is WebSockets or
+server-sent events, not faster polling. Precedent: the Tranche 2a notification
+badge dropped its 60s poll for on-demand refresh (PR #23).
