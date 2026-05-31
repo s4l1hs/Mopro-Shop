@@ -54,11 +54,15 @@ class RefundStatusCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'returns.refund_title'.tr(),
-                  style: theme.textTheme.titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w600),
+                Flexible(
+                  child: Text(
+                    'returns.refund_title'.tr(),
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Chip(
                   label: Text(
                     chipLabel,
@@ -117,16 +121,23 @@ class RefundStatusCard extends StatelessWidget {
   Widget _row(ThemeData theme, String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        Flexible(
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
         ),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(fontWeight: FontWeight.w600),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(fontWeight: FontWeight.w600),
+            textAlign: TextAlign.end,
+          ),
         ),
       ],
     );

@@ -96,10 +96,14 @@ class _ReturnCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    ReturnReason.label(item.reason),
-                    style: theme.textTheme.bodyMedium,
+                  Flexible(
+                    child: Text(
+                      ReturnReason.label(item.reason),
+                      style: theme.textTheme.bodyMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                  const SizedBox(width: 12),
                   Text(
                     MoneyUtils.formatMinor(
                       item.refundAmountMinor,
