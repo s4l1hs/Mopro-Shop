@@ -228,7 +228,9 @@ class QuestionsState {
 }
 
 class QuestionsNotifier extends FamilyNotifier<QuestionsState, int> {
-  late final int _productId;
+  // Not `late final`: a family Notifier may rebuild (e.g. after invalidation),
+  // re-running build() and reassigning this.
+  late int _productId;
 
   @override
   QuestionsState build(int productId) {

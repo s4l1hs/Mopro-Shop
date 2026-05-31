@@ -26,7 +26,7 @@ class _QuestionFormContentState extends ConsumerState<QuestionFormContent> {
       onSubmit: (body) => ref.read(qaRepositoryProvider).ask(
             widget.productId,
             body: body,
-            locale: context.locale.languageCode,
+            locale: EasyLocalization.of(context)?.locale.languageCode ?? 'tr',
           ),
     );
   }
@@ -59,7 +59,7 @@ class _AnswerFormContentState extends ConsumerState<AnswerFormContent> {
             widget.productId,
             widget.questionId,
             body: body,
-            locale: context.locale.languageCode,
+            locale: EasyLocalization.of(context)?.locale.languageCode ?? 'tr',
           ),
     );
   }

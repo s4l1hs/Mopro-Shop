@@ -64,7 +64,8 @@ class _ReviewFormContentState extends ConsumerState<ReviewFormContent> {
       _error = null;
     });
     final repo = ref.read(reviewWriteRepositoryProvider);
-    final locale = context.locale.languageCode;
+    // Null-safe: EasyLocalization may be absent under widget tests.
+    final locale = EasyLocalization.of(context)?.locale.languageCode ?? 'tr';
     final navigator = Navigator.of(context);
     try {
       if (widget.isEdit) {
