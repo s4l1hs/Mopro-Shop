@@ -34,6 +34,7 @@ import 'package:mopro/features/favorites/favorites_screen.dart';
 import 'package:mopro/features/not_found/not_found_screen.dart';
 import 'package:mopro/features/order/presentation/order_detail_screen.dart';
 import 'package:mopro/features/order/presentation/order_history_screen.dart';
+import 'package:mopro/features/order/presentation/order_return_flow_screen.dart';
 import 'package:mopro/features/order/presentation/return_detail_screen.dart';
 import 'package:mopro/features/order/presentation/returns_list_screen.dart';
 import 'package:mopro/features/wallet/plan_detail_screen.dart';
@@ -233,6 +234,28 @@ final routerProvider = Provider<GoRouter>((ref) {
           return _titledLoc(
             '/products/$id',
             ProductDetailScreen(productId: id),
+          );
+        },
+      ),
+      // Full-screen multi-step return flow (outside the account shell).
+      GoRoute(
+        path: '/orders/:id/return',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) {
+          final raw = state.pathParameters['id'];
+          final id = raw != null ? int.tryParse(raw) : null;
+          if (id == null || id <= 0) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => rootNavigatorKey.currentContext?.go('/orders'),
+            );
+            return const SizedBox.shrink();
+          }
+          return _titledLoc(
+            '/orders/$id/return',
+            OrderReturnFlowScreen(
+              orderId: id,
+              initialStep: state.uri.queryParameters['step'],
+            ),
           );
         },
       ),
