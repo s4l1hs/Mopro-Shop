@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -18,6 +19,11 @@ import (
 type authHandlers struct {
 	svc identity.Service
 	log *slog.Logger
+	// onUserDeleted, if set, runs after a successful DELETE /me to cascade the
+	// deletion to dependent stores (analytics erasure — §2.4 blocker #3). Errors
+	// are logged best-effort and do NOT fail the deletion (the soft-delete has
+	// already committed; the RTBF endpoint + nightly jobs are the backstop).
+	onUserDeleted func(ctx context.Context, userID int64) error
 }
 
 // registerAuthRoutes adds all identity routes to mux.
@@ -240,6 +246,11 @@ func (a *authHandlers) handleDeleteMe(w http.ResponseWriter, r *http.Request) {
 	if err := a.svc.DeleteMe(r.Context(), userID); err != nil {
 		a.writeIdentityError(w, err)
 		return
+	}
+	if a.onUserDeleted != nil {
+		if err := a.onUserDeleted(r.Context(), userID); err != nil {
+			a.log.Warn("analytics erasure on account deletion failed", "user_id", userID, "err", err)
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

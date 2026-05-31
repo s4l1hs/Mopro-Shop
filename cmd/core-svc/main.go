@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/mopro/platform/internal/analytics"
 	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/eventbus"
@@ -160,6 +161,7 @@ func main() {
 	helpSvc := help.NewService(help.NewRepository(pool), slog.Default())
 	supportSvc := support.NewService(support.NewRepository(pool))
 	ugcSvc := catalog.NewUGCService(catalog.NewUGCRepository(pool)) // ReviewWriteService + QAService
+	analyticsSvc := analytics.NewService(analytics.NewRepository(pool))
 
 	// Payment module wired before order so orderSvc can receive the PSP reference.
 	paymentRepo := payment.NewRepository(pool)
@@ -360,7 +362,14 @@ func main() {
 	// Identity / auth routes
 	requireAuth := middleware.RequireAuth(jwtSigner)
 	optionalAuth := middleware.OptionalAuth(jwtSigner)
-	auth := &authHandlers{svc: identitySvc, log: slog.Default()}
+	// onUserDeleted cascades account deletion to the analytics tables (blocker #3,
+	// §2.4). DELETE /me is a soft delete and emits no event yet, so erasure is
+	// orchestrated here synchronously rather than via a consumer.
+	auth := &authHandlers{
+		svc:           identitySvc,
+		log:           slog.Default(),
+		onUserDeleted: analyticsSvc.DeleteUserData,
+	}
 	auth.registerRoutes(mux, requireAuth)
 
 	// ── Dev-only endpoint — returns last verification code for an email ───────
@@ -624,6 +633,30 @@ func main() {
 	mux.Handle("GET /me/questions",
 		httpTrace(requireAuth(http.HandlerFunc(handleListUserQuestions(ugcSvc)))),
 	)
+
+	// ── Analytics pipeline (Tranche 4a) ─────────────────────────────────────────
+	// Ingest is OptionalAuth (guest sessions); the rest require auth.
+	mux.Handle("POST /analytics/events",
+		httpTrace(optionalAuth(http.HandlerFunc(handleIngestEvents(analyticsSvc)))),
+	)
+	mux.Handle("POST /analytics/sessions/identify",
+		httpTrace(requireAuth(http.HandlerFunc(handleIdentifySession(analyticsSvc)))),
+	)
+	mux.Handle("GET /me/consent",
+		httpTrace(requireAuth(http.HandlerFunc(handleGetConsent(analyticsSvc)))),
+	)
+	mux.Handle("PUT /me/consent",
+		httpTrace(requireAuth(http.HandlerFunc(handleSetConsent(analyticsSvc)))),
+	)
+	mux.Handle("DELETE /me/analytics-data",
+		httpTrace(requireAuth(http.HandlerFunc(handleDeleteAnalyticsData(analyticsSvc)))),
+	)
+	mux.Handle("GET /me/recently-viewed",
+		httpTrace(requireAuth(http.HandlerFunc(
+			handleRecentlyViewed(analyticsSvc, catalogSvc, defaultLocale, market, cashbackCurrency),
+		))),
+	)
+
 	mux.Handle("GET /seller/orders/{id}/breakdown",
 		httpTrace(http.HandlerFunc(handleSellerBreakdown(orderSvc))),
 	)

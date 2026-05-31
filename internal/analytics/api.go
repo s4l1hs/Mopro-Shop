@@ -1,0 +1,75 @@
+package analytics
+
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+// Service is the analytics pipeline's public surface. Ingest + consent + reads
+// are wired into core-svc; the retention/rebuild/erasure operations are driven
+// by jobs-svc.
+type Service interface {
+	// Ingest validates a batch, applies the consent gate (authed events dropped
+	// unless the user opted in; guest events stored for later merge), appends to
+	// the event log, and incrementally upserts the recently-viewed projection.
+	// Always succeeds for a well-formed batch — consent denial is silent.
+	Ingest(ctx context.Context, batch IngestBatch) error
+
+	// IdentifySession links a guest session to a user (idempotent) and backfills
+	// that user's recently-viewed projection from the session's past events
+	// (Decision 4 merge-on-auth).
+	IdentifySession(ctx context.Context, sessionID string, userID int64) error
+
+	GetConsent(ctx context.Context, userID int64) (Consent, error)
+	SetConsent(ctx context.Context, userID int64, enabled bool) (Consent, error)
+
+	// DeleteUserData erases the user's rows across all analytics tables (RTBF,
+	// Decision 5). Idempotent. Does not touch consent.
+	DeleteUserData(ctx context.Context, userID int64) error
+
+	// RecentlyViewed returns the user's projection rows (product enrichment is
+	// the caller's job — no cross-schema JOIN).
+	RecentlyViewed(ctx context.Context, userID int64, limit int) ([]RecentlyViewedItem, error)
+
+	// PruneEvents deletes events older than `before`, capping rows per call;
+	// returns total deleted. Driven by the jobs-svc retention cron.
+	PruneEvents(ctx context.Context, before time.Time, capPerRun int) (int64, error)
+
+	// RebuildRecentlyViewed recomputes the projection from events since `since`
+	// (drift backstop). Driven by the jobs-svc rebuild cron.
+	RebuildRecentlyViewed(ctx context.Context, since time.Time) error
+}
+
+// StoredEvent is a row ready for insertion (resolved user_id applied).
+type StoredEvent struct {
+	SessionID string
+	UserID    *int64
+	Type      string
+	Payload   map[string]any
+	ClientTs  time.Time
+}
+
+// Repository is the analytics_schema persistence boundary.
+type Repository interface {
+	InsertEvents(ctx context.Context, batchID uuid.UUID, events []StoredEvent) error
+	UpsertRecentlyViewed(ctx context.Context, userID, productID int64, viewedAt time.Time) error
+
+	// ResolveUserID returns the user bound to a session (Decision 4), if any.
+	ResolveUserID(ctx context.Context, sessionID string) (int64, bool, error)
+	// InsertSessionIdentity binds session→user; ON CONFLICT (session_id) DO NOTHING.
+	InsertSessionIdentity(ctx context.Context, sessionID string, userID int64) error
+	// BackfillRecentlyViewed replays a session's product_view events into the
+	// user's projection (used right after identify).
+	BackfillRecentlyViewed(ctx context.Context, sessionID string, userID int64) error
+
+	GetConsent(ctx context.Context, userID int64) (Consent, bool, error)
+	UpsertConsent(ctx context.Context, userID int64, enabled bool) (Consent, error)
+
+	DeleteUserData(ctx context.Context, userID int64) error
+	ListRecentlyViewed(ctx context.Context, userID int64, limit int) ([]RecentlyViewedItem, error)
+
+	PruneEvents(ctx context.Context, before time.Time, capPerRun int) (int64, error)
+	RebuildRecentlyViewed(ctx context.Context, since time.Time) error
+}

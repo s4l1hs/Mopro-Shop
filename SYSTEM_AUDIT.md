@@ -159,104 +159,110 @@ hand-registered route, whether the same method+path is declared in
 
 | Method | Path | Service | File:Line | In OpenAPI |
 |---|---|---|---|---|
-| POST | `/auth/register` | core-svc | `cmd/core-svc/auth_handlers.go:27` | no |
-| POST | `/auth/login` | core-svc | `cmd/core-svc/auth_handlers.go:30` | no |
-| POST | `/auth/verify-email` | core-svc | `cmd/core-svc/auth_handlers.go:34` | no |
-| POST | `/auth/resend-verification` | core-svc | `cmd/core-svc/auth_handlers.go:37` | no |
-| POST | `/auth/forgot-password` | core-svc | `cmd/core-svc/auth_handlers.go:40` | no |
-| POST | `/auth/reset-password` | core-svc | `cmd/core-svc/auth_handlers.go:43` | no |
-| POST | `/auth/mfa/verify` | core-svc | `cmd/core-svc/auth_handlers.go:46` | no |
-| POST | `/auth/otp/request` | core-svc | `cmd/core-svc/auth_handlers.go:50` | yes |
-| POST | `/auth/otp/verify` | core-svc | `cmd/core-svc/auth_handlers.go:53` | yes |
-| POST | `/auth/token/refresh` | core-svc | `cmd/core-svc/auth_handlers.go:56` | yes |
-| POST | `/auth/logout` | core-svc | `cmd/core-svc/auth_handlers.go:61` | yes |
-| POST | `/auth/mfa/enroll` | core-svc | `cmd/core-svc/auth_handlers.go:64` | no |
-| POST | `/auth/mfa/confirm` | core-svc | `cmd/core-svc/auth_handlers.go:67` | no |
-| DELETE | `/auth/mfa` | core-svc | `cmd/core-svc/auth_handlers.go:70` | no |
-| GET | `/me` | core-svc | `cmd/core-svc/auth_handlers.go:73` | yes |
-| PATCH | `/me` | core-svc | `cmd/core-svc/auth_handlers.go:76` | yes |
-| POST | `/me/password` | core-svc | `cmd/core-svc/auth_handlers.go:79` | yes |
-| DELETE | `/me` | core-svc | `cmd/core-svc/auth_handlers.go:82` | yes |
-| POST | `/auth/step-up/request` | core-svc | `cmd/core-svc/auth_handlers.go:85` | no |
-| POST | `/auth/step-up/verify` | core-svc | `cmd/core-svc/auth_handlers.go:88` | no |
-| POST | `/me/devices` | core-svc | `cmd/core-svc/auth_handlers.go:91` | yes |
-| GET | `/healthz` | core-svc | `cmd/core-svc/main.go:355` | yes |
-| GET | `/__version` | core-svc | `cmd/core-svc/main.go:358` | no |
-| GET | `/dev/email-code` | core-svc | `cmd/core-svc/main.go:369` | no |
-| POST | `/products` | core-svc | `cmd/core-svc/main.go:385` | yes |
-| GET | `/products` | core-svc | `cmd/core-svc/main.go:388` | yes |
-| GET | `/products/{id}` | core-svc | `cmd/core-svc/main.go:391` | yes |
-| POST | `/products/{id}/variants` | core-svc | `cmd/core-svc/main.go:394` | no |
-| PUT | `/products/{id}/translations/{locale}` | core-svc | `cmd/core-svc/main.go:397` | no |
-| GET | `/categories` | core-svc | `cmd/core-svc/main.go:400` | yes |
-| GET | `/categories/{id}/commission` | core-svc | `cmd/core-svc/main.go:403` | yes |
-| GET | `/search` | core-svc | `cmd/core-svc/main.go:406` | yes |
-| GET | `/banners` | core-svc | `cmd/core-svc/main.go:409` | yes |
-| GET | `/recommendations` | core-svc | `cmd/core-svc/main.go:412` | yes |
-| GET | `/home/banners` | core-svc | `cmd/core-svc/main.go:417` | no |
-| GET | `/home/rails` | core-svc | `cmd/core-svc/main.go:420` | no |
-| GET | `/home/stories` | core-svc | `cmd/core-svc/main.go:423` | no |
-| GET | `/home/flash-deals` | core-svc | `cmd/core-svc/main.go:426` | no |
-| POST | `/products/batch` | core-svc | `cmd/core-svc/main.go:429` | no |
-| GET | `/products/{id}/reviews` | core-svc | `cmd/core-svc/main.go:433` | no |
-| POST | `/products/{id}/reviews/{reviewId}/helpful` | core-svc | `cmd/core-svc/main.go:437` | no |
-| GET | `/search/trending` | core-svc | `cmd/core-svc/main.go:440` | yes |
-| POST | `/favorites/sync` | core-svc | `cmd/core-svc/main.go:443` | no |
-| POST | `/cart/merge` | core-svc | `cmd/core-svc/main.go:447` | no |
-| GET | `/addresses` | core-svc | `cmd/core-svc/main.go:473` | yes |
-| POST | `/addresses` | core-svc | `cmd/core-svc/main.go:476` | yes |
-| GET | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:479` | no |
-| PUT | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:482` | yes |
-| DELETE | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:485` | yes |
-| POST | `/cart/items` | core-svc | `cmd/core-svc/main.go:490` | yes |
-| DELETE | `/cart/items/{variant_id}` | core-svc | `cmd/core-svc/main.go:493` | yes |
-| GET | `/cart` | core-svc | `cmd/core-svc/main.go:496` | yes |
-| POST | `/cart/reserve` | core-svc | `cmd/core-svc/main.go:499` | yes |
-| POST | `/cart/release` | core-svc | `cmd/core-svc/main.go:502` | yes |
-| POST | `/checkout/initiate` | core-svc | `cmd/core-svc/main.go:507` | no |
-| POST | `/orders` | core-svc | `cmd/core-svc/main.go:517` | yes |
-| GET | `/orders/{id}` | core-svc | `cmd/core-svc/main.go:520` | yes |
-| GET | `/orders` | core-svc | `cmd/core-svc/main.go:523` | yes |
-| POST | `/orders/{id}/status` | core-svc | `cmd/core-svc/main.go:526` | no |
-| POST | `/orders/{id}/deliver` | core-svc | `cmd/core-svc/main.go:529` | no |
-| POST | `/orders/{id}/cancel` | core-svc | `cmd/core-svc/main.go:532` | yes |
-| POST | `/orders/{id}/refund` | core-svc | `cmd/core-svc/main.go:535` | yes |
-| POST | `/orders/{id}/returns` | core-svc | `cmd/core-svc/main.go:538` | yes |
-| GET | `/returns` | core-svc | `cmd/core-svc/main.go:541` | no |
-| GET | `/returns/{id}` | core-svc | `cmd/core-svc/main.go:544` | no |
-| GET | `/notifications` | core-svc | `cmd/core-svc/main.go:548` | no |
-| GET | `/notifications/unread-count` | core-svc | `cmd/core-svc/main.go:551` | no |
-| POST | `/notifications/{id}/read` | core-svc | `cmd/core-svc/main.go:554` | no |
-| POST | `/notifications/read-all` | core-svc | `cmd/core-svc/main.go:557` | no |
-| GET | `/notifications/preferences` | core-svc | `cmd/core-svc/main.go:560` | no |
-| PUT | `/notifications/preferences` | core-svc | `cmd/core-svc/main.go:563` | no |
-| POST | `/push-tokens` | core-svc | `cmd/core-svc/main.go:566` | no |
-| DELETE | `/push-tokens` | core-svc | `cmd/core-svc/main.go:569` | no |
-| GET | `/help/categories` | core-svc | `cmd/core-svc/main.go:573` | no |
-| GET | `/help/categories/{slug}/articles` | core-svc | `cmd/core-svc/main.go:576` | no |
-| GET | `/help/articles/{slug}` | core-svc | `cmd/core-svc/main.go:579` | no |
-| GET | `/help/search` | core-svc | `cmd/core-svc/main.go:582` | no |
-| POST | `/support/tickets` | core-svc | `cmd/core-svc/main.go:586` | no |
-| GET | `/support/tickets` | core-svc | `cmd/core-svc/main.go:589` | no |
-| GET | `/support/tickets/{id}` | core-svc | `cmd/core-svc/main.go:592` | no |
-| POST | `/products/{productId}/reviews` | core-svc | `cmd/core-svc/main.go:596` | no |
-| PUT | `/products/{productId}/reviews/{reviewId}` | core-svc | `cmd/core-svc/main.go:599` | no |
-| DELETE | `/products/{productId}/reviews/{reviewId}` | core-svc | `cmd/core-svc/main.go:602` | no |
-| GET | `/me/reviews` | core-svc | `cmd/core-svc/main.go:605` | no |
-| GET | `/products/{id}/review-eligibility` | core-svc | `cmd/core-svc/main.go:608` | no |
-| POST | `/products/{productId}/questions` | core-svc | `cmd/core-svc/main.go:612` | no |
-| GET | `/products/{productId}/questions` | core-svc | `cmd/core-svc/main.go:615` | no |
-| GET | `/products/{productId}/questions/{questionId}` | core-svc | `cmd/core-svc/main.go:618` | no |
-| POST | `/products/{productId}/questions/{questionId}/answers` | core-svc | `cmd/core-svc/main.go:621` | no |
-| GET | `/me/questions` | core-svc | `cmd/core-svc/main.go:624` | no |
-| GET | `/seller/orders/{id}/breakdown` | core-svc | `cmd/core-svc/main.go:627` | yes |
-| POST | `/payments` | core-svc | `cmd/core-svc/main.go:632` | no |
-| GET | `/payments/{provider_ref}/status` | core-svc | `cmd/core-svc/main.go:635` | no |
-| GET | `/payments/{invoiceID}/intent-status` | core-svc | `cmd/core-svc/main.go:639` | no |
-| POST | `/payments/webhook/sipay` | core-svc | `cmd/core-svc/main.go:644` | no |
-| POST | `/shipping/webhook/surat` | core-svc | `cmd/core-svc/main.go:649` | no |
-| POST | `/shipping/webhook/mng` | core-svc | `cmd/core-svc/main.go:652` | no |
-| POST | `/shipping/webhook/hepsijet` | core-svc | `cmd/core-svc/main.go:655` | no |
+| POST | `/auth/register` | core-svc | `cmd/core-svc/auth_handlers.go:33` | no |
+| POST | `/auth/login` | core-svc | `cmd/core-svc/auth_handlers.go:36` | no |
+| POST | `/auth/verify-email` | core-svc | `cmd/core-svc/auth_handlers.go:40` | no |
+| POST | `/auth/resend-verification` | core-svc | `cmd/core-svc/auth_handlers.go:43` | no |
+| POST | `/auth/forgot-password` | core-svc | `cmd/core-svc/auth_handlers.go:46` | no |
+| POST | `/auth/reset-password` | core-svc | `cmd/core-svc/auth_handlers.go:49` | no |
+| POST | `/auth/mfa/verify` | core-svc | `cmd/core-svc/auth_handlers.go:52` | no |
+| POST | `/auth/otp/request` | core-svc | `cmd/core-svc/auth_handlers.go:56` | yes |
+| POST | `/auth/otp/verify` | core-svc | `cmd/core-svc/auth_handlers.go:59` | yes |
+| POST | `/auth/token/refresh` | core-svc | `cmd/core-svc/auth_handlers.go:62` | yes |
+| POST | `/auth/logout` | core-svc | `cmd/core-svc/auth_handlers.go:67` | yes |
+| POST | `/auth/mfa/enroll` | core-svc | `cmd/core-svc/auth_handlers.go:70` | no |
+| POST | `/auth/mfa/confirm` | core-svc | `cmd/core-svc/auth_handlers.go:73` | no |
+| DELETE | `/auth/mfa` | core-svc | `cmd/core-svc/auth_handlers.go:76` | no |
+| GET | `/me` | core-svc | `cmd/core-svc/auth_handlers.go:79` | yes |
+| PATCH | `/me` | core-svc | `cmd/core-svc/auth_handlers.go:82` | yes |
+| POST | `/me/password` | core-svc | `cmd/core-svc/auth_handlers.go:85` | yes |
+| DELETE | `/me` | core-svc | `cmd/core-svc/auth_handlers.go:88` | yes |
+| POST | `/auth/step-up/request` | core-svc | `cmd/core-svc/auth_handlers.go:91` | no |
+| POST | `/auth/step-up/verify` | core-svc | `cmd/core-svc/auth_handlers.go:94` | no |
+| POST | `/me/devices` | core-svc | `cmd/core-svc/auth_handlers.go:97` | yes |
+| GET | `/healthz` | core-svc | `cmd/core-svc/main.go:357` | yes |
+| GET | `/__version` | core-svc | `cmd/core-svc/main.go:360` | no |
+| GET | `/dev/email-code` | core-svc | `cmd/core-svc/main.go:378` | no |
+| POST | `/products` | core-svc | `cmd/core-svc/main.go:394` | yes |
+| GET | `/products` | core-svc | `cmd/core-svc/main.go:397` | yes |
+| GET | `/products/{id}` | core-svc | `cmd/core-svc/main.go:400` | yes |
+| POST | `/products/{id}/variants` | core-svc | `cmd/core-svc/main.go:403` | no |
+| PUT | `/products/{id}/translations/{locale}` | core-svc | `cmd/core-svc/main.go:406` | no |
+| GET | `/categories` | core-svc | `cmd/core-svc/main.go:409` | yes |
+| GET | `/categories/{id}/commission` | core-svc | `cmd/core-svc/main.go:412` | yes |
+| GET | `/search` | core-svc | `cmd/core-svc/main.go:415` | yes |
+| GET | `/banners` | core-svc | `cmd/core-svc/main.go:418` | yes |
+| GET | `/recommendations` | core-svc | `cmd/core-svc/main.go:421` | yes |
+| GET | `/home/banners` | core-svc | `cmd/core-svc/main.go:426` | no |
+| GET | `/home/rails` | core-svc | `cmd/core-svc/main.go:429` | no |
+| GET | `/home/stories` | core-svc | `cmd/core-svc/main.go:432` | no |
+| GET | `/home/flash-deals` | core-svc | `cmd/core-svc/main.go:435` | no |
+| POST | `/products/batch` | core-svc | `cmd/core-svc/main.go:438` | no |
+| GET | `/products/{id}/reviews` | core-svc | `cmd/core-svc/main.go:442` | no |
+| POST | `/products/{id}/reviews/{reviewId}/helpful` | core-svc | `cmd/core-svc/main.go:446` | no |
+| GET | `/search/trending` | core-svc | `cmd/core-svc/main.go:449` | yes |
+| POST | `/favorites/sync` | core-svc | `cmd/core-svc/main.go:452` | no |
+| POST | `/cart/merge` | core-svc | `cmd/core-svc/main.go:456` | no |
+| GET | `/addresses` | core-svc | `cmd/core-svc/main.go:482` | yes |
+| POST | `/addresses` | core-svc | `cmd/core-svc/main.go:485` | yes |
+| GET | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:488` | no |
+| PUT | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:491` | yes |
+| DELETE | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:494` | yes |
+| POST | `/cart/items` | core-svc | `cmd/core-svc/main.go:499` | yes |
+| DELETE | `/cart/items/{variant_id}` | core-svc | `cmd/core-svc/main.go:502` | yes |
+| GET | `/cart` | core-svc | `cmd/core-svc/main.go:505` | yes |
+| POST | `/cart/reserve` | core-svc | `cmd/core-svc/main.go:508` | yes |
+| POST | `/cart/release` | core-svc | `cmd/core-svc/main.go:511` | yes |
+| POST | `/checkout/initiate` | core-svc | `cmd/core-svc/main.go:516` | no |
+| POST | `/orders` | core-svc | `cmd/core-svc/main.go:526` | yes |
+| GET | `/orders/{id}` | core-svc | `cmd/core-svc/main.go:529` | yes |
+| GET | `/orders` | core-svc | `cmd/core-svc/main.go:532` | yes |
+| POST | `/orders/{id}/status` | core-svc | `cmd/core-svc/main.go:535` | no |
+| POST | `/orders/{id}/deliver` | core-svc | `cmd/core-svc/main.go:538` | no |
+| POST | `/orders/{id}/cancel` | core-svc | `cmd/core-svc/main.go:541` | yes |
+| POST | `/orders/{id}/refund` | core-svc | `cmd/core-svc/main.go:544` | yes |
+| POST | `/orders/{id}/returns` | core-svc | `cmd/core-svc/main.go:547` | yes |
+| GET | `/returns` | core-svc | `cmd/core-svc/main.go:550` | no |
+| GET | `/returns/{id}` | core-svc | `cmd/core-svc/main.go:553` | no |
+| GET | `/notifications` | core-svc | `cmd/core-svc/main.go:557` | no |
+| GET | `/notifications/unread-count` | core-svc | `cmd/core-svc/main.go:560` | no |
+| POST | `/notifications/{id}/read` | core-svc | `cmd/core-svc/main.go:563` | no |
+| POST | `/notifications/read-all` | core-svc | `cmd/core-svc/main.go:566` | no |
+| GET | `/notifications/preferences` | core-svc | `cmd/core-svc/main.go:569` | no |
+| PUT | `/notifications/preferences` | core-svc | `cmd/core-svc/main.go:572` | no |
+| POST | `/push-tokens` | core-svc | `cmd/core-svc/main.go:575` | no |
+| DELETE | `/push-tokens` | core-svc | `cmd/core-svc/main.go:578` | no |
+| GET | `/help/categories` | core-svc | `cmd/core-svc/main.go:582` | no |
+| GET | `/help/categories/{slug}/articles` | core-svc | `cmd/core-svc/main.go:585` | no |
+| GET | `/help/articles/{slug}` | core-svc | `cmd/core-svc/main.go:588` | no |
+| GET | `/help/search` | core-svc | `cmd/core-svc/main.go:591` | no |
+| POST | `/support/tickets` | core-svc | `cmd/core-svc/main.go:595` | no |
+| GET | `/support/tickets` | core-svc | `cmd/core-svc/main.go:598` | no |
+| GET | `/support/tickets/{id}` | core-svc | `cmd/core-svc/main.go:601` | no |
+| POST | `/products/{productId}/reviews` | core-svc | `cmd/core-svc/main.go:605` | no |
+| PUT | `/products/{productId}/reviews/{reviewId}` | core-svc | `cmd/core-svc/main.go:608` | no |
+| DELETE | `/products/{productId}/reviews/{reviewId}` | core-svc | `cmd/core-svc/main.go:611` | no |
+| GET | `/me/reviews` | core-svc | `cmd/core-svc/main.go:614` | no |
+| GET | `/products/{id}/review-eligibility` | core-svc | `cmd/core-svc/main.go:617` | no |
+| POST | `/products/{productId}/questions` | core-svc | `cmd/core-svc/main.go:621` | no |
+| GET | `/products/{productId}/questions` | core-svc | `cmd/core-svc/main.go:624` | no |
+| GET | `/products/{productId}/questions/{questionId}` | core-svc | `cmd/core-svc/main.go:627` | no |
+| POST | `/products/{productId}/questions/{questionId}/answers` | core-svc | `cmd/core-svc/main.go:630` | no |
+| GET | `/me/questions` | core-svc | `cmd/core-svc/main.go:633` | no |
+| POST | `/analytics/events` | core-svc | `cmd/core-svc/main.go:639` | no |
+| POST | `/analytics/sessions/identify` | core-svc | `cmd/core-svc/main.go:642` | no |
+| GET | `/me/consent` | core-svc | `cmd/core-svc/main.go:645` | no |
+| PUT | `/me/consent` | core-svc | `cmd/core-svc/main.go:648` | no |
+| DELETE | `/me/analytics-data` | core-svc | `cmd/core-svc/main.go:651` | no |
+| GET | `/me/recently-viewed` | core-svc | `cmd/core-svc/main.go:654` | no |
+| GET | `/seller/orders/{id}/breakdown` | core-svc | `cmd/core-svc/main.go:660` | yes |
+| POST | `/payments` | core-svc | `cmd/core-svc/main.go:665` | no |
+| GET | `/payments/{provider_ref}/status` | core-svc | `cmd/core-svc/main.go:668` | no |
+| GET | `/payments/{invoiceID}/intent-status` | core-svc | `cmd/core-svc/main.go:672` | no |
+| POST | `/payments/webhook/sipay` | core-svc | `cmd/core-svc/main.go:677` | no |
+| POST | `/shipping/webhook/surat` | core-svc | `cmd/core-svc/main.go:682` | no |
+| POST | `/shipping/webhook/mng` | core-svc | `cmd/core-svc/main.go:685` | no |
+| POST | `/shipping/webhook/hepsijet` | core-svc | `cmd/core-svc/main.go:688` | no |
 
 ### B. OpenAPI operation catalogue (`api/openapi.yaml`)
 
@@ -308,7 +314,7 @@ hand-registered route, whether the same method+path is declared in
 | `POST /products` | CreateProduct |
 | `PUT /addresses/{id}` | UpdateAddress |
 
-_Totals: 98 code-registered routes; 45 OpenAPI operations._
+_Totals: 104 code-registered routes; 45 OpenAPI operations._
 <!-- END:gen:endpoints -->
 
 ### 2.4 OpenAPI and code generation
@@ -605,6 +611,7 @@ and their owning migration come from `migrations/{ecom,ledger}`. Generated by
 
 | Schema | Cluster bootstrap file |
 |---|---|
+| `analytics_schema` | `deploy/postgres-ecom/init/20-schemas.sql` |
 | `antifraud_schema` | `deploy/postgres-ecom/init/20-schemas.sql` |
 | `cart_schema` | `deploy/postgres-ecom/init/20-schemas.sql` |
 | `cashback_schema` | `deploy/postgres-ledger/init/20-schemas.sql` |
@@ -631,6 +638,10 @@ and their owning migration come from `migrations/{ecom,ledger}`. Generated by
 
 | Schema.Table | Defined in |
 |---|---|
+| `analytics_schema.analytics_events` | `0075_analytics_pipeline.up.sql` |
+| `analytics_schema.session_identity` | `0075_analytics_pipeline.up.sql` |
+| `analytics_schema.user_consent` | `0075_analytics_pipeline.up.sql` |
+| `analytics_schema.user_recently_viewed` | `0075_analytics_pipeline.up.sql` |
 | `cashback_schema.payments` | `50-cashback-schema.sql` |
 | `cashback_schema.plans_history` | `50-cashback-schema.sql` |
 | `cashback_schema.plans` | `50-cashback-schema.sql` |
@@ -693,7 +704,7 @@ and their owning migration come from `migrations/{ecom,ledger}`. Generated by
 | `wallet_schema.system_state` | `67-system-state.sql` |
 | `wallet_schema.transactions` | `40-wallet-schema.sql` |
 
-_Totals: 21 schemas, 61 tables; 27 up / 27 down migrations._
+_Totals: 22 schemas, 65 tables; 28 up / 28 down migrations._
 <!-- END:gen:schema -->
 
 **Migrations:** golang-migrate-style numbered `XXXX_name.{up,down}.sql` under
@@ -1213,13 +1224,16 @@ article-feedback analytics, ticket→notification bridge, rate limiting.
 |---|---|---|---|
 | Profile preferences | Partial | account profile | Partial |
 | Search history | Partial | `RecentSearchesNotifier` (local only) | Partial |
-| Browsing history | Missing | — | Missing |
-| Event tracking pipeline | Missing | — | Missing |
+| Browsing history | Partial | `user_recently_viewed` projection + `GET /me/recently-viewed` (Tranche 4a); home rail/UI is 4b | Partial |
+| Event tracking pipeline | Complete | append-only `analytics_events` + ingest/identify + projections + prune/rebuild crons (Tranche 4a) | Complete |
+| Consent / privacy controls | Partial | binary opt-in `user_consent` + GET/PUT consent + RTBF `DELETE /me/analytics-data` + account-deletion cascade (Tranche 4a); consent UX is 4b | Partial |
 | A/B testing | Missing | — | Missing |
-| Recommendation data flow | Missing | (endpoint stub, no data) | Missing |
+| Recommendation data flow | Partial | pipeline + projections feed it; `GET /recommendations` still 501 until 4b | Partial |
 
-*Highest-leverage gap:* **event tracking pipeline** — unblocks recommendations,
-recently-viewed, and abandoned-cart; foundational, so it gets its own tranche.
+*Highest-leverage gap:* **recently-viewed consumer + consent UX (4b)** — the
+Tranche 4a pipeline is shipped and dormant; 4b adds the client instrumentation,
+the consent banner/settings, and the "Son baktıkların" rail that turn browsing
+history + consent Complete.
 
 ### 13. Trust & safety
 | Capability | State | Evidence | Gap |
@@ -1257,26 +1271,28 @@ wins now that path-based URLs and titles exist.
 
 ### 10.3 Roll-up (parity score)
 
-Counting the **90** capability rows across the 15 categories:
+Counting the **91** capability rows across the 15 categories:
 
 | Classification | Count |
 |---|---|
-| Complete | 43 |
-| Partial | 15 |
+| Complete | 44 |
+| Partial | 18 |
 | Stubbed | 3 |
-| Missing | 27 |
+| Missing | 24 |
 | Out of scope | 2 |
 
 _Tranche 1 moved Cancellation, Refunds, Returns/RMA to Complete (original audit
 31/15/7/33/2). Tranche 2a moved In-app notification center + Notification
 settings UI to Complete, Marketing preferences to Partial. Tranche 2b moved
 Ticket backend + FAQ/help center + Contact form to Complete (+3 Complete).
-Tranche 3 added the review write-side and Q&A: +4 Complete (reviews-write, Q&A
-in both PDP §3 and UGC §7), Seller responses Missing→Partial, and split
-"review submission + photos" into submission (Complete) + photos (Missing) — net
-+2 rows (86→88 in-scope)._
+Tranche 3 added the review write-side and Q&A: +4 Complete, Seller responses
+Missing→Partial, split "review submission + photos" — net +2 rows (86→88
+in-scope). Tranche 4a (analytics pipeline, backend-only): Event tracking pipeline
+Missing→Complete (+1), Browsing history + Recommendation data flow Missing→Partial,
+new Consent/privacy-controls row (Partial) — net +1 row (88→89 in-scope)._
 
-**Parity score (Complete ÷ in-scope 88) ≈ 49%.** Orientation only, not a
+**Parity score (Complete ÷ in-scope 89) ≈ 49%.** (The 4b consumer + consent UX
+lift Browsing history + Consent to Complete, toward ~52%.) Orientation only, not a
 scoreboard: the *core differentiator* (perpetual-cashback coin wallet) and the
 hard financial/identity plumbing are Complete; most gaps are conventional
 commerce surface features that reuse existing patterns.
