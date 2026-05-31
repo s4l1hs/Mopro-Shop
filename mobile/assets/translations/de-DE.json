@@ -50,7 +50,12 @@
     }
   },
   "home": {
-    "flash_deals_ended": "Angebot beendet"
+    "flash_deals_ended": "Angebot beendet",
+    "rails": {
+      "recently_viewed": {
+        "title": "Recently viewed"
+      }
+    }
   },
   "footer": {
     "about": "Über uns",

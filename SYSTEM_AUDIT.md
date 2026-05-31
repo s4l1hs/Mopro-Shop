@@ -472,7 +472,7 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `_logoutFnProvider` | `Provider` | `mobile/lib/core/di/providers.dart:81` |
 | `addressApiProvider` | `Provider` | `mobile/lib/api/client.dart:48` |
 | `addressFormProvider` | `NotifierProviderFamily` | `mobile/lib/features/address/providers/address_form_controller.dart:84` |
-| `analyticsServiceProvider` | `Provider` | `mobile/lib/features/analytics/analytics_service.dart:133` |
+| `analyticsServiceProvider` | `Provider` | `mobile/lib/features/analytics/analytics_service.dart:164` |
 | `apiBaseUrlProvider` | `Provider` | `mobile/lib/core/di/providers.dart:13` |
 | `apiClientProvider` | `Provider` | `mobile/lib/api/client.dart:7` |
 | `authApiExtProvider` | `Provider` | `mobile/lib/core/di/providers.dart:73` |
@@ -543,6 +543,7 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `PreferencesNotifier` | `Notifier<PreferencesState>` | `mobile/lib/features/notifications/application/notification_preferences_provider.dart:55` |
 | `QuestionsNotifier` | `FamilyNotifier<QuestionsState, int>` | `mobile/lib/features/catalog/pdp/qa/qa_provider.dart:230` |
 | `RecentSearchesNotifier` | `StateNotifier<List<String>>` | `mobile/lib/features/catalog/providers/recent_searches_provider.dart:10` |
+| `RecentlyViewedNotifier` | `Notifier<AsyncValue<List<ProductSummary>>>` | `mobile/lib/features/home/recently_viewed_provider.dart:17` |
 | `ReturnFlowNotifier` | `FamilyNotifier<ReturnFlowState, int>` | `mobile/lib/features/order/application/return_flow_provider.dart:75` |
 | `ReturnsNotifier` | `Notifier<AsyncValue<List<ReturnListItemDto>>>` | `mobile/lib/features/order/application/returns_provider.dart:14` |
 | `ReviewsNotifier` | `FamilyNotifier<ReviewsState, int>` | `mobile/lib/features/catalog/pdp/reviews/reviews_provider.dart:141` |
@@ -555,7 +556,7 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `WalletNotifier` | `Notifier<WalletState>` | `mobile/lib/features/wallet/providers/wallet_provider.dart:56` |
 | `_AuthStateListenable` | `ChangeNotifier` | `mobile/lib/core/router/app_router.dart:610` |
 
-_Totals: 50 provider declarations; 30 Notifier subclasses._
+_Totals: 50 provider declarations; 31 Notifier subclasses._
 <!-- END:gen:providers -->
 
 ### 3.5 Routing-time concerns
@@ -574,14 +575,14 @@ tests, which don't load assets). Completeness audit by
 `tool/audit/check_i18n.sh`:
 
 <!-- BEGIN:gen:i18n -->
-### Translation completeness (master: `tr-TR.json`, 662 keys)
+### Translation completeness (master: `tr-TR.json`, 663 keys)
 
 | Locale | Keys | Missing vs master | Extra vs master | Completeness |
 |---|---|---|---|---|
-| `ar-AE.json` | 277 | 385 | 0 | 41% |
-| `de-DE.json` | 277 | 385 | 0 | 41% |
-| `en-US.json` | 588 | 74 | 0 | 88% |
-| `tr-TR.json` | 662 | — | — | master |
+| `ar-AE.json` | 278 | 385 | 0 | 41% |
+| `de-DE.json` | 278 | 385 | 0 | 41% |
+| `en-US.json` | 589 | 74 | 0 | 88% |
+| `tr-TR.json` | 663 | — | — | master |
 <!-- END:gen:i18n -->
 
 ### 3.7 Theme system
@@ -1227,16 +1228,17 @@ article-feedback analytics, ticket→notification bridge, rate limiting.
 |---|---|---|---|
 | Profile preferences | Partial | account profile | Partial |
 | Search history | Partial | `RecentSearchesNotifier` (local only) | Partial |
-| Browsing history | Partial | `user_recently_viewed` projection + `GET /me/recently-viewed` (4a); home rail/UI is 4c | Partial |
+| Browsing history | Complete | `user_recently_viewed` projection + `GET /me/recently-viewed` (4a) + `recentlyViewedProvider` + "Son baktıkların" `ProductListRail` home rail + merge-on-auth + RTBF invalidation (4c) | Complete |
 | Event tracking pipeline | Complete | append-only `analytics_events` + ingest/identify + projections + prune/rebuild crons (4a) + client `AnalyticsService` (page_view auto + manual track, consent-gated, batched) (4b) | Complete |
 | Consent / privacy controls | Complete | binary opt-in `user_consent` + GET/PUT/RTBF (4a) + consent banner + `/account/privacy` settings + erase flow, behind `kAnalyticsConsentEnabled` pending legal copy review (4b) | Complete |
 | A/B testing | Missing | — | Missing |
 | Recommendation data flow | Partial | pipeline + projections feed it; `GET /recommendations` still 501 until a recommendation surface lands | Partial |
 
-*Highest-leverage gap:* **recently-viewed consumer (4c)** — the pipeline +
-consent + instrumentation are live; 4c adds the `recentlyViewedProvider` + the
-"Son baktıkların" home rail (build-from-scratch — `ProductRail` is sort-driven)
-that turns browsing history Complete, plus the merge/RTBF closing flows.
+*Highest-leverage gap:* **recommendation surfaces** — the analytics loop is now
+complete end-to-end (events → projection → recently-viewed rail; merge-on-auth;
+RTBF). The pipeline + `user_category_affinity` projection are ready to back
+`GET /recommendations` (still 501) whenever a "Senin için" surface is built; that
+plus recent-search autocomplete are deliberate roadmap items, not gaps.
 
 ### 13. Trust & safety
 | Capability | State | Evidence | Gap |
@@ -1278,8 +1280,8 @@ Counting the **91** capability rows across the 15 categories:
 
 | Classification | Count |
 |---|---|
-| Complete | 45 |
-| Partial | 17 |
+| Complete | 46 |
+| Partial | 16 |
 | Stubbed | 3 |
 | Missing | 24 |
 | Out of scope | 2 |
@@ -1293,10 +1295,11 @@ Missing→Partial, split "review submission + photos" — net +2 rows (86→88
 in-scope). Tranche 4a (analytics pipeline, backend-only): Event tracking pipeline
 Missing→Complete (+1), Browsing history + Recommendation data flow Missing→Partial,
 new Consent/privacy-controls row (Partial) — net +1 row (88→89 in-scope). Tranche
-4b (consent UX + instrumentation): Consent/privacy-controls Partial→Complete (+1)._
+4b (consent UX + instrumentation): Consent/privacy-controls Partial→Complete (+1).
+Tranche 4c (recently-viewed rail + closing flows): Browsing history
+Partial→Complete (+1) — the analytics loop is now end-to-end._
 
-**Parity score (Complete ÷ in-scope 89) ≈ 51%.** (The 4c recently-viewed consumer
-lifts Browsing history to Complete, toward ~52%.) Orientation only, not a
+**Parity score (Complete ÷ in-scope 89) ≈ 52%.** Orientation only, not a
 scoreboard: the *core differentiator* (perpetual-cashback coin wallet) and the
 hard financial/identity plumbing are Complete; most gaps are conventional
 commerce surface features that reuse existing patterns.

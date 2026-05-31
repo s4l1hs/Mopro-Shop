@@ -50,7 +50,12 @@
     }
   },
   "home": {
-    "flash_deals_ended": "انتهى العرض"
+    "flash_deals_ended": "انتهى العرض",
+    "rails": {
+      "recently_viewed": {
+        "title": "Recently viewed"
+      }
+    }
   },
   "footer": {
     "about": "معلومات عنا",

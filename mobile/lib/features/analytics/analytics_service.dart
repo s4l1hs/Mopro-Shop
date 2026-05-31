@@ -32,11 +32,13 @@ class AnalyticsService with WidgetsBindingObserver {
     required this.sessionId,
     required bool Function() gate,
     required Future<void> Function(String sessionId, List<AnalyticsEvent> batch) sink,
+    Future<void> Function(String sessionId)? identifySink,
     this.batchSize = 20,
     this.flushInterval = const Duration(seconds: 5),
     this.maxQueue = 200,
   })  : _gate = gate,
-        _sink = sink {
+        _sink = sink,
+        _identifySink = identifySink {
     // Guarded: a plain (non-widget) test has no initialized binding. Lifecycle
     // flush is a best-effort nicety, never a hard dependency.
     try {
@@ -50,6 +52,7 @@ class AnalyticsService with WidgetsBindingObserver {
   final String sessionId;
   final bool Function() _gate;
   final Future<void> Function(String, List<AnalyticsEvent>) _sink;
+  final Future<void> Function(String)? _identifySink;
   final int batchSize;
   final Duration flushInterval;
   final int maxQueue;
@@ -109,6 +112,15 @@ class AnalyticsService with WidgetsBindingObserver {
         _arm(); // retry on the next interval
       }
     }
+  }
+
+  /// Links the persisted guest session to the now-authed user (merge-on-auth,
+  /// Decision 4) so the backend backfills the user's recently-viewed projection
+  /// from pre-login `product_view` events. Best-effort: never throws into login.
+  Future<void> identify() async {
+    final sink = _identifySink;
+    if (sink == null) return;
+    await sink(sessionId);
   }
 
   @override
@@ -178,7 +190,19 @@ final analyticsServiceProvider = Provider<AnalyticsService>((ref) {
     );
   }
 
-  final svc = AnalyticsService(sessionId: sessionId, gate: gate, sink: sink);
+  Future<void> identifySink(String sid) async {
+    await dio.post<void>(
+      '/analytics/sessions/identify',
+      data: <String, dynamic>{'sessionId': sid},
+    );
+  }
+
+  final svc = AnalyticsService(
+    sessionId: sessionId,
+    gate: gate,
+    sink: sink,
+    identifySink: identifySink,
+  );
   ref.onDispose(svc.dispose);
   return svc;
 });
