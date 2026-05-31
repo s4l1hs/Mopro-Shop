@@ -2171,3 +2171,26 @@ functionally done.
   `surfaceDark`/`onSurfaceVariant`, `verify-contrast` re-checks.
 - **Audit scope** is 8 configs, not all 18 — adding an unlabeled tappable on an
   un-audited screen would not be caught until the harness is extended.
+
+## Tranche 1 PR — Orders Loop
+
+### Baseline (branched off `chore/system-audit`; production tree identical to `main`@`11c3fe99`)
+
+| Metric | Baseline |
+|---|---|
+| `flutter analyze` | No issues found (0/0/0) |
+| `flutter test` | +465 / −73 (73 = Linux-baselined goldens, fail on macOS by design) |
+| `flutter test integration_test` | `integration_test/` = 1 driver (`wallet_flow_test.dart`); A–U flows run under `test/integration/` in the main pass |
+| `flutter build web --release` | succeeds; `main.dart.js` = 4,567,720 B |
+| `go test ./...` | 20 ok packages, 0 fail |
+| Audit parity (PR #21) | ≈ 36% (31 Complete / 15 Partial / 7 Stubbed / 33 Missing / 2 Out-of-scope) |
+
+Stacked on PR #21 (`chore/system-audit`) because Tranche 1 consumes
+`tool/audit/` and updates `SYSTEM_AUDIT.md §10` — retarget to `main` once #21 merges.
+
+### §2 audit confirmation
+See `tool/audit/tranche1_baseline.md`. Summary: cancel + refund endpoints
+**exist**; returns is **spec-only** (OpenAPI `CreateReturn`/`ListReturns` defined,
+unwired — no table/service/handler); order DTO lacks `actions`; no
+`OrderStatusTimeline` widget exists (only a status chip). Scope adaptations
+documented there (return model follows the OpenAPI contract).
