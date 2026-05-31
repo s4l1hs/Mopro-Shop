@@ -24,7 +24,12 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
         smoke loadtest grafana-deploy
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order verify-image-manifest
+verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order verify-image-manifest verify-contrast
+
+# WCAG contrast check for the documented brand colour pairs. Fails if any
+# non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.
+verify-contrast:
+	cd mobile && flutter test test/design/contrast_test.dart
 
 # Re-baseline Flutter goldens on the CURRENT platform and stamp each with a
 # `.png.meta` platform sidecar (written by the guard in
