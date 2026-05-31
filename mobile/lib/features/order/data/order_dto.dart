@@ -11,6 +11,12 @@ class OrderStatus {
   static const refunded = 'refunded';
   static const partiallyRefunded = 'partially_refunded';
 
+  // Post-purchase return/refund states (surfaced on the timeline + return detail).
+  static const returnRequested = 'return_requested';
+  static const returnApproved = 'return_approved';
+  static const returnRejected = 'return_rejected';
+  static const refundIssued = 'refund_issued';
+
   static String label(String status) {
     return switch (status) {
       pendingPayment => 'status.pending_payment'.tr(),
@@ -20,9 +26,20 @@ class OrderStatus {
       cancelled => 'status.cancelled'.tr(),
       refunded => 'status.refunded'.tr(),
       partiallyRefunded => 'status.partially_refunded'.tr(),
+      returnRequested => 'status.return_requested'.tr(),
+      returnApproved => 'status.return_approved'.tr(),
+      returnRejected => 'status.return_rejected'.tr(),
+      refundIssued => 'status.refund_issued'.tr(),
       _ => status,
     };
   }
+
+  static const postPurchase = {
+    returnRequested,
+    returnApproved,
+    returnRejected,
+    refundIssued,
+  };
 
   static bool canCancel(String status) =>
       status == pendingPayment || status == paid;
