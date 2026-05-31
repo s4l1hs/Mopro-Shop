@@ -40,13 +40,66 @@ import 'package:mopro/shell/app_shell.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 /// Wraps a screen in [Title] so the browser tab shows "Mopro · <page>".
-/// Per-route deep-link titles (e.g. "Mopro · Ürün #123") deferred to
-/// Session 4 — those need state.params and aren't always const.
 Widget _titled(String page, Widget child) => Title(
       title: 'Mopro · $page',
       color: MoproTokens.primaryLight,
       child: child,
     );
+
+/// Wraps [child] in a [Title] resolved from [location] (and optional dynamic
+/// [name], e.g. a product title or order id).
+Widget _titledLoc(String location, Widget child, {String? name}) => Title(
+      title: moproPageTitle(location, name: name),
+      color: MoproTokens.primaryLight,
+      child: child,
+    );
+
+/// Pure resolver for the browser tab title of [location]. Dynamic routes accept
+/// a [name] (product title, category name, order id, search query) and fall back
+/// to "Mopro · Yükleniyor…" while it resolves. Unknown → "Mopro · Sayfa Bulunamadı".
+String moproPageTitle(String location, {String? name}) {
+  String t(String s) => 'Mopro · $s';
+  final loading = t('Yükleniyor…');
+
+  // Specific prefixes first.
+  if (location.startsWith('/categories/')) {
+    return name == null ? loading : t(name);
+  }
+  if (location.startsWith('/products/')) {
+    return name == null ? loading : t(name);
+  }
+  if (location.startsWith('/checkout/result')) return t('Sipariş Sonucu');
+  if (location.startsWith('/checkout')) return t('Ödeme');
+  if (location == '/profile/addresses/new') return t('Yeni Adres');
+  if (location.startsWith('/profile/addresses/')) return t('Adresi Düzenle');
+  if (location == '/profile/addresses') return t('Adreslerim');
+  if (location.startsWith('/wallet/plans/')) return t('Kampanya Detayı');
+  if (location == '/wallet') return t('Cüzdan');
+  if (location == '/orders') return t('Siparişlerim');
+  if (location.startsWith('/orders/')) {
+    return name == null ? t('Siparişlerim') : t('Sipariş #$name');
+  }
+  if (location == '/account/profile') return t('Profilim');
+  if (location == '/account/security') return t('Güvenlik');
+  if (location == '/account/cards') return t('Kartlarım');
+  if (location == '/account/notifications') return t('Bildirimler');
+  if (location == '/account') return t('Hesabım');
+  if (location == '/categories') return t('Kategoriler');
+  if (location == '/search') {
+    return name == null || name.isEmpty ? t('Arama') : t('"$name" araması');
+  }
+  if (location == '/cart') return t('Sepetim');
+  if (location == '/favorites') return t('Favorilerim');
+  if (location == '/auth/login') return t('Giriş');
+  if (location == '/auth/register') return t('Üye Ol');
+  if (location == '/auth/verify-email') return t('E-posta Doğrulama');
+  if (location == '/auth/forgot-password') return t('Şifre Sıfırlama');
+  if (location == '/auth/mfa') return t('İki Faktör');
+  if (location == '/auth/profile') return t('Profil Tamamlama');
+  if (location == '/help') return t('Yardım');
+  if (location == '/' || location == '/splash') return 'Mopro';
+  return t('Sayfa Bulunamadı');
+}
 
 /// Pure function exposing the auth-aware redirect rules.
 /// Returns the redirect target, or null if the user may stay at [location].
@@ -118,11 +171,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       // ── New email auth routes ──────────────────────────────────────────────
       GoRoute(
         path: '/auth/login',
-        builder: (_, __) => const SignInScreen(),
+        builder: (_, __) => _titledLoc('/auth/login', const SignInScreen()),
       ),
       GoRoute(
         path: '/auth/register',
-        builder: (_, __) => const SignUpScreen(),
+        builder: (_, __) => _titledLoc('/auth/register', const SignUpScreen()),
       ),
       GoRoute(
         path: '/auth/verify-email',
@@ -151,7 +204,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/search',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (_, __) => const SearchScreen(),
+        builder: (_, state) => _titledLoc(
+          '/search',
+          const SearchScreen(),
+          name: state.uri.queryParameters['q'],
+        ),
       ),
       GoRoute(
         path: '/products/:id',
@@ -165,7 +222,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             );
             return const SizedBox.shrink();
           }
-          return ProductDetailScreen(productId: id);
+          return _titledLoc(
+            '/products/$id',
+            ProductDetailScreen(productId: id),
+          );
         },
       ),
       GoRoute(
@@ -226,7 +286,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       // its own desktop two-pane via ResponsiveBuilder).
       ShellRoute(
         navigatorKey: _accountShellNavKey,
-        builder: (_, __, child) => AccountShell(child: child),
+        builder: (_, state, child) =>
+            _titledLoc(state.matchedLocation, AccountShell(child: child)),
         routes: [
           GoRoute(
             path: '/account/profile',
