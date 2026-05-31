@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/di/providers.dart';
 import 'package:mopro/core/network/app_error.dart';
+import 'package:mopro/features/analytics/analytics_service.dart';
 import 'package:mopro/features/cart/application/cart_cashback_cache.dart';
 import 'package:mopro/features/cart/data/cart_dto.dart';
 import 'package:mopro/features/cart/data/cart_repository.dart';
@@ -85,6 +86,10 @@ class CartNotifier extends Notifier<CartState> {
         qty: qty,
       );
       state = state.copyWith(cart: AsyncData(cart), isMutating: false);
+      // analytics: add_to_cart — manual emission (design §7).
+      ref.read(analyticsServiceProvider).track(
+            AnalyticsEvent('add_to_cart', {'variantId': variantId, 'quantity': qty}),
+          );
     } catch (_) {
       state = state.copyWith(isMutating: false);
       rethrow;

@@ -11,6 +11,7 @@ import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/design/responsive/pointer_kind.dart';
 import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/features/analytics/analytics_service.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/catalog/pdp/qa/pdp_qa_tab.dart';
 import 'package:mopro/features/catalog/pdp/reviews/pdp_reviews_tab.dart';
@@ -94,6 +95,13 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
   @override
   void initState() {
     super.initState();
+    // analytics: product_view — manual emission on PDP mount (design §7).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(analyticsServiceProvider).track(
+            AnalyticsEvent('product_view', {'productId': widget.product.id}),
+          );
+    });
     _tabController = TabController(length: 4, vsync: this);
     _tabController.addListener(() {
       if (mounted) setState(() {});
