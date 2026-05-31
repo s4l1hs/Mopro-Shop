@@ -23,5 +23,8 @@ CREATE SCHEMA IF NOT EXISTS sizefinder_schema   AUTHORIZATION sizefinder_user;
 CREATE SCHEMA IF NOT EXISTS antifraud_schema  AUTHORIZATION antifraud_user;  -- core-svc: ML scoring
 CREATE SCHEMA IF NOT EXISTS einvoice_schema   AUTHORIZATION einvoice_user;   -- jobs-svc: GİB e-fatura
 
+-- Tranche 4a additions
+CREATE SCHEMA IF NOT EXISTS analytics_schema  AUTHORIZATION analytics_user;  -- core-svc ingest + jobs-svc aggregation
+
 -- shared read-only reference schema (owned by the superuser / ecom_admin; modules SELECT only)
 CREATE SCHEMA IF NOT EXISTS ref_schema;

@@ -152,3 +152,13 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA help_schema
   GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO help_user;
 ALTER DEFAULT PRIVILEGES IN SCHEMA help_schema
   GRANT USAGE, SELECT ON SEQUENCES TO help_user;
+
+-- analytics (Tranche 4a — ingest in core-svc, aggregation/retention/erasure in jobs-svc)
+-- core-svc connects as ecom_admin (owns the cluster) so it needs no explicit grant;
+-- jobs-svc connects as notification_user, so cross-grant it analytics DML for the
+-- prune/rebuild crons + the ecom.user.soft_deleted.v1 erasure consumer.
+GRANT USAGE ON SCHEMA analytics_schema TO analytics_user, notification_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA analytics_schema
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO analytics_user, notification_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA analytics_schema
+  GRANT USAGE, SELECT ON SEQUENCES TO analytics_user, notification_user;

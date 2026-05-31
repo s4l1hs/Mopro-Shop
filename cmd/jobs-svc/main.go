@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"github.com/mopro/platform/internal/analytics"
 	"github.com/mopro/platform/internal/eventbus"
 	"github.com/mopro/platform/internal/notification"
 	"github.com/mopro/platform/pkg/logx"
@@ -103,6 +104,17 @@ func main() {
 			slog.Error("jobs-svc: reconcile-drift consumer exited unexpectedly", "err", err)
 		}
 	}()
+
+	// ── Analytics maintenance crons (Tranche 4a: retention prune + rebuild) ───────
+	istanbulLoc, err := time.LoadLocation("Europe/Istanbul")
+	if err != nil {
+		slog.Error("jobs-svc: load Europe/Istanbul timezone", "err", err)
+		os.Exit(1)
+	}
+	analyticsSvc := analytics.NewService(analytics.NewRepository(pool))
+	analyticsCrons := analytics.NewCrons(analyticsSvc, istanbulLoc, analytics.RetentionDays, slog.Default())
+	analyticsCrons.Start(ctx)
+	defer analyticsCrons.Stop()
 
 	// ── HTTP server ──────────────────────────────────────────────────────────────
 	mux := http.NewServeMux()

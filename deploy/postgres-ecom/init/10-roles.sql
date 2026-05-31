@@ -19,7 +19,8 @@ DECLARE
     'help_user',         -- core-svc: public help/FAQ content
     'sizefinder_user',
     'antifraud_user',   -- v7: core-svc ML scoring decision module
-    'einvoice_user'     -- v7: jobs-svc GİB e-fatura/e-arşiv via Foriba
+    'einvoice_user',    -- v7: jobs-svc GİB e-fatura/e-arşiv via Foriba
+    'analytics_user'    -- Tranche 4a: analytics pipeline (core-svc ingest + jobs-svc aggregation)
   ];
   r TEXT;
 BEGIN
