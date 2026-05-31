@@ -216,8 +216,12 @@ asserting the `null` form does NOT clear.
 
 ## Storage-layer idempotency
 
-Two domains now follow this pattern (cashback `payments_made` and reviews
-`helpful_count`):
+Several domains now follow this pattern (cashback `payments_made`, reviews
+`helpful_count`, and Q&A `answer_count`). The reviews write-side adds a second
+flavour of storage-layer idempotency: the `product_reviews (product_id, user_id)`
+unique constraint guarantees one review per user per product, so a concurrent or
+retried submit surfaces as a 23505 mapped to `ErrReviewExists` (the HTTP layer
+returns 409 + the existing review id) rather than a duplicate row.
 
 1. A junction table with `PRIMARY KEY (parent_id, user_id)` (or equivalent
    composite key) catches concurrent inserts at the database via 23505
@@ -233,8 +237,12 @@ Two domains now follow this pattern (cashback `payments_made` and reviews
    sequence of operations.
 
 Implementations: `internal/cashback/RefreshPaymentsMadeCache`,
-`internal/catalog/RefreshHelpfulCountCache`. Add new domains to this list as they
-land.
+`internal/catalog/RefreshHelpfulCountCache`, and (Q&A) `internal/catalog`'s
+`InsertAnswerAndRefresh` (refreshes `product_questions.answer_count` in the same
+tx as the answer insert; covered by `TestProperty_AnswerCountMatchesRows` +
+`TestIntegration_ConcurrentReviewConverges`). The unique-constraint flavour lives
+in `internal/catalog`'s `InsertReview` (23505 → `ErrReviewExists`). Add new domains
+to this list as they land.
 
 ## PostgreSQL serialization retries
 

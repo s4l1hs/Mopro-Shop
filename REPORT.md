@@ -2353,11 +2353,46 @@ endpoints + GET /products/{id}/review-eligibility (order×catalog orchestration)
 Tests green: concurrent review → 1 row + ErrReviewExists; TestProperty_AnswerCountMatchesRows;
 review CRUD + ownership + revisions + soft-delete. is_seller=false in v1 (column/badge ready).
 
-### Remaining (frontend + flows + docs) — NOT yet done
-§4 leaf widgets (ReviewFormContent, QuestionFormContent, AnswerFormContent,
-QuestionRow, AnswerRow, ReviewRow edit-button) · §5 submission flow (3 entry
-points) · §6 /account/reviews + edit/delete + rail · §7 PDP Q&A tab + full list
-+ question detail · §8 /account/questions + rail · §9 flows AA/BB · §10 ~16
-goldens · §11 CONTRIBUTING idempotency list · §12 REPORT/SYSTEM_AUDIT parity.
-The frontend reuses the existing Review DTO/reviewsProvider/ReviewRow and the
-PR #17 adaptive presenter; the PDP "Sorular" tab is a one-line _StubTab swap.
+### §4–§12 frontend — DELIVERED (green, committed)
+
+**§4 data + leaf widgets.** `review_write_provider` (UserReview/ReviewEligibility
+DTOs, ReviewWriteRepository, `reviewEligibilityProvider` family, `myReviewsProvider`
+with optimistic delete); `qa_provider` (Question/Answer DTOs, QaRepository,
+`questionsProvider`/`questionThreadProvider` families, `myQuestionsProvider`);
+`showAdaptiveModal` (bottom sheet <600 / dialog ≥600, mirrors the login presenter);
+ReviewFormContent (create+edit), QuestionFormContent/AnswerFormContent (body-only),
+QuestionRow, AnswerRow ("Satıcı" badge), ReviewRow own-review edit button.
+
+**§5 submission flow — 3 entry points.** `openReviewForm` shared helper
+(auth-gates → adaptive form → invalidate reviews/eligibility/myReviews +
+confirmation SnackBar), wired from (a) the order-detail per-item affordance on
+delivered orders, (b) the PDP reviews-tab eligibility-gated "Değerlendir" CTA
+(guests skip the 401 call), and (c) `/account/reviews` edit.
+
+**§6 /account/reviews.** MyReviewsScreen: own reviews, inline edit (reuses
+openReviewForm) + optimistic delete with confirm dialog; empty/error/load-more.
+
+**§7 PDP Q&A.** `_StubTab` swapped for PdpQaTab in both PDP layouts; qa_submission
+(openAskQuestion/openAnswer); ProductQuestionsScreen (`/products/:id/questions`)
+reuses PdpQaTab; QuestionDetailScreen (`/products/:id/questions/:qid`) renders the
+answer thread + "Yanıtla" CTA. Reads public; ask/answer gate via the presenter.
+
+**§8 /account/questions.** MyQuestionsScreen → tap row opens the detail thread.
+
+Router: public Q&A routes (guest-readable) + hard-gated account-shell reviews/
+questions routes; titles Yorumlarım/Sorularım/Sorular/Soru. Rail + mobile account
+menu gained "Yorumlarım"/"Sorularım".
+
+**§9 flows.** flow_aa (review submit via PDP CTA → POST asserted → SnackBar) +
+flow_bb (Q&A list + ask) — both green; integration suite 35/35.
+
+**§10 goldens.** 16 new goldens (pdp_qa_tab ×4, qa widgets ×4, review form ×3, qa
+form ×2, account my-reviews/my-questions ×3); baselines via golden-rebaseline CI.
+
+**§11/§12 docs.** CONTRIBUTING storage-layer-idempotency list extended (Q&A
+answer_count + the product_reviews unique-constraint flavour); this report +
+SYSTEM_AUDIT §10 parity update (≈45% → ≈50%).
+
+Surfaced fixes: review/qa form locale read is null-safe under widget tests; the
+Reviews/Questions family notifiers use `late int` (not `late final`) so a
+post-submit invalidate→rebuild doesn't throw LateError.
