@@ -32,6 +32,7 @@ import (
 	"github.com/mopro/platform/internal/identity/sms"
 	"github.com/mopro/platform/internal/identity/sms/mock"
 	"github.com/mopro/platform/internal/identity/sms/netgsm"
+	"github.com/mopro/platform/internal/inbox"
 	"github.com/mopro/platform/internal/order"
 	"github.com/mopro/platform/internal/outbox"
 	"github.com/mopro/platform/internal/payment"
@@ -153,6 +154,7 @@ func main() {
 	checkoutSessionRepo := order.NewCheckoutSessionRepository(pool)
 	returnRepo := order.NewReturnRepository(pool)
 	returnSvc := order.NewReturnService(orderRepo, returnRepo)
+	inboxSvc := inbox.NewService(inbox.NewRepository(pool))
 
 	// Payment module wired before order so orderSvc can receive the PSP reference.
 	paymentRepo := payment.NewRepository(pool)
@@ -536,6 +538,31 @@ func main() {
 	)
 	mux.Handle("GET /returns/{id}",
 		httpTrace(requireAuth(http.HandlerFunc(handleGetReturn(returnSvc)))),
+	)
+	// ── Notification inbox (Tranche 2a) ──────────────────────────────────────
+	mux.Handle("GET /notifications",
+		httpTrace(requireAuth(http.HandlerFunc(handleListNotifications(inboxSvc)))),
+	)
+	mux.Handle("GET /notifications/unread-count",
+		httpTrace(requireAuth(http.HandlerFunc(handleUnreadCount(inboxSvc)))),
+	)
+	mux.Handle("POST /notifications/{id}/read",
+		httpTrace(requireAuth(http.HandlerFunc(handleMarkNotificationRead(inboxSvc)))),
+	)
+	mux.Handle("POST /notifications/read-all",
+		httpTrace(requireAuth(http.HandlerFunc(handleMarkAllRead(inboxSvc)))),
+	)
+	mux.Handle("GET /notifications/preferences",
+		httpTrace(requireAuth(http.HandlerFunc(handleGetPreferences(inboxSvc)))),
+	)
+	mux.Handle("PUT /notifications/preferences",
+		httpTrace(requireAuth(http.HandlerFunc(handlePutPreferences(inboxSvc)))),
+	)
+	mux.Handle("POST /push-tokens",
+		httpTrace(requireAuth(http.HandlerFunc(handleRegisterPushToken(inboxSvc)))),
+	)
+	mux.Handle("DELETE /push-tokens",
+		httpTrace(requireAuth(http.HandlerFunc(handleDeletePushToken(inboxSvc)))),
 	)
 	mux.Handle("GET /seller/orders/{id}/breakdown",
 		httpTrace(http.HandlerFunc(handleSellerBreakdown(orderSvc))),
