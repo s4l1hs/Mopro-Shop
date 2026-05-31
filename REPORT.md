@@ -2460,6 +2460,7 @@ No mobile changes this PR (consent UX + consumer are 4b). `flutter analyze` /
 ### Pending legal review
 Privacy copy + consent banner + privacy article — all deferred to 4b; none
 shipped in 4a, so nothing legal-review-gated is exposed to users yet.
+**✅ CLOSED** by `chore/analytics-legal-copy-finalized` (legal review complete).
 
 ### Backlog (4a-surfaced / deferred)
 4b consumers (recent-search autocomplete, `/recommendations` backing, Continue-
@@ -2540,6 +2541,7 @@ Consent banner copy, settings descriptions, privacy article body — all DRAFT,
 gated by `kAnalyticsConsentEnabled` (dev-on / prod-off). Follow-up PR
 `chore/analytics-legal-copy-finalized` flips the prod default + drops DRAFT marks.
 Owner: product/legal.
+**✅ CLOSED** by `chore/analytics-legal-copy-finalized` (Option B — existing copy accepted as final).
 
 ### Parity update
 SYSTEM_AUDIT §12: Consent/privacy-controls Partial→**Complete** (+1); Event
@@ -2604,6 +2606,7 @@ by 4a's Go integration tests.
 ### Pending legal review (carried)
 Consent copy + build flag default unchanged (DRAFT, dev-on/prod-off). Follow-up:
 `chore/analytics-legal-copy-finalized`.
+**✅ CLOSED** by `chore/analytics-legal-copy-finalized`.
 
 ### Backlog
 recent-search autocomplete, `/recommendations` surfaces ("Senin için"),
@@ -2626,3 +2629,30 @@ fails the rail shows post-login events only until the next eligible refresh). Th
 `monthly_amount_minor`↔`monthly_coin_minor` divergence is now provider-mapped but
 the shared serializer remains snake-case-`amount`; any future direct
 `ProductSummary.fromJson` consumer of those endpoints would hit the same trap.
+
+## Legal Copy Finalization PR — `chore/analytics-legal-copy-finalized`
+
+Unblocking, not building: retires the DRAFT carry from PRs #27/#28/#29. No
+features, no parity change.
+
+- **Decision:** Option B (`AskUserQuestion`) — existing `consent.*` copy + privacy
+  article accepted as final; **no copy text changed**.
+- **DRAFT artifacts retired:** `consent_copy_DRAFT.dart` → `consent_copy.dart`
+  (git mv, no importers); legal-review header removed; `kConsentCopyKeysPendingLegalReview`
+  → `kConsentCopyKeys`. Migration `0077` UPDATEs the `privacy-and-tracking` article
+  body to drop the DRAFT blockquote (0076 is shipped/immutable — round-trip verified).
+- **Build flag:** `kAnalyticsConsentEnabled` doc updated to true-default-everywhere
+  with **kill-switch** semantics (`--dart-define=ANALYTICS_CONSENT_ENABLED=false`
+  for incident response). `defaultValue` was already `true`.
+- **Env-override removals:** none — the audit found no `ANALYTICS_CONSENT_ENABLED`
+  override anywhere (`deploy/`, `.github/`, `Makefile`, Dockerfiles); the prod
+  "flip to false" was documented guidance, never wired. So this PR is doc + rename
+  + migration only on the flag side.
+- **Tests:** no text-equality updates (copy unchanged); added
+  `feature_flags_test.dart` asserting the default is `true`. Consent + recently-viewed
+  + service tests stay green (17/17 non-golden).
+- **Goldens:** none changed (Option B renders no new text; the article isn't
+  goldened) → no rebaseline.
+- **Pending-legal-review entries** (4a/4b/4c) marked **✅ CLOSED** pointing here.
+
+The analytics arc (PRs #27/#28/#29) is now fully production-ready.
