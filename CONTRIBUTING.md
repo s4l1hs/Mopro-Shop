@@ -251,3 +251,51 @@ The `require_trailing_commas` lint and `dart format`'s output disagree on
 multi-argument calls when the line would fit without a trailing comma. Hand-format
 the trailing comma in — do not rely on `dart format` to add it. Pre-commit hook
 does not auto-fix this; CI lint catches it.
+
+## Project patterns (index)
+
+These are "the project's way" — established across 2+ implementations and
+expected in new work. The full system inventory and gap analysis live in
+[`SYSTEM_AUDIT.md`](SYSTEM_AUDIT.md).
+
+- [Storage-layer idempotency](#storage-layer-idempotency)
+- [PostgreSQL serialization retries](#postgresql-serialization-retries)
+- [URL state](#url-state)
+- [Adding a Notifier (Riverpod)](#adding-a-notifier-riverpod)
+- [Writing a Regression Test](#writing-a-regression-test)
+- [Goldens (Flutter)](#goldens-flutter)
+- [Formatting](#formatting)
+- [Audit-before-code](#audit-before-code)
+- [Adaptive presenter](#adaptive-presenter)
+- [In-component composition over `Overlay` routing](#in-component-composition-over-overlay-routing)
+
+## Audit-before-code
+
+Before changing a surface that spans many files, **inventory it first** and post
+the baseline, then change against that baseline. This has paid off repeatedly:
+the PDP component extraction measured the widget tree before splitting it, the
+account two-pane PR audited every `go_router` route before adding the shell, and
+the A11y sweep built an audit harness + baseline before fixing a single label.
+`SYSTEM_AUDIT.md` and the `tool/audit/` scripts are the largest instance — they
+generate the inventory deterministically so the "before" is reproducible. For a
+non-trivial change, prefer a measured baseline over a guess.
+
+## Adaptive presenter
+
+One content widget, two presenters chosen by breakpoint. `LoginRequired`
+(`mobile/lib/features/auth/widgets/login_required.dart`) is the canonical case:
+the same presenter-agnostic content renders inside a bottom sheet on mobile
+(`showLoginRequiredSheet`) and a centered `Dialog` on desktop, and both honour
+the `requireAuth(ctx, ref, onAuthed: …)` resume-once contract. When a flow needs
+a modal that differs only in chrome between form factors, write the content once
+and add a presenter — do not fork the widget.
+
+## In-component composition over `Overlay` routing
+
+Prefer composing transient UI **in the widget tree** over pushing it through the
+global `Overlay`/route stack. The PDP hover-zoom and the login dialog both
+compose in-tree, and `AnchoredOverlayPanel`
+(`mobile/lib/design/responsive/anchored_overlay_panel.dart`) anchors dropdowns
+(search pill, account menu, mega-menu) to their trigger rather than routing a new
+page. This keeps focus management, dismissal, and lifecycle local to the
+component and avoids route-stack surprises.
