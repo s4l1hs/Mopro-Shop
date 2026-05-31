@@ -86,7 +86,8 @@
     "delete_confirm_title": "حذف التقييم",
     "delete_confirm_body": "هل أنت متأكد أنك تريد حذف هذا التقييم؟",
     "delete_failed": "فشل الحذف، يرجى المحاولة مرة أخرى.",
-    "go_shopping": "ابدأ التسوق"
+    "go_shopping": "ابدأ التسوق",
+    "submitted": "تم حفظ تقييمك."
   },
   "welcome": {
     "greeting": "مرحباً، {name}.",

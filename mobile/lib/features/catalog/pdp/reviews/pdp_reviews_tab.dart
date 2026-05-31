@@ -1,8 +1,12 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mopro/core/auth/auth_notifier.dart';
+import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/features/catalog/pdp/reviews/rating_distribution_histogram.dart';
 import 'package:mopro/features/catalog/pdp/reviews/review_row.dart';
+import 'package:mopro/features/catalog/pdp/reviews/review_submission.dart';
+import 'package:mopro/features/catalog/pdp/reviews/review_write_provider.dart';
 import 'package:mopro/features/catalog/pdp/reviews/reviews_provider.dart';
 
 /// The product detail page "Değerlendirmeler" tab: rating histogram, a sort
@@ -64,7 +68,9 @@ class PdpReviewsTab extends ConsumerWidget {
     final children = <Widget>[
       if (state.summary != null)
         RatingDistributionHistogram(summary: state.summary!),
-      const SizedBox(height: 24),
+      const SizedBox(height: 16),
+      _WriteReviewCta(productId: productId),
+      const SizedBox(height: 8),
       Row(
         children: [
           Expanded(
@@ -106,6 +112,46 @@ class PdpReviewsTab extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: children,
       ),
+    );
+  }
+}
+
+/// "Değerlendir" CTA. Shown to eligible users (delivered + within the review
+/// window, no existing review). Guests don't see it — tapping the histogram's
+/// general area isn't a review path; the explicit affordance lives here and on
+/// the order detail screen. For guests the eligibility call is skipped to avoid
+/// a guaranteed 401.
+class _WriteReviewCta extends ConsumerWidget {
+  const _WriteReviewCta({required this.productId});
+
+  final int productId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authed =
+        ref.watch(authNotifierProvider).valueOrNull is AuthAuthenticated;
+    if (!authed) return const SizedBox.shrink();
+
+    final elig = ref.watch(reviewEligibilityProvider(productId));
+    return elig.maybeWhen(
+      data: (e) {
+        if (!e.canReview) return const SizedBox.shrink();
+        final cs = Theme.of(context).colorScheme;
+        return SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => openReviewForm(context, ref, productId: productId),
+            icon: const Icon(Icons.rate_review_outlined, size: 18),
+            label: Text('reviews.write_cta'.tr()),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: cs.primary,
+              side: BorderSide(color: cs.primary),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        );
+      },
+      orElse: () => const SizedBox.shrink(),
     );
   }
 }

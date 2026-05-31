@@ -86,7 +86,8 @@
     "delete_confirm_title": "Bewertung löschen",
     "delete_confirm_body": "Möchten Sie diese Bewertung wirklich löschen?",
     "delete_failed": "Löschen fehlgeschlagen, bitte erneut versuchen.",
-    "go_shopping": "Zum Einkaufen"
+    "go_shopping": "Zum Einkaufen",
+    "submitted": "Ihre Bewertung wurde gespeichert."
   },
   "welcome": {
     "greeting": "Willkommen, {name}.",

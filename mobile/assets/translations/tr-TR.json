@@ -261,7 +261,8 @@
     "delete_confirm_title": "Yorumu sil",
     "delete_confirm_body": "Bu yorumu silmek istediğinizden emin misiniz?",
     "delete_failed": "Silme başarısız, tekrar deneyin.",
-    "go_shopping": "Alışverişe başla"
+    "go_shopping": "Alışverişe başla",
+    "submitted": "Değerlendirmeniz kaydedildi."
   },
   "cashback": {
     "schedule_title": "Cashback Takvimi",
