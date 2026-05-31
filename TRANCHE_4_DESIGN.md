@@ -309,7 +309,45 @@ trail of when each link was made, and lets a Decision-5 purge sever the link
 
 ## 6. Decision 5 — Retention policy
 
-_(pending decision)_
+**Chosen: raw bounded (90 days) + user-controllable derived.** Raw
+`analytics_events` are pruned after 90 days; derived projections persist for
+ongoing personalization but the user can delete their own history on demand, and
+consent withdrawal purges it.
+
+**Rationale.** This is the only option that closes the loop opened by Decisions 3
+and 4. An opt-in regime under KVKK/GDPR carries a withdrawal right and a
+Right-to-be-Forgotten obligation; "indefinite, no controls" directly contradicts
+the consent posture, and "raw 90d, derived indefinite" leaves no deletion path
+for the derived profile that is the *actually* sensitive artifact. Bounding raw
+events at 90 days also keeps the append-only log's storage cost flat (it stops
+being unbounded), while keeping derived projections lets personalization survive
+the prune — the projections are the cheap-read product, the raw log is just the
+rebuildable source. The decision the choice resolves: **a defensible
+data-minimization story (bounded raw + on-demand erase) that satisfies the opt-in
+regime without throwing away the personalization product.**
+
+**Deletion mechanics.**
+- **Scheduled prune (daily).** A `analytics-retention-cron` on jobs-svc deletes
+  `analytics_events WHERE created_at < now() - interval '90 days'`. This is the
+  *only* sanctioned bulk delete on the event log; it batches to avoid long locks.
+  Derived projections are untouched (they are rebuilt forward, not from >90d raw).
+- **User-initiated erase.** A "Geçmişimi sil" action in `/account` privacy
+  settings calls `DELETE /me/analytics`, which in one transaction: deletes the
+  user's `analytics_events`, their projection rows
+  (`user_browsing_history`/`user_search_history`/`user_category_affinity`), and
+  their `session_identity` links. Idempotent; returns 204.
+- **Consent withdrawal (Decision 3, Accepted → Declined).** Triggers the same
+  erase path automatically, so flipping the toggle off both stops emission and
+  removes already-derived data — the withdrawal right in one action.
+- **Account closure.** Hooks the existing account-deletion path: the analytics
+  erase runs as part of it (documented as a prerequisite wire-up for 4a).
+- **Granularity.** v1 erase is all-or-nothing per user (matches the binary
+  consent grain). Per-category erase is a no-op extension if Decision 3 ever
+  upgrades to granular.
+
+Raw events older than 90 days cannot be used to rebuild a projection, so a
+projection's lookback window is effectively ≤ 90 days for any field derived from
+raw counts — an intentional bound, not a defect.
 
 ## 7. Decision 6 — Instrumentation pattern
 
