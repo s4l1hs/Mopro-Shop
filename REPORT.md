@@ -2552,3 +2552,77 @@ one-time prompt; revisit if UX wants it above the nav. Consent gate is enforced
 both client (enqueue) and server (ingest). The `AnalyticsService` 5s timer is
 cancelled via `ref.onDispose`; golden/widget tests stub the consent notifier so
 no timer leaks. Build flag must be flipped off for prod until legal signs off.
+
+## Tranche 4c PR — Recently-Viewed Substrate + Home Rail + Closing Flows
+
+### Baseline (branched off `main` @ PR #28 merged)
+`go test ./...` 34 ok · `flutter analyze` clean · integration 38/38 · audit parity ≈51%.
+
+### Service inputs (consumed, no backend change — §3 no-op)
+4a: `GET /me/recently-viewed` (`{"data":[…]}`), `POST /analytics/sessions/identify`.
+4b: `AnalyticsService` (sessionId), `userConsentProvider`, PDP `product_view` emit.
+
+### `ProductListRail` shape decision
+`ProductRail` is a sort-key-driven `ConsumerWidget` (watches
+`productsRailProvider(sort)`) — a `.fromList` mode would contort it. Shipped a
+**sibling `ProductListRail`** (StatelessWidget, same scroller visuals, reuses
+`ProductCard`) per §1.6 trigger #1 / §2.2. Existing rail callers untouched.
+
+### `recentlyViewedProvider` (greenfield) + defensive layering
+`NotifierProvider<…, AsyncValue<List<ProductSummary>>>` gated on flag+auth+consent;
+fetch errors resolve to **empty data** (rail hides), never error state. Rebuilds on
+auth + consent changes.
+
+### Production bug caught + fixed
+`GET /me/recently-viewed` returns the shared `buildProductSummaryJSON` shape
+(`cashback_preview.monthly_amount_minor`), but the generated `ProductSummary.fromJson`
+requires `monthly_coin_minor` — so `fromJson` would throw on every row and the rail
+would be **permanently empty in production**. Verified empirically. Fixed by mapping
+the response explicitly in the provider (snake_case + `monthly_amount_minor`),
+self-contained (no shared-serializer change).
+
+### Home mount + merge + RTBF
+"Son baktıkların" `ProductListRail` mounts as a `wrap`-ed sliver in the home
+`CustomScrollView` (after server rails), `SizedBox.shrink()` when empty (existing
+home goldens unchanged). Login → `AnalyticsService.identify()` (POST
+sessions/identify) → invalidate `recentlyViewedProvider` (app.dart `ref.listen` on
+auth transition, best-effort). RTBF `DELETE /me/analytics-data` success →
+invalidate `recentlyViewedProvider` → rail empties.
+
+### Reconciliations (locked design / CONTRIBUTING > prompt)
+- Sibling `ProductListRail` over the prompt's `MoproProductRail` extension (the
+  named widget doesn't exist; `ProductRail` is provider-coupled).
+- Provider returns `List<ProductSummary>` (matches `ProductCard` + endpoint), not
+  the prompt snippet's `List<Product>`.
+
+### Flows (CC/DD/EE — `flow_gg_recently_viewed_loop_test.dart`)
+Deterministic ProviderContainer/widget level (per the 4b navigator-flow timeout
+lesson): CC eligible→rail renders server projection; DD `identify()` links the
+session; EE RTBF DELETE → invalidate → empty. The real backend backfill is covered
+by 4a's Go integration tests.
+
+### Pending legal review (carried)
+Consent copy + build flag default unchanged (DRAFT, dev-on/prod-off). Follow-up:
+`chore/analytics-legal-copy-finalized`.
+
+### Backlog
+recent-search autocomplete, `/recommendations` surfaces ("Senin için"),
+"Continue browsing" rail, `/account/browsing-history` (the rail's "Tümünü gör"),
+raw-search opt-in, external broker, A/B testing, guest client-side tracking.
+
+### Parity
+SYSTEM_AUDIT §12: Browsing history Partial→**Complete**. Roll-up ≈51% → **≈52%**.
+The analytics arc (4a pipeline → 4b consent+instrumentation → 4c consumer) is now
+functionally complete end-to-end.
+
+### Goldens
+3 `ProductListRail` goldens (1440 light/dark, 375 light) baselined on CI. Home-
+with-rail is covered by `ProductListRail` goldens + the unchanged home composition
+goldens (hidden-state regression guard).
+
+### Risk notes
+Rail visibility flips on consent toggle / login; identify is best-effort (if it
+fails the rail shows post-login events only until the next eligible refresh). The
+`monthly_amount_minor`↔`monthly_coin_minor` divergence is now provider-mapped but
+the shared serializer remains snake-case-`amount`; any future direct
+`ProductSummary.fromJson` consumer of those endpoints would hit the same trap.
