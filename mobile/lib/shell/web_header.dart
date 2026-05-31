@@ -8,6 +8,7 @@ import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/cart/application/cart_count_provider.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
+import 'package:mopro/features/notifications/widgets/notification_badge.dart';
 import 'package:mopro/shell/account_hover_menu.dart';
 import 'package:mopro/shell/web_search_pill.dart';
 
@@ -246,20 +247,22 @@ class _AccountAvatar extends StatelessWidget {
         width: 44,
         height: 44,
         child: Center(
-          child: Container(
-            width: 36,
-            height: 36,
-            decoration: const BoxDecoration(
-              color: MoproTokens.primaryLight,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: const Text(
-              'M',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
+          child: NotificationBadge(
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(
+                color: MoproTokens.primaryLight,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                'M',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
               ),
             ),
           ),

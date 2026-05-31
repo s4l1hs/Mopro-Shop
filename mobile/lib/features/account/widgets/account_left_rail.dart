@@ -7,6 +7,7 @@ import 'package:mopro/design/theme_controller.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/account/current_user_provider.dart';
 import 'package:mopro/features/account/widgets/account_rail_item.dart';
+import 'package:mopro/features/notifications/widgets/notification_badge.dart';
 
 /// Desktop/tablet account navigation rail: a user card on top (authed/guest
 /// variants) and a column of menu rows with route-aware active highlight, hover
@@ -63,7 +64,8 @@ class _AccountLeftRailState extends ConsumerState<AccountLeftRail> {
         _row(AccountRailItem.security, Icons.security_outlined,
             'account.security'.tr(), active, '/account/security',),
         _row(AccountRailItem.notifications, Icons.notifications_outlined,
-            'account.notifications'.tr(), active, '/account/notifications',),
+            'account.notifications'.tr(), active, '/account/notifications',
+            withBadge: true,),
         const _RailDivider(),
         _row(AccountRailItem.help, Icons.help_outline_rounded,
             'account.menu_help'.tr(), active, '/help',),
@@ -85,13 +87,15 @@ class _AccountLeftRailState extends ConsumerState<AccountLeftRail> {
     IconData icon,
     String label,
     AccountRailItem active,
-    String route,
-  ) {
+    String route, {
+    bool withBadge = false,
+  }) {
     return _RailRow(
       icon: icon,
       label: label,
       active: item != AccountRailItem.none && item == active,
       onTap: () => context.go(route),
+      withBadge: withBadge,
     );
   }
 
@@ -306,6 +310,7 @@ class _RailRow extends StatelessWidget {
     required this.onTap,
     this.trailing,
     this.foreground,
+    this.withBadge = false,
   });
 
   final IconData icon;
@@ -314,6 +319,7 @@ class _RailRow extends StatelessWidget {
   final VoidCallback onTap;
   final Widget? trailing;
   final Color? foreground;
+  final bool withBadge;
 
   @override
   Widget build(BuildContext context) {
@@ -350,7 +356,10 @@ class _RailRow extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
                     children: [
-                      Icon(icon, size: 20, color: fg),
+                      if (withBadge)
+                        NotificationBadge(child: Icon(icon, size: 20, color: fg))
+                      else
+                        Icon(icon, size: 20, color: fg),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(

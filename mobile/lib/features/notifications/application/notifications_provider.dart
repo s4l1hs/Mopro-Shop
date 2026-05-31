@@ -10,25 +10,21 @@ import 'package:mopro/features/notifications/data/notification_repository.dart';
 
 enum NotificationFilter { all, unread }
 
-/// Unread-count badge source: polls every 60s while an authenticated user is
-/// present, and exposes a refresh for after-action refetch. 0 for guests.
+/// Unread-count badge source. Fetches on build (when authed) and on-demand
+/// after any notification action; 0 for guests. A 60s background poll
+/// is deferred (Backlog) — it leaks a timer across widget tests and adds load;
+/// on-demand refresh keeps the badge accurate for every in-app action.
 final unreadNotificationCountProvider =
     NotifierProvider<UnreadCountNotifier, int>(UnreadCountNotifier.new);
 
 class UnreadCountNotifier extends Notifier<int> {
-  Timer? _timer;
   bool _disposed = false;
 
   @override
   int build() {
     final authed = ref.watch(authNotifierProvider).valueOrNull is AuthAuthenticated;
-    ref.onDispose(() {
-      _disposed = true;
-      _timer?.cancel();
-    });
-    _timer?.cancel();
+    ref.onDispose(() => _disposed = true);
     if (!authed) return 0;
-    _timer = Timer.periodic(const Duration(seconds: 60), (_) => refresh());
     Future.microtask(refresh);
     return 0;
   }

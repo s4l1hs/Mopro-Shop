@@ -13,7 +13,13 @@ import 'package:mopro/design/theme.dart';
 import 'package:mopro/design/theme_controller.dart';
 import 'package:mopro/features/account/current_user_provider.dart';
 import 'package:mopro/features/account/widgets/account_left_rail.dart';
+import 'package:mopro/features/notifications/application/notifications_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class _RailFakeCount extends UnreadCountNotifier {
+  @override
+  int build() => 0; // no timer / no polling under test
+}
 
 class _FakeAuth extends AuthNotifier {
   _FakeAuth(this._initial);
@@ -68,6 +74,9 @@ Future<_FakeAuth> _pumpRail(
           sharedPreferencesProvider.overrideWithValue(prefs),
           currentUserProvider.overrideWith((ref) async => user),
           authNotifierProvider.overrideWith(() => fakeAuth),
+          // Badge on the Bildirimler row: stub the count to avoid the 60s poll
+          // timer leaking past the test (pending-timer failure).
+          unreadNotificationCountProvider.overrideWith(_RailFakeCount.new),
         ],
         child: MaterialApp.router(
           theme: buildLightTheme(),

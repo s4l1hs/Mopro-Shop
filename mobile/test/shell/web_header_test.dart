@@ -10,6 +10,7 @@ import 'package:mopro/features/cart/application/cart_count_provider.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
 import 'package:mopro/shell/web_header.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../_support/stub_unread_count.dart';
 
 import '../_support/test_harness.dart';
 
@@ -74,6 +75,7 @@ Future<void> _pump(
     ProviderScope(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
+        stubUnreadCountOverride,
         cartCountProvider.overrideWithValue(cartCount),
         authNotifierProvider.overrideWith(() => _FakeAuthNotifier(authState)),
       ],

@@ -26,6 +26,7 @@ import 'package:mopro/features/wallet/providers/cashback_plans_provider.dart';
 import 'package:mopro/features/wallet/providers/wallet_provider.dart';
 import 'package:mopro_api/mopro_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../_support/stub_unread_count.dart';
 
 /// Shared screen-mount harness used by both the §3 baseline report and the §10
 /// strict regression guard, so they audit identical configurations.
@@ -207,6 +208,7 @@ Future<void> pumpAuditConfig(WidgetTester tester, String config) async {
       child: ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
+          stubUnreadCountOverride,
           authNotifierProvider.overrideWith(
             () => FakeAuth(
               authed
