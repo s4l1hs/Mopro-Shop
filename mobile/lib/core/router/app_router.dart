@@ -49,6 +49,7 @@ import 'package:mopro/features/order/presentation/order_history_screen.dart';
 import 'package:mopro/features/order/presentation/order_return_flow_screen.dart';
 import 'package:mopro/features/order/presentation/return_detail_screen.dart';
 import 'package:mopro/features/order/presentation/returns_list_screen.dart';
+import 'package:mopro/features/seller/screens/seller_storefront_screen.dart';
 import 'package:mopro/features/wallet/plan_detail_screen.dart';
 import 'package:mopro/features/wallet/wallet_screen.dart';
 import 'package:mopro/shell/app_shell.dart';
@@ -89,6 +90,9 @@ String moproPageTitle(String location, {String? name}) {
   }
   if (location.startsWith('/products/')) {
     return name == null ? loading : t(name);
+  }
+  if (location.startsWith('/sellers/')) {
+    return name == null ? t('Mağaza') : t(name);
   }
   if (location.startsWith('/checkout/result')) return t('Sipariş Sonucu');
   if (location.startsWith('/checkout')) return t('Ödeme');
@@ -274,6 +278,21 @@ final routerProvider = Provider<GoRouter>((ref) {
             '/products/$id',
             ProductDetailScreen(productId: id),
           );
+        },
+      ),
+      // Public seller storefront (Tranche 5a). Deep-linkable by slug; guests welcome.
+      GoRoute(
+        path: '/sellers/:slug',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) {
+          final slug = state.pathParameters['slug'] ?? '';
+          if (slug.isEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => rootNavigatorKey.currentContext?.go('/'),
+            );
+            return const SizedBox.shrink();
+          }
+          return _titledLoc('/sellers/$slug', SellerStorefrontScreen(slug: slug));
         },
       ),
       // Public Q&A: standalone questions list + single-question thread. Reads

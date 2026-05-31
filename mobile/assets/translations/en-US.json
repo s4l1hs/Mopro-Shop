@@ -423,6 +423,18 @@
     "net": "Net Payout",
     "payout_date": "Expected Payout: {date}"
   },
+  "seller_storefront": {
+    "title": "Store",
+    "tab_about": "About",
+    "tab_products": "Products",
+    "tab_reviews": "Reviews",
+    "rating_summary": "{avg} ({count} reviews)",
+    "no_ratings": "No ratings yet",
+    "no_products": "This store has no products yet",
+    "no_reviews": "No reviews for this store yet",
+    "load_error": "Could not load the store",
+    "retry": "Try again"
+  },
   "error": {
     "unauthorized": "Your session has expired. Please sign in again.",
     "not_found": "{resource} not found.",

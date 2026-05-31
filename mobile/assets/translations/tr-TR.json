@@ -503,6 +503,18 @@
     "net": "Net Ödeme",
     "payout_date": "Tahmini Ödeme: {date}"
   },
+  "seller_storefront": {
+    "title": "Mağaza",
+    "tab_about": "Hakkımızda",
+    "tab_products": "Ürünler",
+    "tab_reviews": "Yorumlar",
+    "rating_summary": "{avg} ({count} değerlendirme)",
+    "no_ratings": "Henüz değerlendirme yok",
+    "no_products": "Bu mağazada henüz ürün yok",
+    "no_reviews": "Bu mağaza için henüz yorum yok",
+    "load_error": "Mağaza yüklenemedi",
+    "retry": "Tekrar dene"
+  },
   "error": {
     "unauthorized": "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
     "not_found": "{resource} bulunamadı.",
