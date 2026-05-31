@@ -4,6 +4,8 @@ import 'package:mopro/features/order/application/orders_provider.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/features/order/data/order_repository.dart';
 
+import '../../_support/order_returns_stub.dart';
+
 OrderDto _order(int id) => OrderDto(
       id: id,
       userId: 1,
@@ -13,7 +15,7 @@ OrderDto _order(int id) => OrderDto(
       createdAt: DateTime(2026),
     );
 
-class _FakeOrderRepo implements OrderRepository {
+class _FakeOrderRepo with OrderReturnsStub implements OrderRepository {
   _FakeOrderRepo({this.totalPages = 1});
   final int totalPages;
 
@@ -30,10 +32,14 @@ class _FakeOrderRepo implements OrderRepository {
   Future<OrderDto> getOrder(int id) async => _order(id);
 
   @override
-  Future<void> cancelOrder({required int id, String reason = ''}) async {}
+  Future<void> cancelOrder({
+    required int id,
+    String reason = '',
+    String note = '',
+  }) async {}
 }
 
-class _EmptyOrderRepo implements OrderRepository {
+class _EmptyOrderRepo with OrderReturnsStub implements OrderRepository {
   @override
   Future<OrderListResult> listOrders({int page = 1, int perPage = 20}) async =>
       OrderListResult(
@@ -47,7 +53,11 @@ class _EmptyOrderRepo implements OrderRepository {
   Future<OrderDto> getOrder(int id) async => _order(id);
 
   @override
-  Future<void> cancelOrder({required int id, String reason = ''}) async {}
+  Future<void> cancelOrder({
+    required int id,
+    String reason = '',
+    String note = '',
+  }) async {}
 }
 
 ProviderContainer _container(OrderRepository repo) => ProviderContainer(

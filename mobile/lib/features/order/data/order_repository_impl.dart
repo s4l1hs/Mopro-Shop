@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/features/order/data/order_repository.dart';
+import 'package:mopro/features/order/data/return_dto.dart';
 
 class OrderRepositoryImpl implements OrderRepository {
   const OrderRepositoryImpl(this._dio);
@@ -37,10 +38,46 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
-  Future<void> cancelOrder({required int id, String reason = ''}) async {
+  Future<void> cancelOrder({
+    required int id,
+    String reason = '',
+    String note = '',
+  }) async {
     await _dio.post<void>(
       '/orders/$id/cancel',
-      data: {'reason': reason},
+      data: {
+        'reason': reason,
+        if (note.isNotEmpty) 'note': note,
+      },
     );
+  }
+
+  @override
+  Future<ReturnDetailDto> createReturn(CreateReturnRequest req) async {
+    final resp = await _dio.post<Map<String, dynamic>>(
+      '/orders/${req.orderId}/returns',
+      data: req.toJson(),
+    );
+    return ReturnDetailDto.fromJson(resp.data!);
+  }
+
+  @override
+  Future<List<ReturnListItemDto>> listReturns({
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final resp = await _dio.get<Map<String, dynamic>>(
+      '/returns',
+      queryParameters: {'limit': limit, 'offset': offset},
+    );
+    return (resp.data!['data'] as List<dynamic>)
+        .map((e) => ReturnListItemDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
+  Future<ReturnDetailDto> getReturn(int id) async {
+    final resp = await _dio.get<Map<String, dynamic>>('/returns/$id');
+    return ReturnDetailDto.fromJson(resp.data!);
   }
 }

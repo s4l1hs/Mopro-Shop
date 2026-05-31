@@ -81,5 +81,54 @@ void main() {
       await tester.pump();
       expect(find.byIcon(Icons.cancel_outlined), findsOneWidget);
     });
+
+    testWidgets('return_requested renders the return icon (additive state)',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const SizedBox(
+            width: 1100,
+            child: OrderStatusTimeline(status: OrderStatus.returnRequested),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byIcon(Icons.assignment_return_outlined), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('refund_issued renders payments icon + timestamp', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          SizedBox(
+            width: 1100,
+            child: OrderStatusTimeline(
+              status: OrderStatus.refundIssued,
+              at: DateTime(2026, 6, 10),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byIcon(Icons.payments_outlined), findsOneWidget);
+      expect(find.text('10.06.2026'), findsOneWidget);
+    });
+
+    testWidgets('return_rejected renders error-styled cancel icon',
+        (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          const SizedBox(
+            width: 1100,
+            child: OrderStatusTimeline(status: OrderStatus.returnRejected),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.byIcon(Icons.cancel_outlined), findsOneWidget);
+    });
   });
 }

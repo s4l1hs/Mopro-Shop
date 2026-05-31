@@ -9,7 +9,9 @@ import 'package:mopro/features/order/application/order_detail_provider.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/features/order/data/order_item_dto.dart';
 import 'package:mopro/features/order/widgets/cashback_schedule.dart';
+import 'package:mopro/features/order/widgets/order_eligibility_actions.dart';
 import 'package:mopro/features/order/widgets/order_status_chip.dart';
+import 'package:mopro/features/order/widgets/refund_status_card.dart';
 import 'package:mopro/utils/money.dart';
 
 class OrderDetailScreen extends ConsumerWidget {
@@ -148,18 +150,14 @@ class _OrderDetailBody extends ConsumerWidget {
                     isTotal: true,
                   ),
                   const SizedBox(height: 24),
-                  if (OrderStatus.canCancel(order.status)) ...[
-                    OutlinedButton(
-                      onPressed: () => _confirmCancel(context, ref),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: cs.error,
-                        side: BorderSide(color: cs.error),
-                        minimumSize: const Size.fromHeight(48),
-                      ),
-                      child: Text('order.cancel'.tr()),
-                    ),
+                  if (order.refund != null) ...[
+                    RefundStatusCard(refund: order.refund!),
                     const SizedBox(height: 16),
                   ],
+                  OrderEligibilityActions(order: order),
+                  if ((order.actions?.canCancel ?? false) ||
+                      (order.actions?.canReturn ?? false))
+                    const SizedBox(height: 16),
                   // ── Cashback schedule ──────────────────────────────────
                   if (order.items.isNotEmpty) ...[
                     Text(
@@ -201,31 +199,6 @@ class _OrderDetailBody extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmCancel(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('order.cancel_title'.tr()),
-        content: Text('order.cancel_confirm'.tr()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text('common.no'.tr()),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: Text('order.cancel'.tr()),
-          ),
-        ],
-      ),
-    );
-    if ((confirmed ?? false) && context.mounted) {
-      await ref.read(orderDetailProvider(orderId).notifier).cancelOrder();
-    }
-  }
 }
 
 class _OrderItemRow extends StatelessWidget {

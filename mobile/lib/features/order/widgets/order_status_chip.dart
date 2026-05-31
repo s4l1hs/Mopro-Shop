@@ -48,9 +48,12 @@ class OrderStatusChip extends StatelessWidget {
 }
 
 class OrderStatusTimeline extends StatelessWidget {
-  const OrderStatusTimeline({required this.status, super.key});
+  const OrderStatusTimeline({required this.status, this.at, super.key});
 
   final String status;
+
+  /// Optional timestamp rendered next to terminal / post-purchase states.
+  final DateTime? at;
 
   @override
   Widget build(BuildContext context) {
@@ -58,23 +61,28 @@ class OrderStatusTimeline extends StatelessWidget {
     final cs = theme.colorScheme;
     final timeline = OrderStatus.timeline;
     final currentIndex = timeline.indexOf(status);
+
+    // Post-purchase return/refund states render as a single accented row.
+    if (OrderStatus.postPurchase.contains(status)) {
+      final (icon, color) = switch (status) {
+        OrderStatus.returnRejected => (Icons.cancel_outlined, cs.error),
+        OrderStatus.refundIssued => (Icons.payments_outlined, cs.primary),
+        OrderStatus.returnApproved => (Icons.check_circle_outline, cs.primary),
+        _ => (Icons.assignment_return_outlined, cs.primary),
+      };
+      return _terminalRow(theme, icon, color, OrderStatus.label(status));
+    }
+
     final isCancelled = status == OrderStatus.cancelled ||
         status == OrderStatus.refunded ||
         status == OrderStatus.partiallyRefunded;
 
     if (isCancelled) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Icon(Icons.cancel_outlined, color: cs.error, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              OrderStatus.label(status),
-              style: theme.textTheme.bodyMedium?.copyWith(color: cs.error),
-            ),
-          ],
-        ),
+      return _terminalRow(
+        theme,
+        Icons.cancel_outlined,
+        cs.error,
+        OrderStatus.label(status),
       );
     }
 
@@ -111,6 +119,30 @@ class OrderStatusTimeline extends StatelessWidget {
       OrderStatus.delivered => 'order.step_delivered'.tr(),
       _ => '',
     };
+  }
+
+  Widget _terminalRow(ThemeData theme, IconData icon, Color color, String label) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(color: color),
+            ),
+          ),
+          if (at != null)
+            Text(
+              DateFormat('dd.MM.yyyy').format(at!.toLocal()),
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+        ],
+      ),
+    );
   }
 }
 

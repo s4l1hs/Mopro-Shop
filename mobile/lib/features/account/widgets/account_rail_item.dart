@@ -3,6 +3,7 @@
 enum AccountRailItem {
   profile,
   orders,
+  returns,
   wallet,
   addresses,
   cards,
@@ -24,6 +25,7 @@ AccountRailItem accountRailItemFor(String location) {
     return AccountRailItem.notifications;
   }
   if (location.startsWith('/orders')) return AccountRailItem.orders;
+  if (location.startsWith('/returns')) return AccountRailItem.returns;
   if (location.startsWith('/wallet')) return AccountRailItem.wallet;
   if (location.startsWith('/profile/addresses')) {
     return AccountRailItem.addresses;

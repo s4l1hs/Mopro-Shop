@@ -136,6 +136,7 @@ void main() {
       expect(find.text('ada@example.com'), findsOneWidget);
       expect(find.text('account.logout'), findsOneWidget);
       expect(find.text('account.orders'), findsOneWidget);
+      expect(find.text('account.returns'), findsOneWidget);
     });
 
     testWidgets('guest variant shows login/register, no logout/orders',

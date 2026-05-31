@@ -234,6 +234,11 @@ func (s *orderService) CancelOrder(ctx context.Context, orderID int64, reason st
 	if err != nil {
 		return err
 	}
+	// Idempotent: re-cancelling an already-cancelled order is a no-op success,
+	// not an error (§3.2). Concurrent double-submits converge here.
+	if o.Status == StatusCancelled {
+		return nil
+	}
 	if o.Status != StatusPendingPayment && o.Status != StatusPaid {
 		return fmt.Errorf("%w: cannot cancel order in status %q", ErrInvalidTransition, o.Status)
 	}

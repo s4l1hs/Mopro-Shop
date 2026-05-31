@@ -34,6 +34,9 @@ import 'package:mopro/features/favorites/favorites_screen.dart';
 import 'package:mopro/features/not_found/not_found_screen.dart';
 import 'package:mopro/features/order/presentation/order_detail_screen.dart';
 import 'package:mopro/features/order/presentation/order_history_screen.dart';
+import 'package:mopro/features/order/presentation/order_return_flow_screen.dart';
+import 'package:mopro/features/order/presentation/return_detail_screen.dart';
+import 'package:mopro/features/order/presentation/returns_list_screen.dart';
 import 'package:mopro/features/wallet/plan_detail_screen.dart';
 import 'package:mopro/features/wallet/wallet_screen.dart';
 import 'package:mopro/shell/app_shell.dart';
@@ -76,8 +79,13 @@ String moproPageTitle(String location, {String? name}) {
   if (location.startsWith('/wallet/plans/')) return t('Kampanya Detayı');
   if (location == '/wallet') return t('Cüzdan');
   if (location == '/orders') return t('Siparişlerim');
+  if (location.endsWith('/return')) return t('İade Talebi');
   if (location.startsWith('/orders/')) {
     return name == null ? t('Siparişlerim') : t('Sipariş #$name');
+  }
+  if (location == '/returns') return t('İadelerim');
+  if (location.startsWith('/returns/')) {
+    return name == null ? t('İadelerim') : t('İade #$name');
   }
   if (location == '/account/profile') return t('Profilim');
   if (location == '/account/security') return t('Güvenlik');
@@ -120,6 +128,7 @@ String? computeAuthRedirect({
       location == '/wallet' ||
       location.startsWith('/wallet/') ||
       location.startsWith('/orders') ||
+      location.startsWith('/returns') ||
       location.startsWith('/profile/addresses') ||
       location.startsWith('/account/profile') ||
       location.startsWith('/account/security') ||
@@ -228,6 +237,28 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      // Full-screen multi-step return flow (outside the account shell).
+      GoRoute(
+        path: '/orders/:id/return',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) {
+          final raw = state.pathParameters['id'];
+          final id = raw != null ? int.tryParse(raw) : null;
+          if (id == null || id <= 0) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => rootNavigatorKey.currentContext?.go('/orders'),
+            );
+            return const SizedBox.shrink();
+          }
+          return _titledLoc(
+            '/orders/$id/return',
+            OrderReturnFlowScreen(
+              orderId: id,
+              initialStep: state.uri.queryParameters['step'],
+            ),
+          );
+        },
+      ),
       GoRoute(
         path: '/categories/:id',
         parentNavigatorKey: rootNavigatorKey,
@@ -331,6 +362,26 @@ final routerProvider = Provider<GoRouter>((ref) {
                     return const SizedBox.shrink();
                   }
                   return OrderDetailScreen(orderId: id);
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: '/returns',
+            builder: (_, __) => const ReturnsListScreen(),
+            routes: [
+              GoRoute(
+                path: ':id',
+                builder: (_, state) {
+                  final raw = state.pathParameters['id'];
+                  final id = raw != null ? int.tryParse(raw) : null;
+                  if (id == null || id <= 0) {
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => rootNavigatorKey.currentContext?.go('/returns'),
+                    );
+                    return const SizedBox.shrink();
+                  }
+                  return ReturnDetailScreen(returnId: id);
                 },
               ),
             ],

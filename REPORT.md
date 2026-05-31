@@ -2171,3 +2171,59 @@ functionally done.
   `surfaceDark`/`onSurfaceVariant`, `verify-contrast` re-checks.
 - **Audit scope** is 8 configs, not all 18 — adding an unlabeled tappable on an
   un-audited screen would not be caught until the harness is extended.
+
+## Tranche 1 PR — Orders Loop
+
+### Baseline (branched off `chore/system-audit`; production tree identical to `main`@`11c3fe99`)
+
+| Metric | Baseline |
+|---|---|
+| `flutter analyze` | No issues found (0/0/0) |
+| `flutter test` | +465 / −73 (73 = Linux-baselined goldens, fail on macOS by design) |
+| `flutter test integration_test` | `integration_test/` = 1 driver (`wallet_flow_test.dart`); A–U flows run under `test/integration/` in the main pass |
+| `flutter build web --release` | succeeds; `main.dart.js` = 4,567,720 B |
+| `go test ./...` | 20 ok packages, 0 fail |
+| Audit parity (PR #21) | ≈ 36% (31 Complete / 15 Partial / 7 Stubbed / 33 Missing / 2 Out-of-scope) |
+
+Stacked on PR #21 (`chore/system-audit`) because Tranche 1 consumes
+`tool/audit/` and updates `SYSTEM_AUDIT.md §10` — retarget to `main` once #21 merges.
+
+### §2 audit confirmation
+See `tool/audit/tranche1_baseline.md`. Summary: cancel + refund endpoints
+**exist**; returns is **spec-only** (OpenAPI `CreateReturn`/`ListReturns` defined,
+unwired — no table/service/handler); order DTO lacks `actions`; no
+`OrderStatusTimeline` widget exists (only a status chip). Scope adaptations
+documented there (return model follows the OpenAPI contract).
+
+### §3 backend — DELIVERED (green, pushed)
+- Migration `0070_returns` (returns + return_items + return_status_history); round-trip + `UNIQUE(order_id,order_item_id)` verified live on pg-ecom-test.
+- `order.ReturnService`: CreateReturn (ownership/delivery/14-day-window/membership/quantity validation, refactored under gocyclo 15), GetReturn (ownership-scoped), ListReturns, ComputeActions (server-side `actions`).
+- core-svc routes: `POST /orders/{id}/returns`, `GET /returns`, `GET /returns/{id}`; `GET /orders/{id}` now carries `actions` + read-only `refund`.
+- CancelOrder idempotent (re-cancel = no-op success).
+- Tests: unit (eligibility + all CreateReturn rejections) + integration concurrent-convergence (N goroutines → 1 row). `make verify` green.
+- Adaptation: returns follow the OpenAPI contract (single reason + optional items); refund visibility is read-only (no new ledger writes). Followed the hand-written-endpoint convention (no OpenAPI/Dart regen) — consistent with the Reviews PR; openapi-ci stays in sync.
+
+### Remaining (frontend + integration + docs) — NOT yet done
+§4 OrderEligibilityActions · §5 CancelOrderDialog · §6 multi-step return flow · §7 RefundStatusCard · §8 OrderStatusTimeline (new — no prior widget existed) · §9 returns list/detail + account rail · §10 flows V/W/X · §11 golden rebaseline (Linux CI) · §12 REPORT/SYSTEM_AUDIT parity update. The frontend also needs to reconcile the wrapped `{order,items,actions,refund}` detail response with the hand-written `OrderDto.fromJson`.
+
+### Tranche 1 COMPLETE — frontend + flows + goldens
+
+**Sections (one commit each):** DTO+provider wiring · RefundStatusCard + OrderStatusTimeline states + locale keys (4 locales, 69 `returns.*` keys) · OrderEligibilityActions + adaptive CancelOrderDialog · returns list/detail + account rail · 4-step return flow (URL `?step=`) · flows V/W/X · goldens.
+
+**Frontend additions:** `OrderActions`/`RefundInfo` on `OrderDto` (wrapped-envelope parse, backward-compatible); `OrderEligibilityActions` (server-driven CTAs); adaptive `CancelOrderDialog`/`CancelOrderContent`; `RefundStatusCard` (4 status variants); `OrderStatusTimeline` extended with return/refund states + timestamp; `ReturnsListScreen`/`ReturnDetailScreen` + `ReturnStatusChip`; `OrderReturnFlowScreen` (4 steps); `returnsProvider`/`returnDetailProvider`/`returnFlowProvider`; "İadelerim" account-rail row + page titles.
+
+**Integration flows:** V (cancel pre-shipment → refund card), W (delivered → 4-step return → confirmation → İadelerim list), X (refund status visibility) — all green. All prior flows still pass.
+
+**Goldens:** 8 new (RefundStatusCard ×4, timeline return_requested/refund_issued, returns list populated/empty) + existing account goldens (rail gained İadelerim) re-baselined on Linux via the golden-rebaseline workflow.
+
+**Parity update:** Orders & post-purchase — Cancellation, Refunds, Returns/RMA moved Partial/Stubbed → **Complete**. Roll-up 31→34 Complete; parity ≈ 36% → **≈ 40%** (SYSTEM_AUDIT §10 updated; generated inventory blocks refreshed via `make audit`).
+
+**Adaptations / drive-by:**
+- Returns follow the **OpenAPI contract** (single reason + optional items), refund visibility is **read-only** (no new ledger writes).
+- **Audit correction:** an `OrderStatusTimeline` widget *did* exist (embedded in `order_status_chip.dart`) — §8 was an enhancement, not a new widget.
+- drive-by: `requireIdempotencyKey` now accepts `X-Idempotency-Key` (Dart client + OpenAPI header); RefundStatusCard/returns-list rows made overflow-safe.
+- Return CTA enters the full-screen flow via `context.go` (root-navigator route) rather than `push`.
+
+**Backlog (surfaced):** seller-side return approval; return-reason photo upload (needs object storage); notification on return/refund status (Tranche 2); refund-method switching; reorder; invoice download; carrier-integrated live tracking; full browser-back-per-step history in the return flow (URL reflects step; in-flow back + PopScope drive transitions); per-id browser title for `/returns/:id` (generic, matching `/orders/:id`).
+
+**Risk notes:** return-window edge cases at tz boundaries (14-day window computed from `delivered_at` in UTC via `AddDate`); eligibility race if an order ships mid-flow (server re-validates on submit → 422); refund DTO assumes a single payment per order (existing `FindPaymentByOrderID`).
