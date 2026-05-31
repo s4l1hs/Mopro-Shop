@@ -46,3 +46,4 @@ app.*.map.json
 
 # Dart defines — local only, never commit secrets
 dart_defines/dev.json
+REPORT_BASELINE.md

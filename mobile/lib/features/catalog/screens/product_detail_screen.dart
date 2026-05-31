@@ -143,6 +143,9 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
             actions: [
               IconButton(
                 icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
+                tooltip: isFav
+                    ? 'product.remove_from_favorites'.tr()
+                    : 'product.add_to_favorites'.tr(),
                 onPressed: () =>
                     ref.read(favoritesProvider.notifier).toggle(product.id),
               ),
@@ -261,6 +264,9 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
         actions: [
           IconButton(
             icon: Icon(isFav ? Icons.favorite : Icons.favorite_border),
+            tooltip: isFav
+                ? 'product.remove_from_favorites'.tr()
+                : 'product.add_to_favorites'.tr(),
             onPressed: () =>
                 ref.read(favoritesProvider.notifier).toggle(product.id),
           ),
@@ -812,7 +818,7 @@ class _QuantityStepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    Widget btn(IconData icon, VoidCallback? onTap) => SizedBox(
+    Widget btn(IconData icon, String label, VoidCallback? onTap) => SizedBox(
           width: 44,
           height: 44,
           child: OutlinedButton(
@@ -821,12 +827,18 @@ class _QuantityStepper extends StatelessWidget {
               padding: EdgeInsets.zero,
               side: BorderSide(color: cs.outlineVariant),
             ),
-            child: Icon(icon, size: 18),
+            // Tooltip inside the button (like IconButton.tooltip) so the name
+            // merges down into the button's semantics node.
+            child: Tooltip(
+              message: label,
+              child: Icon(icon, size: 18, semanticLabel: label),
+            ),
           ),
         );
     return Row(
       children: [
-        btn(Icons.remove, quantity > 1 ? () => onChanged(quantity - 1) : null),
+        btn(Icons.remove, 'product.decrease_qty'.tr(),
+            quantity > 1 ? () => onChanged(quantity - 1) : null,),
         SizedBox(
           width: 48,
           child: Text(
@@ -835,7 +847,8 @@ class _QuantityStepper extends StatelessWidget {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
         ),
-        btn(Icons.add, () => onChanged(quantity + 1)),
+        btn(Icons.add, 'product.increase_qty'.tr(),
+            () => onChanged(quantity + 1),),
       ],
     );
   }

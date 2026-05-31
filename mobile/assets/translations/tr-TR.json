@@ -225,7 +225,10 @@
     "specs_tab": "Özellikler",
     "reviews_tab": "Değerlendirmeler",
     "qa_tab": "Soru & Cevap",
-    "related_title": "Benzer Ürünler"
+    "related_title": "Benzer Ürünler",
+    "remove_from_favorites": "Favorilerden çıkar",
+    "decrease_qty": "Adet azalt",
+    "increase_qty": "Adet artır"
   },
   "reviews": {
     "header": "Yorumlar ({count})",
@@ -508,5 +511,10 @@
     "reason_fav_desc": "Tüm cihazlarında aynı favoriler.",
     "reason_orders_title": "Sipariş takibi",
     "reason_orders_desc": "Siparişlerini tek bir yerden izle."
+  },
+  "a11y": {
+    "skip_to_content": "İçeriğe atla",
+    "loading": "Yükleniyor",
+    "page_not_found": "Sayfa Bulunamadı"
   }
 }

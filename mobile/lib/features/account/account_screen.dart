@@ -525,6 +525,7 @@ class _ThemeTile extends ConsumerWidget {
                 .read(themeControllerProvider.notifier)
                 .setMode(ThemeMode.light),
             cs: cs,
+            semanticLabel: 'account.theme_light'.tr(),
           ),
           const SizedBox(width: 6),
           _ModeChip(
@@ -534,6 +535,7 @@ class _ThemeTile extends ConsumerWidget {
                 .read(themeControllerProvider.notifier)
                 .setMode(ThemeMode.dark),
             cs: cs,
+            semanticLabel: 'account.theme_dark'.tr(),
           ),
         ],
       ),
@@ -547,17 +549,24 @@ class _ModeChip extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.cs,
+    required this.semanticLabel,
   });
 
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
   final ColorScheme cs;
+  final String semanticLabel;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
+    return MergeSemantics(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: semanticLabel,
+        child: GestureDetector(
+          onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         width: 32,
@@ -569,10 +578,12 @@ class _ModeChip extends StatelessWidget {
             color: selected ? cs.primary : cs.outlineVariant,
           ),
         ),
-        child: Icon(
-          icon,
-          size: 16,
-          color: selected ? cs.onPrimary : cs.onSurfaceVariant,
+            child: Icon(
+              icon,
+              size: 16,
+              color: selected ? cs.onPrimary : cs.onSurfaceVariant,
+            ),
+          ),
         ),
       ),
     );

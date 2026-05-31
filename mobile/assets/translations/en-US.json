@@ -195,7 +195,10 @@
     "specs_tab": "Specifications",
     "reviews_tab": "Reviews",
     "qa_tab": "Q&A",
-    "related_title": "Similar Products"
+    "related_title": "Similar Products",
+    "remove_from_favorites": "Remove from favorites",
+    "decrease_qty": "Decrease quantity",
+    "increase_qty": "Increase quantity"
   },
   "reviews": {
     "header": "Reviews ({count})",
@@ -428,5 +431,10 @@
     "reason_fav_desc": "Same favorites on all your devices.",
     "reason_orders_title": "Order tracking",
     "reason_orders_desc": "Track all your orders in one place."
+  },
+  "a11y": {
+    "skip_to_content": "Skip to content",
+    "loading": "Loading",
+    "page_not_found": "Page Not Found"
   }
 }
