@@ -21,43 +21,20 @@ class OrderDetailNotifier extends FamilyNotifier<AsyncValue<OrderDto>, int> {
     return _load();
   }
 
-  Future<void> cancelOrder({String reason = ''}) async {
+  /// Cancels the order, then re-fetches so the server-computed refund block and
+  /// updated `actions` are reflected. Throws on failure so the caller (dialog)
+  /// can keep itself open and surface the error.
+  Future<void> cancelOrder({String reason = '', String note = ''}) async {
     final current = state.valueOrNull;
-    if (current == null) return;
-    try {
-      final repo = ref.read(orderRepositoryProvider);
-      await repo.cancelOrder(id: arg, reason: reason);
+    final repo = ref.read(orderRepositoryProvider);
+    await repo.cancelOrder(id: arg, reason: reason, note: note);
+    // Optimistic local flip first (snappy), then authoritative refetch.
+    if (current != null) {
       state = AsyncData(
-        OrderDto(
-          id: current.id,
-          userId: current.userId,
-          sellerId: current.sellerId,
-          status: OrderStatus.cancelled,
-          totalMinor: current.totalMinor,
-          itemsMinor: current.itemsMinor,
-          shippingMinor: current.shippingMinor,
-          commissionMinor: current.commissionMinor,
-          kdvMinor: current.kdvMinor,
-          currency: current.currency,
-          createdAt: current.createdAt,
-          updatedAt: DateTime.now(),
-          shippedAt: current.shippedAt,
-          deliveredAt: current.deliveredAt,
-          items: current.items,
-        ),
-      );
-    } on DioException catch (e, st) {
-      final err = e.error;
-      state = AsyncError(
-        err is AppError ? err : NetworkError(message: e.message ?? ''),
-        st,
-      );
-    } catch (e, st) {
-      state = AsyncError(
-        UnknownError(statusCode: 0, message: e.toString()),
-        st,
+        current.copyWith(status: OrderStatus.cancelled, updatedAt: DateTime.now()),
       );
     }
+    await _load();
   }
 
   Future<void> _load() async {

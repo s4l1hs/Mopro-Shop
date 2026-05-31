@@ -35,6 +35,96 @@ class OrderStatus {
       ];
 }
 
+/// A single order item that may still be returned, with its remaining quantity.
+class ReturnableItem {
+  const ReturnableItem({required this.itemId, required this.maxQuantity});
+
+  factory ReturnableItem.fromJson(Map<String, dynamic> json) => ReturnableItem(
+        itemId: (json['itemId'] as num).toInt(),
+        maxQuantity: (json['maxQuantity'] as num).toInt(),
+      );
+
+  final int itemId;
+  final int maxQuantity;
+}
+
+/// Server-computed eligibility block (the client renders CTAs from this — no
+/// client-side eligibility math, see SYSTEM_AUDIT §3.1).
+class OrderActions {
+  const OrderActions({
+    this.canCancel = false,
+    this.canReturn = false,
+    this.returnableUntil,
+    this.returnableItems = const [],
+  });
+
+  factory OrderActions.fromJson(Map<String, dynamic> json) => OrderActions(
+        canCancel: json['canCancel'] as bool? ?? false,
+        canReturn: json['canReturn'] as bool? ?? false,
+        returnableUntil: json['returnableUntil'] != null
+            ? DateTime.tryParse(json['returnableUntil'] as String)
+            : null,
+        returnableItems: (json['returnableItems'] as List<dynamic>? ?? [])
+            .map((e) => ReturnableItem.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+
+  final bool canCancel;
+  final bool canReturn;
+  final DateTime? returnableUntil;
+  final List<ReturnableItem> returnableItems;
+
+  int maxQuantityFor(int itemId) {
+    for (final r in returnableItems) {
+      if (r.itemId == itemId) return r.maxQuantity;
+    }
+    return 0;
+  }
+}
+
+/// Refund status as surfaced on order + return detail.
+class RefundStatus {
+  static const pending = 'pending';
+  static const processing = 'processing';
+  static const issued = 'issued';
+  static const failed = 'failed';
+}
+
+/// Read-only refund visibility block (derived server-side from the payment /
+/// return record). Null when no refund is in scope.
+class RefundInfo {
+  const RefundInfo({
+    required this.amountMinor,
+    required this.currency,
+    required this.method,
+    required this.status,
+    this.issuedAt,
+    this.estimatedAt,
+  });
+
+  factory RefundInfo.fromJson(Map<String, dynamic> json) => RefundInfo(
+        amountMinor: (json['amountMinor'] as num?)?.toInt() ?? 0,
+        currency: (json['currency'] as String?) ?? 'TRY',
+        method: (json['method'] as String?) ?? 'original_payment',
+        status: (json['status'] as String?) ?? RefundStatus.pending,
+        issuedAt: json['issuedAt'] != null
+            ? DateTime.tryParse(json['issuedAt'] as String)
+            : null,
+        estimatedAt: json['estimatedAt'] != null
+            ? DateTime.tryParse(json['estimatedAt'] as String)
+            : null,
+      );
+
+  final int amountMinor;
+  final String currency;
+  final String method; // original_payment | wallet_credit
+  final String status; // pending | processing | issued | failed
+  final DateTime? issuedAt;
+  final DateTime? estimatedAt;
+
+  bool get isWallet => method == 'wallet_credit';
+}
+
 class OrderDto {
   const OrderDto({
     required this.id,
@@ -52,33 +142,48 @@ class OrderDto {
     this.shippedAt,
     this.deliveredAt,
     this.items = const [],
+    this.actions,
+    this.refund,
   });
 
-  factory OrderDto.fromJson(Map<String, dynamic> json) => OrderDto(
-        id: (json['id'] as num).toInt(),
-        userId: (json['user_id'] as num).toInt(),
-        sellerId: (json['seller_id'] as num?)?.toInt(),
-        status: (json['status'] as String?) ?? OrderStatus.pendingPayment,
-        totalMinor: (json['total_minor'] as num).toInt(),
-        itemsMinor: (json['items_minor'] as num?)?.toInt(),
-        shippingMinor: (json['shipping_minor'] as num?)?.toInt(),
-        commissionMinor: (json['commission_minor'] as num?)?.toInt(),
-        kdvMinor: (json['kdv_minor'] as num?)?.toInt(),
-        currency: (json['currency'] as String?) ?? 'TRY',
-        createdAt: DateTime.parse(json['created_at'] as String),
-        updatedAt: json['updated_at'] != null
-            ? DateTime.tryParse(json['updated_at'] as String)
-            : null,
-        shippedAt: json['shipped_at'] != null
-            ? DateTime.tryParse(json['shipped_at'] as String)
-            : null,
-        deliveredAt: json['delivered_at'] != null
-            ? DateTime.tryParse(json['delivered_at'] as String)
-            : null,
-        items: (json['items'] as List<dynamic>? ?? [])
-            .map((e) => OrderItemDto.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+  /// Accepts both the flat order object (list items in `data[]`) and the
+  /// wrapped detail envelope `{order, items, actions, refund}`.
+  factory OrderDto.fromJson(Map<String, dynamic> json) {
+    final wrapped = json['order'] is Map<String, dynamic>;
+    final o = wrapped ? json['order'] as Map<String, dynamic> : json;
+    final itemsJson = (wrapped ? json['items'] : o['items']) as List<dynamic>?;
+    return OrderDto(
+      id: (o['id'] as num).toInt(),
+      userId: (o['user_id'] as num).toInt(),
+      sellerId: (o['seller_id'] as num?)?.toInt(),
+      status: (o['status'] as String?) ?? OrderStatus.pendingPayment,
+      totalMinor: (o['total_minor'] as num).toInt(),
+      itemsMinor: (o['items_minor'] as num?)?.toInt(),
+      shippingMinor: (o['shipping_minor'] as num?)?.toInt(),
+      commissionMinor: (o['commission_minor'] as num?)?.toInt(),
+      kdvMinor: (o['kdv_minor'] as num?)?.toInt(),
+      currency: (o['currency'] as String?) ?? 'TRY',
+      createdAt: DateTime.parse(o['created_at'] as String),
+      updatedAt: o['updated_at'] != null
+          ? DateTime.tryParse(o['updated_at'] as String)
+          : null,
+      shippedAt: o['shipped_at'] != null
+          ? DateTime.tryParse(o['shipped_at'] as String)
+          : null,
+      deliveredAt: o['delivered_at'] != null
+          ? DateTime.tryParse(o['delivered_at'] as String)
+          : null,
+      items: (itemsJson ?? [])
+          .map((e) => OrderItemDto.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      actions: json['actions'] is Map<String, dynamic>
+          ? OrderActions.fromJson(json['actions'] as Map<String, dynamic>)
+          : null,
+      refund: json['refund'] is Map<String, dynamic>
+          ? RefundInfo.fromJson(json['refund'] as Map<String, dynamic>)
+          : null,
+    );
+  }
 
   final int id;
   final int userId;
@@ -95,6 +200,34 @@ class OrderDto {
   final DateTime? shippedAt;
   final DateTime? deliveredAt;
   final List<OrderItemDto> items;
+  final OrderActions? actions;
+  final RefundInfo? refund;
+
+  OrderDto copyWith({
+    String? status,
+    DateTime? updatedAt,
+    OrderActions? actions,
+    RefundInfo? refund,
+  }) =>
+      OrderDto(
+        id: id,
+        userId: userId,
+        sellerId: sellerId,
+        status: status ?? this.status,
+        totalMinor: totalMinor,
+        itemsMinor: itemsMinor,
+        shippingMinor: shippingMinor,
+        commissionMinor: commissionMinor,
+        kdvMinor: kdvMinor,
+        currency: currency,
+        createdAt: createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        shippedAt: shippedAt,
+        deliveredAt: deliveredAt,
+        items: items,
+        actions: actions ?? this.actions,
+        refund: refund ?? this.refund,
+      );
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -110,8 +243,7 @@ class OrderDto {
         'created_at': createdAt.toIso8601String(),
         if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
         if (shippedAt != null) 'shipped_at': shippedAt!.toIso8601String(),
-        if (deliveredAt != null)
-          'delivered_at': deliveredAt!.toIso8601String(),
+        if (deliveredAt != null) 'delivered_at': deliveredAt!.toIso8601String(),
         'items': items.map((i) => i.toJson()).toList(),
       };
 }

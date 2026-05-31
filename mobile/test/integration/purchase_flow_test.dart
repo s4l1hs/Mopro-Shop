@@ -14,6 +14,8 @@ import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/features/order/data/order_repository.dart';
 import 'package:mopro_api/mopro_api.dart';
 
+import '../_support/order_returns_stub.dart';
+
 // ── Fakes ─────────────────────────────────────────────────────────────────────
 
 class _FakeCartRepo implements CartRepository {
@@ -128,7 +130,7 @@ Address _fakeAddress({int id = 5}) => Address(
       isDefault: true,
     );
 
-class _FakeOrderRepo implements OrderRepository {
+class _FakeOrderRepo with OrderReturnsStub implements OrderRepository {
   @override
   Future<OrderListResult> listOrders({int page = 1, int perPage = 20}) async =>
       OrderListResult(
@@ -158,7 +160,11 @@ class _FakeOrderRepo implements OrderRepository {
       );
 
   @override
-  Future<void> cancelOrder({required int id, String reason = ''}) async {}
+  Future<void> cancelOrder({
+    required int id,
+    String reason = '',
+    String note = '',
+  }) async {}
 }
 
 // ── Tests ──────────────────────────────────────────────────────────────────────

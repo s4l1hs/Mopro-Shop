@@ -658,7 +658,9 @@ func buildRedisClient(ctx context.Context) (*redis.Client, error) {
 
 // requireIdempotencyKey returns false and writes 422 if the header is missing.
 func requireIdempotencyKey(w http.ResponseWriter, r *http.Request) bool {
-	if r.Header.Get("Idempotency-Key") == "" {
+	// Accept either header: the Dart client + OpenAPI spec use X-Idempotency-Key,
+	// while older hand-written handlers/tests use Idempotency-Key.
+	if r.Header.Get("Idempotency-Key") == "" && r.Header.Get("X-Idempotency-Key") == "" {
 		jsonError(w, "Idempotency-Key header required", http.StatusUnprocessableEntity)
 		return false
 	}
