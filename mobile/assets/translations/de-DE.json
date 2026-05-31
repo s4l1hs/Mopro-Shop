@@ -87,5 +87,10 @@
     "reason_fav_desc": "Dieselben Favoriten auf allen Geräten.",
     "reason_orders_title": "Bestellverfolgung",
     "reason_orders_desc": "Verfolge alle Bestellungen an einem Ort."
+  },
+  "a11y": {
+    "skip_to_content": "Zum Inhalt springen",
+    "loading": "Wird geladen",
+    "page_not_found": "Seite nicht gefunden"
   }
 }

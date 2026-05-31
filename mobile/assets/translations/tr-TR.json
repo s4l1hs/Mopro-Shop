@@ -508,5 +508,10 @@
     "reason_fav_desc": "Tüm cihazlarında aynı favoriler.",
     "reason_orders_title": "Sipariş takibi",
     "reason_orders_desc": "Siparişlerini tek bir yerden izle."
+  },
+  "a11y": {
+    "skip_to_content": "İçeriğe atla",
+    "loading": "Yükleniyor",
+    "page_not_found": "Sayfa Bulunamadı"
   }
 }

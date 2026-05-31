@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/design/widgets/skip_to_content_link.dart';
 import 'package:mopro/features/cart/application/cart_count_provider.dart';
 import 'package:mopro/features/web/mega_menu/mega_menu_bar.dart';
 import 'package:mopro/shell/web_header.dart';
@@ -136,26 +137,89 @@ class _MobileShell extends ConsumerWidget {
 // is enforced HERE in the shell rather than inside the bar so the bar's own
 // rendering stays breakpoint-agnostic.
 
-class _WebShell extends StatelessWidget {
+class _WebShell extends StatefulWidget {
   const _WebShell({required this.navigationShell});
   final StatefulNavigationShell navigationShell;
 
   static const double megaMenuMinWidth = 768;
 
   @override
+  State<_WebShell> createState() => _WebShellState();
+}
+
+class _WebShellState extends State<_WebShell> {
+  // Focus scope wrapping the route content; the skip link moves focus here.
+  final FocusScopeNode _contentScope = FocusScopeNode(debugLabel: 'main-content');
+
+  @override
+  void dispose() {
+    _contentScope.dispose();
+    super.dispose();
+  }
+
+  void _skipToContent() {
+    // Land on the first focusable descendant of the content.
+    _contentScope
+      ..requestFocus()
+      ..nextFocus();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
-    final showMegaMenu = width >= megaMenuMinWidth;
-    return Scaffold(
-      appBar: const WebHeader(),
-      body: Column(
+    final showMegaMenu = width >= _WebShell.megaMenuMinWidth;
+    return FocusTraversalGroup(
+      policy: OrderedTraversalPolicy(),
+      child: Stack(
         children: [
-          if (showMegaMenu) const MegaMenuBar(),
-          Expanded(child: navigationShell),
+          MainContentScope(
+            contentScope: _contentScope,
+            child: Scaffold(
+              appBar: const WebHeader(),
+              body: Column(
+                children: [
+                  if (showMegaMenu) const MegaMenuBar(),
+                  Expanded(
+                    child: FocusScope(
+                      node: _contentScope,
+                      child: widget.navigationShell,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Skip link paints on top (last child) but is traversal-priority 0.
+          Positioned(
+            top: 8,
+            left: 8,
+            child: SkipToContentLink(onSkip: _skipToContent),
+          ),
         ],
       ),
     );
   }
+}
+
+/// Exposes the shell's main-content focus scope to descendants (mirrors the
+/// AccountChromeScope pattern). Routes may target this scope to receive focus
+/// from the skip link; the default skip behaviour focuses its first focusable.
+class MainContentScope extends InheritedWidget {
+  const MainContentScope({
+    required this.contentScope,
+    required super.child,
+    super.key,
+  });
+
+  final FocusScopeNode contentScope;
+
+  static FocusScopeNode? of(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<MainContentScope>()
+      ?.contentScope;
+
+  @override
+  bool updateShouldNotify(MainContentScope oldWidget) =>
+      oldWidget.contentScope != contentScope;
 }
 
 // ── Mobile bottom-nav item (unchanged) ──────────────────────────────────────
