@@ -1,11 +1,17 @@
 /// Compile-time feature flags.
 ///
-/// [kAnalyticsConsentEnabled] is the **launch gate** for the analytics consent
-/// surface (banner + settings) and the instrumentation layer (Tranche 4a/4b).
-/// It defaults to `true` for dev/staging so the flow is exercisable, and MUST be
-/// flipped to `false` for production via `--dart-define=ANALYTICS_CONSENT_ENABLED=false`
-/// until the privacy copy passes legal review (KVKK + GDPR — see
-/// `TRANCHE_4_DESIGN.md` §11, blocker #1, and REPORT.md "Pending legal review").
+/// [kAnalyticsConsentEnabled] enables the analytics consent surface (banner +
+/// settings) and the instrumentation layer (Tranche 4a/4b/4c).
+///
+/// Default `true` **everywhere** (dev, staging, prod) as of
+/// `chore/analytics-legal-copy-finalized` — legal review of the consent +
+/// privacy copy is complete, so production launch is unblocked. No env override
+/// is needed for prod.
+///
+/// Retained as a runtime **kill-switch**: ops can pass
+/// `--dart-define=ANALYTICS_CONSENT_ENABLED=false` for incident response (e.g. a
+/// data-handling issue requiring an immediate tracking pause). Removing the flag
+/// entirely is Backlog once the kill-switch is no longer needed.
 ///
 /// When `false`: the consent banner does not render, the privacy settings row is
 /// hidden, and `AnalyticsService.track()` no-ops (no queue, no network). The
