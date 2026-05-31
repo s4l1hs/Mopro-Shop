@@ -159,6 +159,7 @@ func main() {
 	inboxSvc := inbox.NewService(inbox.NewRepository(pool))
 	helpSvc := help.NewService(help.NewRepository(pool), slog.Default())
 	supportSvc := support.NewService(support.NewRepository(pool))
+	ugcSvc := catalog.NewUGCService(catalog.NewUGCRepository(pool)) // ReviewWriteService + QAService
 
 	// Payment module wired before order so orderSvc can receive the PSP reference.
 	paymentRepo := payment.NewRepository(pool)
@@ -590,6 +591,38 @@ func main() {
 	)
 	mux.Handle("GET /support/tickets/{id}",
 		httpTrace(requireAuth(http.HandlerFunc(handleGetTicket(supportSvc)))),
+	)
+	// ── Reviews write-side (Tranche 3) ────────────────────────────────────────
+	mux.Handle("POST /products/{productId}/reviews",
+		httpTrace(requireAuth(http.HandlerFunc(handleCreateReview(ugcSvc)))),
+	)
+	mux.Handle("PUT /products/{productId}/reviews/{reviewId}",
+		httpTrace(requireAuth(http.HandlerFunc(handleUpdateReview(ugcSvc)))),
+	)
+	mux.Handle("DELETE /products/{productId}/reviews/{reviewId}",
+		httpTrace(requireAuth(http.HandlerFunc(handleDeleteReview(ugcSvc)))),
+	)
+	mux.Handle("GET /me/reviews",
+		httpTrace(requireAuth(http.HandlerFunc(handleListUserReviews(ugcSvc)))),
+	)
+	mux.Handle("GET /products/{id}/review-eligibility",
+		httpTrace(requireAuth(http.HandlerFunc(handleReviewEligibility(ugcSvc, catalogSvc, orderSvc)))),
+	)
+	// ── Q&A (Tranche 3) ───────────────────────────────────────────────────────
+	mux.Handle("POST /products/{productId}/questions",
+		httpTrace(requireAuth(http.HandlerFunc(handleCreateQuestion(ugcSvc, identitySvc)))),
+	)
+	mux.Handle("GET /products/{productId}/questions",
+		httpTrace(http.HandlerFunc(handleListQuestions(ugcSvc))),
+	)
+	mux.Handle("GET /products/{productId}/questions/{questionId}",
+		httpTrace(http.HandlerFunc(handleGetQuestion(ugcSvc))),
+	)
+	mux.Handle("POST /products/{productId}/questions/{questionId}/answers",
+		httpTrace(requireAuth(http.HandlerFunc(handleCreateAnswer(ugcSvc, identitySvc)))),
+	)
+	mux.Handle("GET /me/questions",
+		httpTrace(requireAuth(http.HandlerFunc(handleListUserQuestions(ugcSvc)))),
 	)
 	mux.Handle("GET /seller/orders/{id}/breakdown",
 		httpTrace(http.HandlerFunc(handleSellerBreakdown(orderSvc))),

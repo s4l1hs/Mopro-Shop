@@ -139,7 +139,9 @@ class ReviewsState {
 /// Reviews notifier, keyed by productId. Not an AsyncNotifier because pagination
 /// state needs explicit handling and the helpful toggle is optimistic.
 class ReviewsNotifier extends FamilyNotifier<ReviewsState, int> {
-  late final int _productId;
+  // Not `late final`: the family Notifier rebuilds when invalidated (e.g. after
+  // a review submit), re-running build() and reassigning this.
+  late int _productId;
 
   @override
   ReviewsState build(int productId) {

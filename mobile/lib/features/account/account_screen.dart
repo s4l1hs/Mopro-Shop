@@ -159,6 +159,25 @@ class _AccountMobileBody extends ConsumerWidget {
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
+          // ── My content group (reviews + questions) ──────────────────────
+          SliverToBoxAdapter(
+            child: _TileGroup(
+              children: [
+                _Tile(
+                  icon: Icons.rate_review_outlined,
+                  label: 'account.rail_reviews'.tr(),
+                  onTap: () => context.push('/account/reviews'),
+                ),
+                _Tile(
+                  icon: Icons.help_outline_rounded,
+                  label: 'account.rail_questions'.tr(),
+                  onTap: () => context.push('/account/questions'),
+                ),
+              ],
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
           // ── Settings group ──────────────────────────────────────────────
           SliverToBoxAdapter(
             child: _TileGroup(

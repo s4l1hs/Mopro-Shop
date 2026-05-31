@@ -4,6 +4,8 @@ enum AccountRailItem {
   profile,
   orders,
   returns,
+  reviews,
+  questions,
   wallet,
   addresses,
   cards,
@@ -23,6 +25,10 @@ AccountRailItem accountRailItemFor(String location) {
   if (location.startsWith('/account/cards')) return AccountRailItem.cards;
   if (location.startsWith('/account/notifications')) {
     return AccountRailItem.notifications;
+  }
+  if (location.startsWith('/account/reviews')) return AccountRailItem.reviews;
+  if (location.startsWith('/account/questions')) {
+    return AccountRailItem.questions;
   }
   if (location.startsWith('/orders')) return AccountRailItem.orders;
   if (location.startsWith('/returns')) return AccountRailItem.returns;

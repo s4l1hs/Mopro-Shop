@@ -36,7 +36,9 @@
     "theme_dark": "Dunkel",
     "language": "Sprache",
     "coming_soon": "Dieser Bereich kommt bald.",
-    "returns": "Meine Rücksendungen"
+    "returns": "Meine Rücksendungen",
+    "rail_reviews": "Meine Bewertungen",
+    "rail_questions": "Meine Fragen"
   },
   "mega_menu": {
     "see_all": "Alle anzeigen",
@@ -67,7 +69,25 @@
     "sort_newest": "Neueste",
     "sort_highest": "Beste Bewertung",
     "sort_lowest": "Schlechteste Bewertung",
-    "sort_helpful": "Hilfreichste"
+    "sort_helpful": "Hilfreichste",
+    "edit": "Bearbeiten",
+    "write_cta": "Bewerten",
+    "form_title_new": "Bewertung schreiben",
+    "form_title_edit": "Bewertung bearbeiten",
+    "form_title_label": "Titel (optional)",
+    "form_body_label": "Ihre Bewertung",
+    "form_rating_required": "Bitte eine Bewertung wählen.",
+    "form_body_required": "Bitte schreiben Sie Ihre Bewertung.",
+    "form_already_exists": "Sie haben dieses Produkt bereits bewertet.",
+    "form_submit_new": "Senden",
+    "form_submit_edit": "Aktualisieren",
+    "my_title": "Meine Bewertungen",
+    "my_empty": "Sie haben noch keine Bewertungen geschrieben.",
+    "delete_confirm_title": "Bewertung löschen",
+    "delete_confirm_body": "Möchten Sie diese Bewertung wirklich löschen?",
+    "delete_failed": "Löschen fehlgeschlagen, bitte erneut versuchen.",
+    "go_shopping": "Zum Einkaufen",
+    "submitted": "Ihre Bewertung wurde gespeichert."
   },
   "welcome": {
     "greeting": "Willkommen, {name}.",
@@ -242,5 +262,35 @@
     "contact_ticket_no": "Ticket No: #{}",
     "contact_success_sub": "We'll respond within 48 hours.",
     "contact_title": "Kontakt"
+  },
+  "qa": {
+    "header": "Fragen ({count})",
+    "empty": "Noch keine Fragen.",
+    "ask_cta": "Frage stellen",
+    "ask_title": "Frage stellen",
+    "ask_hint": "Was möchten Sie zu diesem Produkt fragen?",
+    "ask_submit": "Frage senden",
+    "answer_title": "Antworten",
+    "answer_hint": "Schreiben Sie Ihre Antwort",
+    "answer_submit": "Antwort senden",
+    "answer_cta": "Antworten",
+    "answer_count": "{count} Antworten",
+    "answers_header": "Antworten",
+    "no_answers": "Noch keine Antworten. Antworten Sie als Erster.",
+    "body_required": "Bitte geben Sie einen Text ein.",
+    "action_failed": "Aktion fehlgeschlagen, bitte erneut versuchen.",
+    "seller_badge": "Verkäufer",
+    "load_more": "Weitere Fragen laden",
+    "load_error": "Fragen konnten nicht geladen werden.",
+    "sort_newest": "Neueste",
+    "sort_most_answered": "Meiste Antworten",
+    "login_to_ask": "Melden Sie sich an, um eine Frage zu stellen.",
+    "login_to_answer": "Melden Sie sich an, um zu antworten.",
+    "view_all": "Alle Fragen ansehen",
+    "my_title": "Meine Fragen",
+    "my_empty": "Sie haben noch keine Fragen gestellt.",
+    "detail_title": "Frage",
+    "ask_success": "Ihre Frage wurde gesendet.",
+    "answer_success": "Ihre Antwort wurde gesendet."
   }
 }

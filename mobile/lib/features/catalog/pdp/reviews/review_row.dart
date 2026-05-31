@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
+import 'package:mopro/core/widgets/adaptive_modal.dart';
 import 'package:mopro/core/widgets/login_required_sheet.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/features/account/current_user_provider.dart';
+import 'package:mopro/features/catalog/pdp/reviews/review_form_content.dart';
 import 'package:mopro/features/catalog/pdp/reviews/reviews_provider.dart';
 
 /// A single review: star rating + date, optional title/body, and a "Faydalı (N)"
@@ -43,10 +46,30 @@ class ReviewRow extends ConsumerWidget {
     }
   }
 
+  /// Opens the edit form in the adaptive presenter; on success re-fetches the
+  /// reviews list so the edited content shows immediately.
+  Future<void> _onEditTap(BuildContext context, WidgetRef ref) async {
+    final ok = await showAdaptiveModal<bool>(
+      context,
+      builder: (_) => ReviewFormContent(
+        productId: productId,
+        reviewId: review.id,
+        initialRating: review.rating,
+        initialTitle: review.title,
+        initialBody: review.body,
+      ),
+    );
+    if (ok ?? false) {
+      ref.invalidate(reviewsNotifierProvider(productId));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final currentUserId = ref.watch(currentUserProvider).valueOrNull?.id;
+    final isOwn = currentUserId != null && currentUserId == review.userId;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,6 +93,22 @@ class ReviewRow extends ConsumerWidget {
                 color: cs.onSurfaceVariant,
               ),
             ),
+            if (isOwn) ...[
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _onEditTap(context, ref),
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: Text('reviews.edit'.tr()),
+                style: TextButton.styleFrom(
+                  foregroundColor: cs.primary,
+                  visualDensity: VisualDensity.compact,
+                  textStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
         if (review.title.isNotEmpty) ...[

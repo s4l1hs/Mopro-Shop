@@ -2320,3 +2320,79 @@ separate `internal/help` (help_schema, public) + `internal/support`
 **Backlog (2b-surfaced):** ticket reply threading, agent inbox / live chat, article CMS/editor, article translation pipeline, article-feedback analytics, **ticket→notification bridge** (architecture path: a ticket-status-change event consumed by the PR #23 inbox to create a `system` notification), markdown image embedding, contact-form rate limiting.
 
 **Risk notes:** shared-IP rate-limit edge cases once throttling lands; markdown XSS surface if inline-HTML support is ever added (currently disabled); locale-fallback metric noise until de/ar articles are seeded; ILIKE search plan performance under large article counts (fine at 24, revisit with FTS at scale).
+
+## Tranche 3 PR — Review Submission + Q&A
+
+### Baseline (branched off `main` @ ff9a1cff; PR #24 merged)
+
+| Metric | Baseline |
+|---|---|
+| `flutter analyze` | No issues (0/0/0) |
+| `flutter test` | +521 / −94 (94 = Linux-baselined goldens on macOS) |
+| `flutter build web --release` | `main.dart.js` = 4,652,517 B |
+| `go test ./...` | 33 ok / 0 fail |
+| Audit parity (post-2b) | ≈ 45% |
+
+### §2 audit + decisions
+See `tool/audit/tranche3_baseline.md`. `product_reviews` already has the
+`(product_id,user_id)` unique + title/updated_at (0064) — write-side is purely
+additive (status + submitted_locale + revisions table). Reviews service is in
+`internal/catalog`. Q&A is greenfield; the PDP "Sorular" tab is a `_StubTab`
+placeholder (one-line swap). **§1.6 escape hatch NOT triggered — shipping one PR.**
+**Q&A module decision (AskUserQuestion): `internal/catalog` / `catalog_schema`**
+(alongside reviews).
+
+### §3 backend — DELIVERED (green, committed)
+Migrations 0073 (reviews write-side: status/submitted_locale + revisions; the
+(product_id,user_id) unique already existed) + 0074 (Q&A in catalog_schema:
+product_questions/product_answers, denormalized answer_count + author_name).
+`internal/catalog` ReviewWriteService + QAService (separate from the mocked
+catalog.Service): create/update(+revision)/soft-delete/list reviews, UserReviewID,
+Q&A create/list(sort)/detail/answer(+answer_count refresh)/my-questions; 9
+endpoints + GET /products/{id}/review-eligibility (order×catalog orchestration).
+Tests green: concurrent review → 1 row + ErrReviewExists; TestProperty_AnswerCountMatchesRows;
+review CRUD + ownership + revisions + soft-delete. is_seller=false in v1 (column/badge ready).
+
+### §4–§12 frontend — DELIVERED (green, committed)
+
+**§4 data + leaf widgets.** `review_write_provider` (UserReview/ReviewEligibility
+DTOs, ReviewWriteRepository, `reviewEligibilityProvider` family, `myReviewsProvider`
+with optimistic delete); `qa_provider` (Question/Answer DTOs, QaRepository,
+`questionsProvider`/`questionThreadProvider` families, `myQuestionsProvider`);
+`showAdaptiveModal` (bottom sheet <600 / dialog ≥600, mirrors the login presenter);
+ReviewFormContent (create+edit), QuestionFormContent/AnswerFormContent (body-only),
+QuestionRow, AnswerRow ("Satıcı" badge), ReviewRow own-review edit button.
+
+**§5 submission flow — 3 entry points.** `openReviewForm` shared helper
+(auth-gates → adaptive form → invalidate reviews/eligibility/myReviews +
+confirmation SnackBar), wired from (a) the order-detail per-item affordance on
+delivered orders, (b) the PDP reviews-tab eligibility-gated "Değerlendir" CTA
+(guests skip the 401 call), and (c) `/account/reviews` edit.
+
+**§6 /account/reviews.** MyReviewsScreen: own reviews, inline edit (reuses
+openReviewForm) + optimistic delete with confirm dialog; empty/error/load-more.
+
+**§7 PDP Q&A.** `_StubTab` swapped for PdpQaTab in both PDP layouts; qa_submission
+(openAskQuestion/openAnswer); ProductQuestionsScreen (`/products/:id/questions`)
+reuses PdpQaTab; QuestionDetailScreen (`/products/:id/questions/:qid`) renders the
+answer thread + "Yanıtla" CTA. Reads public; ask/answer gate via the presenter.
+
+**§8 /account/questions.** MyQuestionsScreen → tap row opens the detail thread.
+
+Router: public Q&A routes (guest-readable) + hard-gated account-shell reviews/
+questions routes; titles Yorumlarım/Sorularım/Sorular/Soru. Rail + mobile account
+menu gained "Yorumlarım"/"Sorularım".
+
+**§9 flows.** flow_aa (review submit via PDP CTA → POST asserted → SnackBar) +
+flow_bb (Q&A list + ask) — both green; integration suite 35/35.
+
+**§10 goldens.** 16 new goldens (pdp_qa_tab ×4, qa widgets ×4, review form ×3, qa
+form ×2, account my-reviews/my-questions ×3); baselines via golden-rebaseline CI.
+
+**§11/§12 docs.** CONTRIBUTING storage-layer-idempotency list extended (Q&A
+answer_count + the product_reviews unique-constraint flavour); this report +
+SYSTEM_AUDIT §10 parity update (≈45% → ≈50%).
+
+Surfaced fixes: review/qa form locale read is null-safe under widget tests; the
+Reviews/Questions family notifiers use `late int` (not `late final`) so a
+post-submit invalidate→rebuild doesn't throw LateError.

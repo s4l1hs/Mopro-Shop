@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
+import 'package:mopro/features/catalog/pdp/reviews/review_submission.dart';
 import 'package:mopro/features/order/application/order_detail_provider.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/features/order/data/order_item_dto.dart';
@@ -116,6 +117,13 @@ class _OrderDetailBody extends ConsumerWidget {
               (_, i) => _OrderItemRow(
                 item: order.items[i],
                 moneyFmt: moneyFmt,
+                onReview: order.status == OrderStatus.delivered
+                    ? () => openReviewForm(
+                          context,
+                          ref,
+                          productId: order.items[i].productId,
+                        )
+                    : null,
               ),
               childCount: order.items.length,
             ),
@@ -202,10 +210,18 @@ class _OrderDetailBody extends ConsumerWidget {
 }
 
 class _OrderItemRow extends StatelessWidget {
-  const _OrderItemRow({required this.item, required this.moneyFmt});
+  const _OrderItemRow({
+    required this.item,
+    required this.moneyFmt,
+    this.onReview,
+  });
 
   final OrderItemDto item;
   final NumberFormat moneyFmt;
+
+  /// When non-null (delivered orders), renders a "Değerlendir" affordance that
+  /// opens the review form for this item's product.
+  final VoidCallback? onReview;
 
   @override
   Widget build(BuildContext context) {
@@ -214,52 +230,74 @@ class _OrderItemRow extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: item.coverImageUrl != null
-                ? CachedNetworkImage(
-                    imageUrl: item.coverImageUrl!,
-                    width: 64,
-                    height: 64,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => _placeholder(cs),
-                  )
-                : _placeholder(cs),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  style: theme.textTheme.bodyMedium,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: item.coverImageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: item.coverImageUrl!,
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => _placeholder(cs),
+                      )
+                    : _placeholder(cs),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: theme.textTheme.bodyMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'order.qty_x_price'.tr(namedArgs: {
+                        'qty': '${item.qty}',
+                        'price': moneyFmt.format(item.priceMinor / 100.0),
+                      },),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'order.qty_x_price'.tr(namedArgs: {
-                    'qty': '${item.qty}',
-                    'price': moneyFmt.format(item.priceMinor / 100.0),
-                  },),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                moneyFmt.format(item.lineTotalMinor / 100.0),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          if (onReview != null)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(top: 8, start: 76),
+                child: OutlinedButton.icon(
+                  onPressed: onReview,
+                  icon: const Icon(Icons.rate_review_outlined, size: 16),
+                  label: Text('reviews.write_cta'.tr()),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: cs.primary,
+                    side: BorderSide(color: cs.primary),
+                    visualDensity: VisualDensity.compact,
                   ),
                 ),
-              ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            moneyFmt.format(item.lineTotalMinor / 100.0),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
         ],
       ),
     );

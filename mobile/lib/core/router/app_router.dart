@@ -7,6 +7,8 @@ import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/account/account_screen.dart';
 import 'package:mopro/features/account/cards_screen.dart';
 import 'package:mopro/features/account/profile_screen.dart';
+import 'package:mopro/features/account/questions/my_questions_screen.dart';
+import 'package:mopro/features/account/reviews/my_reviews_screen.dart';
 import 'package:mopro/features/account/security_screen.dart';
 import 'package:mopro/features/account/widgets/account_shell.dart';
 import 'package:mopro/features/address/screens/address_form_screen.dart';
@@ -23,6 +25,8 @@ import 'package:mopro/features/catalog/screens/category_products_screen.dart';
 import 'package:mopro/features/catalog/screens/category_screen.dart';
 import 'package:mopro/features/catalog/screens/home_screen.dart';
 import 'package:mopro/features/catalog/screens/product_detail_screen.dart';
+import 'package:mopro/features/catalog/screens/product_questions_screen.dart';
+import 'package:mopro/features/catalog/screens/question_detail_screen.dart';
 import 'package:mopro/features/catalog/screens/search_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_address_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_payment_screen.dart';
@@ -74,6 +78,13 @@ String moproPageTitle(String location, {String? name}) {
   if (location.startsWith('/categories/')) {
     return name == null ? loading : t(name);
   }
+  // Q&A sub-routes must be matched before the generic /products/ product title.
+  if (RegExp(r'^/products/\d+/questions/\d+').hasMatch(location)) {
+    return t('Soru');
+  }
+  if (RegExp(r'^/products/\d+/questions/?$').hasMatch(location)) {
+    return t('Sorular');
+  }
   if (location.startsWith('/products/')) {
     return name == null ? loading : t(name);
   }
@@ -96,6 +107,8 @@ String moproPageTitle(String location, {String? name}) {
   if (location == '/account/profile') return t('Profilim');
   if (location == '/account/security') return t('Güvenlik');
   if (location == '/account/cards') return t('Kartlarım');
+  if (location == '/account/reviews') return t('Yorumlarım');
+  if (location == '/account/questions') return t('Sorularım');
   if (location == '/account/notifications/preferences') {
     return t('Bildirim Ayarları');
   }
@@ -148,7 +161,9 @@ String? computeAuthRedirect({
       location.startsWith('/profile/addresses') ||
       location.startsWith('/account/profile') ||
       location.startsWith('/account/security') ||
-      location.startsWith('/account/cards');
+      location.startsWith('/account/cards') ||
+      location.startsWith('/account/reviews') ||
+      location.startsWith('/account/questions');
 
   return switch (auth) {
     null || AuthUnauthenticated() => isAuthRoute
@@ -253,6 +268,47 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      // Public Q&A: standalone questions list + single-question thread. Reads
+      // are open to guests; the ask/answer CTAs gate via the login presenter.
+      GoRoute(
+        path: '/products/:id/questions',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) {
+          final raw = state.pathParameters['id'];
+          final id = raw != null ? int.tryParse(raw) : null;
+          if (id == null || id <= 0) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => rootNavigatorKey.currentContext?.go('/'),
+            );
+            return const SizedBox.shrink();
+          }
+          return _titledLoc(
+            '/products/$id/questions',
+            ProductQuestionsScreen(productId: id),
+          );
+        },
+        routes: [
+          GoRoute(
+            path: ':qid',
+            builder: (_, state) {
+              final pRaw = state.pathParameters['id'];
+              final qRaw = state.pathParameters['qid'];
+              final pid = pRaw != null ? int.tryParse(pRaw) : null;
+              final qid = qRaw != null ? int.tryParse(qRaw) : null;
+              if (pid == null || pid <= 0 || qid == null || qid <= 0) {
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => rootNavigatorKey.currentContext?.go('/'),
+                );
+                return const SizedBox.shrink();
+              }
+              return _titledLoc(
+                '/products/$pid/questions/$qid',
+                QuestionDetailScreen(productId: pid, questionId: qid),
+              );
+            },
+          ),
+        ],
+      ),
       // Full-screen multi-step return flow (outside the account shell).
       GoRoute(
         path: '/orders/:id/return',
@@ -347,6 +403,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/account/cards',
             builder: (_, __) => const CardsScreen(),
+          ),
+          GoRoute(
+            path: '/account/reviews',
+            builder: (_, __) => const MyReviewsScreen(),
+          ),
+          GoRoute(
+            path: '/account/questions',
+            builder: (_, __) => const MyQuestionsScreen(),
           ),
           GoRoute(
             path: '/account/notifications',
