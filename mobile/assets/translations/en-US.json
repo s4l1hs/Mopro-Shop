@@ -626,6 +626,8 @@
     "view_all": "See all questions",
     "my_title": "My questions",
     "my_empty": "You haven't asked any questions yet.",
-    "detail_title": "Question"
+    "detail_title": "Question",
+    "ask_success": "Your question has been submitted.",
+    "answer_success": "Your answer has been submitted."
   }
 }

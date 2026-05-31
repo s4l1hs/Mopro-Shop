@@ -289,6 +289,8 @@
     "view_all": "عرض كل الأسئلة",
     "my_title": "أسئلتي",
     "my_empty": "لم تطرح أي أسئلة بعد.",
-    "detail_title": "سؤال"
+    "detail_title": "سؤال",
+    "ask_success": "تم إرسال سؤالك.",
+    "answer_success": "تم إرسال إجابتك."
   }
 }

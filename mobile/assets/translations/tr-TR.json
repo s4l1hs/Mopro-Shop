@@ -706,6 +706,8 @@
     "view_all": "Tüm soruları gör",
     "my_title": "Sorularım",
     "my_empty": "Henüz soru sormadınız.",
-    "detail_title": "Soru"
+    "detail_title": "Soru",
+    "ask_success": "Sorunuz gönderildi.",
+    "answer_success": "Yanıtınız gönderildi."
   }
 }
