@@ -388,3 +388,32 @@ actions, on screen open, on auth-state changes — over `Timer.periodic`. When
 real-time updates matter for a specific surface, the path is WebSockets or
 server-sent events, not faster polling. Precedent: the Tranche 2a notification
 badge dropped its 60s poll for on-demand refresh (PR #23).
+
+## Decision precedence — locked design > CONTRIBUTING > prompt specifics
+
+When a task prompt conflicts with a locked architectural decision
+(`TRANCHE_*_DESIGN.md`) or an established CONTRIBUTING pattern, the
+higher-precedence source wins:
+
+> **locked design > CONTRIBUTING patterns > per-task-prompt specifics**
+
+Each level may override the next when they conflict; the override is auditable
+because it cites the higher-precedence source. Precedents:
+- PR #28 followed design §7 (auto `page_view` + **manual** business events) over
+  the prompt's auto-ProviderObserver allowlist.
+- PR #27 followed the CONTRIBUTING cross-schema soft-reference pattern over the
+  prompt's `REFERENCES … ON DELETE CASCADE` SQL.
+- Tranche 4c shipped a sibling `ProductListRail` rather than contorting the
+  provider-coupled `ProductRail` the prompt named `MoproProductRail`.
+
+## Defensive layering — cross-cutting infra fails closed
+
+Cross-cutting infrastructure (analytics, telemetry, observability) must **fail
+closed for itself but open for the surfaces it instruments**. An analytics
+failure must never propagate into the commerce path. Event emission, flush,
+identify, and recently-viewed fetch resolve to silent no-ops or **empty** states —
+never error states that the home/cart/checkout flows would render or crash on.
+Precedents: PR #28 caught a `purchase_flow` regression during instrumentation
+(resilient session-id + guarded lifecycle observer); Tranche 4c's
+`recentlyViewedProvider` treats fetch errors as empty data (rail hides), not error
+data (rail shows an error).
