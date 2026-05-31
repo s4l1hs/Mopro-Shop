@@ -2194,3 +2194,14 @@ See `tool/audit/tranche1_baseline.md`. Summary: cancel + refund endpoints
 unwired — no table/service/handler); order DTO lacks `actions`; no
 `OrderStatusTimeline` widget exists (only a status chip). Scope adaptations
 documented there (return model follows the OpenAPI contract).
+
+### §3 backend — DELIVERED (green, pushed)
+- Migration `0070_returns` (returns + return_items + return_status_history); round-trip + `UNIQUE(order_id,order_item_id)` verified live on pg-ecom-test.
+- `order.ReturnService`: CreateReturn (ownership/delivery/14-day-window/membership/quantity validation, refactored under gocyclo 15), GetReturn (ownership-scoped), ListReturns, ComputeActions (server-side `actions`).
+- core-svc routes: `POST /orders/{id}/returns`, `GET /returns`, `GET /returns/{id}`; `GET /orders/{id}` now carries `actions` + read-only `refund`.
+- CancelOrder idempotent (re-cancel = no-op success).
+- Tests: unit (eligibility + all CreateReturn rejections) + integration concurrent-convergence (N goroutines → 1 row). `make verify` green.
+- Adaptation: returns follow the OpenAPI contract (single reason + optional items); refund visibility is read-only (no new ledger writes). Followed the hand-written-endpoint convention (no OpenAPI/Dart regen) — consistent with the Reviews PR; openapi-ci stays in sync.
+
+### Remaining (frontend + integration + docs) — NOT yet done
+§4 OrderEligibilityActions · §5 CancelOrderDialog · §6 multi-step return flow · §7 RefundStatusCard · §8 OrderStatusTimeline (new — no prior widget existed) · §9 returns list/detail + account rail · §10 flows V/W/X · §11 golden rebaseline (Linux CI) · §12 REPORT/SYSTEM_AUDIT parity update. The frontend also needs to reconcile the wrapped `{order,items,actions,refund}` detail response with the hand-written `OrderDto.fromJson`.
