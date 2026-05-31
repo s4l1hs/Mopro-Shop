@@ -2396,3 +2396,89 @@ SYSTEM_AUDIT §10 parity update (≈45% → ≈50%).
 Surfaced fixes: review/qa form locale read is null-safe under widget tests; the
 Reviews/Questions family notifiers use `late int` (not `late final`) so a
 post-submit invalidate→rebuild doesn't throw LateError.
+
+## Tranche 4a PR — Analytics Pipeline (pipeline-only; consumer → 4b)
+
+### Baseline (branched off `main` @ PR #26 merged)
+
+| Metric | Baseline |
+|---|---|
+| `go test ./...` | 33 pkgs ok / 0 fail |
+| `flutter analyze` | No issues |
+| integration suite | 35/35 |
+| 3 binaries build | OK |
+| next migration | 0075 |
+| audit parity | ≈49% |
+
+### Design inputs (locked, TRANCHE_4_DESIGN.md §2–§8)
+Taxonomy = Standard ~20 events · Storage = append-only log + derived projections ·
+Consent = binary opt-in · Identity = guest tracking + merge-on-auth · Retention =
+raw 90d + user-controllable erase · Instrumentation = hybrid · Bundle = infra + one
+consumer (recently-viewed).
+
+### §1.6 split invoked (trigger #1) — pipeline-only 4a
+Audit (`tool/audit/tranche4a_baseline.md`) surfaced that the backend pipeline is a
+full large PR on its own AND that the §7 recently-viewed consumer is
+**build-from-scratch** (no Session-5a `recentlyViewedProvider`/home rail exists —
+the prompt's "refactor" premise was incorrect; the rail column is explicitly
+omitted at `home_screen.dart:109–130`). Design doc estimated 4a at ~2 sessions.
+Confirmed with the user → shipped 4a = **backend pipeline** (green, tested,
+documented); consent UX + instrumentation + recently-viewed consumer + flows +
+goldens carried to **4b**.
+
+### Backend delivered (green)
+Migration `0075` (round-trip verified on pg-ecom-test): `analytics_schema` +
+`analytics_events` (append-only) + `session_identity` + `user_consent` +
+`user_recently_viewed`; plain BIGINT soft refs (no cross-schema FK). Bootstrap
+role/schema/grants. `internal/analytics` (shared core-svc + jobs-svc): 20-event
+validation, consent-gated ingest, identify+backfill, consent CRUD, RTBF erase,
+recently-viewed read, prune (03:00) + rebuild (04:00) crons. 6 core-svc endpoints
+(`POST /analytics/events` OptionalAuth; identify/consent×3/recently-viewed auth).
+Tests: 9 unit (fakeRepo) + 6 integration — all green; boundaries OK; lint 0 issues.
+
+### Blocker resolutions (`tool/audit/tranche4a_blockers.md`)
+- **#2 raw search text** — RESOLVED: Option A (normalized intent only); raw keys
+  stripped server-side + unit-tested.
+- **#3 account deletion** — RESOLVED: `DELETE /me` `onUserDeleted` hook erases
+  analytics rows synchronously (soft-delete emits no event, so no consumer);
+  integration-tested.
+- **#1 privacy copy / legal review** — carried to 4b (consent UX deferred). The
+  pipeline is **dormant** in 4a: consent defaults off, no consent-UI caller, no
+  client instrumentation → no events flow until 4b. Legal review gates 4b.
+
+### Important reconciliation
+The prompt's §3.1 SQL used cross-schema FKs (`REFERENCES users(id)/products(id)
+ON DELETE CASCADE`). That conflicts with the locked design (Decision 4: soft
+BIGINT refs), CLAUDE.md §5, the Tranche 3 precedent, and the soft-delete reality
+(CASCADE never fires). Reconciled to plain BIGINT soft references + explicit
+handler-orchestrated erasure. Documented in the audit baseline.
+
+### Frontend
+No mobile changes this PR (consent UX + consumer are 4b). `flutter analyze` /
+`flutter test` / `flutter build web` unchanged by construction.
+
+### Pending legal review
+Privacy copy + consent banner + privacy article — all deferred to 4b; none
+shipped in 4a, so nothing legal-review-gated is exposed to users yet.
+
+### Backlog (4a-surfaced / deferred)
+4b consumers (recent-search autocomplete, `/recommendations` backing, Continue-
+browsing rail) · consent UX + DRAFT copy + build flag + privacy article ·
+hybrid instrumentation (analyticsService + observers + manual call sites) ·
+recently-viewed home rail (build-from-scratch) · flows CC/DD · ~8 goldens ·
+raw-search-text opt-in toggle · ingest rate-limiting (60/min/session) ·
+external broker (design Option C, scale escape) · A/B testing (separate domain).
+
+### Parity update
+SYSTEM_AUDIT §12: Event tracking pipeline Missing→**Complete**; Browsing history
+Missing→**Partial** (projection + read endpoint; UI is 4b); Recommendation data
+flow Missing→**Partial**; new Consent/privacy-controls row **Partial**. Roll-up
+≈49% → ≈49–50% (the consumer + consent UX in 4b lift browsing/consent to
+Complete toward the ~52% target).
+
+### Risk notes
+Pipeline dormant until 4b (safe). Projection drift between incremental upsert and
+nightly rebuild (rebuild is the backstop). Prune lock contention bounded by the
+100k-row cap + iterate. Analytics shares the postgres-ecom pool; high event
+volume is a future concern (design Option C escape, not pre-built). Normalized-
+only search reduces some recommendation signal (accepted; raw-opt-in is Backlog).
