@@ -441,7 +441,14 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
           ),
         ],
         const SizedBox(height: 16),
-        PdpSellerCard(sellerName: product.sellerName, onTap: () {}),
+        PdpSellerCard(
+          sellerName: product.sellerName,
+          // Route to the seller storefront only when the slug resolved; a null
+          // slug (legacy/platform-direct or suspended seller) hides the link.
+          onTap: (product.sellerSlug != null && product.sellerSlug!.isNotEmpty)
+              ? () => context.push('/sellers/${product.sellerSlug}')
+              : null,
+        ),
         const SizedBox(height: 16),
         _QuantityStepper(
           quantity: _quantity,

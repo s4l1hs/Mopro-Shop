@@ -42,9 +42,13 @@ class PdpSellerCard extends StatelessWidget {
             ),
           ),
           if (onTap != null)
-            TextButton(
-              onPressed: onTap,
-              child: Text('product.go_to_store'.tr()),
+            Semantics(
+              button: true,
+              label: 'product.go_to_store_a11y'.tr(),
+              child: TextButton(
+                onPressed: onTap,
+                child: Text('product.go_to_store'.tr()),
+              ),
             ),
         ],
       ),
