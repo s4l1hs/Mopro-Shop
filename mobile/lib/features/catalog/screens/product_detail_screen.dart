@@ -29,6 +29,8 @@ import 'package:mopro/features/catalog/widgets/pdp_image_gallery.dart';
 import 'package:mopro/features/catalog/widgets/product_card.dart';
 import 'package:mopro/features/catalog/widgets/product_rail.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
+import 'package:mopro/features/growth/meta_tags_service.dart';
+import 'package:mopro/features/growth/seo_head.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 class ProductDetailScreen extends ConsumerWidget {
@@ -132,8 +134,18 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
 
   @override
   Widget build(BuildContext context) {
-    if (!context.isMobile) return _buildWide(context);
-    return _buildMobile(context);
+    final product = widget.product;
+    final webBase = ref.watch(webBaseUrlProvider);
+    return SeoHead(
+      meta: MetaTagsInput(
+        title: '${product.title} — Mopro',
+        description: seoDescription(product.description),
+        imageUrl: _imageUrls.firstOrNull,
+        canonicalUrl: '$webBase/products/${product.id}',
+        openGraphExtras: const {'og:type': 'product'},
+      ),
+      child: context.isMobile ? _buildMobile(context) : _buildWide(context),
+    );
   }
 
   Widget _buildMobile(BuildContext context) {

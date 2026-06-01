@@ -521,6 +521,9 @@
     "link_copied": "Bağlantı kopyalandı.",
     "share_a11y": "Paylaş: {title}"
   },
+  "seo": {
+    "category_description": "{category} kategorisindeki ürünleri keşfedin."
+  },
   "browsing_history": {
     "title": "Geçmişin",
     "subtitle": "Son baktığın ürünler. Geçmişini istediğin zaman silebilirsin.",

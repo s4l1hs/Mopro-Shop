@@ -18,6 +18,8 @@ import 'package:mopro/features/catalog/plp/widgets/plp_filter_chips.dart';
 import 'package:mopro/features/catalog/providers/filtered_products_provider.dart';
 import 'package:mopro/features/catalog/widgets/filter_sheet.dart';
 import 'package:mopro/features/catalog/widgets/sort_sheet.dart';
+import 'package:mopro/features/growth/meta_tags_service.dart';
+import 'package:mopro/features/growth/seo_head.dart';
 import 'package:mopro/widgets/catalog/catalog_shell.dart';
 import 'package:mopro_api/mopro_api.dart';
 
@@ -135,17 +137,26 @@ class _CategoryProductsScreenState
           ref.read(filteredProductsProvider(_key).notifier).refresh(),
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.categoryName),
-        actions: [
-          MoproShareButton(
-            url: '${ref.watch(webBaseUrlProvider)}/categories/${widget.categoryId}',
-            title: widget.categoryName,
-          ),
-        ],
+    final webBase = ref.watch(webBaseUrlProvider);
+    return SeoHead(
+      meta: MetaTagsInput(
+        title: '${widget.categoryName} — Mopro',
+        description: 'seo.category_description'
+            .tr(namedArgs: {'category': widget.categoryName}),
+        canonicalUrl: '$webBase/categories/${widget.categoryId}',
       ),
-      body: context.isMobile ? shell : _buildWide(context, products, shell),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.categoryName),
+          actions: [
+            MoproShareButton(
+              url: '$webBase/categories/${widget.categoryId}',
+              title: widget.categoryName,
+            ),
+          ],
+        ),
+        body: context.isMobile ? shell : _buildWide(context, products, shell),
+      ),
     );
   }
 
