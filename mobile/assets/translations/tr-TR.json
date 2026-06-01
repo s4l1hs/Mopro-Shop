@@ -191,7 +191,8 @@
     "returns": "İadelerim",
     "rail_reviews": "Yorumlarım",
     "rail_questions": "Sorularım",
-    "rail_privacy": "Gizlilik"
+    "rail_privacy": "Gizlilik",
+    "rail_history": "Geçmişim"
   },
   "address": {
     "list_title": "Adreslerim",

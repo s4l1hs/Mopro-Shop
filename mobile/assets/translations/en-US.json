@@ -161,7 +161,8 @@
     "returns": "My Returns",
     "rail_reviews": "My reviews",
     "rail_questions": "My questions",
-    "rail_privacy": "Privacy"
+    "rail_privacy": "Privacy",
+    "rail_history": "My history"
   },
   "address": {
     "list_title": "My Addresses",
