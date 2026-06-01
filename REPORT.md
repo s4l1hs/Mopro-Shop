@@ -2718,6 +2718,7 @@ storefront, no role gating. Built the module from the stub.
 - **PDP "Mağazaya git" wiring**: needs the seller **slug** on the product-detail
   payload (generated `Product` has only `sellerId`/`sellerName`) → an OpenAPI
   codegen change. Storefront is fully deep-linkable by slug meanwhile.
+  ✅ **CLOSED** by the `seller.slug DTO PR` (see below).
 
 ### Deferred to 5b (next tranche, pre-authorized)
 Share infra, SEO meta tags, JSON-LD, sitemap/robots, Recently-Viewed see-all.
@@ -2736,3 +2737,49 @@ Linux via the rebaseline workflow; no existing goldens changed.
   inline guard — enforcement is present in the handler.
 - de/ar storefront strings fall back to the configured `tr-TR` fallback (the de/ar
   files are curated subsets), consistent with the existing `seller.*` block.
+
+## seller.slug DTO PR — `chore/seller-slug-in-product-dto`
+
+Operational unblock, not a feature: makes the Tranche 5a PDP→storefront link work
+by adding the missing field at its source (OpenAPI spec → regen → wire).
+
+1. **Closed carry** — closes the Tranche 5a "PDP Mağazaya git wiring" carry
+   (REPORT §"Carried to 5a-2", marked ✅ above). 5a is **not** merged to main, so
+   this branched off `feat/seller-facing-and-platform-growth` (stacking), not
+   main — flagged in `tool/audit/seller_slug_dto_baseline.md`.
+2. **DTO change** — `seller_slug` (string, **nullable**) added to the `Product`
+   (detail) schema only (`api/openapi.yaml`); `ProductSummary` intentionally
+   untouched (list cards don't navigate to storefronts).
+3. **Handler update** — `cmd/core-svc/catalog_handlers.go` `handleGetProductDetail`
+   now resolves `seller.Service.GetByID(p.SellerID)` and emits `seller_slug`
+   (null on `ErrSellerNotFound`) + `seller_name` (`""` unresolved) via a struct
+   embedding `catalog.Product`. This also fixed a latent gap: `seller_name` was
+   schema-required but never populated (handler returned `catalog.Product`
+   directly). Wired in `cmd/core-svc/main.go`.
+4. **Frontend wiring** — `mobile/lib/features/catalog/screens/product_detail_screen.dart:444`
+   passes `onTap: () => context.push('/sellers/$slug')` when `sellerSlug != null`,
+   else null (the card hides the link). `PdpSellerCard` link wrapped in
+   `Semantics(button, label: product.go_to_store_a11y)`.
+5. **No parity change** — operational unblock; no capability flipped.
+
+**Codegen:** `make api-gen` (oapi-codegen Go + openapi-generator Dart) **+**
+`dart run build_runner build` (the `*.g.dart` that actually (de)serializes).
+`api-check-sync` green; diff scoped to the Product schema.
+
+**Drive-by fixes (§7):** `build_runner` regenerated `product_summary.g.dart`,
+which had been missing `flash_price_minor` (de)serialization — a prior PR added
+the field to the spec/DTO but never re-ran `build_runner`, so flash-deal prices
+silently weren't serializing. Corrected here (the exact drift the new CONTRIBUTING
+"Generated DTOs are source-of-truth" note warns about).
+
+**Goldens:** the 8 `pdp_two_col_*` goldens render the PDP incl. the seller card.
+Fixtures gained `sellerSlug: 'acme-store'` so the (now functional) link renders
+exactly as before — `Semantics` adds no pixels → byte-identical, **no rebaseline**
+(CI's Linux golden job is the arbiter). 2 new card tests + 1 a11y-guard test.
+
+**Tests:** `go test ./...` green; full backend incl. 2 new product-detail handler
+tests (slug+name resolved; unresolved → null slug + empty name). Flutter:
+556 passed / 121 failed where **all 121 are the macOS golden platform guard**
+(baselined on Linux CI) — no logic regressions. `flutter analyze` clean;
+`flutter build web --release` succeeds (`main.dart.js` 4.73 MB, within the +1%
+budget — change is one field + one handler).
