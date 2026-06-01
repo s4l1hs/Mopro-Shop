@@ -8,6 +8,7 @@ import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/account/current_user_provider.dart';
 import 'package:mopro/features/account/widgets/account_rail_item.dart';
 import 'package:mopro/features/notifications/widgets/notification_badge.dart';
+import 'package:mopro/features/seller/user_is_seller_provider.dart';
 
 /// Desktop/tablet account navigation rail: a user card on top (authed/guest
 /// variants) and a column of menu rows with route-aware active highlight, hover
@@ -74,6 +75,10 @@ class _AccountLeftRailState extends ConsumerState<AccountLeftRail> {
         _row(AccountRailItem.notifications, Icons.notifications_outlined,
             'account.notifications'.tr(), active, '/account/notifications',
             withBadge: true,),
+        // Seller panel — only for users bound to a seller account.
+        if (ref.watch(userIsSellerProvider))
+          _row(AccountRailItem.seller, Icons.storefront_outlined,
+              'seller.panel_title'.tr(), active, '/seller/dashboard',),
         const _RailDivider(),
         _row(AccountRailItem.help, Icons.help_outline_rounded,
             'account.menu_help'.tr(), active, '/help',),
