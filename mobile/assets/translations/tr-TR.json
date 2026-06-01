@@ -191,7 +191,8 @@
     "returns": "İadelerim",
     "rail_reviews": "Yorumlarım",
     "rail_questions": "Sorularım",
-    "rail_privacy": "Gizlilik"
+    "rail_privacy": "Gizlilik",
+    "rail_history": "Geçmişim"
   },
   "address": {
     "list_title": "Adreslerim",
@@ -515,6 +516,26 @@
     "no_reviews": "Bu mağaza için henüz yorum yok",
     "load_error": "Mağaza yüklenemedi",
     "retry": "Tekrar dene"
+  },
+  "share": {
+    "share": "Paylaş",
+    "link_copied": "Bağlantı kopyalandı.",
+    "share_a11y": "Paylaş: {title}"
+  },
+  "seo": {
+    "category_description": "{category} kategorisindeki ürünleri keşfedin."
+  },
+  "browsing_history": {
+    "title": "Geçmişin",
+    "subtitle": "Son baktığın ürünler. Geçmişini istediğin zaman silebilirsin.",
+    "clear": "Geçmişi sil",
+    "empty_title": "Henüz ürün incelememişsin.",
+    "empty_cta": "Keşfetmeye başla",
+    "confirm_title": "Geçmişi silmek istediğinden emin misin?",
+    "confirm_body": "Bu işlem geri alınamaz. Geçmiş silindikten sonra önerilerimiz değişebilir.",
+    "confirm_cancel": "Vazgeç",
+    "confirm_delete": "Sil",
+    "deleted_toast": "Geçmişin silindi."
   },
   "error": {
     "unauthorized": "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",

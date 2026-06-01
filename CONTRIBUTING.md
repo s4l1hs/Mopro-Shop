@@ -106,6 +106,41 @@ Examples:
 
 `golangci-lint` (depguard rules in `.golangci.yml`) enforces the same rules at lint time.
 
+## Runtime DOM mutation for Flutter web head content
+
+Flutter web ships as an SPA; per-route head content (titles, meta tags, JSON-LD)
+is set at runtime via DOM mutation rather than build-time templating. Modern
+crawlers execute JavaScript and pick up the updates; the trade-off (JS-less
+crawlers see only the initial `web/index.html` shell) is documented per-PR.
+
+Services follow a consistent shape: an abstract interface with `setX(...)`
+methods, behind a **conditional import** (`import 'x_noop.dart' if
+(dart.library.html) 'x_web.dart'`) so the web build gets a `package:web`
+(not deprecated `dart:html`) DOM impl and every other target (mobile, desktop,
+VM tests) gets a no-op. The web impl is **idempotent** (update existing tags in
+place, create when absent) and **fails closed** — a DOM error never propagates to
+the user surface (try/catch + optional dev log). Keep the input→tags mapping in a
+**pure function** so it's unit-testable without a DOM; the per-route invocation is
+tested by overriding the service provider with a recorder.
+
+Precedent: Tranche 5b `MetaTagsService` + `StructuredDataService`, applied via the
+`SeoHead` wrapper in a post-frame callback (never blocks first paint).
+
+## Backend-served paths that bypass the Flutter router
+
+Some routes are served entirely by the backend without entering Flutter's router:
+`/sitemap.xml`, `/robots.txt`, OAuth callbacks, raw asset proxies. When adding
+such routes, verify the Flutter web `go_router` config doesn't catch them — they
+should fall through to the backend / static asset serving (Caddy routes the path
+prefix to the service before the SPA loads). The verification is a backend
+integration smoke test that fetches the route and asserts the content type;
+frontend-side, confirm `go_router` has no matching entry (only the `errorBuilder`
+would see it, and these never reach the SPA in production).
+
+Precedent: Tranche 5b sitemap + robots (core-svc handlers; the web origin is
+injected via `WEB_BASE_URL`, and a Caddy route to core-svc exposes them at the
+public origin — a deploy config item).
+
 ## Generated DTOs are source-of-truth
 
 When frontend code needs a field that exists conceptually in the backend but is

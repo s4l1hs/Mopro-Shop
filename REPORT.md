@@ -2783,3 +2783,109 @@ tests (slug+name resolved; unresolved → null slug + empty name). Flutter:
 (baselined on Linux CI) — no logic regressions. `flutter analyze` clean;
 `flutter build web --release` succeeds (`main.dart.js` 4.73 MB, within the +1%
 budget — change is one field + one handler).
+
+## Tranche 5b PR — Platform Growth (share + SEO + JSON-LD + sitemap + browsing history)
+
+Closes the last named roadmap item. Five additive growth surfaces; no new domain
+schema. Branched off `feat/seller-facing-and-platform-growth` (5a+slug; not yet
+on main — same stacking precedent as the slug PR; flagged in
+`tool/audit/tranche5b_baseline.md`).
+
+### 1. Baseline → final
+| Gate | Baseline (5a) | Final (5b) |
+|---|---|---|
+| `go test ./...` | green | green |
+| `flutter analyze` | clean | clean |
+| `flutter test` | 556 pass / 121 macOS-golden-fail | pass + new growth tests; golden fails are macOS-only (Linux-baselined) |
+| `flutter build web --release` | 4.73 MB main.dart.js | 4.75 MB (**+0.3%**, budget +6%) |
+| boundaries / golangci-lint | OK / 0 | OK / 0 |
+
+### 2. Audit confirmation (§2)
+Share infra, JSON-LD, sitemap/robots: all **absent** (confirmed). `web/index.html`
+was the **default Flutter shell** (`description="A new Flutter project."`,
+`<title>mopro</title>`) — pure SPA, no per-route templating. recentlyViewed
+provider + rail (onSeeAll omitted) + AccountLeftRail confirmed intact.
+
+### 3. SEO injection strategy (§5.1)
+**Runtime DOM mutation** via `package:web` (not deprecated `dart:html`),
+conditional-import noop off-web. **§1.6 trigger #1 did NOT fire** — no JS-less
+crawler requirement; the runtime trade-off (legacy non-JS crawlers see only the
+shell) is accepted per non-goals and documented. The shell `index.html` now ships
+real default meta (drive-by) so even pre-JS state is sane.
+
+### 4. Share infrastructure
+Package: **share_plus ^10.1.1** (ecosystem standard). Behavior:
+| Platform | Path |
+|---|---|
+| Mobile (iOS/Android) | native share sheet (share_plus) |
+| Web + Web Share API | `navigator.share` (via share_plus) |
+| Web w/o Web Share | clipboard fallback + "Bağlantı kopyalandı." snackbar |
+
+`MoproShareButton` (brand-orange, 44dp, semantic label) on PDP, category, help
+article, seller storefront. `webBaseUrlProvider` (`WEB_BASE_URL`, default
+`https://mopro.shop`) builds absolute URLs (products/categories id-based).
+
+### 5. Meta tags per route
+| Route | title | description | canonical | og:type |
+|---|---|---|---|---|
+| PDP | `{title} — Mopro` | desc (160) | `/products/{id}` | product |
+| Category | `{name} — Mopro` | seo.category_description | `/categories/{id}` | website |
+| Help article | `{title} — Mopro Yardım` | body (160) | `/help/article/{slug}` | article |
+| Storefront | `{name} — Mopro` | bio (160) | `/sellers/{slug}` | website |
+Plus OG/Twitter card + image (PDP first image, storefront banner). Applied via
+`SeoHead` (post-frame, idempotent, re-applies on input change).
+
+### 6. JSON-LD per route
+PDP `Product` (+ Offer from cheapest variant), category `BreadcrumbList`
+(Mopro → category), help article `Article`, storefront `Organization`. Single
+`<script type="application/ld+json">` replaced per route.
+
+### 7. Sitemap + robots
+`GET /sitemap.xml` (core-svc): active products (`/products/{id}`, daily) +
+categories (`/categories/{id}`, weekly) + active sellers (`/sellers/{slug}`) +
+published help articles (`/help/article/{slug}`) + static (`/`, `/help`,
+`/categories`). 1h app cache, `Cache-Control: max-age=3600`. Auth-gated prefixes
+excluded (verified by test). `GET /robots.txt` allows all, disallows auth-gated,
+points at the sitemap. Per-module `SitemapReader` (no cross-schema JOIN). Single
+file (<50k URLs); sitemap-index pagination is Backlog-when-triggered. **Deploy
+note:** a Caddy route to core-svc exposes both at the web origin.
+
+### 8. Browsing history see-all
+`/account/browsing-history` (auth+consent gated): header + responsive
+ProductCard grid (2/4/5) + empty state; "Geçmişi sil" → confirm → DELETE
+/me/analytics-data → rail invalidate + snackbar. Home rail `onSeeAll` wired;
+"Geçmişim" account-rail entry. Page title per PR #20.
+
+### 9. Flows JJ–NN
+JJ/NN (SeoHead drives meta + JSON-LD), KK (share success/clipboard), LL (rail →
+browsing history) — green (`flow_growth_test.dart`). MM (sitemap/robots) covered
+by the handler unit test + catalog reader integration (no triple-schema boot
+harness for a deterministic XML endpoint).
+
+### 10. Drive-by fixes
+- `web/index.html`: replaced the default Flutter placeholder meta/title with real
+  Mopro shell defaults.
+
+### 11. Backlog (deferred from 5b)
+Full SSR for SEO; search-engine submission automation; image OG card
+optimization; marketing pixels (FB/GTM); hreflang multi-locale signaling; JSON-LD
+schema.org validator tooling; sitemap-index pagination (>50k URLs); native
+iOS/Android share extensions; share buttons on auth-gated routes.
+
+### 12. Parity
+Flipped: social/share meta (Missing→Complete), structured data JSON-LD
+(Missing→Complete), SEO sitemap/robots (Missing→Complete), browsing-history
+surface (Stubbed→Complete). Roll-up ~54–55% → **~58%**.
+
+### 13. Risk notes
+- SEO relies on JS-aware crawlers (Googlebot/Bingbot OK; legacy bots see the
+  shell only) — documented trade-off, SSR is the escape path.
+- Sitemap 1h cache: newly published products/sellers/articles appear up to an
+  hour late (acceptable; not real-time-critical).
+- Share/canonical URLs depend on `WEB_BASE_URL` being set correctly per env;
+  misconfig yields wrong absolute URLs (default is the launch domain).
+- JSON-LD field omissions only affect individual rich-result eligibility (Google),
+  never the page; validation tooling is Backlog.
+- New + changed goldens (share button, browsing history, storefront/PDP/category
+  AppBar, account rail/hover) are baselined on the Linux CI rebaseline run — that
+  job is the arbiter, not local macOS.

@@ -58,6 +58,12 @@ func main() {
 	market := os.Getenv("MARKET")
 	defaultCurrency := os.Getenv("DEFAULT_CURRENCY")
 	defaultLocale := os.Getenv("DEFAULT_LOCALE")
+	// Web origin for sitemap/robots/canonical URLs (the SPA host, distinct from
+	// the API host). Defaults to the launch domain when unset.
+	webBaseURL := os.Getenv("WEB_BASE_URL")
+	if webBaseURL == "" {
+		webBaseURL = "https://mopro.shop"
+	}
 	logx.Setup("core-svc", market)
 
 	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -363,6 +369,18 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("GET /__version", handleVersion("core-svc"))
+
+	// ── SEO: sitemap + robots (public, backend-served; Tranche 5b) ───────────
+	mux.Handle("GET /sitemap.xml",
+		httpTrace(http.HandlerFunc(handleSitemap(webBaseURL, time.Hour,
+			catalog.NewSitemapReader(pool),
+			seller.NewSitemapReader(pool),
+			help.NewSitemapReader(pool),
+		))),
+	)
+	mux.Handle("GET /robots.txt",
+		httpTrace(http.HandlerFunc(handleRobots(webBaseURL))),
+	)
 
 	// Identity / auth routes
 	requireAuth := middleware.RequireAuth(jwtSigner)

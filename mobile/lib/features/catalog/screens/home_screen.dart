@@ -149,7 +149,7 @@ class _RecentlyViewedSliver extends ConsumerWidget {
       child: ProductListRail(
         products: products,
         title: 'home.rails.recently_viewed.title'.tr(),
-        // No /account/browsing-history screen yet — "Tümünü gör" omitted (Backlog).
+        onSeeAll: () => context.go('/account/browsing-history'),
       ),
     );
     return context.isMobile ? rail : CenteredContentColumn(child: rail);

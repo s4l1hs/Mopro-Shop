@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/core/di/providers.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/utils/coin_formatter.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/design/responsive/pointer_kind.dart';
 import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/design/widgets/mopro_share_button.dart';
 import 'package:mopro/features/analytics/analytics_service.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/catalog/pdp/qa/pdp_qa_tab.dart';
@@ -27,6 +29,9 @@ import 'package:mopro/features/catalog/widgets/pdp_image_gallery.dart';
 import 'package:mopro/features/catalog/widgets/product_card.dart';
 import 'package:mopro/features/catalog/widgets/product_rail.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
+import 'package:mopro/features/growth/meta_tags_service.dart';
+import 'package:mopro/features/growth/seo_head.dart';
+import 'package:mopro/features/growth/structured_data_service.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 class ProductDetailScreen extends ConsumerWidget {
@@ -130,8 +135,32 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
 
   @override
   Widget build(BuildContext context) {
-    if (!context.isMobile) return _buildWide(context);
-    return _buildMobile(context);
+    final product = widget.product;
+    final webBase = ref.watch(webBaseUrlProvider);
+    final url = '$webBase/products/${product.id}';
+    final cheapest = product.variants.isEmpty
+        ? null
+        : product.variants
+            .reduce((a, b) => a.priceMinor <= b.priceMinor ? a : b);
+    return SeoHead(
+      meta: MetaTagsInput(
+        title: '${product.title} — Mopro',
+        description: seoDescription(product.description),
+        imageUrl: _imageUrls.firstOrNull,
+        canonicalUrl: url,
+        openGraphExtras: const {'og:type': 'product'},
+      ),
+      jsonLd: productJsonLd(
+        name: product.title,
+        description: seoDescription(product.description),
+        url: url,
+        image: _imageUrls.firstOrNull,
+        brand: product.brand,
+        priceMinor: cheapest?.priceMinor,
+        priceCurrency: cheapest?.priceCurrency,
+      ),
+      child: context.isMobile ? _buildMobile(context) : _buildWide(context),
+    );
   }
 
   Widget _buildMobile(BuildContext context) {
@@ -157,6 +186,10 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
                     : 'product.add_to_favorites'.tr(),
                 onPressed: () =>
                     ref.read(favoritesProvider.notifier).toggle(product.id),
+              ),
+              MoproShareButton(
+                url: '${ref.watch(webBaseUrlProvider)}/products/${product.id}',
+                title: product.title,
               ),
               const SizedBox(width: 4),
             ],

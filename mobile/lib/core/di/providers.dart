@@ -14,6 +14,15 @@ final apiBaseUrlProvider = Provider<String>(
   (_) => 'https://api.moproshop.com',
 );
 
+/// Public web origin (where the SPA is served) — used to build absolute,
+/// shareable/canonical URLs (share sheet, SEO canonical, OG). Distinct from
+/// [apiBaseUrlProvider]. Override at startup from --dart-define=WEB_BASE_URL.
+const _webBaseUrl = String.fromEnvironment(
+  'WEB_BASE_URL',
+  defaultValue: 'https://mopro.shop',
+);
+final webBaseUrlProvider = Provider<String>((_) => _webBaseUrl);
+
 final secureStorageProvider = Provider<FlutterSecureStorage>((ref) {
   return const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),

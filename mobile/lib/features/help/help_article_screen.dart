@@ -3,7 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/core/di/providers.dart';
+import 'package:mopro/design/widgets/mopro_share_button.dart';
 import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
+import 'package:mopro/features/growth/meta_tags_service.dart';
+import 'package:mopro/features/growth/seo_head.dart';
+import 'package:mopro/features/growth/structured_data_service.dart';
 import 'package:mopro/features/help/application/help_providers.dart';
 
 class HelpArticleScreen extends ConsumerWidget {
@@ -21,7 +26,18 @@ class HelpArticleScreen extends ConsumerWidget {
       body: article.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (_, __) => Center(child: Text('common.error'.tr())),
-        data: (a) => ListView(
+        data: (a) => SeoHead(
+          meta: MetaTagsInput(
+            title: '${a.title} — Mopro Yardım',
+            description: seoDescription(a.body),
+            canonicalUrl: '${ref.watch(webBaseUrlProvider)}/help/article/$slug',
+            openGraphExtras: const {'og:type': 'article'},
+          ),
+          jsonLd: articleJsonLd(
+            headline: a.title,
+            url: '${ref.watch(webBaseUrlProvider)}/help/article/$slug',
+          ),
+          child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             Semantics(
@@ -44,6 +60,14 @@ class HelpArticleScreen extends ConsumerWidget {
                 a: TextStyle(color: Theme.of(context).colorScheme.primary),
               ),
             ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: MoproShareButton(
+                url: '${ref.watch(webBaseUrlProvider)}/help/article/$slug',
+                title: a.title,
+              ),
+            ),
             const SizedBox(height: 24),
             _Feedback(),
             const Divider(height: 32),
@@ -55,6 +79,7 @@ class HelpArticleScreen extends ConsumerWidget {
               label: Text('help.contact_cta'.tr()),
             ),
           ],
+          ),
         ),
       ),
     );

@@ -5,6 +5,7 @@ import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/account/account_screen.dart';
+import 'package:mopro/features/account/browsing_history_screen.dart';
 import 'package:mopro/features/account/cards_screen.dart';
 import 'package:mopro/features/account/privacy/privacy_settings_screen.dart';
 import 'package:mopro/features/account/profile_screen.dart';
@@ -116,6 +117,7 @@ String moproPageTitle(String location, {String? name}) {
   if (location == '/account/reviews') return t('Yorumlarım');
   if (location == '/account/questions') return t('Sorularım');
   if (location == '/account/privacy') return t('Gizlilik');
+  if (location == '/account/browsing-history') return t('Geçmişim');
   if (location == '/account/notifications/preferences') {
     return t('Bildirim Ayarları');
   }
@@ -171,7 +173,8 @@ String? computeAuthRedirect({
       location.startsWith('/account/cards') ||
       location.startsWith('/account/reviews') ||
       location.startsWith('/account/questions') ||
-      location.startsWith('/account/privacy');
+      location.startsWith('/account/privacy') ||
+      location.startsWith('/account/browsing-history');
 
   return switch (auth) {
     null || AuthUnauthenticated() => isAuthRoute
@@ -442,6 +445,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/account/privacy',
             builder: (_, __) => const PrivacySettingsScreen(),
+          ),
+          GoRoute(
+            path: '/account/browsing-history',
+            builder: (_, __) => const BrowsingHistoryScreen(),
           ),
           GoRoute(
             path: '/account/notifications',

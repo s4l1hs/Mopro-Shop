@@ -3,7 +3,12 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/core/di/providers.dart';
+import 'package:mopro/design/widgets/mopro_share_button.dart';
 import 'package:mopro/features/catalog/widgets/product_grid.dart';
+import 'package:mopro/features/growth/meta_tags_service.dart';
+import 'package:mopro/features/growth/seo_head.dart';
+import 'package:mopro/features/growth/structured_data_service.dart';
 import 'package:mopro/features/seller/data/seller_storefront_repository.dart';
 import 'package:mopro/features/seller/providers/seller_storefront_provider.dart';
 import 'package:mopro/widgets/star_rating.dart';
@@ -35,12 +40,19 @@ class _SellerStorefrontScreenState extends ConsumerState<SellerStorefrontScreen>
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(sellerProfileProvider(widget.slug));
 
+    final profile = profileAsync.valueOrNull;
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          profileAsync.valueOrNull?.displayName ??
-              'seller_storefront.title'.tr(),
+          profile?.displayName ?? 'seller_storefront.title'.tr(),
         ),
+        actions: [
+          if (profile != null)
+            MoproShareButton(
+              url: '${ref.watch(webBaseUrlProvider)}/sellers/${widget.slug}',
+              title: profile.displayName,
+            ),
+        ],
         bottom: TabBar(
           controller: _tabs,
           tabs: [
@@ -57,13 +69,27 @@ class _SellerStorefrontScreenState extends ConsumerState<SellerStorefrontScreen>
             ref.invalidate(sellerProfileProvider(widget.slug));
           },
         ),
-        data: (profile) => TabBarView(
-          controller: _tabs,
-          children: [
-            _AboutTab(profile: profile),
-            _ProductsTab(slug: widget.slug),
-            _ReviewsTab(slug: widget.slug),
-          ],
+        data: (profile) => SeoHead(
+          meta: MetaTagsInput(
+            title: '${profile.displayName} — Mopro',
+            description: seoDescription(profile.bio),
+            imageUrl: profile.bannerImageUrl,
+            canonicalUrl: '${ref.watch(webBaseUrlProvider)}/sellers/${widget.slug}',
+            openGraphExtras: const {'og:type': 'website'},
+          ),
+          jsonLd: organizationJsonLd(
+            name: profile.displayName,
+            url: '${ref.watch(webBaseUrlProvider)}/sellers/${widget.slug}',
+            logo: profile.logoImageUrl,
+          ),
+          child: TabBarView(
+            controller: _tabs,
+            children: [
+              _AboutTab(profile: profile),
+              _ProductsTab(slug: widget.slug),
+              _ReviewsTab(slug: widget.slug),
+            ],
+          ),
         ),
       ),
     );
