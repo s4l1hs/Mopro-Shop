@@ -635,3 +635,47 @@ Precedents: PR #28 caught a `purchase_flow` regression during instrumentation
 (resilient session-id + guarded lifecycle observer); Tranche 4c's
 `recentlyViewedProvider` treats fetch errors as empty data (rail hides), not error
 data (rail shows an error).
+
+## Test-suite CI gating discipline
+
+A test suite that isn't in `make verify` is one refactor away from silent rot.
+The `internal/e2e` suite drifted across multiple refactors (cashback v6→v8
+rewrite, `cart.Service`/`catalog.Service` interface growth, `RunMonth`/
+`CreatePlanForOrder` entry-point removal, plus the v8 `plans`/`orders` schema
+columns) **without anyone noticing**, because nothing made the build break
+loudly — `make verify`'s `test` target runs `go test ./...` *without*
+`-tags=integration`, so the entire build-tagged suite was invisible.
+
+Discipline: every test suite intended to enforce a contract MUST be gated by
+`make verify` (or a CI workflow that runs on every PR). Suites that exist only
+as documentation or developer-iteration tools should be labelled as such — but
+if they exercise behavior production depends on, they belong in the gate.
+
+When adding a new test surface (integration-tagged, build-tagged, etc.), the
+**same PR that adds the tests must add the gate**. Adding tests without gating
+them is filing for future silent breakage. For suites needing infrastructure,
+follow the idempotent self-bootstrap precedent (`pg-ledger-test-up`,
+`e2e-test-up`): apply the **real** init + migration SQL — never a hand-rolled
+DDL snapshot, which silently drifts from production schema (it's what rotted the
+e2e ledger schema here).
+
+Precedent: `chore/revive-internal-e2e-suite` (this PR) gated the suite after it
+had rotted; `chore/cashback-reference-rate-constant-fix` (PR #37) first surfaced
+the rot. `go build` does NOT compile `_test.go` files — use
+`go test`/`go vet -tags=integration` to detect test rot.
+
+## Migration discipline for test fixtures
+
+When refactoring a service interface or removing a public entry point, grep for
+usage across **both production code AND test code** (including build-tagged or
+`_test.go` files). Test files don't appear in `go build` without the right tags,
+so the compiler won't catch them. Use `gofmt -r` for renames; use explicit grep
+for signature changes. The Go compiler reports only the *first* missing
+interface method — a single "missing method X" error can hide a dozen more (the
+e2e catalog mock was missing 13 methods, surfaced one at a time).
+
+When a test references a deleted constant or function, the question is "what
+does the test actually need to assert?" Restoring the symbol is rarely right
+(PR #37's analysis); migrating the test to the current engine functions usually
+is — e.g. `cashback.ComputePlanTerms(price, bps).MonthlyAmountMinor` rather than
+a hardcoded monthly amount that silently encodes the old (v6) math.
