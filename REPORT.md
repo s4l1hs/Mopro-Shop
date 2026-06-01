@@ -3508,6 +3508,9 @@ The §12 payoff: blindly "routing all PostInTx reads through the tx" (the naive 
 - `TestCronProperty_ConcurrentIdempotency` — pool pinned to `MaxConns=4` (deterministic repro across runners); **deadlocked pre-fix, passes post-fix** — this is the deadlock regression guard. Iterations cut 100→20 so it fits the 2-vCPU runner's 600s package budget (100-iter × 8-way SERIALIZABLE contention was super-linear on 2 CPUs).
 - A `MaxConns=1` "exactly one connection" precision guard was added then **dropped**: it proved fragile on the shared-CPU CI runner (a legit single payment exceeded its 20s deadline under load while passing in 0.03s locally — not catching a real bug). A non-fragile single-connection assertion (counting-pool decorator) is Backlogged. The deadlock itself is covered by the MaxConns=4 test above.
 
+### 4a. CI status (make-verify on PR #42)
+The deadlock fix is **verified green in CI**: `property-cashback` (incl. `TestCronProperty_ConcurrentIdempotency`) and the `internal/e2e` suite both pass on the 2-vCPU runner (run `26778777465`: `ok internal/e2e 11.788s`; all cashback properties OK). The make-verify job is still **red on one unrelated step** — `verify-image-manifest` → `tool/audit-images.sh` needs **ImageMagick 7 (`magick`)**, which `make-verify.yml` (created in PR #41) doesn't install. That's a CI-workflow gap, **not** a cashback issue; Backlogged below. Per decision: this PR's cashback fix stands complete on its passing tests; `make-verify` is not flipped to a required check until the ImageMagick step lands. (Local `make verify` is green — ImageMagick 7 is installed locally.)
+
 ### 5. Production concurrency (§6)
 - Cashback monthly cron is a **singleton** (`cmd/fin-svc/main.go` `NewMonthlyCron(...).Start()`), processing plans **sequentially**; no non-cron invocation path found.
 - ⇒ **Prod was safe today** by operational invariant (1 tx at a time × pool≈6); the deadlock was test-surfaced. After this PR the single-connection property holds **independent of concurrency × pool sizing** — the singleton invariant becomes defense-in-depth, not a load-bearing safety mechanism.
@@ -3524,7 +3527,8 @@ The §12 payoff: blindly "routing all PostInTx reads through the tx" (the naive 
 ### 8. New Backlog items
 - `fix/financial-domain-pool-discipline` (the analogous patterns above) — also fold in a **non-fragile single-connection assertion** (counting-pool decorator) to replace the dropped `MaxConns=1` guard.
 - Set an explicit production `DB_MAX_CONNS` (don't rely on the CPU-derived default).
-- Flip `make-verify` to a required check now that the deadlock is fixed (verify CI green first).
+- **`make-verify.yml`: install ImageMagick 7** (`magick`) so `verify-image-manifest` runs in CI — a PR #41 workflow gap that currently reds make-verify on every PR independent of the diff (apt on ubuntu-24.04 is IM6 without `magick`; needs a PPA/setup-action). A focused CI-infra follow-up, not cashback.
+- Flip `make-verify` to a required check once the deadlock fix **and** the ImageMagick step are both in and CI is fully green.
 - Pre-existing, unrelated: `internal/cart` + `internal/identity` have rotted *integration*-tagged tests (`alwaysValidCatalog` missing `catalog.HomeBanners`; stale `identity.NewService` arity) — surfaced by a broad `go vet -tags=integration ./...`; not in `make verify`'s path. Same rot class as PR #40's `internal/e2e`. Not touched here (other domains).
 
 ### 9. No parity change
