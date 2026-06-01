@@ -2715,6 +2715,7 @@ storefront, no role gating. Built the module from the stub.
 - **Seller dashboard UI** (returns inbox + Q&A inbox screens + "Satıcı Paneli"
   account-rail entry). The backend (role gating + all endpoints) is shipped and
   tested; only the Flutter dashboard surface is carried.
+  ✅ **CLOSED** by the `seller dashboard UI PR` (see below).
 - **PDP "Mağazaya git" wiring**: needs the seller **slug** on the product-detail
   payload (generated `Product` has only `sellerId`/`sellerName`) → an OpenAPI
   codegen change. Storefront is fully deep-linkable by slug meanwhile.
@@ -2889,3 +2890,95 @@ surface (Stubbed→Complete). Roll-up ~54–55% → **~58%**.
 - New + changed goldens (share button, browsing history, storefront/PDP/category
   AppBar, account rail/hover) are baselined on the Linux CI rebaseline run — that
   job is the arbiter, not local macOS.
+
+## Seller Dashboard UI PR — `feat/seller-dashboard-ui`
+
+Closes the last 5a implementation carry: the Flutter seller surfaces consuming
+the 5a role-gated backend. Branched off `feat/seller-facing-and-platform-growth`
+(5a+slug+5b accumulation; not yet on main — same stacking precedent).
+
+### 1. Baseline → final
+| Gate | Final |
+|---|---|
+| `go test ./...` | green (seller BindingForUser integration + resolveSellerBinding) |
+| `flutter analyze` | clean |
+| `flutter build web --release` | 4.56 MB main.dart.js (**+0.77%** vs 5b 4.53 MB; budget +6%) |
+| seller non-golden tests | 67 pass |
+| api-check-sync / boundaries | OK / OK |
+
+### 2. Audit + §2.2 gate
+`/me` carried **no** seller binding → §3.2 applied. Bounded (seller svc already
+wired since 5a, `seller_users` exists, no migration, no auth-middleware change)
+→ **§1.6 escape did NOT fire**. Also found: no seller-scoped
+`GET /seller/returns/:id` (5a shipped list + actions only) → detail renders from
+the inbox header; itemized breakdown is Backlog.
+
+### 3. Backend Inputs (consumed)
+5a's `GET /seller/returns` (`{data,hasMore}`, no total), `POST
+/seller/returns/{id}/{approve,reject}` (`reason_code` any string), `GET
+/seller/questions` (`{data,total,hasMore}`, `?unanswered`), `RequireSellerRole`
+(403), and the answer endpoint's server-side `is_seller`.
+
+### 4. `/me` extension
+`seller_binding` (nullable {seller_id, seller_slug, seller_name, role}) added to
+the `User` schema via a seller `GetBindingForUser` (single JOIN) + handler enrich
++ OpenAPI/regen (Go+Dart+build_runner) + `CurrentUser.sellerBinding` mapping.
+
+### 5. Providers
+`userIsSellerProvider` (bool) + `currentSellerBindingProvider` (SellerBinding?),
+derived from `currentUserProvider` (shape #1).
+
+### 6. Customer anonymization (decision)
+Seller surfaces never show buyer names. Returns carry only `order_id` (no
+user/product data on the list) → anonymized as `Müşteri #{orderId}`; questions
+carry `user_id` → `Müşteri #{userId}`. If disputes ever need real-name context,
+that's a separate product decision.
+
+### 7. Screens + gating
+- **Dashboard** (`/seller/dashboard`): name + role chip, 2 overview cards
+  (pending returns w/ "+", unanswered questions; "approved this month" omitted —
+  endpoint has no date filter), quick actions, all-done empty state.
+- **Returns** inbox (status chips, pagination, anonymized cards) + detail
+  (approve confirm dialog / reject adaptive sheet w/ 4 reason codes + note;
+  status banner for resolved).
+- **Questions** inbox (unanswered/all chips, answered/awaiting, celebration
+  empty) + detail (reuses `questionThreadProvider` + `AnswerRow` + `openAnswer` →
+  server `is_seller=true`).
+- **Role gating**: `computeSellerRedirect` (pure, loading-deferred) + redirect
+  wiring + `pendingSnackbarProvider` → app-root snackbar (`seller.access_denied`)
+  + `refreshListenable` on `currentUserProvider`. Page titles per PR #20.
+- **Rail**: "Satıcı Paneli" row, seller-only, active highlight on `/seller/*`.
+
+### 8. Flows
+HH (dashboard→returns→detail→approve, full UI) + OO (gate decisions) green
+(`flow_seller_dashboard_test.dart`). II (Q&A answer) covered by the questions
+tests + the reused `openAnswer` submit path. A11y guards green (dashboard).
+
+### 9. DTO regen impact
+`User` DTO gains `sellerBinding` (SellerBinding?); new `SellerBinding` model.
+`api-check-sync` green.
+
+### 10. Drive-by
+None.
+
+### 11. Backlog (deferred)
+Seller self-service signup; bulk actions; seller analytics; notification
+subscriptions (needs the ticket→notification bridge); multi-seller account
+switching; seller-scoped return-detail-with-items endpoint (itemized breakdown);
+"approved this month" counter (needs a date filter on `/seller/returns`);
+real-name display policy (currently anonymized).
+
+### 12. Parity
+Flipped: seller returns inbox (Backlog→Complete), seller Q&A inbox
+(Backlog→Complete), seller dashboard (Missing→Complete). "Seller chat" stays
+Missing; "follow" stays storefront-indirect. Roll-up ~58% → **~60%**.
+
+### 13. Risk notes
+- Customer anonymization may be insufficient if disputes need real-name context.
+- Dashboard counts cache (autoDispose) can lag an inbox action until re-entry/
+  refresh.
+- Role-gate defers while `/me` loads (avoids the bounce race); a seller sees the
+  panel only after `/me` resolves.
+- Return detail has no itemized breakdown (no 5a endpoint) — header + actions only.
+- New + changed goldens (seller screens + account rail) baseline on the Linux
+  rebaseline run — that job is the arbiter, not local macOS.
