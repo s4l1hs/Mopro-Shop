@@ -420,13 +420,17 @@ func TestE2E_KargoWebhookToCashbackPlan(t *testing.T) { //nolint:gocyclo,cyclop
 	if planMonthly <= 0 {
 		t.Errorf("cashback monthly_amount_minor: want >0, got %d", planMonthly)
 	}
-	// Formula check: commAmt=7000, yearly=7000*5000/10000=3500, monthly=3500/12=291
-	expectedMonthly := (commAmt * cashback.ReferenceInterestRateBpsConst / 10000) / 12
-	if planMonthly != expectedMonthly {
-		t.Errorf("monthly formula: want %d (commAmt=%d * 0.50 / 12), got %d", expectedMonthly, commAmt, planMonthly)
+	// v8 accelerated model: monthly = (price × commissionBps) / CashbackK, computed
+	// via the engine's own ComputePlanTerms (price=100000, commissionBps=700 → 448).
+	terms, err := cashback.ComputePlanTerms(priceMinor, commPctBps)
+	if err != nil {
+		t.Fatalf("ComputePlanTerms(price=%d, bps=%d): %v", priceMinor, commPctBps, err)
 	}
-	t.Logf("ASSERT cashback_schema.plans monthly_amount_minor=%d — PASS (formula: commAmt=%d → yearly=%d → monthly=%d)",
-		planMonthly, commAmt, commAmt*cashback.ReferenceInterestRateBpsConst/10000, expectedMonthly)
+	if planMonthly != terms.MonthlyAmountMinor {
+		t.Errorf("monthly: want %d (v8 ComputePlanTerms), got %d", terms.MonthlyAmountMinor, planMonthly)
+	}
+	t.Logf("ASSERT cashback_schema.plans monthly_amount_minor=%d — PASS (v8: price=%d bps=%d → %d)",
+		planMonthly, priceMinor, commPctBps, terms.MonthlyAmountMinor)
 
 	// ── 10. ASSERT seller payout ───────────────────────────────────────────────
 	var payoutStatus string

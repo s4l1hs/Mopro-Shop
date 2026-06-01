@@ -3263,3 +3263,67 @@ Operational/architectural cleanup. No endpoints, no DTOs, no user surface.
   undefined — a cashback constant rename, unrelated to this PR). Not in any
   `make verify` gate (vet/test run without the integration tag); my e2e edits are
   SQL-string changes that don't affect compilation. Flagged for a separate fix.
+
+## Cashback Constant Fix PR — `chore/cashback-reference-rate-constant-fix`
+
+Resolves the `cashback.ReferenceInterestRateBpsConst undefined` reference in the
+integration-tagged `internal/e2e/` suite (flagged in PR #36's REPORT). Stacked on
+`feat/seller-facing-and-platform-growth`.
+
+### 1. Baseline
+`go vet -tags=integration ./internal/e2e/` → `undefined: cashback.ReferenceInterestRateBpsConst`.
+`make verify` green (the integration-tagged e2e build is not gated). `go test ./...`
+(no integration tag) green.
+
+### 2. Audit finding — Option C/B (migrate to v8), not restore
+Deletion commit **`127f3f07 feat(cashback): implement v8 ACCELERATED MODEL`** removed
+`const ReferenceInterestRateBpsConst = 5000` (v6 perpetual) and replaced the formula
+with `const CashbackK int64 = 156000` + `ComputePlanTerms`. The constant was
+deliberately deleted, not lost — restoring it would compile but leave the 3 e2e
+sites asserting the **live v8 plan row** against **dead v6 math**. Chosen fix
+(owner-approved): migrate the sites to the engine's own
+`cashback.ComputePlanTerms(price, bps).MonthlyAmountMinor`.
+
+### 3. Fix applied
+3 sites, all in `internal/e2e/`:
+- `order_to_cashback_test.go:273` — v6 `145` → v8 `ComputePlanTerms(50000,700)` = 224.
+- `kargo_to_cashback_test.go:424` — v6 formula → v8 `ComputePlanTerms(100000,700)` = 448.
+- `delivered_multi_seller_test.go:171` — v6 `totalComm` math → v8
+  `ComputePlanTerms(160000,700)` = 717 (order-level plan; removed unused
+  `commA1/A2/B1/totalComm`).
+
+The deleted constant now has **zero references** in `internal/` and `cmd/`
+(one stale prose comment remains in `cmd/core-svc/catalog_handlers.go:15`; left as
+a drive-by candidate, see below).
+
+### 4. Verification — partial; DoD "compiles cleanly" NOT met (scope correction)
+The prompt's premise (the constant was the *sole* blocker) proved **false**.
+Removing it surfaced that `internal/e2e/` has pervasive, pre-existing
+**multi-refactor drift** and still does not compile under `-tags=integration`:
+- `cashback.NewService` signature changed (now `WalletPoster` + `*metrics.BusinessMetrics`) — 4+ call sites on the old 6-arg form.
+- `cashback.Service.RunMonth` removed/renamed — 2 sites.
+- `cashback.Service.CreatePlanForOrder` removed/renamed — 1 site.
+- test mocks miss `cart.Service.SeedStockIfAbsent` and `catalog.Service.HomeBanners` (both interfaces grew).
+- "…too many errors" — more beyond these.
+
+These are independent of the constant (the suite has been uncompilable across
+several refactors; it isn't in `make verify`, so it went unnoticed). The v8 math
+edits above are **correct by construction** (they call the engine's own
+`ComputePlanTerms`) but **unrunnable** until the suite compiles.
+
+Non-integration gates green throughout: `go build ./...`, `go test ./...`
+(no tag), `make verify`, `flutter analyze` (no frontend changes).
+
+### 5. Backlog updated
+- **NEW: "Revive `internal/e2e` integration suite (v8 + interface migration)"** —
+  migrate `NewService` call sites to the `WalletPoster`/`BusinessMetrics`
+  signature, replace removed `RunMonth`/`CreatePlanForOrder` calls, implement
+  `SeedStockIfAbsent` + `HomeBanners` on the test mocks, then get the suite
+  compiling + passing, and add it to a CI gate so it can't silently rot again.
+- PR #36's flagged item ("`internal/e2e` doesn't compile — `ReferenceInterestRateBpsConst` undefined") is **refined, not fully closed**: the constant cause is resolved; the broader revival is the carried successor item above.
+
+### 6. Drive-by (not taken)
+- `cmd/core-svc/catalog_handlers.go:15` comment "mirrors cashback.ReferenceInterestRateBpsConst" now references a deleted symbol. Left untouched to keep the diff minimal/honest to scope; rolled into the revival Backlog.
+
+### No parity change
+Operational build fix; no capability change.
