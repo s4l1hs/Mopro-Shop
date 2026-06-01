@@ -299,6 +299,37 @@ services:
       retries: 5
       start_period: 15s
 
+  # ── MinIO (S3-compatible object storage) — DEV/CI ONLY (ADR-0004) ───────────
+  # Backs media uploads (review/return photos) locally; production uses
+  # Backblaze B2 (S3-compatible) — this service MUST NOT appear in
+  # docker-compose.prod.yml. Gated by STORAGE_ENABLED on core-svc.
+  minio:
+    container_name: minio
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    networks: [mopro-net]
+    mem_limit: 512m
+    cpus: '0.5'
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    env_file: [../.env.local]
+    environment:
+      MINIO_ROOT_USER: "${STORAGE_ACCESS_KEY:-minioadmin}"
+      MINIO_ROOT_PASSWORD: "${STORAGE_SECRET_KEY:-minioadmin}"
+    volumes:
+      - ${DATA_DIR:-../data}/minio:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
   # ── Caddy 2 (reverse proxy + TLS) ───────────────────────────────────────────
   # NET_BIND_SERVICE: bind to ports 80/443 as non-root.
   # /healthz is served natively by Caddyfile (no dependency on core-svc).

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCHEMAS="identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|shipping|notification|support|media|sizefinder"
+SCHEMAS="identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|shipping|notification|support|media|sizefinder|attachments"
 
 # Cross-module-schema reads in raw SQL (ref_schema is exempt).
 # Migrations are exempt because they own the schema and routinely seed
@@ -11,7 +11,7 @@ SCHEMAS="identity|catalog|cart|order|payment|seller|search|wallet|commission|tre
 if grep -rE "FROM\s+($SCHEMAS)_schema\." \
     --include='*.sql' --include='*.go' \
     internal/ migrations/ \
-    | grep -vE '/(identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|sellerpayout|reconcile|shipping|notification|support|media|sizefinder|eventbus|e2e)/' \
+    | grep -vE '/(identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|sellerpayout|reconcile|shipping|notification|support|media|sizefinder|attachments|eventbus|e2e)/' \
     | grep -vE '^migrations/' \
     | grep -vE 'ref_schema\.' ; then
     echo "ERROR: cross-schema reference detected"
