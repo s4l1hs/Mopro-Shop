@@ -3162,3 +3162,104 @@ pipeline. Stacked on `feat/seller-facing-and-platform-growth`.
   session/time window, the top-N caps, and the 30-min timeout. Watch its
   duration as event volume grows (candidate for incremental/materialized
   approaches later).
+
+## Sellerpayout Schema Split PR — `chore/sellerpayout-schema-split`
+
+Architectural cleanup. Closes the PR #8 boundaries-guard exemption that let
+`internal/sellerpayout/` read `commission_schema` by relocating the three
+sellerpayout-owned tables into a dedicated `sellerpayout_schema`. Stacked on
+`feat/recommendation-surfaces` (recommendation PR #35 unmerged; main at #30).
+
+### 1. Baseline vs. final
+| | Baseline | Final |
+|---|---|---|
+| `make boundaries` | `boundaries OK` (sellerpayout exempted on commission_schema) | `boundaries OK` (exemption gone; new sellerpayout_schema guard) |
+| sellerpayout unit + integration (:6434) | green | green (on new schema) |
+| `go test ./...` | green | green |
+| 3 binaries | build | build |
+| Migration round-trip | n/a | up→down→re-up clean |
+
+### 2. Audit findings
+- **Tables relocated (3, all exclusively sellerpayout-owned):** `seller_payouts`,
+  `payout_batches`, `seller_psp_accounts` + the immutable-trigger function
+  `enforce_payout_immutable`. `capture_postings` stays in `commission_schema`
+  (commission-owned; sellerpayout reads it via the `commission.CaptureRecorder`
+  in-process seam, no direct SQL).
+- **References updated:** 17 non-test SQL refs in `internal/sellerpayout/`
+  (`repository.go` ×13, `domain.go` ×3, `service.go` ×1) + 21 in its tests;
+  e2e fixtures/assertions (4 files); zero `commission_schema` refs remain in
+  `internal/sellerpayout/`.
+- **Dual schema source of truth:** `deploy/postgres-ledger/init/` (fresh DBs) +
+  `migrations/ledger/` (deployed). Both updated; the migration is idempotent so
+  the test harness (init + migrations on a fresh DB) no-ops the move.
+
+### 3. Boundaries guard diff
+- Removed `internal/sellerpayout/` from the `commission_schema` regression-guard
+  exempt list (+ removed the "consider splitting … future refactor" note).
+- Added a parallel **`sellerpayout_schema` regression guard** (every SQL op, not
+  just `FROM`); recognized callers = `internal/sellerpayout/`, `internal/e2e/`,
+  `migrations/`, `deploy/postgres-ledger/init/`.
+- Added `sellerpayout` to the generic cross-schema `SCHEMAS` list.
+- Retargeted the immutable-UPDATE guard to `sellerpayout_schema.seller_payouts`.
+- **Smoke test:** injecting `// SELECT * FROM sellerpayout_schema.seller_payouts`
+  into `internal/wallet/api.go` →
+  `ERROR: sellerpayout_schema.* access outside the recognized callers` +
+  `internal/wallet/api.go:158`; reverting → `boundaries OK`.
+
+### 4. Migration round-trip
+`migrations/ledger/0080_sellerpayout_schema_split.{up,down}.sql`. Verified on the
+:6434 ledger DB: up → tables in `sellerpayout_schema` (+ function); down → back
+in `commission_schema`, schema dropped (`schemata` count 0); re-up → back in
+`sellerpayout_schema`. Fresh `pg-ledger-test-up` (init + all migrations) ends
+with `seller_payouts/payout_batches/seller_psp_accounts` in `sellerpayout_schema`
+and `capture_postings` still in `commission_schema`.
+
+### 5. Tests
+- `go test -tags=integration ./internal/sellerpayout/` green (8.6s) on the new
+  schema; no test logic changed beyond schema-name updates.
+- `go test ./...` green.
+
+### 6. Cross-schema review
+- FK `seller_payouts.batch_id → payout_batches(id)` is now intra-
+  `sellerpayout_schema` (both moved together; constraint stayed valid across
+  `SET SCHEMA`).
+- `sellerpayout_schema → wallet_schema.ledger_alerts` (escalation INSERT) stays
+  — a write to a wallet-owned table that already went through the established
+  Phase 2.3 grant, not a new cross-domain read.
+- `reconcile_user` keeps read-only `SELECT` on `seller_payouts` (now in
+  `sellerpayout_schema`, USAGE granted) for invariant checks.
+- sellerpayout no longer touches `commission_schema` at all.
+
+### 7. Constitution / CONTRIBUTING update
+- `CLAUDE.md §5`: `commission_schema (seller payouts here)` → adds
+  `sellerpayout_schema` as an owned schema.
+- `DATA_DICTIONARY.md §2.2`: split the `commission + sellerpayout` row into
+  separate `commission` and `sellerpayout` rows; `§9` header + DDL + immutability
+  rules retargeted to `sellerpayout_schema`.
+- `CONTRIBUTING.md`: new "Relocating tables across schemas to fix a boundary
+  debt" pattern (dual source of truth, idempotent migration, trigger-function
+  move, guard smoke-test).
+
+### 8. Backlog updated
+- ✅ **Closed: "sellerpayout_schema split"** (carried from the PR #8 era through
+  the PR #21 audit; the boundaries-guard "consider splitting … in a future
+  refactor" note). The sellerpayout module now owns its own schema and the
+  guard enforces the boundary.
+
+### 9. No parity change
+Operational/architectural cleanup. No endpoints, no DTOs, no user surface.
+
+### 10. Risk notes
+- **CDC / BI consumers:** anything reading `commission_schema.seller_payouts`
+  (or `payout_batches` / `seller_psp_accounts`) directly — analytics/BI tooling,
+  external CDC — breaks on the rename. Ops must repoint to `sellerpayout_schema`
+  before/with the deploy. The migration is the coordination point.
+- **Migrate-role privilege:** `ALTER TABLE … SET SCHEMA` + `ALTER FUNCTION …
+  SET SCHEMA` + `CREATE SCHEMA … AUTHORIZATION` require the migration role to own
+  the objects / be superuser. Verified under the test container's superuser;
+  confirm the prod migrate role has the rights (or run as owner) before deploy.
+- **Pre-existing, out of scope:** the integration-tagged `internal/e2e/` suite
+  does not compile on the base branch (`cashback.ReferenceInterestRateBpsConst`
+  undefined — a cashback constant rename, unrelated to this PR). Not in any
+  `make verify` gate (vet/test run without the integration tag); my e2e edits are
+  SQL-string changes that don't affect compilation. Flagged for a separate fix.

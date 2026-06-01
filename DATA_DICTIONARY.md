@@ -48,9 +48,16 @@ Every module owns ONE Postgres schema. Tables, types, functions belonging to the
 | Schema | Owner module | Service binary |
 |---|---|---|
 | `wallet_schema` | wallet | fin-svc |
-| `commission_schema` | commission + sellerpayout | fin-svc |
+| `commission_schema` | commission | fin-svc |
+| `sellerpayout_schema` | sellerpayout | fin-svc |
 | `treasury_schema` | treasury | fin-svc |
 | `cashback_schema` | cashback | fin-svc |
+
+> `sellerpayout_schema` (seller_payouts, payout_batches, seller_psp_accounts) was
+> split out of `commission_schema` by `chore/sellerpayout-schema-split` so the
+> sellerpayout module owns its own schema. Cross-domain reads of commission truth
+> (capture_postings) go through the `commission.CaptureRecorder` in-process seam,
+> never direct SQL.
 
 ### 2.3 Schema permissions
 
@@ -396,7 +403,7 @@ In `postgres-ledger`:
 - NEVER alter a column type once it carries production data.
 - New tables/columns are append-only.
 - `cashback_schema.plans` rows are IMMUTABLE once created. Mutations to core fields forbidden by trigger.
-- `commission_schema.seller_payouts` rows are IMMUTABLE once created. Status transitions only via INSERT into a separate audit table.
+- `sellerpayout_schema.seller_payouts` rows are IMMUTABLE once created. Status transitions only via INSERT into a separate audit table.
 
 If a ledger schema change is genuinely needed, write a NEW schema/table in parallel; never mutate existing.
 
@@ -416,8 +423,8 @@ If a ledger schema change is genuinely needed, write a NEW schema/table in paral
 - `cashback_schema.plans.start_date` (first instalment date) is `delivered_at + 3 business days` and IMMUTABLE.
 - `cashback_schema.payments` rows are append-only; one row per `(plan_id, period_yyyymm)` created by the monthly cron.
 - A trigger enforces: a payment's `(plan_id, period_yyyymm)` is UNIQUE.
-- `commission_schema.seller_payouts.unlock_at` is `delivered_at + 3 business days` and IMMUTABLE.
-- `commission_schema.seller_payouts.amount_minor` is the snapshotted net amount, IMMUTABLE.
+- `sellerpayout_schema.seller_payouts.unlock_at` is `delivered_at + 3 business days` and IMMUTABLE.
+- `sellerpayout_schema.seller_payouts.amount_minor` is the snapshotted net amount, IMMUTABLE.
 
 ---
 
@@ -611,10 +618,10 @@ CREATE INDEX cashback_payments_due_idx ON cashback_schema.payments(scheduled_dat
 
 ---
 
-## 9. Seller Payout Schema Tables (postgres-ledger / commission_schema) — NEW IN v5
+## 9. Seller Payout Schema Tables (postgres-ledger / sellerpayout_schema) — NEW IN v5
 
 ```sql
-CREATE TABLE commission_schema.seller_payouts (
+CREATE TABLE sellerpayout_schema.seller_payouts (
   id BIGSERIAL PRIMARY KEY,
   order_id BIGINT NOT NULL,                                   -- denormalized; no FK across cluster
   seller_id BIGINT NOT NULL,
@@ -636,13 +643,13 @@ CREATE TABLE commission_schema.seller_payouts (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX seller_payouts_due_idx ON commission_schema.seller_payouts(unlock_at, status)
+CREATE INDEX seller_payouts_due_idx ON sellerpayout_schema.seller_payouts(unlock_at, status)
     WHERE status = 'scheduled';
-CREATE INDEX seller_payouts_seller_idx ON commission_schema.seller_payouts(seller_id, created_at DESC);
-CREATE INDEX seller_payouts_order_idx ON commission_schema.seller_payouts(order_id);
+CREATE INDEX seller_payouts_seller_idx ON sellerpayout_schema.seller_payouts(seller_id, created_at DESC);
+CREATE INDEX seller_payouts_order_idx ON sellerpayout_schema.seller_payouts(order_id);
 
 -- Trigger: payout rows are IMMUTABLE for amount and unlock_at.
-CREATE OR REPLACE FUNCTION commission_schema.enforce_payout_immutable()
+CREATE OR REPLACE FUNCTION sellerpayout_schema.enforce_payout_immutable()
 RETURNS TRIGGER AS $$
 BEGIN
     IF OLD.amount_minor != NEW.amount_minor
@@ -657,8 +664,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 CREATE TRIGGER seller_payout_immutable_trg
-BEFORE UPDATE ON commission_schema.seller_payouts
-FOR EACH ROW EXECUTE FUNCTION commission_schema.enforce_payout_immutable();
+BEFORE UPDATE ON sellerpayout_schema.seller_payouts
+FOR EACH ROW EXECUTE FUNCTION sellerpayout_schema.enforce_payout_immutable();
 ```
 
 ---

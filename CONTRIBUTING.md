@@ -106,6 +106,35 @@ Examples:
 
 `golangci-lint` (depguard rules in `.golangci.yml`) enforces the same rules at lint time.
 
+### Relocating tables across schemas to fix a boundary debt
+
+When a table lives in the "wrong" schema and the boundaries guard carries an
+exemption for it, the workflow to pay down that debt is:
+
+1. Audit which tables genuinely belong to the destination domain (some may
+   legitimately live where they are — confirm ownership by who reads/writes
+   them, not by name).
+2. Write an `ALTER TABLE … SET SCHEMA` migration with a reversible `.down.sql`.
+   Make it **idempotent** (guarded `IF EXISTS` moves) when the same DB also runs
+   the init scripts — the test harness applies init **and** migrations to a
+   fresh DB, so the migration must no-op once the init already builds the new
+   layout. Remember the trigger **function** does not travel with the table on
+   `SET SCHEMA` — relocate it with `ALTER FUNCTION … SET SCHEMA`.
+3. Update the **dual** schema source of truth in lockstep: the migration (for
+   deployed DBs) **and** `deploy/postgres-ledger/init/` (for fresh DBs), plus
+   the per-role grants (the new schema needs `USAGE` granted; table-level grants
+   persist with the table object across `SET SCHEMA`).
+4. Update application SQL references + any governing-doc decision that pinned the
+   old location (`CLAUDE.md`, `DATA_DICTIONARY.md`).
+5. Update the boundaries guard to enforce the new boundary and smoke-test it by
+   injecting a violation and confirming it fires.
+
+Cross-schema foreign keys can stay when they cross between domains owned by the
+same migration namespace; cross-schema reads from application code go through
+interface seams (per PR #8's commission/orderledger `CaptureRecorder` pattern).
+
+Precedent: `chore/sellerpayout-schema-split`.
+
 ## Photo upload integration pattern
 
 Photo uploads are a **two-phase commit**: (1) `POST /uploads/photos` validates +
