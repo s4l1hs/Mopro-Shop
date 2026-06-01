@@ -106,6 +106,34 @@ Examples:
 
 `golangci-lint` (depguard rules in `.golangci.yml`) enforces the same rules at lint time.
 
+## Generated DTOs are source-of-truth
+
+When frontend code needs a field that exists conceptually in the backend but is
+absent from the generated DTO, the fix is in the OpenAPI spec + codegen regen,
+never by hand-editing generated code. Hand-edits get clobbered on the next regen
+and create invisible drift between the spec and the actual DTO.
+
+The workflow: (1) add or change the field in `api/openapi.yaml`, (2) update the
+backend handler to populate it, (3) run codegen, (4) commit the regenerated files
+alongside the spec change. CI's `api-check-sync` gate catches missed
+regenerations.
+
+Codegen has **two** stages — miss either and the field won't (de)serialize:
+- `make api-gen` — `oapi-codegen` (Go types under `internal/api/gen/`) +
+  `openapi-generator` via Docker (Dart `*.dart` models with `@JsonKey`
+  annotations under `mobile/packages/mopro_api/`).
+- `dart run build_runner build` in `mobile/packages/mopro_api/` — regenerates the
+  `*.g.dart` files that hold the actual `fromJson`/`toJson`. The Dart `.dart`
+  model alone only declares the field; the `.g.dart` is what serializes it.
+  CI's flutter-ci `build_runner` job fails if these are stale.
+
+Precedent: Tranche 5a left a documented carry because `Product.sellerSlug` was
+needed for PDP→storefront navigation but absent from the generated DTO; the
+`chore/seller-slug-in-product-dto` PR closes it via spec + regen rather than
+hand-edit. That same regen surfaced a latent `build_runner` miss
+(`product_summary.g.dart` lacked `flash_price_minor` serialization) — exactly the
+drift this gate exists to prevent.
+
 ## Adding a new dependency
 
 1. Check if it already exists in `go.mod`.

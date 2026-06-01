@@ -192,6 +192,7 @@
     "buy_now": "Buy Now",
     "sold_by": "Sold by {seller}",
     "go_to_store": "Go to store",
+    "go_to_store_a11y": "View seller's store",
     "lowest_30d": "Lowest price in 30 days: {price}",
     "stock_left": "{count} left in stock",
     "select_variant": "Option",

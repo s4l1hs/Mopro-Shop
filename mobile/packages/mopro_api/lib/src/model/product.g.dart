@@ -30,6 +30,7 @@ Product _$ProductFromJson(Map<String, dynamic> json) => $checkedCreate(
       id: $checkedConvert('id', (v) => (v as num).toInt()),
       sellerId: $checkedConvert('seller_id', (v) => (v as num).toInt()),
       sellerName: $checkedConvert('seller_name', (v) => v as String),
+      sellerSlug: $checkedConvert('seller_slug', (v) => v as String?),
       categoryId: $checkedConvert('category_id', (v) => (v as num).toInt()),
       brand: $checkedConvert('brand', (v) => v as String),
       status: $checkedConvert(
@@ -58,6 +59,7 @@ Product _$ProductFromJson(Map<String, dynamic> json) => $checkedCreate(
   fieldKeyMap: const {
     'sellerId': 'seller_id',
     'sellerName': 'seller_name',
+    'sellerSlug': 'seller_slug',
     'categoryId': 'category_id',
     'cashbackPreview': 'cashback_preview',
     'createdAt': 'created_at',
@@ -68,6 +70,7 @@ Map<String, dynamic> _$ProductToJson(Product instance) => <String, dynamic>{
   'id': instance.id,
   'seller_id': instance.sellerId,
   'seller_name': instance.sellerName,
+  'seller_slug': ?instance.sellerSlug,
   'category_id': instance.categoryId,
   'brand': instance.brand,
   'status': _$ProductStatusEnumEnumMap[instance.status]!,

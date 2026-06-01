@@ -11,6 +11,7 @@ Name | Type | Description | Notes
 **id** | **int** |  | 
 **sellerId** | **int** |  | 
 **sellerName** | **String** |  | 
+**sellerSlug** | **String** | URL-safe identifier for the seller; used to deep-link to the seller storefront at /sellers/:slug. Null when the product's seller_id does not resolve to an active seller (legacy/platform-direct or suspended).  | [optional] 
 **categoryId** | **int** |  | 
 **brand** | **String** |  | 
 **status** | **String** |  | 

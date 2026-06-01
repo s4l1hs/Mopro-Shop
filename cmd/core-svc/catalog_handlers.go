@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/mopro/platform/internal/catalog"
+	"github.com/mopro/platform/internal/seller"
 	"github.com/mopro/platform/pkg/mediaurl"
 )
 
@@ -121,7 +122,7 @@ func handleSearch(svc catalog.Service, defaultLocale, defaultMarket, cashbackCur
 
 // handleGetProductDetail handles GET /products/{id} with cashback_preview.
 // Replaces the original stub in main.go (wired separately).
-func handleGetProductDetail(svc catalog.Service, defaultMarket, cashbackCurrency string) http.HandlerFunc {
+func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
@@ -177,8 +178,27 @@ func handleGetProductDetail(svc catalog.Service, defaultMarket, cashbackCurrency
 			variantsOut[i] = vo
 		}
 
+		// Resolve the seller for storefront deep-linking. seller_name is required
+		// by the Product schema; seller_slug is nullable — both null/empty when
+		// the product's seller_id doesn't resolve to an active seller (pre-5a
+		// data or a suspended seller). Embedding promotes catalog.Product's
+		// fields to the top level alongside the two seller fields.
+		type productOut struct {
+			catalog.Product
+			SellerName string  `json:"seller_name"`
+			SellerSlug *string `json:"seller_slug"`
+		}
+		out := productOut{Product: p}
+		if s, sErr := sellerSvc.GetByID(r.Context(), p.SellerID); sErr == nil {
+			out.SellerName = s.DisplayName
+			slug := s.Slug
+			out.SellerSlug = &slug
+		} else if !errors.Is(sErr, seller.ErrSellerNotFound) {
+			slog.Error("catalog: resolve seller for product", "seller_id", p.SellerID, "err", sErr)
+		}
+
 		jsonOK(w, http.StatusOK, map[string]any{
-			"product":          p,
+			"product":          out,
 			"variants":         variantsOut,
 			"translations":     translations,
 			"cashback_preview": cashbackPreview,
