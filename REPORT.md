@@ -3479,3 +3479,57 @@ Operational + infrastructure PR; no user-facing capability.
 - make-verify CI runtime grows as `internal/e2e/` accumulates scenarios (20-min timeout; watch the §1.6#2 15-min budget).
 - Owner-relative registry means a fork's images land under the fork's namespace — prod compose (`ghcr.io/mopro/*`) only matches when the repo is under `mopro`.
 - GHCR rate limits under heavy CI; manual rollout stays manual until auto-pull is wired.
+
+## Cashback PgxPool Deadlock Fix PR — `fix/cashback-pgxpool-deadlock`
+
+Focused financial-domain fix for the deadlock PR #41's make-verify CI caught.
+
+### 1. Origin / baseline
+- PR #41 CI repro: https://github.com/s4l1hs/Mopro-Shop/actions/runs/26772827566 (make-verify FAILURE).
+- Pre-fix: `TestCronProperty_ConcurrentIdempotency` deadlocks under `-race` at `MaxConns=4` (the 2-vCPU runner's pgx default). Passed on 6-core local (pool default `max(4,NumCPU)`=6).
+- Prod pool size: **unset everywhere** → pgx default `max(4,NumCPU)` ≈ 6 on the 6-vCPU VDS.
+
+### 2. Engine review (CLAUDE.md §12) — `tool/audit/cashback_deadlock_baseline.md`
+Deadlock chain: `PayMonthlyInstallments → WithTx(SERIALIZABLE) → PostInTx →` a pool read = a 2nd connection inside the tx. Under 8 concurrent payments × 2-conn-need vs a 4-conn pool, the claim-winner waits for conn #2 while claim-losers hold conns blocked on the winner's uncommitted `ClaimPaymentPeriod` row-lock → cycle.
+
+`PostInTx` has **three** pool reads; only some are both the deadlock source AND safely tx-routable:
+| Read | Deadlock source | Fix |
+|------|-----------------|-----|
+| `GetAccountCurrencies` | yes | **tx-route** — accounts committed before the tx; snapshot sees them |
+| `checkReadOnly→GetSystemState` (cold cache) | yes (empirically — deadlock *moved* here after fixing the first) | **tx-route** — committed singleton config row |
+| `GetTransactionByIdempotencyKey` (replay) | no (claim guard) | **stays pool** — must see concurrently-committed txns; tx-route would return not-found → break idempotent replay |
+
+The §12 payoff: blindly "routing all PostInTx reads through the tx" (the naive fix) would have turned the idempotency lookup into a correctness bug. The empirical `-race` repro also disproved a one-line fix — `GetAccountCurrencies` alone just moved the deadlock to `GetSystemState`.
+
+### 3. Fix applied
+`GetAccountCurrencies` and `GetSystemState` gain an optional `pgx.Tx` (non-nil → read on the tx; nil → pool; mirrors the existing `SetSystemState` convention). `PostInTx` passes its tx to both (via `checkReadOnly(ctx, tx)`). `StartRefresher` (background, no tx) passes nil. No business-logic / schema / external-API change; non-financial consumers unaffected (only `PostInTx` calls these inside a tx).
+
+### 4. Regression tests (20 consecutive `-race` runs, green)
+- `TestCronProperty_ConcurrentIdempotency` — pool pinned to `MaxConns=4` (deterministic repro across runners).
+- New `TestProperty_PostInTx_SingleConnectionHotPath` — runs the hot path on a `MaxConns=1` pool; success proves single-connection acquisition; a regression hangs→fails via context deadline. Scoped to the non-duplicate path (the replay pool-read stays by design).
+
+### 5. Production concurrency (§6)
+- Cashback monthly cron is a **singleton** (`cmd/fin-svc/main.go` `NewMonthlyCron(...).Start()`), processing plans **sequentially**; no non-cron invocation path found.
+- ⇒ **Prod was safe today** by operational invariant (1 tx at a time × pool≈6); the deadlock was test-surfaced. After this PR the single-connection property holds **independent of concurrency × pool sizing** — the singleton invariant becomes defense-in-depth, not a load-bearing safety mechanism.
+
+### 6. §1.6 trigger #1 fired — Backlog `fix/financial-domain-pool-discipline`
+≥3 analogous pool-read-inside-tx patterns exist; this PR fixed the cashback path only:
+- wallet `GetTransactionByIdempotencyKey` (replay) — latent 2nd-conn; **not** tx-routable (correctness) → needs an architectural fix (reserved conn / restructure).
+- wallet `GetSystemState` via the background refresher — already pool (fine); the in-tx path is fixed.
+- sellerpayout `FindPayoutByKey` / `FindBatchByKey` — same idempotency-lookup-via-pool shape; audit whether they run inside the payout `WithTx`.
+
+### 7. Closed item
+- PR #41 Backlog "cashback cron pool/deadlock engine review + fix" → ✅ (cashback path).
+
+### 8. New Backlog items
+- `fix/financial-domain-pool-discipline` (the analogous patterns above).
+- Set an explicit production `DB_MAX_CONNS` (don't rely on the CPU-derived default).
+- Flip `make-verify` to a required check now that the deadlock is fixed (verify CI green first).
+- Pre-existing, unrelated: `internal/cart` + `internal/identity` have rotted *integration*-tagged tests (`alwaysValidCatalog` missing `catalog.HomeBanners`; stale `identity.NewService` arity) — surfaced by a broad `go vet -tags=integration ./...`; not in `make verify`'s path. Same rot class as PR #40's `internal/e2e`. Not touched here (other domains).
+
+### 9. No parity change
+Connection-acquisition fix; no capability change.
+
+### 10. Risk notes
+- The nullable-`tx` shape relies on callers passing the tx when inside one; the `MaxConns=1` property test is the guard against a future caller passing nil inside a tx.
+- Routing `GetAccountCurrencies`/`GetSystemState` onto the SERIALIZABLE tx adds their (point/singleton) reads to its conflict scope — negligible extra 40001 on rarely-mutated rows; the existing retry loop absorbs it.
