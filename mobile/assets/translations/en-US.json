@@ -68,6 +68,10 @@
     "rails": {
       "recently_viewed": {
         "title": "Recently viewed"
+      },
+      "recommendations": {
+        "personalized_title": "Picked for you",
+        "popular_title": "Popular products"
       }
     }
   },
