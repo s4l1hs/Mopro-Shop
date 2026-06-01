@@ -3373,3 +3373,56 @@ PR #38's required `Generated files in sync` check failed on a **single stale lin
 
 ### 7. No new commits to feature PRs
 The drain was orchestration only. The single non-orchestration commit (`590e0f9b`, OpenAPI `FILES` re-sync) was a user-approved bookkeeping fix to unblock the required check — generated manifest only, no feature/source change.
+
+## E2e Revival PR — `chore/revive-internal-e2e-suite`
+
+Revived the rotted `internal/e2e/` integration suite and gated it in `make verify`.
+
+### 1. Baseline
+- `go build -tags=integration ./internal/e2e/...` → **exit 0** (misleading: `go build` skips `_test.go`).
+- Real repro `go test/go vet -tags=integration ./internal/e2e/...` → **17 compile errors / 4 files** (`dlq_e2e_test.go` clean).
+- `make verify` did **not** run the suite (`test` target = `go test ./...` without `-tags=integration`) — the root cause of the silent rot.
+
+### 2. Audit findings — 5 compile breakage classes (all mechanically migrated)
+| Class | Symbol | Migration |
+|-------|--------|-----------|
+| Signature change | `cashback.NewService` (+`*metrics.BusinessMetrics`; param5 `WalletPoster`) | append nil biz |
+| Interface growth | `cart.Service.SeedStockIfAbsent` | stub both cart mocks |
+| Interface growth | `catalog.Service` +**13 methods** (compiler showed only `HomeBanners`) | stub both catalog mocks |
+| Removed entry point | `RunMonth` | → `PayMonthlyInstallments(ctx, runDate)` |
+| Removed entry point | `CreatePlanForOrder` | → `CreatePlanFromDelivery` + populate v8 `PriceMinor`/`CommissionBps` (mirror consumer.go) |
+
+### 3. Mechanical migration — breakage count 17 → 0
+- `f6b142d5` cashback v8 API migration (NewService/RunMonth/CreatePlanForOrder).
+- `f884a39f` mock expansion (1 cart + 13 catalog methods × 2 mocks each).
+- `go vet -tags=integration ./internal/e2e/...` → clean.
+
+### 4. §1.6 trigger #2 fired — runtime drift was a deeper second front
+Compile-green ≠ runtime-green. Running the suite surfaced issues the compile audit couldn't see; the user chose **"go deeper in this PR"**:
+- **Concurrent-map race** (`dlq` property test) — handler mutated an `atomic.Value`-stored map in place across eventbus goroutines → fatal under `-race`. Fixed with a `sync.Mutex` (`0f7d54ae`).
+- **Schema drift (orders)** — `setupEcomSchema` missing `seller_id`+`checkout_session_id` (migration 0059). Synced (`0f7d54ae`).
+- **Schema drift (ledger plans)** — hand-rolled `setupLedgerSchema` was a stale snapshot missing 7 v8 columns. **Killed the hand-rolled-DDL anti-pattern**: `setupLedgerSchema` now truncates for a clean slate against the **real** schema that `make e2e-test-up` applies (`deploy/postgres-ledger/init/*` + `migrations/ledger/*.up.sql`, same recipe as `pg-ledger-test-up`) (`ef9c52d3`).
+- **Stale v6 assertion** — redis test hardcoded `monthly=145`; now derives via `cashback.ComputePlanTerms` (v8 = 224) (`ef9c52d3`).
+
+### 5. CI gate addition (load-bearing)
+- `make verify` now includes `integration-e2e` → `go test -tags=integration ./internal/e2e/... -count=1 -race -timeout 5m`, bootstrapped by idempotent `e2e-test-up`.
+- **Smoke-tested**: injected `cashback.SomeNonExistentFunction_SMOKE` → `make verify`/gate failed at build (`undefined … [build failed]`, `make: Error 1`); reverted → green.
+- Final suite: **6 PASS + 1 SKIP** under `-race` (`ok internal/e2e 12.5s`).
+- **§5.3 CI-enforcement gap:** **no workflow runs `make verify`**, and `e2e.yml` is Playwright (frontend), not the Go suite. The gate fires for anyone running `make verify` locally (constitution §11 mandates it pre-push) but is **not yet CI-enforced** — see Backlog.
+
+### 6. Closed carry
+- PR #37's "Revive internal/e2e suite" Backlog item → **✅ closed** (compiles, runs, gated).
+
+### 7. New Backlog items
+- **De-flake `TestProperty_DLQContainsExactlyPermanentFailures`** — aggressive XAUTOCLAIM idle (100ms) races transient retries → transient msgs wrongly DLQ'd. Skip-guarded (`REVIVAL_GAP`, run via `E2E_RUN_FLAKY_DLQ=1`). Needs eventbus autoclaim/retry-window rework.
+- **Ecom e2e bootstrap from real migrations** — blocked by a pre-existing repo inconsistency: `deploy/postgres-ecom/init/80-seller-schema.sql` defines `sellers(name,…)` while `migrations/ecom/0078_sellers.up.sql` defines a different `sellers(slug,…)` → init+migrations conflicts at 0078. Ecom stays hand-rolled (minimal: orders/order_items/shipping/outbox) until the seller-schema divergence is reconciled by the owning team.
+- **Drop obsolete `last_distributed_period`** awareness — the old hand-rolled plans DDL carried a v6 column not in the v8 schema; removed with the snapshot.
+- **Enforce the e2e gate in CI (§5.3)** — no workflow runs `make verify`; `e2e.yml` is Playwright, not the Go suite. The gate is local-only (constitution §11 pre-push) until a Go CI job runs `make verify` / `make integration-e2e` with Docker postgres+redis services. This is the same gap class that allowed the silent rot — closing it fully needs that CI job. Separate infra change.
+
+### 8. No parity change
+Operational + test-hygiene PR; no user-facing capability added.
+
+### 9. Risk notes
+- `make verify` now requires Docker for three e2e containers (consistent with existing `pg-ledger-test-up` requirement). `setupLedgerSchema` errors with a clear "run `make e2e-test-up`" message if the ledger container wasn't bootstrapped.
+- e2e containers are reused across runs (fast dev loop); a crashed run can leave dirty state — `make e2e-test-down` resets. `test-e2e` is the throwaway fresh-container variant.
+- e2e adds ~13s (race) to `make verify`.

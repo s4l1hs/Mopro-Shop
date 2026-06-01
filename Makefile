@@ -17,14 +17,14 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
         caddy-validate caddy-reload \
         test-integration-catalog test-integration-outbox test-integration-cart test-integration-order \
-        test-integration-sellerpayout test-e2e \
+        test-integration-sellerpayout test-e2e integration-e2e e2e-test-up e2e-test-down \
         api-gen-models api-gen-core api-gen-fin api-gen-dart api-gen api-lint contract-test \
         docker-build release deploy deploy-staging rollback \
         seed-dry-run seed-staging seed-prod build-seed \
         smoke loadtest grafana-deploy
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order verify-image-manifest verify-contrast
+verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order integration-e2e verify-image-manifest verify-contrast
 
 # WCAG contrast check for the documented brand colour pairs. Fails if any
 # non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.
@@ -324,21 +324,69 @@ api-check-sync:
 
 # ── e2e ────────────────────────────────────────────────────────────────────────
 
-test-e2e:
-	docker rm -f pg-ecom-e2e pg-ledger-e2e redis-e2e 2>/dev/null || true
-	docker run -d --name redis-e2e -p 6381:6379 redis:7-alpine
-	docker run -d --name pg-ecom-e2e -p 6435:5432 \
-	  -e POSTGRES_USER=ecom_admin -e POSTGRES_PASSWORD=test123 \
-	  -e POSTGRES_DB=mopro_ecom postgres:16-alpine
-	docker run -d --name pg-ledger-e2e -p 6436:5432 \
-	  -e POSTGRES_USER=ledger_admin -e POSTGRES_PASSWORD=test123 \
-	  -e POSTGRES_DB=mopro_ledger postgres:16-alpine
-	sleep 3
+# test-e2e: throwaway fresh-container run (tears down first, then the gated run,
+# then tears down). Use `make integration-e2e` for the fast reuse-containers loop.
+test-e2e: e2e-test-down integration-e2e
+	@$(MAKE) e2e-test-down
+
+# ── E2e suite infra (gated by `make verify` via integration-e2e) ─────────────
+# Idempotent self-bootstrap, mirroring pg-ledger-test-up: reuse running
+# containers, start fresh otherwise, LEAVE running for dev iteration.
+# Unlike test-e2e (throwaway containers, torn down each run), these persist so
+# `make verify` is fast on repeat. The suite's TestMain applies its own schema
+# (setupEcomSchema/setupLedgerSchema), so these are plain empty postgres + redis
+# — no init/migration files applied here.
+# `make verify` already requires docker (property-* use pg-ledger-test-up), so
+# hard-requiring these three containers is consistent; TestMain os.Exit(1)s if
+# postgres is absent, which is why bootstrap-as-dependency (not skip) is correct.
+e2e-test-up:
+	@if docker inspect redis-e2e > /dev/null 2>&1; then echo "[redis-e2e] reusing" ; else \
+	    echo "[redis-e2e] starting on 6381..." ; \
+	    docker run -d --name redis-e2e -p 6381:6379 redis:7-alpine > /dev/null ; fi
+	@if docker inspect pg-ecom-e2e > /dev/null 2>&1; then echo "[pg-ecom-e2e] reusing" ; else \
+	    echo "[pg-ecom-e2e] starting on 6435..." ; \
+	    docker run -d --name pg-ecom-e2e -p 6435:5432 \
+	        -e POSTGRES_USER=ecom_admin -e POSTGRES_PASSWORD=test123 \
+	        -e POSTGRES_DB=mopro_ecom postgres:16-alpine > /dev/null ; fi
+	@if docker inspect pg-ledger-e2e > /dev/null 2>&1; then echo "[pg-ledger-e2e] reusing" ; else \
+	    echo "[pg-ledger-e2e] starting on 6436..." ; \
+	    docker run -d --name pg-ledger-e2e -p 6436:5432 \
+	        -e POSTGRES_USER=ledger_admin -e POSTGRES_PASSWORD=test123 \
+	        -e POSTGRES_DB=mopro_ledger postgres:16-alpine > /dev/null ; \
+	    echo "[pg-ledger-e2e] waiting for postgres..." ; \
+	    for i in $$(seq 1 30); do \
+	        if docker exec pg-ledger-e2e psql -U ledger_admin -d mopro_ledger -c 'SELECT 1' > /dev/null 2>&1; then break ; fi ; \
+	        sleep 1 ; \
+	    done ; \
+	    echo "[pg-ledger-e2e] applying init schema (deploy/postgres-ledger/init/*.sql)..." ; \
+	    for f in $$(ls deploy/postgres-ledger/init/*.sql | sort); do \
+	        docker exec -i pg-ledger-e2e psql -U ledger_admin -d mopro_ledger < $$f > /dev/null \
+	            || { echo "ledger init apply failed at $$f" >&2 ; exit 1 ; } ; \
+	    done ; \
+	    echo "[pg-ledger-e2e] applying ledger migrations (migrations/ledger/*.up.sql)..." ; \
+	    for f in $$(ls migrations/ledger/*.up.sql | sort); do \
+	        docker exec -i pg-ledger-e2e psql -U ledger_admin -d mopro_ledger < $$f > /dev/null \
+	            || { echo "ledger migration apply failed at $$f" >&2 ; exit 1 ; } ; \
+	    done ; \
+	    echo "[pg-ledger-e2e] ready (real schema applied)" ; fi
+	@echo "[e2e] waiting for postgres readiness..." ; \
+	for i in $$(seq 1 30); do \
+	    if docker exec pg-ecom-e2e psql -U ecom_admin -d mopro_ecom -c 'SELECT 1' > /dev/null 2>&1 \
+	       && docker exec pg-ledger-e2e psql -U ledger_admin -d mopro_ledger -c 'SELECT 1' > /dev/null 2>&1; then \
+	        echo "[e2e] postgres ready" ; break ; fi ; \
+	    sleep 1 ; \
+	done
+
+e2e-test-down:
+	-@docker rm -f redis-e2e pg-ecom-e2e pg-ledger-e2e > /dev/null 2>&1 ; echo "[e2e] containers torn down"
+
+# integration-e2e is the load-bearing gate: it runs the build-tagged internal/e2e
+# suite (invisible to `go test ./...` / `go build`) so refactors break it loudly.
+integration-e2e: e2e-test-up
 	REDIS_E2E_ADDR=localhost:6381 \
 	ORDER_E2E_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
 	LEDGER_E2E_DSN=postgres://ledger_admin:test123@localhost:6436/mopro_ledger \
-	  go test -tags=integration -count=1 -race -v ./internal/e2e/... ; \
-	  STATUS=$$? ; docker rm -f pg-ecom-e2e pg-ledger-e2e redis-e2e ; exit $$STATUS
+	  go test -tags=integration ./internal/e2e/... -count=1 -race -timeout 5m
 
 # ── Catalog seed ───────────────────────────────────────────────────────────────
 

@@ -66,6 +66,48 @@ func (m *multiVariantCatalogMock) GetVariantByID(_ context.Context, id int64) (c
 	return v, nil
 }
 
+// E2E_MOCK: the discovery/reviews surface (Phase 4.4a+) that catalog.Service grew.
+// Stubs for interface compliance; no behavior asserted by current e2e scenarios.
+func (m *multiVariantCatalogMock) ListCategories(_ context.Context, _ string, _ int) ([]catalog.CategoryRow, error) {
+	return nil, nil
+}
+func (m *multiVariantCatalogMock) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return nil, 0, nil
+}
+func (m *multiVariantCatalogMock) SearchSummary(_ context.Context, _, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return nil, 0, nil
+}
+func (m *multiVariantCatalogMock) ListProductsByIDs(_ context.Context, _ []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {
+	return nil, nil
+}
+func (m *multiVariantCatalogMock) HomeRails(_ context.Context, _ string) ([]catalog.HomeRailRow, error) {
+	return nil, nil
+}
+func (m *multiVariantCatalogMock) HomeBanners(_ context.Context) ([]catalog.HomeBannerRow, error) {
+	return nil, nil
+}
+func (m *multiVariantCatalogMock) HomeMoodStories(_ context.Context) ([]catalog.HomeMoodStoryRow, error) {
+	return nil, nil
+}
+func (m *multiVariantCatalogMock) HomeFlashDeals(_ context.Context, _ string, _ *int64) (*catalog.FlashDealsResult, error) {
+	return nil, nil
+}
+func (m *multiVariantCatalogMock) ListReviews(_ context.Context, _ int64, _ catalog.ReviewSort, _, _ int, _ int64) ([]catalog.ProductReviewRow, int, error) {
+	return nil, 0, nil
+}
+func (m *multiVariantCatalogMock) ReviewsSummary(_ context.Context, _ int64) (catalog.ReviewsSummary, error) {
+	return catalog.ReviewsSummary{}, nil
+}
+func (m *multiVariantCatalogMock) ReviewProductID(_ context.Context, _ int64) (int64, error) {
+	return 0, nil
+}
+func (m *multiVariantCatalogMock) ToggleHelpfulVote(_ context.Context, _, _ int64) (catalog.HelpfulVoteResult, error) {
+	return catalog.HelpfulVoteResult{}, nil
+}
+func (m *multiVariantCatalogMock) ListAllVariantStocks(_ context.Context) ([]catalog.VariantStock, error) {
+	return nil, nil
+}
+
 // multiItemCartMock returns a cart with multiple items.
 type multiItemCartMock struct {
 	items []cart.CartItem
@@ -82,6 +124,10 @@ func (m *multiItemCartMock) Reserve(_ context.Context, _ int64) (string, time.Ti
 func (m *multiItemCartMock) Release(_ context.Context, _ string) error           { return nil }
 func (m *multiItemCartMock) CommitReservation(_ context.Context, _ string) error { return nil }
 func (m *multiItemCartMock) SeedStock(_ context.Context, _ int64, _ int) error   { return nil }
+
+// E2E_MOCK: cart.Service grew SeedStockIfAbsent (startup SET-NX). Stub for interface
+// compliance; no behavior asserted by current e2e scenarios.
+func (m *multiItemCartMock) SeedStockIfAbsent(_ context.Context, _ int64, _ int) error { return nil }
 
 // TestE2E_DeliveredEventTwoSellersIdempotent exercises the full Phase 3.1 scenario:
 //
@@ -192,7 +238,7 @@ func TestE2E_DeliveredEventTwoSellersIdempotent(t *testing.T) { //nolint:gocyclo
 
 	cashbackRepo := cashback.NewRepository(ledgerPool)
 	cashbackOutboxRepo := outbox.NewRepository("wallet_schema.outbox")
-	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutboxRepo, calLoader, coinCurrency, walletSvc, slog.Default())
+	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutboxRepo, calLoader, coinCurrency, walletSvc, slog.Default(), nil)
 
 	payoutRepo := sellerpayout.NewRepository(ledgerPool)
 	payoutSvc := sellerpayout.NewService(payoutRepo, nil, nil, calLoader, payoutCurrency, slog.Default())
@@ -403,13 +449,14 @@ func TestE2E_DeliveredEventTwoSellersIdempotent(t *testing.T) { //nolint:gocyclo
 
 	// ── Step 9: Cashback monthly cron — first run creates 1 payment ──────────────
 	now := time.Now().UTC()
-	period := now.Year()*100 + int(now.Month())
 
-	result, err := cashbackSvc.RunMonth(ctx, period, now, coinCurrency)
+	// v8: PayMonthlyInstallments derives the period from runDate; the coin currency
+	// is fixed at NewService time (replaces the old RunMonth(period, now, currency)).
+	result, err := cashbackSvc.PayMonthlyInstallments(ctx, now)
 	if err != nil {
-		t.Fatalf("RunMonth: %v", err)
+		t.Fatalf("PayMonthlyInstallments: %v", err)
 	}
-	t.Logf("RunMonth result: processed=%d skipped=%d failed=%d", result.Processed, result.Skipped, result.Failed)
+	t.Logf("PayMonthlyInstallments result: processed=%d skipped=%d failed=%d", result.Processed, result.Skipped, result.Failed)
 
 	if result.Failed > 0 {
 		t.Errorf("RunMonth: %d plan(s) failed", result.Failed)
@@ -428,13 +475,13 @@ func TestE2E_DeliveredEventTwoSellersIdempotent(t *testing.T) { //nolint:gocyclo
 	t.Logf("monthly cron first run OK: payments=%d", paymentCount2)
 
 	// ── Step 10: Second cron run same period — idempotent ────────────────────────
-	result2, err := cashbackSvc.RunMonth(ctx, period, now, coinCurrency)
+	result2, err := cashbackSvc.PayMonthlyInstallments(ctx, now)
 	if err != nil {
-		t.Fatalf("RunMonth (idempotent): %v", err)
+		t.Fatalf("PayMonthlyInstallments (idempotent): %v", err)
 	}
 	// All plans skipped (already paid this period).
 	if result2.Processed != 0 {
-		t.Errorf("second RunMonth: want 0 processed (idempotent), got %d", result2.Processed)
+		t.Errorf("second PayMonthlyInstallments: want 0 processed (idempotent), got %d", result2.Processed)
 	}
 
 	var paymentCount3 int
