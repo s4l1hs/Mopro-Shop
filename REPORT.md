@@ -3447,17 +3447,20 @@ The runbook is **not in the repo or any `outputs/` dir** (it's the user's extern
 - Orphan `internal/media/integration_test.go`: **DELETE** — non-compiling (`undefined: media.PhotoAttachment`; surface moved to `internal/attachments`), wrong schema (`media_schema` vs `attachments_schema`), 100% superseded by `internal/attachments/integration_test.go` (PR #34, gated). Removed (was untracked → `rm`, no commit artifact).
 
 ### 4. Image-build workflow (§5)
-`.github/workflows/build-images.yml` — main-push + `workflow_dispatch`, matrix `[core-svc, fin-svc, jobs-svc]`, `build/Dockerfile` + `SERVICE`/`BUILD_SHA`/`BUILT_AT` build-args, tags `latest`/full-sha/short-sha, gha cache. `docs/deploy.md` documents owner-relative namespace + manual rollout + hotfix builds. Smoke test (workflow_dispatch): _<run URL below>_.
+`.github/workflows/build-images.yml` — main-push + `workflow_dispatch`, matrix `[core-svc, fin-svc, jobs-svc]`, `build/Dockerfile` + `SERVICE`/`BUILD_SHA`/`BUILT_AT` build-args, tags `latest`/full-sha/short-sha, gha cache. `docs/deploy.md` documents owner-relative namespace + manual rollout + hotfix builds.
+**Smoke test not possible pre-merge**: `gh workflow run` → `404: workflow not found on the default branch` — GitHub allows `workflow_dispatch` only once the file is on `main`. Combined with the `ghcr.io/mopro/` org-push block, the first real run is **post-merge** (push trigger on `main`, or dispatch once present). YAML validated (`yaml.safe_load`); recipe mirrors the proven `make docker-build`. Carry: validate the first build post-merge.
 
 ### 5. make-verify workflow (§6)
-`.github/workflows/make-verify.yml` — PR-to-main + main-push, Go (from go.mod) + golangci-lint v2.12.2 (matches `.golangci.yml` v2) + Flutter 3.x; Docker preinstalled, sub-targets self-bootstrap postgres/redis; 20-min timeout. Smoke test (this PR): _<run URL below>_. Required-status-check flip in branch protection = follow-up (GitHub UI).
+`.github/workflows/make-verify.yml` — PR-to-main + main-push, Go (from go.mod) + golangci-lint v2.12.2 (matches `.golangci.yml` v2) + Flutter 3.x; Docker preinstalled, sub-targets self-bootstrap postgres/redis; 20-min timeout.
+**Smoke test (PR #41): https://github.com/s4l1hs/Mopro-Shop/actions/runs/26772827566 — FAILURE (~15.3 min), and the failure is the gate doing its job.** It ran `internal/cashback`'s `TestCronProperty_ConcurrentIdempotency` — a property suite that had **never run in CI** (openapi-ci runs `go test` without `-tags=integration`) — and hit a **pgxpool deadlock**: `wallet.PostInTx` (called inside the cashback `WithTx`) acquires a *second* pool connection via `GetAccountCurrencies` (deliberately "reads from pool not tx", `wallet/repository.go:130`); the test fires up to 8 concurrent `PayMonthlyInstallments` on a pool defaulting to `max(4,NumCPU)` = **4 on the 2-vCPU runner** → 8×2-conn-need vs 4 conns → deadlock → 600s package timeout. Passes locally (`make verify` exit 0; 6-core → larger default pool).
+**Decision (user): ship make-verify red + Backlog the fix.** Zero financial code touched here; the workflow is correct and is **not** flipped to a required check until the cashback-pool fix lands.
 
 ### 6. Orphan file resolution (§7)
 Deleted (rationale in §3 above + `tool/audit/ci_infra_cleanup_baseline.md`). No REVIVAL_GAP — scenarios preserved in `internal/attachments`.
 
 ### 7. Closed gaps
-- "No image-build workflow" (PR #38) → ✅ workflow shipped (owner-relative; mopro-org push validated in follow-up).
-- "`make verify` not in CI" (PR #40) → ✅ make-verify workflow gates PRs.
+- "No image-build workflow" (PR #38) → ✅ workflow shipped (owner-relative; first real push validated post-merge / from mopro-org).
+- "`make verify` not in CI" (PR #40) → ✅ make-verify workflow runs on every PR. First run is **red** — it caught a real pre-existing cashback concurrency deadlock (gate working as designed); not yet a required check (pending the Backlogged fix).
 - Orphan `internal/media/integration_test.go` (3-session carry) → ✅ deleted.
 - Runbook defects (201-vs-200, missing `CDN_BASE_URL`, unsatisfiable CI-image-build prereq) → ✅ corrected text provided.
 
@@ -3465,8 +3468,9 @@ Deleted (rationale in §3 above + `tool/audit/ci_infra_cleanup_baseline.md`). No
 Operational + infrastructure PR; no user-facing capability.
 
 ### 9. Backlog deltas
+- **Fix the cashback cron concurrent-idempotency pgxpool deadlock** (blocks make-verify going green). Two angles: (a) test-only — size `propCronPool`'s `MaxConns` ≥ 2× max concurrency (~16) in `cashback_cron_property_test.go` so the nested acquire has headroom on constrained runners; (b) **engine review (escalate, §12)** — `wallet.PostInTx` needing a 2nd pool connection (`GetAccountCurrencies` reads pool-not-tx by design) means concurrent `PayMonthlyInstallments` callers each need 2 conns; assess whether the prod monthly cron's concurrency + pool sizing can hit the same exhaustion, and whether `GetAccountCurrencies` should route through the tx or the cron should bound concurrency.
 - Validate the first real image push from where `mopro`-org GHCR creds exist (the §1.6#1 carry); reconcile owner-relative vs `ghcr.io/mopro/` once repo ownership is settled.
-- Flip `make-verify` to a required status check (branch-protection UI).
+- Flip `make-verify` to a required status check (branch-protection UI) — **after** the cashback deadlock fix lands and the gate is green.
 - Watchtower-style auto-pull on the deploy host (build→deploy automation).
 - Image vuln scanning + signing (Trivy + cosign).
 - Multi-arch matrix if ARM hosts surface.
