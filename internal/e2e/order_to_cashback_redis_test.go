@@ -167,7 +167,14 @@ func TestE2E_FullCheckoutToPayoutViaRedis(t *testing.T) { //nolint:gocyclo,cyclo
 
 	// ── Step 5: Poll for cashback plan ────────────────────────────────────────
 	// D3: stdlib polling loop, no testify.
-	const wantMonthlyMinor int64 = 145 // commAmt=3500, yearly=1750, monthly=145
+	// v8 accelerated model: derive the expected monthly from the engine rather
+	// than hardcoding. Was 145 (stale v6 yearly-interest/12); v8 yields 224 =
+	// (price × commissionBps)/CashbackK. Mirrors order_to_cashback_test.go.
+	terms, err := cashback.ComputePlanTerms(priceMinor, commPctBps)
+	if err != nil {
+		t.Fatalf("ComputePlanTerms(price=%d, bps=%d): %v", priceMinor, commPctBps, err)
+	}
+	wantMonthlyMinor := terms.MonthlyAmountMinor
 	var planExists bool
 	deadline := time.Now().Add(6 * time.Second)
 	for time.Now().Before(deadline) {

@@ -551,162 +551,37 @@ CREATE TABLE order_schema.outbox (
 }
 
 func setupLedgerSchema(ctx context.Context) error {
+	// Clean slate against the REAL ledger schema. `make e2e-test-up` applies
+	// deploy/postgres-ledger/init/*.sql + migrations/ledger/*.up.sql to
+	// pg-ledger-e2e (the same recipe pg-ledger-test-up uses for the property
+	// suites), so we no longer hand-roll a DDL snapshot here — that snapshot
+	// silently drifted from the v8 plans schema (missing price_minor,
+	// commission_bps, total_months, monthly_amount_last_minor, product_*) and is
+	// exactly the rot this revival closes. Truncating every table in the
+	// e2e-touched schemas is robust to future column/table additions.
+	var hasPriceMinor bool
+	if err := ledgerPool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_schema = 'cashback_schema' AND table_name = 'plans'
+			  AND column_name = 'price_minor')`).Scan(&hasPriceMinor); err != nil {
+		return fmt.Errorf("probe ledger schema: %w", err)
+	}
+	if !hasPriceMinor {
+		return fmt.Errorf("ledger schema not bootstrapped (cashback_schema.plans.price_minor missing) — " +
+			"run `make e2e-test-up` (or `make integration-e2e`), which applies the real ledger init+migrations")
+	}
 	_, err := ledgerPool.Exec(ctx, `
-CREATE SCHEMA IF NOT EXISTS cashback_schema;
-CREATE SCHEMA IF NOT EXISTS commission_schema;
-CREATE SCHEMA IF NOT EXISTS sellerpayout_schema;
-CREATE SCHEMA IF NOT EXISTS wallet_schema;
-
-DROP TABLE IF EXISTS wallet_schema.event_dlq CASCADE;
-DROP TABLE IF EXISTS wallet_schema.event_delivery_attempts CASCADE;
-DROP TABLE IF EXISTS cashback_schema.payments CASCADE;
-DROP TABLE IF EXISTS cashback_schema.plans CASCADE;
-DROP TABLE IF EXISTS sellerpayout_schema.seller_payouts CASCADE;
-DROP TABLE IF EXISTS wallet_schema.ledger_entries CASCADE;
-DROP TABLE IF EXISTS wallet_schema.transactions CASCADE;
-DROP TABLE IF EXISTS wallet_schema.accounts CASCADE;
-DROP TABLE IF EXISTS wallet_schema.outbox CASCADE;
-
-CREATE TABLE cashback_schema.plans (
-  id                          BIGSERIAL PRIMARY KEY,
-  order_id                    BIGINT NOT NULL,
-  user_id                     BIGINT NOT NULL,
-  monthly_amount_minor        BIGINT NOT NULL CHECK (monthly_amount_minor > 0),
-  currency                    TEXT NOT NULL,
-  reference_interest_rate_bps INTEGER NOT NULL DEFAULT 5000,
-  start_date                  DATE NOT NULL,
-  status                      TEXT NOT NULL DEFAULT 'active'
-    CHECK (status IN ('active','cancelled','suspended')),
-  delivered_at                TIMESTAMPTZ NOT NULL,
-  market                      TEXT NOT NULL,
-  commission_snapshot         JSONB NOT NULL,
-  idempotency_key             TEXT NOT NULL UNIQUE,
-  last_distributed_period     INTEGER,
-  created_at                  TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at                  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE cashback_schema.payments (
-  id                   BIGSERIAL PRIMARY KEY,
-  plan_id              BIGINT NOT NULL REFERENCES cashback_schema.plans(id),
-  period_yyyymm        INTEGER NOT NULL,
-  scheduled_date       DATE NOT NULL,
-  amount_minor         BIGINT NOT NULL CHECK (amount_minor > 0),
-  status               TEXT NOT NULL DEFAULT 'scheduled'
-    CHECK (status IN ('scheduled','paid','failed')),
-  ledger_transaction_id BIGINT,
-  paid_date            TIMESTAMPTZ,
-  attempt_count        INTEGER NOT NULL DEFAULT 0,
-  last_attempt_at      TIMESTAMPTZ,
-  last_error           TEXT,
-  idempotency_key      TEXT NOT NULL UNIQUE,
-  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (plan_id, period_yyyymm)
-);
-
-CREATE TABLE sellerpayout_schema.seller_payouts (
-  id              BIGSERIAL PRIMARY KEY,
-  order_id        BIGINT NOT NULL,
-  seller_id       BIGINT NOT NULL,
-  amount_minor    BIGINT NOT NULL CHECK (amount_minor > 0),
-  currency        TEXT NOT NULL,
-  delivered_at    TIMESTAMPTZ NOT NULL,
-  unlock_at       DATE NOT NULL,
-  paid_at         TIMESTAMPTZ,
-  status          TEXT NOT NULL DEFAULT 'scheduled'
-    CHECK (status IN ('scheduled','processing','paid','failed','cancelled','reversed')),
-  market          TEXT NOT NULL,
-  ledger_transaction_id BIGINT,
-  idempotency_key TEXT NOT NULL UNIQUE,
-  attempt_count   INTEGER NOT NULL DEFAULT 0,
-  last_attempt_at TIMESTAMPTZ,
-  last_error      TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE wallet_schema.accounts (
-  id         BIGSERIAL PRIMARY KEY,
-  type       TEXT NOT NULL,
-  owner_type TEXT,
-  owner_id   BIGINT,
-  currency   TEXT NOT NULL,
-  status     TEXT NOT NULL DEFAULT 'active',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-CREATE UNIQUE INDEX accounts_platform_type_currency_uq
-    ON wallet_schema.accounts(type, currency)
-    WHERE owner_type = 'platform' AND owner_id IS NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS accounts_owner_currency_uq
-    ON wallet_schema.accounts(type, owner_type, owner_id, currency)
-    WHERE owner_id IS NOT NULL;
-
-CREATE TABLE wallet_schema.transactions (
-  id              BIGSERIAL PRIMARY KEY,
-  type            TEXT NOT NULL,
-  reference       TEXT,
-  fx_pair_id      TEXT,
-  idempotency_key TEXT NOT NULL UNIQUE,
-  status          TEXT NOT NULL DEFAULT 'posted',
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE wallet_schema.ledger_entries (
-  id             BIGSERIAL PRIMARY KEY,
-  transaction_id BIGINT NOT NULL REFERENCES wallet_schema.transactions(id),
-  account_id     BIGINT NOT NULL REFERENCES wallet_schema.accounts(id),
-  direction      CHAR(1) NOT NULL CHECK (direction IN ('D','C')),
-  amount_minor   BIGINT NOT NULL CHECK (amount_minor > 0),
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE wallet_schema.outbox (
-  id              BIGSERIAL PRIMARY KEY,
-  aggregate       TEXT NOT NULL,
-  event_type      TEXT NOT NULL,
-  payload         JSONB NOT NULL,
-  idempotency_key TEXT NOT NULL UNIQUE,
-  trace_id        TEXT,
-  span_id         TEXT,
-  market          TEXT NOT NULL,
-  currency        TEXT NOT NULL,
-  published_at    TIMESTAMPTZ,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE wallet_schema.event_delivery_attempts (
-  id              BIGSERIAL PRIMARY KEY,
-  stream          TEXT NOT NULL,
-  message_id      TEXT NOT NULL,
-  consumer_group  TEXT NOT NULL,
-  consumer_name   TEXT NOT NULL,
-  attempt_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-  outcome         TEXT NOT NULL CHECK (outcome IN ('success', 'error', 'panic')),
-  error_message   TEXT,
-  duration_ms     INTEGER
-);
-
-CREATE TABLE wallet_schema.event_dlq (
-  id                   BIGSERIAL PRIMARY KEY,
-  original_topic       TEXT NOT NULL,
-  original_message_id  TEXT NOT NULL,
-  consumer_group       TEXT NOT NULL,
-  idempotency_key      TEXT NOT NULL DEFAULT '',
-  payload              JSONB NOT NULL DEFAULT '{}',
-  attempt_count        INTEGER NOT NULL DEFAULT 0,
-  error_history        JSONB NOT NULL DEFAULT '[]',
-  status               TEXT NOT NULL DEFAULT 'open'
-    CHECK (status IN ('open','replayed','dismissed')),
-  created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
-  replayed_at          TIMESTAMPTZ,
-  replayed_by          TEXT,
-  replayed_message_id  TEXT,
-  dismissed_at         TIMESTAMPTZ,
-  dismissed_by         TEXT,
-  dismissal_reason     TEXT,
-  UNIQUE (consumer_group, original_message_id)
-);
-`)
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN
+    SELECT schemaname, tablename FROM pg_tables
+    WHERE schemaname IN ('cashback_schema','wallet_schema','sellerpayout_schema','commission_schema')
+  LOOP
+    EXECUTE format('TRUNCATE TABLE %I.%I RESTART IDENTITY CASCADE', r.schemaname, r.tablename);
+  END LOOP;
+END $$;`)
 	return err
 }
 
