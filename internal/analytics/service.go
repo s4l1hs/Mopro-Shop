@@ -143,6 +143,57 @@ func (s *service) RebuildRecentlyViewed(ctx context.Context, since time.Time) er
 	return s.repo.RebuildRecentlyViewed(ctx, since)
 }
 
+// Recommendation refresh tuning (§3.2). All deterministic; safe to re-run.
+const (
+	popularLookbackDays = 30   // popularity counts product_view over the trailing 30d
+	popularTopN         = 1000 // keep the top-N globally popular products
+	coViewWindowSeconds = 3600 // two views co-occur if within 1h of each other in a session
+	coViewCapPerProduct = 50   // keep the top-50 partners per product
+	homeSeedLimit       = 20   // co-view seeds = the user's 20 most-recently-viewed products
+)
+
+func (s *service) RefreshRecommendations(ctx context.Context) error {
+	since := time.Now().AddDate(0, 0, -popularLookbackDays)
+	if err := s.repo.RebuildPopular(ctx, since, popularTopN); err != nil {
+		return err
+	}
+	return s.repo.RebuildCoViews(ctx, coViewWindowSeconds, coViewCapPerProduct)
+}
+
+func (s *service) PopularProductIDs(ctx context.Context, limit int) ([]int64, error) {
+	return s.repo.PopularGlobalIDs(ctx, clampLimit(limit))
+}
+
+func (s *service) HomeRecommendationIDs(ctx context.Context, userID int64, limit int) ([]int64, error) {
+	seeds, err := s.repo.ListRecentlyViewed(ctx, userID, homeSeedLimit)
+	if err != nil {
+		return nil, err
+	}
+	if len(seeds) == 0 {
+		return nil, nil // no history → caller falls back to popular
+	}
+	ids := make([]int64, len(seeds))
+	for i, it := range seeds {
+		ids[i] = it.ProductID
+	}
+	return s.repo.CoViewIDsForSeeds(ctx, ids, clampLimit(limit))
+}
+
+func (s *service) SimilarProductIDs(ctx context.Context, productID int64, limit int) ([]int64, error) {
+	return s.repo.CoViewIDs(ctx, productID, clampLimit(limit))
+}
+
+// clampLimit bounds a caller-supplied rail size to a sane range.
+func clampLimit(limit int) int {
+	if limit < 1 {
+		return 20
+	}
+	if limit > 50 {
+		return 50
+	}
+	return limit
+}
+
 // payloadInt64 extracts an integer-valued payload field (JSON numbers decode as
 // float64; ints may arrive directly from internal callers).
 func payloadInt64(p map[string]any, key string) (int64, bool) {

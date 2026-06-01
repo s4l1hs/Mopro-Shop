@@ -44,12 +44,14 @@ func (c *Crons) Start(ctx context.Context) {
 		cron.WithLocation(c.loc),
 		cron.WithLogger(cron.DiscardLogger),
 	)
-	_, _ = c.cron.AddFunc("0 0 3 * * *", func() { c.runPrune(ctx) })   // 03:00 daily
-	_, _ = c.cron.AddFunc("0 0 4 * * *", func() { c.runRebuild(ctx) }) // 04:00 daily
+	_, _ = c.cron.AddFunc("0 0 3 * * *", func() { c.runPrune(ctx) })       // 03:00 daily
+	_, _ = c.cron.AddFunc("0 0 4 * * *", func() { c.runRebuild(ctx) })     // 04:00 daily
+	_, _ = c.cron.AddFunc("0 0 5 * * *", func() { c.runRecsRefresh(ctx) }) // 05:00 daily
 	c.cron.Start()
 	c.log.InfoContext(ctx, "analytics: crons started",
 		"prune", "0 0 3 * * * (Europe/Istanbul)",
 		"rebuild", "0 0 4 * * * (Europe/Istanbul)",
+		"recs_refresh", "0 0 5 * * * (Europe/Istanbul)",
 		"retention_days", c.retentionDays)
 }
 
@@ -81,4 +83,19 @@ func (c *Crons) runRebuild(ctx context.Context) {
 	}
 	c.log.InfoContext(ctx, "analytics: recently-viewed rebuild complete",
 		"since", since.Format(time.RFC3339), "took", time.Since(start).String())
+}
+
+// recsRefreshTimeout bounds the (self-join-heavy) co-view rebuild (§3.2).
+const recsRefreshTimeout = 30 * time.Minute
+
+func (c *Crons) runRecsRefresh(ctx context.Context) {
+	start := time.Now()
+	ctx, cancel := context.WithTimeout(ctx, recsRefreshTimeout)
+	defer cancel()
+	if err := c.svc.RefreshRecommendations(ctx); err != nil {
+		c.log.ErrorContext(ctx, "analytics: recommendation refresh error", "err", err)
+		return
+	}
+	c.log.InfoContext(ctx, "analytics: recommendation refresh complete",
+		"took", time.Since(start).String())
 }

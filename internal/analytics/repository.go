@@ -231,3 +231,141 @@ func (r *pgxRepository) RebuildRecentlyViewed(ctx context.Context, since time.Ti
 	)
 	return err
 }
+
+// RebuildPopular truncates popular_products and recomputes the 'global' scope
+// from product_view counts since `since`. Per-category scope is deliberately
+// not populated here: product→category mapping lives in catalog_schema, which
+// the jobs-svc refresh cannot read (no cross-schema JOIN, CLAUDE.md §5). The
+// `scope` column is retained for a future category tier once categoryId is
+// carried on the product_view payload (Backlog).
+func (r *pgxRepository) RebuildPopular(ctx context.Context, since time.Time, limit int) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `TRUNCATE analytics_schema.popular_products`); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx,
+		`INSERT INTO analytics_schema.popular_products (scope, product_id, view_count)
+		 SELECT 'global', (payload->>'productId')::numeric::bigint, COUNT(*)
+		   FROM analytics_schema.analytics_events
+		  WHERE event_type = 'product_view'
+		    AND server_ts >= $1
+		    AND payload ? 'productId'
+		  GROUP BY (payload->>'productId')::numeric::bigint
+		  ORDER BY COUNT(*) DESC
+		  LIMIT $2`,
+		since, limit,
+	); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// RebuildCoViews truncates product_co_views and recomputes symmetric
+// co-occurrence from product_view pairs that share a session within
+// `windowSeconds`, keeping the top `capPerProduct` partners per product_a.
+func (r *pgxRepository) RebuildCoViews(ctx context.Context, windowSeconds, capPerProduct int) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err = tx.Exec(ctx, `TRUNCATE analytics_schema.product_co_views`); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx,
+		`WITH views AS (
+		    SELECT session_id,
+		           (payload->>'productId')::numeric::bigint AS pid,
+		           server_ts
+		      FROM analytics_schema.analytics_events
+		     WHERE event_type = 'product_view'
+		       AND payload ? 'productId'
+		 ), pairs AS (
+		    SELECT a.pid AS product_a, b.pid AS product_b, COUNT(*) AS co_view_count
+		      FROM views a
+		      JOIN views b
+		        ON a.session_id = b.session_id
+		       AND a.pid <> b.pid
+		       AND b.server_ts BETWEEN a.server_ts - ($1 * interval '1 second')
+		                           AND a.server_ts + ($1 * interval '1 second')
+		     GROUP BY a.pid, b.pid
+		 ), ranked AS (
+		    SELECT product_a, product_b, co_view_count,
+		           ROW_NUMBER() OVER (PARTITION BY product_a ORDER BY co_view_count DESC, product_b) AS rn
+		      FROM pairs
+		 )
+		 INSERT INTO analytics_schema.product_co_views (product_a, product_b, co_view_count)
+		 SELECT product_a, product_b, co_view_count FROM ranked WHERE rn <= $2`,
+		windowSeconds, capPerProduct,
+	); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *pgxRepository) PopularGlobalIDs(ctx context.Context, limit int) ([]int64, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT product_id FROM analytics_schema.popular_products
+		  WHERE scope = 'global'
+		  ORDER BY view_count DESC, product_id
+		  LIMIT $1`,
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanIDs(rows)
+}
+
+func (r *pgxRepository) CoViewIDs(ctx context.Context, productID int64, limit int) ([]int64, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT product_b FROM analytics_schema.product_co_views
+		  WHERE product_a = $1
+		  ORDER BY co_view_count DESC, product_b
+		  LIMIT $2`,
+		productID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanIDs(rows)
+}
+
+func (r *pgxRepository) CoViewIDsForSeeds(ctx context.Context, seedIDs []int64, limit int) ([]int64, error) {
+	if len(seedIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := r.pool.Query(ctx,
+		`SELECT product_b FROM analytics_schema.product_co_views
+		  WHERE product_a = ANY($1)
+		    AND product_b <> ALL($1)
+		  GROUP BY product_b
+		  ORDER BY SUM(co_view_count) DESC, product_b
+		  LIMIT $2`,
+		seedIDs, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanIDs(rows)
+}
+
+// scanIDs collects a single-BIGINT-column result into an ordered slice.
+func scanIDs(rows pgx.Rows) ([]int64, error) {
+	var out []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
