@@ -109,8 +109,12 @@ type Repository interface {
 	InsertEntry(ctx context.Context, tx pgx.Tx, txnID int64, e ledger.Entry) error
 
 	// GetAccountCurrencies fetches the currency of each account in accountIDs.
-	// Reads from pool. Returns a partial map if some IDs do not exist.
-	GetAccountCurrencies(ctx context.Context, accountIDs []int64) (map[int64]string, error)
+	// Callers inside a WithTx block MUST pass the active tx — otherwise this
+	// acquires a SECOND pool connection inside the transaction and can deadlock
+	// when the pool budget is saturated (see CONTRIBUTING "Connection acquisition
+	// inside transactions"; fix/cashback-pgxpool-deadlock). Pass nil outside a tx.
+	// Returns a partial map if some IDs do not exist.
+	GetAccountCurrencies(ctx context.Context, tx pgx.Tx, accountIDs []int64) (map[int64]string, error)
 
 	// FindAccountByType looks up a platform account by (type, currency).
 	// Hits the accounts_platform_type_currency_uq partial index.

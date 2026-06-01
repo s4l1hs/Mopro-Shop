@@ -90,7 +90,11 @@ func (s *walletService) PostInTx(ctx context.Context, tx pgx.Tx, in ledger.PostI
 	for i, e := range in.Entries {
 		acctIDs[i] = e.AccountID
 	}
-	currencies, err := s.repo.GetAccountCurrencies(ctx, acctIDs)
+	// Pass the active tx: PostInTx runs inside the caller's transaction, so this
+	// read must use that connection rather than acquiring a second pool conn
+	// (deadlock under saturation — fix/cashback-pgxpool-deadlock). Accounts are
+	// committed before the tx opens, so the tx snapshot sees them.
+	currencies, err := s.repo.GetAccountCurrencies(ctx, tx, acctIDs)
 	if err != nil {
 		return 0, fmt.Errorf("wallet: get account currencies: %w", err)
 	}

@@ -52,7 +52,7 @@ func (m *mockRepo) GetTransactionByIdempotencyKey(_ context.Context, _ string) (
 func (m *mockRepo) InsertEntry(_ context.Context, _ pgx.Tx, _ int64, _ ledger.Entry) error {
 	return m.insertEntryErr
 }
-func (m *mockRepo) GetAccountCurrencies(_ context.Context, _ []int64) (map[int64]string, error) {
+func (m *mockRepo) GetAccountCurrencies(_ context.Context, _ pgx.Tx, _ []int64) (map[int64]string, error) {
 	return m.getCurrencies, m.getCurrErr
 }
 func (m *mockRepo) FindAccountByType(_ context.Context, _, _ string) (Account, error) {
