@@ -165,4 +165,3 @@ lib/src/model/variant.dart
 lib/src/model/verify_otp_request.dart
 lib/src/model/wallet_balance.dart
 lib/src/model/wallet_transaction.dart
-test/seller_binding_test.dart
