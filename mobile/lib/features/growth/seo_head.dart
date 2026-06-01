@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/features/growth/meta_tags_service.dart';
+import 'package:mopro/features/growth/structured_data_service.dart';
 
 /// Transparent wrapper that applies per-route SEO head content as a side effect
 /// and renders [child] unchanged. Place it around the data-resolved subtree of a
@@ -14,10 +15,14 @@ class SeoHead extends ConsumerStatefulWidget {
   const SeoHead({
     required this.meta,
     required this.child,
+    this.jsonLd,
     super.key,
   });
 
   final MetaTagsInput meta;
+
+  /// Optional JSON-LD structured-data payload for the route (schema.org).
+  final Map<String, dynamic>? jsonLd;
   final Widget child;
 
   @override
@@ -48,9 +53,13 @@ class _SeoHeadState extends ConsumerState<SeoHead> {
 
   void _apply() {
     final meta = widget.meta;
+    final jsonLd = widget.jsonLd;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(metaTagsServiceProvider).setMetaTags(meta);
+      if (jsonLd != null) {
+        ref.read(structuredDataServiceProvider).setJsonLd(jsonLd);
+      }
     });
   }
 

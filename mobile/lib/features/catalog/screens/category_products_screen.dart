@@ -20,6 +20,7 @@ import 'package:mopro/features/catalog/widgets/filter_sheet.dart';
 import 'package:mopro/features/catalog/widgets/sort_sheet.dart';
 import 'package:mopro/features/growth/meta_tags_service.dart';
 import 'package:mopro/features/growth/seo_head.dart';
+import 'package:mopro/features/growth/structured_data_service.dart';
 import 'package:mopro/widgets/catalog/catalog_shell.dart';
 import 'package:mopro_api/mopro_api.dart';
 
@@ -145,6 +146,13 @@ class _CategoryProductsScreenState
             .tr(namedArgs: {'category': widget.categoryName}),
         canonicalUrl: '$webBase/categories/${widget.categoryId}',
       ),
+      jsonLd: breadcrumbJsonLd([
+        (name: 'Mopro', url: webBase),
+        (
+          name: widget.categoryName,
+          url: '$webBase/categories/${widget.categoryId}',
+        ),
+      ]),
       child: Scaffold(
         appBar: AppBar(
           title: Text(widget.categoryName),

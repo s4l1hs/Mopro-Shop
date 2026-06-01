@@ -8,6 +8,7 @@ import 'package:mopro/design/widgets/mopro_share_button.dart';
 import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 import 'package:mopro/features/growth/meta_tags_service.dart';
 import 'package:mopro/features/growth/seo_head.dart';
+import 'package:mopro/features/growth/structured_data_service.dart';
 import 'package:mopro/features/help/application/help_providers.dart';
 
 class HelpArticleScreen extends ConsumerWidget {
@@ -31,6 +32,10 @@ class HelpArticleScreen extends ConsumerWidget {
             description: seoDescription(a.body),
             canonicalUrl: '${ref.watch(webBaseUrlProvider)}/help/article/$slug',
             openGraphExtras: const {'og:type': 'article'},
+          ),
+          jsonLd: articleJsonLd(
+            headline: a.title,
+            url: '${ref.watch(webBaseUrlProvider)}/help/article/$slug',
           ),
           child: ListView(
           padding: const EdgeInsets.all(16),

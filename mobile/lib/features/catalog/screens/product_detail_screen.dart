@@ -31,6 +31,7 @@ import 'package:mopro/features/catalog/widgets/product_rail.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
 import 'package:mopro/features/growth/meta_tags_service.dart';
 import 'package:mopro/features/growth/seo_head.dart';
+import 'package:mopro/features/growth/structured_data_service.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 class ProductDetailScreen extends ConsumerWidget {
@@ -136,13 +137,27 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
   Widget build(BuildContext context) {
     final product = widget.product;
     final webBase = ref.watch(webBaseUrlProvider);
+    final url = '$webBase/products/${product.id}';
+    final cheapest = product.variants.isEmpty
+        ? null
+        : product.variants
+            .reduce((a, b) => a.priceMinor <= b.priceMinor ? a : b);
     return SeoHead(
       meta: MetaTagsInput(
         title: '${product.title} — Mopro',
         description: seoDescription(product.description),
         imageUrl: _imageUrls.firstOrNull,
-        canonicalUrl: '$webBase/products/${product.id}',
+        canonicalUrl: url,
         openGraphExtras: const {'og:type': 'product'},
+      ),
+      jsonLd: productJsonLd(
+        name: product.title,
+        description: seoDescription(product.description),
+        url: url,
+        image: _imageUrls.firstOrNull,
+        brand: product.brand,
+        priceMinor: cheapest?.priceMinor,
+        priceCurrency: cheapest?.priceCurrency,
       ),
       child: context.isMobile ? _buildMobile(context) : _buildWide(context),
     );

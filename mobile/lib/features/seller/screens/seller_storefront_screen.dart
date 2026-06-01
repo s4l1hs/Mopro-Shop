@@ -8,6 +8,7 @@ import 'package:mopro/design/widgets/mopro_share_button.dart';
 import 'package:mopro/features/catalog/widgets/product_grid.dart';
 import 'package:mopro/features/growth/meta_tags_service.dart';
 import 'package:mopro/features/growth/seo_head.dart';
+import 'package:mopro/features/growth/structured_data_service.dart';
 import 'package:mopro/features/seller/data/seller_storefront_repository.dart';
 import 'package:mopro/features/seller/providers/seller_storefront_provider.dart';
 import 'package:mopro/widgets/star_rating.dart';
@@ -75,6 +76,11 @@ class _SellerStorefrontScreenState extends ConsumerState<SellerStorefrontScreen>
             imageUrl: profile.bannerImageUrl,
             canonicalUrl: '${ref.watch(webBaseUrlProvider)}/sellers/${widget.slug}',
             openGraphExtras: const {'og:type': 'website'},
+          ),
+          jsonLd: organizationJsonLd(
+            name: profile.displayName,
+            url: '${ref.watch(webBaseUrlProvider)}/sellers/${widget.slug}',
+            logo: profile.logoImageUrl,
           ),
           child: TabBarView(
             controller: _tabs,
