@@ -3408,6 +3408,7 @@ Compile-green ≠ runtime-green. Running the suite surfaced issues the compile a
 - `make verify` now includes `integration-e2e` → `go test -tags=integration ./internal/e2e/... -count=1 -race -timeout 5m`, bootstrapped by idempotent `e2e-test-up`.
 - **Smoke-tested**: injected `cashback.SomeNonExistentFunction_SMOKE` → `make verify`/gate failed at build (`undefined … [build failed]`, `make: Error 1`); reverted → green.
 - Final suite: **6 PASS + 1 SKIP** under `-race` (`ok internal/e2e 12.5s`).
+- **§5.3 CI-enforcement gap:** **no workflow runs `make verify`**, and `e2e.yml` is Playwright (frontend), not the Go suite. The gate fires for anyone running `make verify` locally (constitution §11 mandates it pre-push) but is **not yet CI-enforced** — see Backlog.
 
 ### 6. Closed carry
 - PR #37's "Revive internal/e2e suite" Backlog item → **✅ closed** (compiles, runs, gated).
@@ -3416,6 +3417,7 @@ Compile-green ≠ runtime-green. Running the suite surfaced issues the compile a
 - **De-flake `TestProperty_DLQContainsExactlyPermanentFailures`** — aggressive XAUTOCLAIM idle (100ms) races transient retries → transient msgs wrongly DLQ'd. Skip-guarded (`REVIVAL_GAP`, run via `E2E_RUN_FLAKY_DLQ=1`). Needs eventbus autoclaim/retry-window rework.
 - **Ecom e2e bootstrap from real migrations** — blocked by a pre-existing repo inconsistency: `deploy/postgres-ecom/init/80-seller-schema.sql` defines `sellers(name,…)` while `migrations/ecom/0078_sellers.up.sql` defines a different `sellers(slug,…)` → init+migrations conflicts at 0078. Ecom stays hand-rolled (minimal: orders/order_items/shipping/outbox) until the seller-schema divergence is reconciled by the owning team.
 - **Drop obsolete `last_distributed_period`** awareness — the old hand-rolled plans DDL carried a v6 column not in the v8 schema; removed with the snapshot.
+- **Enforce the e2e gate in CI (§5.3)** — no workflow runs `make verify`; `e2e.yml` is Playwright, not the Go suite. The gate is local-only (constitution §11 pre-push) until a Go CI job runs `make verify` / `make integration-e2e` with Docker postgres+redis services. This is the same gap class that allowed the silent rot — closing it fully needs that CI job. Separate infra change.
 
 ### 8. No parity change
 Operational + test-hygiene PR; no user-facing capability added.
