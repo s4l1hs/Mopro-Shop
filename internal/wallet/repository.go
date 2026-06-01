@@ -125,16 +125,28 @@ func (r *walletRepository) InsertEntry(ctx context.Context, tx pgx.Tx, txnID int
 }
 
 // GetAccountCurrencies returns a map[accountID]currency for the given IDs.
-// Reads from pool (not tx) to avoid snapshot isolation surprises with newly-created accounts.
 // Returns a partial map if some IDs do not exist.
-func (r *walletRepository) GetAccountCurrencies(ctx context.Context, accountIDs []int64) (map[int64]string, error) {
+//
+// When tx is non-nil the read runs on the caller's transaction connection; when
+// nil it falls back to the pool. Callers inside a WithTx block MUST pass the tx
+// — a pool read inside an open tx acquires a SECOND connection and deadlocks
+// under pool saturation (PR #41 CI; fix/cashback-pgxpool-deadlock). Reading on
+// the tx is correct here because every caller resolves the involved accounts
+// (system + user wallet) and commits them BEFORE opening the tx, so the tx
+// snapshot always sees them — unlike GetTransactionByIdempotencyKey, which must
+// stay on the pool to see concurrently-committed rows.
+func (r *walletRepository) GetAccountCurrencies(ctx context.Context, tx pgx.Tx, accountIDs []int64) (map[int64]string, error) {
 	if len(accountIDs) == 0 {
 		return map[int64]string{}, nil
 	}
-	rows, err := r.pool.Query(ctx,
-		`SELECT id, currency FROM wallet_schema.accounts WHERE id = ANY($1)`,
-		accountIDs,
-	)
+	const q = `SELECT id, currency FROM wallet_schema.accounts WHERE id = ANY($1)`
+	var rows pgx.Rows
+	var err error
+	if tx != nil {
+		rows, err = tx.Query(ctx, q, accountIDs)
+	} else {
+		rows, err = r.pool.Query(ctx, q, accountIDs)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("wallet: get account currencies: %w", err)
 	}

@@ -722,3 +722,49 @@ docker push ghcr.io/<owner>/core-svc:hotfix-<short_sha>
 
 Then `docker compose pull` + `up -d` on the host. Keep `:latest` reserved for the
 `main`-built image — don't push custom tags to `:latest`.
+
+## Connection acquisition inside transactions
+
+A function called from within an active `pgx.Tx` block must use that tx for its
+database reads. Reading via the pool (`pool.Query`/`QueryRow`) inside a tx-bearing
+call chain makes the function acquire a **second** pool connection while the first
+(the tx) is still held — which **deadlocks** when the pool budget is saturated by
+concurrent goroutines each holding one connection and waiting for a second.
+
+Pattern: repository functions that may be called from inside a tx take an optional
+`pgx.Tx` parameter — non-nil → read on the tx; nil → fall back to the pool (correct
+for callers outside a tx). Precedents: `wallet.GetAccountCurrencies`,
+`wallet.GetSystemState`, `wallet.SetSystemState`.
+
+**Correctness caveat — not every read can be tx-routed.** A read that must observe
+rows committed by a *concurrent* transaction (e.g. `wallet.GetTransactionByIdempotencyKey`
+on the idempotent-replay path, looking up a txn another worker just committed) must
+stay on the pool: a SERIALIZABLE tx's snapshot was frozen at tx start and would
+return *not-found*. Tx-route a read only when the rows it needs are already committed
+before the tx opens (account/config lookups), not when it must see concurrent commits.
+
+This deadlock surfaced in PR #41's `make-verify` CI: `TestCronProperty_ConcurrentIdempotency`
+on a 2-vCPU runner with pgx's default `MaxConns=4` × 8 concurrent payments. Local
+6-core machines masked it (pool default is `max(4, NumCPU)`). Fix:
+`fix/cashback-pgxpool-deadlock`.
+
+## Financial-domain change discipline (CLAUDE.md §12)
+
+When changing financial-domain code (`internal/wallet`, `internal/cashback`,
+`internal/sellerpayout`, `internal/orderledger`):
+
+- **Audit pool-vs-tx in every call path.** Grep tx-bearing functions for pool reads
+  (the deadlock pattern above). Document the inventory before changing code.
+- **Pin pool budget in concurrency tests** (`MaxConns=4`, or `=1` for a
+  single-connection contract guard) so behavior is reproducible across runner CPU
+  counts — never rely on the CPU-derived default.
+- **Guard the contract with a concurrency test.** A new tx-bearing function on the
+  financial write path gets a pinned-pool concurrency test (`MaxConns=4`, more
+  goroutines than connections) that deadlocks if it acquires a second connection
+  under contention — like `TestCronProperty_ConcurrentIdempotency`. (A `MaxConns=1`
+  "exactly one connection" assertion is tempting but fragile on shared-CPU CI
+  runners — a legit single op can exceed a wall-clock deadline under load; prefer a
+  counting-pool decorator if you need a precise per-op assertion.) Don't widen the
+  pool to silence such a test.
+- **Confirm singleton/concurrency invariants** and document the production pool size
+  (set an explicit `DB_MAX_CONNS` rather than the implicit default).
