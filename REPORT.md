@@ -3327,3 +3327,49 @@ Non-integration gates green throughout: `go build ./...`, `go test ./...`
 
 ### No parity change
 Operational build fix; no capability change.
+
+## Stack Drain PR — `chore/drain-pr-stack`
+
+Orchestration-only PR to drain the accumulated stack to `main`. **No feature code.**
+
+### Audit drift (vs §0 plan)
+§0 assumed an eight-deep chain of *open* PRs to merge sequentially onto `main`. Reality at audit time: **zero open PRs.** All seven feature PRs (#31–#37) had already merged into the integration branch `feat/seller-facing-and-platform-growth` (not into `main`), collapsing the stack into one branch sitting +66 commits / 7 PR-merges ahead of `main`. There was **no PR** from the integration branch to `main`. The §3 sequential per-PR loop was therefore moot; with user approval ("PR + verify + merge") the drain became a single integration→`main` PR (#38) preserving all 7 PR-merge commits.
+
+### 1. Drained PRs
+| PR | Title | Merge SHA on main |
+|----|-------|-------------------|
+| #31 | seller.slug on Product DTO → storefront | `2699aa18` |
+| #32 | Tranche 5b — platform growth (share + SEO + JSON-LD + sitemap + history) | `73b14dd7` |
+| #33 | seller dashboard UI — dashboard + returns/Q&A inboxes | `72347c7f` |
+| #34 | photo upload shared infra (storage + endpoint + migration 0079) | `2c71e77a` |
+| #35 | recommendation surfaces — home popularity + PDP co-view rails | `ad7f7aa6` |
+| #36 | split sellerpayout tables into sellerpayout_schema | `6573b12a` |
+| #37 | migrate internal/e2e cashback assertions off deleted constant (v8) | `06e19a25` |
+| #38 | **drain PR** (integration → main) | `86cfb79e` |
+
+### 2. Order vs. plan
+Landed oldest-first #31→#37, matching §0's intended order — but as one merge of the pre-assembled integration branch, not seven sequential merges (the per-PR merges had already happened on the branch). Drift surfaced and confirmed with the user before any write to `main`.
+
+### 3. Per-merge verify status
+- `make verify` (constitution §11) on integration tip `06e19a25`: **exit 0**.
+- PR #38 full CI: green on 2nd run (see blocker below).
+- `make verify` on `main@86cfb79e` after merge: **exit 0**, clean.
+- Post-merge main CI (Flutter CI + OpenAPI Contract): completed/success.
+
+### Blocker encountered + cleared
+PR #38's required `Generated files in sync` check failed on a **single stale line** in `mobile/packages/mopro_api/.openapi-generator/FILES` (`test/seller_binding_test.dart`), introduced by `fc643808` in PR #31 and never caught because that check is path-filtered (didn't run on branch pushes). Per §3.1/§9 the merge was held and surfaced; per the user's decision, `make api-gen` re-synced the manifest (verified the *only* change was that one line), committed `590e0f9b` and pushed. CI re-ran fully green.
+
+### 4. Deployed image rebuild — drift
+**No container image-build/push workflow exists in this repo** (`branch-guard`, `e2e`, `flutter-ci`, `golden-rebaseline`, `openapi-ci` — none build images). The §0/§4.2 assumption that a GitHub Action rebuilds `ghcr.io/mopro/core-svc:latest` on main moves is **not borne out**. **Image rebuild/deploy is an external/manual ops step** and out of this drain's scope. Ops must rebuild + roll the core-svc image from `main@86cfb79e`.
+
+### 5. Unblocked work
+- **Photo upload UI hold** can be released once storage provisioning completes — `main` now contains PR #34's upload backend (endpoint + migration 0079). The deployed image must be rebuilt from `main@86cfb79e` first (manual ops, no CI image build).
+- Future work branches from a clean `main`; the 8-deep stack is gone.
+
+### 6. Backlog updated
+- Drain-the-stack carry: **closed** — `main` contains all of #31–#37.
+- `internal/media/integration_test.go` (PR #34 artifact, never committed): left in local working tree for the #34 author to commit in a follow-up.
+- No CI image-build pipeline exists — if automated image rebuild on main is desired, file an ADR/infra task (out of scope here).
+
+### 7. No new commits to feature PRs
+The drain was orchestration only. The single non-orchestration commit (`590e0f9b`, OpenAPI `FILES` re-sync) was a user-approved bookkeeping fix to unblock the required check — generated manifest only, no feature/source change.
