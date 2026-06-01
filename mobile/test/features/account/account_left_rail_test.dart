@@ -13,7 +13,9 @@ import 'package:mopro/design/theme.dart';
 import 'package:mopro/design/theme_controller.dart';
 import 'package:mopro/features/account/current_user_provider.dart';
 import 'package:mopro/features/account/widgets/account_left_rail.dart';
+import 'package:mopro/features/account/widgets/account_rail_item.dart';
 import 'package:mopro/features/notifications/application/notifications_provider.dart';
+import 'package:mopro_api/mopro_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _RailFakeCount extends UnreadCountNotifier {
@@ -208,6 +210,44 @@ void main() {
       await tester.tap(find.text('account.logout'));
       await tester.pumpAndSettle();
       expect(auth.logoutCalls, 1);
+    });
+  });
+
+  group('Satıcı Paneli rail entry (role-gated)', () {
+    CurrentUser sellerUser() => CurrentUser(
+          id: 1,
+          displayName: 'Acme',
+          sellerBinding: SellerBinding(
+            sellerId: 1,
+            sellerSlug: 'acme-store',
+            sellerName: 'Acme Store',
+            role: SellerBindingRoleEnum.owner,
+          ),
+        );
+
+    testWidgets('visible for a seller-bound user', (tester) async {
+      await _pumpRail(tester, location: '/account/profile', user: sellerUser());
+      expect(find.text('seller.panel_title'), findsOneWidget);
+    });
+
+    testWidgets('absent for a non-seller user', (tester) async {
+      await _pumpRail(
+        tester,
+        location: '/account/profile',
+        user: const CurrentUser(id: 1, displayName: 'Acme'),
+      );
+      expect(find.text('seller.panel_title'), findsNothing);
+    });
+  });
+
+  group('accountRailItemFor — seller panel', () {
+    test('/seller/* sub-routes resolve to the seller item', () {
+      expect(accountRailItemFor('/seller/dashboard'), AccountRailItem.seller);
+      expect(accountRailItemFor('/seller/returns/9'), AccountRailItem.seller);
+      expect(accountRailItemFor('/seller/questions/3'), AccountRailItem.seller);
+    });
+    test('public /sellers/:slug storefront is NOT the seller panel item', () {
+      expect(accountRailItemFor('/sellers/acme-store'), AccountRailItem.none);
     });
   });
 }

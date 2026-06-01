@@ -297,6 +297,38 @@ func (r *ugcRepository) CountUserQuestions(ctx context.Context, userID int64) (i
 	return n, nil
 }
 
+func (r *ugcRepository) ListSellerInboxQuestions(ctx context.Context, productIDs []int64, onlyUnanswered bool, limit, offset int) ([]Question, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, product_id, user_id, author_name, body, answer_count, created_at
+		   FROM catalog_schema.product_questions q
+		  WHERE q.product_id = ANY($1) AND q.status='published'
+		    AND ($2 = false OR NOT EXISTS (
+		      SELECT 1 FROM catalog_schema.product_answers a
+		       WHERE a.question_id = q.id AND a.is_seller = true))
+		  ORDER BY q.created_at DESC, q.id DESC LIMIT $3 OFFSET $4`,
+		productIDs, onlyUnanswered, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.ugc: list seller inbox questions: %w", err)
+	}
+	defer rows.Close()
+	return scanQuestions(rows)
+}
+
+func (r *ugcRepository) CountSellerInboxQuestions(ctx context.Context, productIDs []int64, onlyUnanswered bool) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM catalog_schema.product_questions q
+		  WHERE q.product_id = ANY($1) AND q.status='published'
+		    AND ($2 = false OR NOT EXISTS (
+		      SELECT 1 FROM catalog_schema.product_answers a
+		       WHERE a.question_id = q.id AND a.is_seller = true))`,
+		productIDs, onlyUnanswered).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("catalog.ugc: count seller inbox questions: %w", err)
+	}
+	return n, nil
+}
+
 func scanQuestions(rows pgx.Rows) ([]Question, error) {
 	var out []Question
 	for rows.Next() {

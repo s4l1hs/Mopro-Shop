@@ -167,12 +167,16 @@ func TestE2E_DeliveredEventTwoSellersIdempotent(t *testing.T) { //nolint:gocyclo
 	wantSellerANet := netA1 + netA2
 	wantSellerBNet := netB1
 
-	// v6 formula: totalComm × refRate / 12
-	commA1 := priceA1 * int64(commBpsA) / 10000
-	commA2 := priceA2 * int64(commBpsA) / 10000
-	commB1 := priceB1 * int64(commBpsB) / 10000
-	totalComm := commA1 + commA2 + commB1
-	wantMonthly := (totalComm * int64(cashback.ReferenceInterestRateBpsConst) / 10000) / 12
+	// v8 accelerated model: one order-level plan from total price × items[0] bps
+	// (the consumer sums item prices and takes the first item's commissionBps;
+	// item order is A1,A2,B1 so bps=commBpsA), via the engine's own
+	// ComputePlanTerms (price=160000, bps=700 → 717).
+	totalPrice := priceA1 + priceA2 + priceB1
+	terms, err := cashback.ComputePlanTerms(totalPrice, commBpsA)
+	if err != nil {
+		t.Fatalf("ComputePlanTerms(price=%d, bps=%d): %v", totalPrice, commBpsA, err)
+	}
+	wantMonthly := terms.MonthlyAmountMinor
 	t.Logf("expected: monthly=%d sellerA=%d sellerB=%d", wantMonthly, wantSellerANet, wantSellerBNet)
 
 	// ── Wiring ───────────────────────────────────────────────────────────────────
@@ -301,7 +305,7 @@ func TestE2E_DeliveredEventTwoSellersIdempotent(t *testing.T) { //nolint:gocyclo
 	deadline = time.Now().Add(8 * time.Second)
 	for time.Now().Before(deadline) {
 		if err := ledgerPool.QueryRow(ctx,
-			`SELECT COUNT(*) FROM commission_schema.seller_payouts WHERE order_id = $1`,
+			`SELECT COUNT(*) FROM sellerpayout_schema.seller_payouts WHERE order_id = $1`,
 			createdOrder.ID,
 		).Scan(&payoutCount); err == nil && payoutCount == 2 {
 			break
@@ -319,7 +323,7 @@ func TestE2E_DeliveredEventTwoSellersIdempotent(t *testing.T) { //nolint:gocyclo
 		status      string
 	}
 	rows, err := ledgerPool.Query(ctx,
-		`SELECT seller_id, amount_minor, status FROM commission_schema.seller_payouts WHERE order_id = $1`,
+		`SELECT seller_id, amount_minor, status FROM sellerpayout_schema.seller_payouts WHERE order_id = $1`,
 		createdOrder.ID,
 	)
 	if err != nil {

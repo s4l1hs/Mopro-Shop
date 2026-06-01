@@ -2025,6 +2025,29 @@ components:
         updated_at:
           type: string
           format: date-time
+        seller_binding:
+          allOf:
+            - $ref: '#/components/schemas/SellerBinding'
+          nullable: true
+          description: |
+            The user's seller-account binding, or null when the user is not bound
+            to an active seller. Drives client-side seller-role detection.
+
+    SellerBinding:
+      type: object
+      description: A user's link to a seller account (seller_users row + seller identity).
+      required: [seller_id, seller_slug, seller_name, role]
+      properties:
+        seller_id:
+          type: integer
+          format: int64
+        seller_slug:
+          type: string
+        seller_name:
+          type: string
+        role:
+          type: string
+          enum: [owner, staff]
 
     Device:
       type: object
@@ -2237,6 +2260,13 @@ components:
           format: int64
         seller_name:
           type: string
+        seller_slug:
+          type: string
+          nullable: true
+          description: |
+            URL-safe identifier for the seller; used to deep-link to the seller
+            storefront at /sellers/:slug. Null when the product's seller_id does
+            not resolve to an active seller (legacy/platform-direct or suspended).
         category_id:
           type: integer
           format: int64

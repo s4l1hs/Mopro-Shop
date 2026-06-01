@@ -11,6 +11,8 @@ enum AccountRailItem {
   cards,
   security,
   privacy,
+  history,
+  seller,
   notifications,
   help,
 
@@ -25,6 +27,11 @@ AccountRailItem accountRailItemFor(String location) {
   if (location.startsWith('/account/security')) return AccountRailItem.security;
   if (location.startsWith('/account/cards')) return AccountRailItem.cards;
   if (location.startsWith('/account/privacy')) return AccountRailItem.privacy;
+  if (location.startsWith('/account/browsing-history')) {
+    return AccountRailItem.history;
+  }
+  // `/seller/*` (panel); NOT `/sellers/*` (public storefront).
+  if (location.startsWith('/seller/')) return AccountRailItem.seller;
   if (location.startsWith('/account/notifications')) {
     return AccountRailItem.notifications;
   }

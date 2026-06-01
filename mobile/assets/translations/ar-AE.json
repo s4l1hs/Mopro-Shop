@@ -54,6 +54,10 @@
     "rails": {
       "recently_viewed": {
         "title": "Recently viewed"
+      },
+      "recommendations": {
+        "personalized_title": "اخترنا لك",
+        "popular_title": "منتجات رائجة"
       }
     }
   },

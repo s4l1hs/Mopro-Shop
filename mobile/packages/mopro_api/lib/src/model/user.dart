@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:mopro_api/src/model/seller_binding.dart';
 import 'package:json_annotation/json_annotation.dart';
 
 part 'user.g.dart';
@@ -33,6 +34,8 @@ class User {
     required  this.createdAt,
 
     required  this.updatedAt,
+
+     this.sellerBinding,
   });
 
   @JsonKey(
@@ -131,6 +134,19 @@ class User {
 
 
 
+      /// The user's seller-account binding, or null when the user is not bound to an active seller. Drives client-side seller-role detection. 
+  @JsonKey(
+    
+    name: r'seller_binding',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final SellerBinding? sellerBinding;
+
+
+
 
 
     @override
@@ -142,7 +158,8 @@ class User {
       other.email == email &&
       other.locale == locale &&
       other.createdAt == createdAt &&
-      other.updatedAt == updatedAt;
+      other.updatedAt == updatedAt &&
+      other.sellerBinding == sellerBinding;
 
     @override
     int get hashCode =>
@@ -153,7 +170,8 @@ class User {
         email.hashCode +
         locale.hashCode +
         createdAt.hashCode +
-        updatedAt.hashCode;
+        updatedAt.hashCode +
+        sellerBinding.hashCode;
 
   factory User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);
 

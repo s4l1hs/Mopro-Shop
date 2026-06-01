@@ -19,6 +19,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/mopro/platform/internal/analytics"
+	"github.com/mopro/platform/internal/attachments"
 	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/eventbus"
@@ -39,10 +40,12 @@ import (
 	"github.com/mopro/platform/internal/outbox"
 	"github.com/mopro/platform/internal/payment"
 	"github.com/mopro/platform/internal/payment/sipay"
+	"github.com/mopro/platform/internal/seller"
 	"github.com/mopro/platform/internal/shipping"
 	"github.com/mopro/platform/internal/shipping/hepsijet"
 	"github.com/mopro/platform/internal/shipping/mng"
 	"github.com/mopro/platform/internal/shipping/surat"
+	"github.com/mopro/platform/internal/storage"
 	"github.com/mopro/platform/internal/support"
 	"github.com/mopro/platform/pkg/logx"
 	"github.com/mopro/platform/pkg/metrics"
@@ -57,6 +60,12 @@ func main() {
 	market := os.Getenv("MARKET")
 	defaultCurrency := os.Getenv("DEFAULT_CURRENCY")
 	defaultLocale := os.Getenv("DEFAULT_LOCALE")
+	// Web origin for sitemap/robots/canonical URLs (the SPA host, distinct from
+	// the API host). Defaults to the launch domain when unset.
+	webBaseURL := os.Getenv("WEB_BASE_URL")
+	if webBaseURL == "" {
+		webBaseURL = "https://mopro.shop"
+	}
 	logx.Setup("core-svc", market)
 
 	otelEndpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -162,6 +171,21 @@ func main() {
 	supportSvc := support.NewService(support.NewRepository(pool))
 	ugcSvc := catalog.NewUGCService(catalog.NewUGCRepository(pool)) // ReviewWriteService + QAService
 	analyticsSvc := analytics.NewService(analytics.NewRepository(pool))
+	// Seller storefronts + seller-role binding (Tranche 5a). storefrontReader is
+	// the catalog-side read surface used by the storefront + dashboard handlers.
+	sellerSvc := seller.NewService(seller.NewRepository(pool))
+	storefrontReader := catalog.NewStorefrontReader(pool)
+
+	// Media uploads (photos) — gated by STORAGE_ENABLED until an app bucket is
+	// provisioned (ADR-0004). When disabled, the upload route 503s and the
+	// consumer surfaces stay dormant.
+	var attachmentsSvc attachments.Service
+	if photoStore, perr := storage.New(initCtx); perr == nil {
+		attachmentsSvc = attachments.NewService(attachments.NewRepository(pool), photoStore)
+	} else if !errors.Is(perr, storage.ErrDisabled) {
+		slog.Error("media: storage init failed", "err", perr)
+	}
+	uploadLim := newUploadLimiter()
 
 	// Payment module wired before order so orderSvc can receive the PSP reference.
 	paymentRepo := payment.NewRepository(pool)
@@ -359,9 +383,24 @@ func main() {
 	})
 	mux.HandleFunc("GET /__version", handleVersion("core-svc"))
 
+	// ── SEO: sitemap + robots (public, backend-served; Tranche 5b) ───────────
+	mux.Handle("GET /sitemap.xml",
+		httpTrace(http.HandlerFunc(handleSitemap(webBaseURL, time.Hour,
+			catalog.NewSitemapReader(pool),
+			seller.NewSitemapReader(pool),
+			help.NewSitemapReader(pool),
+		))),
+	)
+	mux.Handle("GET /robots.txt",
+		httpTrace(http.HandlerFunc(handleRobots(webBaseURL))),
+	)
+
 	// Identity / auth routes
 	requireAuth := middleware.RequireAuth(jwtSigner)
 	optionalAuth := middleware.OptionalAuth(jwtSigner)
+	// requireSellerRole gates the seller dashboard: RequireAuth resolves the user,
+	// then this resolves their seller binding (403 if none) and puts seller_id in ctx.
+	requireSellerRole := middleware.RequireSellerRole(sellerSvc.ResolveSellerForUser)
 	// onUserDeleted cascades account deletion to the analytics tables (blocker #3,
 	// §2.4). DELETE /me is a soft delete and emits no event yet, so erasure is
 	// orchestrated here synchronously rather than via a consumer.
@@ -369,6 +408,15 @@ func main() {
 		svc:           identitySvc,
 		log:           slog.Default(),
 		onUserDeleted: analyticsSvc.DeleteUserData,
+		// Enrich /me with the seller binding (null when unbound) for client-side
+		// role detection (seller dashboard).
+		sellerBinding: func(ctx context.Context, userID int64) (*seller.Binding, error) {
+			b, ok, err := sellerSvc.GetBindingForUser(ctx, userID)
+			if err != nil || !ok {
+				return nil, err
+			}
+			return &b, nil
+		},
 	}
 	auth.registerRoutes(mux, requireAuth)
 
@@ -398,7 +446,7 @@ func main() {
 		httpTrace(http.HandlerFunc(handleListProducts(catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)
 	mux.Handle("GET /products/{id}",
-		httpTrace(http.HandlerFunc(handleGetProductDetail(catalogSvc, market, cashbackCurrency))),
+		httpTrace(http.HandlerFunc(handleGetProductDetail(catalogSvc, sellerSvc, market, cashbackCurrency))),
 	)
 	mux.Handle("POST /products/{id}/variants",
 		httpTrace(http.HandlerFunc(handleAddVariant(catalogSvc, defaultCurrency))),
@@ -418,8 +466,15 @@ func main() {
 	mux.Handle("GET /banners",
 		httpTrace(http.HandlerFunc(handleListBanners())),
 	)
-	mux.Handle("GET /recommendations",
-		httpTrace(http.HandlerFunc(handleListRecommendations())),
+	mux.Handle("GET /recommendations/home",
+		httpTrace(optionalAuth(http.HandlerFunc(
+			handleHomeRecommendations(analyticsSvc, catalogSvc, defaultLocale, market, cashbackCurrency),
+		))),
+	)
+	mux.Handle("GET /products/{id}/similar",
+		httpTrace(http.HandlerFunc(
+			handleSimilarProducts(analyticsSvc, catalogSvc, defaultLocale, market, cashbackCurrency),
+		)),
 	)
 
 	// ── Home composition + batch ──────────────────────────────────────────────
@@ -628,10 +683,40 @@ func main() {
 		httpTrace(http.HandlerFunc(handleGetQuestion(ugcSvc))),
 	)
 	mux.Handle("POST /products/{productId}/questions/{questionId}/answers",
-		httpTrace(requireAuth(http.HandlerFunc(handleCreateAnswer(ugcSvc, identitySvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleCreateAnswer(ugcSvc, identitySvc, sellerSvc, storefrontReader)))),
 	)
 	mux.Handle("GET /me/questions",
 		httpTrace(requireAuth(http.HandlerFunc(handleListUserQuestions(ugcSvc)))),
+	)
+
+	// ── Seller storefronts (public) + seller dashboard (role-gated) — Tranche 5a ──
+	mux.Handle("GET /sellers/{slug}",
+		httpTrace(http.HandlerFunc(handleSellerStorefront(sellerSvc, storefrontReader, defaultLocale))),
+	)
+	mux.Handle("GET /sellers/{slug}/products",
+		httpTrace(http.HandlerFunc(handleSellerStorefrontProducts(sellerSvc, storefrontReader, defaultLocale, cashbackCurrency))),
+	)
+	mux.Handle("GET /sellers/{slug}/reviews",
+		httpTrace(http.HandlerFunc(handleSellerStorefrontReviews(sellerSvc, storefrontReader, defaultLocale))),
+	)
+	mux.Handle("GET /seller/returns",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleSellerReturns(storefrontReader, returnSvc))))),
+	)
+	mux.Handle("POST /seller/returns/{id}/approve",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleSellerApproveReturn(storefrontReader, returnSvc))))),
+	)
+	mux.Handle("POST /seller/returns/{id}/reject",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleSellerRejectReturn(storefrontReader, returnSvc))))),
+	)
+	mux.Handle("GET /seller/questions",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleSellerQuestions(storefrontReader, ugcSvc))))),
+	)
+
+	// ── Media upload (photos) — auth-gated; 503 until STORAGE_ENABLED (ADR-0004) ─
+	mux.Handle("POST /uploads/photos",
+		httpTrace(requireAuth(http.HandlerFunc(
+			handleUploadPhoto(attachmentsSvc, storage.Enabled(), uploadLim),
+		))),
 	)
 
 	// ── Analytics pipeline (Tranche 4a) ─────────────────────────────────────────

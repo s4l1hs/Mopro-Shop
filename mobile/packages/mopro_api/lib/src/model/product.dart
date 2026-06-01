@@ -26,6 +26,8 @@ class Product {
 
     required  this.sellerName,
 
+     this.sellerSlug,
+
     required  this.categoryId,
 
     required  this.brand,
@@ -76,6 +78,19 @@ class Product {
 
 
   final String sellerName;
+
+
+
+      /// URL-safe identifier for the seller; used to deep-link to the seller storefront at /sellers/:slug. Null when the product's seller_id does not resolve to an active seller (legacy/platform-direct or suspended). 
+  @JsonKey(
+    
+    name: r'seller_slug',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final String? sellerSlug;
 
 
 
@@ -184,6 +199,7 @@ class Product {
       other.id == id &&
       other.sellerId == sellerId &&
       other.sellerName == sellerName &&
+      other.sellerSlug == sellerSlug &&
       other.categoryId == categoryId &&
       other.brand == brand &&
       other.status == status &&
@@ -198,6 +214,7 @@ class Product {
         id.hashCode +
         sellerId.hashCode +
         sellerName.hashCode +
+        sellerSlug.hashCode +
         categoryId.hashCode +
         brand.hashCode +
         status.hashCode +

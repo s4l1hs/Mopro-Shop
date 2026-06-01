@@ -106,6 +106,153 @@ Examples:
 
 `golangci-lint` (depguard rules in `.golangci.yml`) enforces the same rules at lint time.
 
+### Relocating tables across schemas to fix a boundary debt
+
+When a table lives in the "wrong" schema and the boundaries guard carries an
+exemption for it, the workflow to pay down that debt is:
+
+1. Audit which tables genuinely belong to the destination domain (some may
+   legitimately live where they are — confirm ownership by who reads/writes
+   them, not by name).
+2. Write an `ALTER TABLE … SET SCHEMA` migration with a reversible `.down.sql`.
+   Make it **idempotent** (guarded `IF EXISTS` moves) when the same DB also runs
+   the init scripts — the test harness applies init **and** migrations to a
+   fresh DB, so the migration must no-op once the init already builds the new
+   layout. Remember the trigger **function** does not travel with the table on
+   `SET SCHEMA` — relocate it with `ALTER FUNCTION … SET SCHEMA`.
+3. Update the **dual** schema source of truth in lockstep: the migration (for
+   deployed DBs) **and** `deploy/postgres-ledger/init/` (for fresh DBs), plus
+   the per-role grants (the new schema needs `USAGE` granted; table-level grants
+   persist with the table object across `SET SCHEMA`).
+4. Update application SQL references + any governing-doc decision that pinned the
+   old location (`CLAUDE.md`, `DATA_DICTIONARY.md`).
+5. Update the boundaries guard to enforce the new boundary and smoke-test it by
+   injecting a violation and confirming it fires.
+
+Cross-schema foreign keys can stay when they cross between domains owned by the
+same migration namespace; cross-schema reads from application code go through
+interface seams (per PR #8's commission/orderledger `CaptureRecorder` pattern).
+
+Precedent: `chore/sellerpayout-schema-split`.
+
+## Photo upload integration pattern
+
+Photo uploads are a **two-phase commit**: (1) `POST /uploads/photos` validates +
+stores the bytes and returns an orphan attachment row (`entity_id = NULL`); (2)
+the entity submission endpoint (review POST, return POST) accepts `photo_ids` and
+atomically attaches them inside its transaction (ownership-scoped, orphan-state
++ per-entity-limit checked). Orphans older than 24h are deleted by a cleanup job
+(Backlog). Form abandonment is clean — abandoned uploads disappear within the
+window.
+
+Server-side validation **never trusts the client `Content-Type`** — MIME is
+determined by magic-number sniffing (`http.DetectContentType`); dimensions by
+decoding the image header; size is capped before any storage write. Moderation +
+virus-scan are documented placeholder no-ops at the upload path; integrations
+slot in there without changing the upload contract.
+
+Storage is S3-compatible (`internal/storage`, B2 in prod / MinIO in dev) behind
+`STORAGE_ENABLED`. **Placement:** consumer-UGC photos for core-svc entities live
+in `internal/attachments` (core-svc, owns `attachments_schema`) — NOT
+`internal/media` (jobs-svc-only per CLAUDE.md §2.3, the product-image-resize
+pipeline). When a new upload concern appears, match the module to the binary that
+owns the entity, and give it its own schema (the boundary script keys on
+module↔schema). Precedent + rationale: ADR-0004.
+
+## Two-phase commit for cross-entity attachments
+
+Broader than photos: when an entity (review, return, support ticket) must
+reference data uploaded *before the entity exists*, use two-phase commit —
+(1) upload to an orphan table keyed by the uploading user, (2) atomically attach
+via the entity's submission endpoint (verify ownership + unattached state inside
+the tx), (3) clean up orphans on a schedule. The pattern survives form
+abandonment and avoids dangling references. Attach happens via the owning
+module's repository inside the submission tx (a `pgx.Tx` is threaded in), never a
+cross-schema write from the consumer module.
+
+## Role-gated routes via redirect + snackbar
+
+Routes gated by a user role (seller, admin, moderator, …) follow one shape: a
+`go_router` `redirect` callback reads the role provider via `ref`, returns the
+redirect target when the user lacks the role, and sets a one-shot
+`pendingSnackbarProvider` (an i18n key) that an app-root listener shows once via
+`rootNavigatorKey` then clears (mirrors `sessionRevokedProvider`).
+
+The role provider **derives from `currentUserProvider`** — auth state is the
+source of truth; role bindings are facts about that state, never their own
+network call. Keep the gate decision in a **pure function**
+(`computeXRedirect(location, hasRole, roleKnown)`) so it's unit-testable, and
+**defer while the role is still loading** (`roleKnown == false` → return null) so
+a legitimate user isn't bounced mid-`/me`-fetch; add `currentUserProvider` to the
+router's `refreshListenable` so the deferred gate re-runs on resolve.
+
+Precedent: `feat/seller-dashboard-ui` — `userIsSellerProvider` +
+`computeSellerRedirect` gate the `/seller/*` panel; non-sellers get
+`seller.access_denied`. Future role surfaces follow the same shape.
+
+## Runtime DOM mutation for Flutter web head content
+
+Flutter web ships as an SPA; per-route head content (titles, meta tags, JSON-LD)
+is set at runtime via DOM mutation rather than build-time templating. Modern
+crawlers execute JavaScript and pick up the updates; the trade-off (JS-less
+crawlers see only the initial `web/index.html` shell) is documented per-PR.
+
+Services follow a consistent shape: an abstract interface with `setX(...)`
+methods, behind a **conditional import** (`import 'x_noop.dart' if
+(dart.library.html) 'x_web.dart'`) so the web build gets a `package:web`
+(not deprecated `dart:html`) DOM impl and every other target (mobile, desktop,
+VM tests) gets a no-op. The web impl is **idempotent** (update existing tags in
+place, create when absent) and **fails closed** — a DOM error never propagates to
+the user surface (try/catch + optional dev log). Keep the input→tags mapping in a
+**pure function** so it's unit-testable without a DOM; the per-route invocation is
+tested by overriding the service provider with a recorder.
+
+Precedent: Tranche 5b `MetaTagsService` + `StructuredDataService`, applied via the
+`SeoHead` wrapper in a post-frame callback (never blocks first paint).
+
+## Backend-served paths that bypass the Flutter router
+
+Some routes are served entirely by the backend without entering Flutter's router:
+`/sitemap.xml`, `/robots.txt`, OAuth callbacks, raw asset proxies. When adding
+such routes, verify the Flutter web `go_router` config doesn't catch them — they
+should fall through to the backend / static asset serving (Caddy routes the path
+prefix to the service before the SPA loads). The verification is a backend
+integration smoke test that fetches the route and asserts the content type;
+frontend-side, confirm `go_router` has no matching entry (only the `errorBuilder`
+would see it, and these never reach the SPA in production).
+
+Precedent: Tranche 5b sitemap + robots (core-svc handlers; the web origin is
+injected via `WEB_BASE_URL`, and a Caddy route to core-svc exposes them at the
+public origin — a deploy config item).
+
+## Generated DTOs are source-of-truth
+
+When frontend code needs a field that exists conceptually in the backend but is
+absent from the generated DTO, the fix is in the OpenAPI spec + codegen regen,
+never by hand-editing generated code. Hand-edits get clobbered on the next regen
+and create invisible drift between the spec and the actual DTO.
+
+The workflow: (1) add or change the field in `api/openapi.yaml`, (2) update the
+backend handler to populate it, (3) run codegen, (4) commit the regenerated files
+alongside the spec change. CI's `api-check-sync` gate catches missed
+regenerations.
+
+Codegen has **two** stages — miss either and the field won't (de)serialize:
+- `make api-gen` — `oapi-codegen` (Go types under `internal/api/gen/`) +
+  `openapi-generator` via Docker (Dart `*.dart` models with `@JsonKey`
+  annotations under `mobile/packages/mopro_api/`).
+- `dart run build_runner build` in `mobile/packages/mopro_api/` — regenerates the
+  `*.g.dart` files that hold the actual `fromJson`/`toJson`. The Dart `.dart`
+  model alone only declares the field; the `.g.dart` is what serializes it.
+  CI's flutter-ci `build_runner` job fails if these are stale.
+
+Precedent: Tranche 5a left a documented carry because `Product.sellerSlug` was
+needed for PDP→storefront navigation but absent from the generated DTO; the
+`chore/seller-slug-in-product-dto` PR closes it via spec + regen rather than
+hand-edit. That same regen surfaced a latent `build_runner` miss
+(`product_summary.g.dart` lacked `flash_price_minor` serialization) — exactly the
+drift this gate exists to prevent.
+
 ## Adding a new dependency
 
 1. Check if it already exists in `go.mod`.
@@ -268,6 +415,42 @@ account-deletion erasure is wired explicitly (a `DELETE /me` handler hook), not 
 Implementation: `internal/analytics` (shared by core-svc ingest + jobs-svc
 crons), Tranche 4a.
 
+## Source-tagged recommendations + daily projection rebuild
+
+Recommendation surfaces (home "Senin için seçtiklerimiz" rail, PDP "Benzer
+ürünler" rail) read two derived projections in `analytics_schema`:
+`popular_products` (global view-count ranking) and `product_co_views`
+(co-occurrence). Unlike `user_recently_viewed` — which refreshes **incrementally
+on ingest** — these are **truncate-and-rebuild** projections: a single jobs-svc
+cron (05:00 Europe/Istanbul, alongside the prune/rebuild crons) recomputes both
+from scratch each day (`RefreshRecommendations`). Co-occurrence has no cheap
+incremental form, and recs tolerate up-to-24h staleness, so a full daily rebuild
+is the right cost trade — no on-ingest path. The co-view rebuild is a
+self-join over a session/time window; it carries a 30-min context timeout.
+
+`product_id` columns are **plain BIGINT soft references** (no cross-schema FK),
+same convention as the rest of `analytics_schema`. Reads return **ranked IDs
+only**; the HTTP handler hydrates them via `catalog.ListProductsByIDs`
+(read→hydrate, order-preserving) — never a cross-schema JOIN. Per-category
+popularity is **deliberately not built**: the product→category map lives in
+`catalog_schema`, which the jobs-svc refresh cannot read; the `scope` column is
+retained for that future tier (Backlog) and the PDP fallback is therefore
+co-view → global-popular.
+
+**Source tagging:** recommendation responses carry a `source` field so the
+client picks the right presentation without re-deriving server logic — home is
+`"personalized"` (co-view over the user's recently-viewed seeds, for an
+authed+consented user with history) or `"popular"` (the fallback for guests,
+non-consenting users, and cold-start); the PDP is `"co_view"` or `"popular"`.
+The fallback chain lives **server-side** (the handler decides + tags); the
+client only reads the tag. Combined with defensive layering (below), a sparse
+co-view table or a fetch error degrades to popularity or an empty (hidden) rail,
+never an error.
+
+Implementation: `internal/analytics` (refresh + reads) + the
+`/recommendations/home` and `/products/{id}/similar` handlers
+(`feat/recommendation-surfaces`).
+
 ## Build-flag gating for legal-review surfaces
 
 Production surfaces that depend on legal review (privacy copy, consent flows,
@@ -279,6 +462,40 @@ render, no network). Tracked in REPORT.md "Pending legal review".
 
 Precedent: `kAnalyticsConsentEnabled` (`lib/core/feature_flags.dart`, Tranche
 4a/4b) gates the analytics consent banner + settings + the instrumentation layer.
+
+## Seller storefront + role-gated dashboard (Tranche 5a)
+
+Seller surfaces span three modules without widening their core interfaces:
+
+- **Separate read interfaces, not `Service` widening.** Storefront reads live on
+  `catalog.SellerStorefrontReader` and seller-side returns on
+  `order.ReturnService` — distinct from `catalog.Service` / `order.Service` so
+  existing mocks don't churn (same rationale as the Tranche 3 UGC interfaces and
+  the checkout-session repo). Prefer a new narrow interface over a method on a
+  widely-mocked one.
+- **Cross-schema stays soft + JOIN-free.** `products.seller_id` (catalog_schema)
+  and `seller_users.user_id` (seller_schema) are plain BIGINT soft references —
+  **no** FK (same convention as `analytics_events.user_id`,
+  `product_questions.user_id`). Seller-scoped reads/writes get the seller's
+  product-id set from catalog, then scope **within** order_schema
+  (`ReturnProductIDs` ∩ `sellerProductIDs`); there is no cross-schema JOIN.
+- **Never trust the path id for seller writes.** `SellerApprove`/`SellerReject`
+  verify the target return references one of the caller's products and return
+  `ErrReturnNotOwned` (mapped to 404, not 403, so a seller can't probe another
+  seller's return ids) before the pending-state guard. The `seller_id` comes from
+  `RequireSellerRole` (ctx), never the request body.
+- **is_seller is computed at answer time**, in the handler, from
+  `seller.ResolveSellerForUser(user)` ∩ `catalog.ProductSellerID(question→product)`
+  — not stored on the user. The service layer just threads `AnswerInput.IsSeller`.
+
+Mobile: the storefront products tab reuses the shared `buildProductSummaryJSON`
+shape, so it hits the **same cashback field-name trap** as the recently-viewed
+rail — the wire key is `cashback_preview.monthly_amount_minor` but the generated
+`ProductSummary.fromJson` expects `monthly_coin_minor`. Map explicitly
+(`sellerProductFromApi`); do **not** call `ProductSummary.fromJson` on these
+hand-written endpoints. The generated `Product`/`ProductSummary` models carry
+`sellerId`/`sellerName` but **no slug**, so PDP→storefront deep-linking needs the
+slug added to the product-detail payload (an OpenAPI codegen change) — carried.
 
 ## PostgreSQL serialization retries
 
@@ -304,6 +521,7 @@ expected in new work. The full system inventory and gap analysis live in
 
 - [Storage-layer idempotency](#storage-layer-idempotency)
 - [Append-only event log + derived projections](#append-only-event-log--derived-projections)
+- [Source-tagged recommendations + daily projection rebuild](#source-tagged-recommendations--daily-projection-rebuild)
 - [PostgreSQL serialization retries](#postgresql-serialization-retries)
 - [URL state](#url-state)
 - [Adding a Notifier (Riverpod)](#adding-a-notifier-riverpod)

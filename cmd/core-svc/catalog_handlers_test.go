@@ -19,6 +19,8 @@ type stubCatalogSvc struct {
 	reviewsSummaryFn  func() (catalog.ReviewsSummary, error)
 	reviewProductIDFn func(reviewID int64) (int64, error)
 	toggleHelpfulFn   func() (catalog.HelpfulVoteResult, error)
+	getByIDFn         func(id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error)
+	listByIDsFn       func(ids []int64) ([]catalog.ProductSummaryRow, error)
 }
 
 func (s *stubCatalogSvc) CreateProduct(_ context.Context, _ catalog.CreateProductRequest) (catalog.Product, error) {
@@ -30,7 +32,10 @@ func (s *stubCatalogSvc) AddVariant(_ context.Context, _ int64, _ catalog.AddVar
 func (s *stubCatalogSvc) UpdateTranslation(_ context.Context, _ int64, _, _, _ string) error {
 	return nil
 }
-func (s *stubCatalogSvc) GetByID(_ context.Context, _ int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error) {
+func (s *stubCatalogSvc) GetByID(_ context.Context, id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error) {
+	if s.getByIDFn != nil {
+		return s.getByIDFn(id)
+	}
 	return catalog.Product{}, nil, nil, nil
 }
 func (s *stubCatalogSvc) Search(_ context.Context, _, _, _ string) ([]catalog.Product, error) {
@@ -54,7 +59,10 @@ func (s *stubCatalogSvc) ListProductsByCategory(_ context.Context, _ int64, _, _
 func (s *stubCatalogSvc) SearchSummary(_ context.Context, _, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
-func (s *stubCatalogSvc) ListProductsByIDs(_ context.Context, _ []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {
+func (s *stubCatalogSvc) ListProductsByIDs(_ context.Context, ids []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {
+	if s.listByIDsFn != nil {
+		return s.listByIDsFn(ids)
+	}
 	return nil, nil
 }
 func (s *stubCatalogSvc) HomeRails(_ context.Context, _ string) ([]catalog.HomeRailRow, error) {

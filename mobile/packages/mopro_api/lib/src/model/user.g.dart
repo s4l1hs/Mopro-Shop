@@ -29,6 +29,12 @@ User _$UserFromJson(Map<String, dynamic> json) => $checkedCreate(
         'updated_at',
         (v) => DateTime.parse(v as String),
       ),
+      sellerBinding: $checkedConvert(
+        'seller_binding',
+        (v) => v == null
+            ? null
+            : SellerBinding.fromJson(v as Map<String, dynamic>),
+      ),
     );
     return val;
   },
@@ -37,6 +43,7 @@ User _$UserFromJson(Map<String, dynamic> json) => $checkedCreate(
     'nameLast': 'name_last',
     'createdAt': 'created_at',
     'updatedAt': 'updated_at',
+    'sellerBinding': 'seller_binding',
   },
 );
 
@@ -49,4 +56,5 @@ Map<String, dynamic> _$UserToJson(User instance) => <String, dynamic>{
   'locale': instance.locale,
   'created_at': instance.createdAt.toIso8601String(),
   'updated_at': instance.updatedAt.toIso8601String(),
+  'seller_binding': ?instance.sellerBinding?.toJson(),
 };

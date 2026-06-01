@@ -133,6 +133,69 @@ func (r *pgxReturnRepository) ListReturnsByUser(ctx context.Context, userID int6
 	return out, rows.Err()
 }
 
+func (r *pgxReturnRepository) ListReturnsByProductIDs(ctx context.Context, productIDs []int64, status string, limit, offset int) ([]Return, error) {
+	// returns → return_items → order_items.product_id (all order_schema; the
+	// product-id set comes from catalog, so no cross-schema JOIN here).
+	rows, err := r.pool.Query(ctx,
+		`SELECT DISTINCT r.id, r.order_id, r.user_id, r.status, r.reason, r.description,
+		        r.refund_amount_minor, r.refund_currency, r.created_at, r.updated_at
+		   FROM order_schema.returns r
+		   JOIN order_schema.return_items ri ON ri.return_id = r.id
+		   JOIN order_schema.order_items oi ON oi.id = ri.order_item_id
+		  WHERE oi.product_id = ANY($1)
+		    AND ($2 = '' OR r.status = $2)
+		  ORDER BY r.created_at DESC, r.id DESC
+		  LIMIT $3 OFFSET $4`, productIDs, status, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("order.returns.repo: list by products: %w", err)
+	}
+	defer rows.Close()
+	var out []Return
+	for rows.Next() {
+		var rec Return
+		var st, reason string
+		if err := rows.Scan(&rec.ID, &rec.OrderID, &rec.UserID, &st, &reason, &rec.Description,
+			&rec.RefundAmountMinor, &rec.RefundCurrency, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("order.returns.repo: scan: %w", err)
+		}
+		rec.Status = ReturnStatus(st)
+		rec.Reason = ReturnReason(reason)
+		out = append(out, rec)
+	}
+	if out == nil {
+		out = []Return{}
+	}
+	return out, rows.Err()
+}
+
+func (r *pgxReturnRepository) ReturnProductIDs(ctx context.Context, returnID int64) ([]int64, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT DISTINCT oi.product_id
+		   FROM order_schema.return_items ri
+		   JOIN order_schema.order_items oi ON oi.id = ri.order_item_id
+		  WHERE ri.return_id = $1`, returnID)
+	if err != nil {
+		return nil, fmt.Errorf("order.returns.repo: return product ids: %w", err)
+	}
+	defer rows.Close()
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("order.returns.repo: scan product id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (r *pgxReturnRepository) UpdateReturnStatus(ctx context.Context, tx pgx.Tx, returnID int64, status string) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE order_schema.returns SET status = $2, updated_at = now() WHERE id = $1`,
+		returnID, status)
+	return err
+}
+
 func (r *pgxReturnRepository) ReturnedQtyByOrder(ctx context.Context, orderID int64) (map[int64]int, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT order_item_id, COALESCE(SUM(quantity),0)

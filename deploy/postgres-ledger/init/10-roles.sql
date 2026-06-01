@@ -9,7 +9,7 @@ DECLARE
     'commission_user',   -- commission_schema: (future) commission records
     'treasury_user',     -- treasury_schema: float yield tracking
     'cashback_user',     -- cashback_schema: plans, plans_history, payments
-    'sellerpayout_user'  -- commission_schema: seller_payouts (shared schema with commission_user)
+    'sellerpayout_user'  -- sellerpayout_schema: seller_payouts, payout_batches, seller_psp_accounts
   ];
   r TEXT;
 BEGIN

@@ -31,9 +31,9 @@ func propPayoutSellerID() int64 {
 // Deletion order respects the FK: seller_payouts (referencing) → payout_batches
 // (referenced). Ledger entries are append-only and are intentionally left intact.
 func propPayoutCleanup(pool *pgxpool.Pool, ctx context.Context, sellerID int64) {
-	pool.Exec(ctx, `DELETE FROM commission_schema.seller_payouts WHERE seller_id=$1`, sellerID)
-	pool.Exec(ctx, `DELETE FROM commission_schema.payout_batches WHERE seller_id=$1`, sellerID)
-	pool.Exec(ctx, `DELETE FROM commission_schema.seller_psp_accounts WHERE seller_id=$1`, sellerID)
+	pool.Exec(ctx, `DELETE FROM sellerpayout_schema.seller_payouts WHERE seller_id=$1`, sellerID)
+	pool.Exec(ctx, `DELETE FROM sellerpayout_schema.payout_batches WHERE seller_id=$1`, sellerID)
+	pool.Exec(ctx, `DELETE FROM sellerpayout_schema.seller_psp_accounts WHERE seller_id=$1`, sellerID)
 }
 
 // TestCronProperty_BatchingAggregation is a 500-iteration property test that
@@ -91,7 +91,7 @@ func TestCronProperty_BatchingAggregation(t *testing.T) {
 				for i, amt := range amounts {
 					uid := uniqueID()
 					_, err := pool.Exec(ctx, `
-						INSERT INTO commission_schema.seller_payouts
+						INSERT INTO sellerpayout_schema.seller_payouts
 							(order_id, seller_id, amount_minor, currency,
 							 delivered_at, unlock_at, status, market, idempotency_key)
 						VALUES ($1,$2,$3,'TRY',
@@ -128,7 +128,7 @@ func TestCronProperty_BatchingAggregation(t *testing.T) {
 				var dbTotal int64
 				pool.QueryRow(ctx,
 					`SELECT status, total_amount_minor
-					 FROM commission_schema.payout_batches
+					 FROM sellerpayout_schema.payout_batches
 					 WHERE seller_id=$1 AND payout_date=$2 AND currency='TRY'`,
 					sellerID, payoutDate.Format("2006-01-02"),
 				).Scan(&batchStatus, &dbTotal)
@@ -146,11 +146,11 @@ func TestCronProperty_BatchingAggregation(t *testing.T) {
 				// ── Check 3: all N payouts status='paid', one shared batch_id ──────
 				var paidCount, distinctBatchIDs int
 				pool.QueryRow(ctx,
-					`SELECT COUNT(*) FROM commission_schema.seller_payouts
+					`SELECT COUNT(*) FROM sellerpayout_schema.seller_payouts
 					 WHERE seller_id=$1 AND status='paid'`, sellerID,
 				).Scan(&paidCount)
 				pool.QueryRow(ctx,
-					`SELECT COUNT(DISTINCT batch_id) FROM commission_schema.seller_payouts
+					`SELECT COUNT(DISTINCT batch_id) FROM sellerpayout_schema.seller_payouts
 					 WHERE seller_id=$1 AND batch_id IS NOT NULL`, sellerID,
 				).Scan(&distinctBatchIDs)
 				if paidCount != n {

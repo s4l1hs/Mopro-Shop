@@ -121,10 +121,26 @@ func (s *ugcService) CreateAnswer(ctx context.Context, in AnswerInput) (Answer, 
 	if len(in.Body) > maxAnswerBody {
 		return Answer{}, ErrBodyTooLong
 	}
-	// is_seller: no user↔product seller association exists in v1 → always false.
-	// The column + DTO + "Satıcı" badge are ready for when that association lands.
-	const isSeller = false
-	return s.repo.InsertAnswerAndRefresh(ctx, in, isSeller)
+	// is_seller is set by the handler from the seller_users binding (Tranche 5a).
+	return s.repo.InsertAnswerAndRefresh(ctx, in, in.IsSeller)
+}
+
+// ── Seller Q&A inbox (Tranche 5a) ─────────────────────────────────────────────
+
+func (s *ugcService) ListSellerQuestions(ctx context.Context, productIDs []int64, onlyUnanswered bool, limit, offset int) ([]Question, int, error) {
+	if len(productIDs) == 0 {
+		return []Question{}, 0, nil
+	}
+	limit, offset = clampPage(limit, offset)
+	items, err := s.repo.ListSellerInboxQuestions(ctx, productIDs, onlyUnanswered, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := s.repo.CountSellerInboxQuestions(ctx, productIDs, onlyUnanswered)
+	if err != nil {
+		return nil, 0, err
+	}
+	return items, total, nil
 }
 
 func (s *ugcService) ListUserQuestions(ctx context.Context, userID int64, limit, offset int) ([]Question, int, error) {

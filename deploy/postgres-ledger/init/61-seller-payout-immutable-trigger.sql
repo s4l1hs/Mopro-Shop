@@ -3,7 +3,7 @@
 -- v0.3-enhanced beyond DATA_DICTIONARY.md baseline: additional belt-and-suspenders
 -- guards on delivered_at and idempotency_key approved at Phase 0.3.
 
-CREATE OR REPLACE FUNCTION commission_schema.enforce_payout_immutable()
+CREATE OR REPLACE FUNCTION sellerpayout_schema.enforce_payout_immutable()
 RETURNS TRIGGER AS $$
 BEGIN
     -- Baseline locked fields (DATA_DICTIONARY.md § 9 verbatim):
@@ -25,5 +25,5 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER seller_payout_immutable_trg
-BEFORE UPDATE ON commission_schema.seller_payouts
-FOR EACH ROW EXECUTE FUNCTION commission_schema.enforce_payout_immutable();
+BEFORE UPDATE ON sellerpayout_schema.seller_payouts
+FOR EACH ROW EXECUTE FUNCTION sellerpayout_schema.enforce_payout_immutable();

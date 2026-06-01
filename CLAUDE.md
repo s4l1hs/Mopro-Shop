@@ -211,7 +211,7 @@ The `seller-payout-engine` module inside fin-svc owns seller net payout lifecycl
 - `postgres-ecom` and `postgres-ledger` are SEPARATE clusters with SEPARATE volumes, ports, passwords.
 - fin-svc connects ONLY to `postgres-ledger` via `pgbouncer-ledger`.
 - core-svc and jobs-svc connect ONLY to `postgres-ecom` via `pgbouncer-ecom`.
-- Every module owns its own SCHEMA: `identity_schema`, `catalog_schema`, `wallet_schema`, `cashback_schema`, `commission_schema` (seller payouts here), etc.
+- Every module owns its own SCHEMA: `identity_schema`, `catalog_schema`, `wallet_schema`, `cashback_schema`, `commission_schema`, `sellerpayout_schema` (seller_payouts, payout_batches, seller_psp_accounts — owned by `internal/sellerpayout/`; no other module reads or writes it), etc.
 - Cross-schema SQL `JOIN` is **FORBIDDEN**, with ONE exception: `ref_schema` (currencies, countries, locales, **categories**, **commission_rules**, **business_calendars**) is readable by every module.
 - See `DATA_DICTIONARY.md` for full schema rules.
 

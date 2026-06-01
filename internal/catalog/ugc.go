@@ -143,6 +143,9 @@ type AnswerInput struct {
 	AuthorName      string
 	Body            string
 	SubmittedLocale string
+	// IsSeller is set by the handler when the answering user owns the product
+	// (Tranche 5a). Drives the "Satıcı" badge.
+	IsSeller bool
 }
 
 type QAService interface {
@@ -151,6 +154,9 @@ type QAService interface {
 	GetQuestion(ctx context.Context, questionID int64) (Question, []Answer, error)
 	CreateAnswer(ctx context.Context, in AnswerInput) (Answer, error)
 	ListUserQuestions(ctx context.Context, userID int64, limit, offset int) ([]Question, int, error)
+	// ListSellerQuestions is the seller Q&A inbox: questions on the given
+	// (seller-owned) products; onlyUnanswered filters to those without a seller answer.
+	ListSellerQuestions(ctx context.Context, productIDs []int64, onlyUnanswered bool, limit, offset int) ([]Question, int, error)
 }
 
 // UGCRepository backs both the review write-side and Q&A.
@@ -174,4 +180,6 @@ type UGCRepository interface {
 	InsertAnswerAndRefresh(ctx context.Context, in AnswerInput, isSeller bool) (Answer, error)
 	ListUserQuestions(ctx context.Context, userID int64, limit, offset int) ([]Question, error)
 	CountUserQuestions(ctx context.Context, userID int64) (int, error)
+	ListSellerInboxQuestions(ctx context.Context, productIDs []int64, onlyUnanswered bool, limit, offset int) ([]Question, error)
+	CountSellerInboxQuestions(ctx context.Context, productIDs []int64, onlyUnanswered bool) (int, error)
 }

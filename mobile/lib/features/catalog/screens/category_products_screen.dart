@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/core/di/providers.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/utils/debouncer.dart';
 import 'package:mopro/core/utils/uri_ext.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/design/responsive/responsive.dart';
+import 'package:mopro/design/widgets/mopro_share_button.dart';
 import 'package:mopro/features/catalog/plp/plp_filters.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_codec.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
@@ -16,6 +18,9 @@ import 'package:mopro/features/catalog/plp/widgets/plp_filter_chips.dart';
 import 'package:mopro/features/catalog/providers/filtered_products_provider.dart';
 import 'package:mopro/features/catalog/widgets/filter_sheet.dart';
 import 'package:mopro/features/catalog/widgets/sort_sheet.dart';
+import 'package:mopro/features/growth/meta_tags_service.dart';
+import 'package:mopro/features/growth/seo_head.dart';
+import 'package:mopro/features/growth/structured_data_service.dart';
 import 'package:mopro/widgets/catalog/catalog_shell.dart';
 import 'package:mopro_api/mopro_api.dart';
 
@@ -133,9 +138,33 @@ class _CategoryProductsScreenState
           ref.read(filteredProductsProvider(_key).notifier).refresh(),
     );
 
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.categoryName)),
-      body: context.isMobile ? shell : _buildWide(context, products, shell),
+    final webBase = ref.watch(webBaseUrlProvider);
+    return SeoHead(
+      meta: MetaTagsInput(
+        title: '${widget.categoryName} — Mopro',
+        description: 'seo.category_description'
+            .tr(namedArgs: {'category': widget.categoryName}),
+        canonicalUrl: '$webBase/categories/${widget.categoryId}',
+      ),
+      jsonLd: breadcrumbJsonLd([
+        (name: 'Mopro', url: webBase),
+        (
+          name: widget.categoryName,
+          url: '$webBase/categories/${widget.categoryId}',
+        ),
+      ]),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(widget.categoryName),
+          actions: [
+            MoproShareButton(
+              url: '$webBase/categories/${widget.categoryId}',
+              title: widget.categoryName,
+            ),
+          ],
+        ),
+        body: context.isMobile ? shell : _buildWide(context, products, shell),
+      ),
     );
   }
 

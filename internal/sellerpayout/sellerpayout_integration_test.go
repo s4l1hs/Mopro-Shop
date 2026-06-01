@@ -98,7 +98,7 @@ func setupService(t *testing.T, pool *pgxpool.Pool, psp sellerpayout.PspTransfer
 func seedPspAccount(t *testing.T, pool *pgxpool.Pool, sellerID int64, memberID string) {
 	t.Helper()
 	_, err := pool.Exec(context.Background(),
-		`INSERT INTO commission_schema.seller_psp_accounts (seller_id, psp_member_id, market, status)
+		`INSERT INTO sellerpayout_schema.seller_psp_accounts (seller_id, psp_member_id, market, status)
 		 VALUES ($1, $2, 'TR', 'active')
 		 ON CONFLICT (seller_id) DO UPDATE SET psp_member_id = EXCLUDED.psp_member_id`,
 		sellerID, memberID,
@@ -116,7 +116,7 @@ func seedScheduledPayouts(t *testing.T, pool *pgxpool.Pool, sellerID int64, coun
 		uid := uniqueID()
 		var id int64
 		err := pool.QueryRow(context.Background(), `
-			INSERT INTO commission_schema.seller_payouts
+			INSERT INTO sellerpayout_schema.seller_payouts
 				(order_id, seller_id, amount_minor, currency, delivered_at, unlock_at,
 				 status, market, idempotency_key)
 			VALUES ($1, $2, $3, $4, now()-interval '5 days', now()-interval '2 days',
@@ -139,7 +139,7 @@ func seedScheduledPayouts(t *testing.T, pool *pgxpool.Pool, sellerID int64, coun
 func cancelStaleScheduledPayouts(t *testing.T, pool *pgxpool.Pool) {
 	t.Helper()
 	_, err := pool.Exec(context.Background(),
-		`UPDATE commission_schema.seller_payouts
+		`UPDATE sellerpayout_schema.seller_payouts
 		 SET status='cancelled', updated_at=now()
 		 WHERE status='scheduled'`)
 	if err != nil {
@@ -147,12 +147,12 @@ func cancelStaleScheduledPayouts(t *testing.T, pool *pgxpool.Pool) {
 	}
 }
 
-// paymentExists checks whether commission_schema.payout_batches has a paid row for seller+date.
+// paymentExists checks whether sellerpayout_schema.payout_batches has a paid row for seller+date.
 func batchPaidExists(t *testing.T, pool *pgxpool.Pool, sellerID int64, payoutDate time.Time) bool {
 	t.Helper()
 	var count int
 	err := pool.QueryRow(context.Background(),
-		`SELECT COUNT(*) FROM commission_schema.payout_batches
+		`SELECT COUNT(*) FROM sellerpayout_schema.payout_batches
 		 WHERE seller_id=$1 AND status='paid' AND payout_date=$2`,
 		sellerID, payoutDate.Format("2006-01-02"),
 	).Scan(&count)
@@ -240,7 +240,7 @@ func TestPayoutIntegration_AmbiguousStateOnDifferentTransferID(t *testing.T) {
 	// Manually insert a stuck 'processing' batch with a known psp_transfer_id.
 	var batchID int64
 	err := pool.QueryRow(ctx, `
-		INSERT INTO commission_schema.payout_batches
+		INSERT INTO sellerpayout_schema.payout_batches
 			(seller_id, currency, payout_date, total_amount_minor, status,
 			 idempotency_key, market, attempt_count, psp_transfer_id, last_attempt_at)
 		VALUES ($1,'TRY',$2,20000,'processing',$3,'TR',1,'original_transfer_abc',now()-interval '15 minutes')
@@ -259,7 +259,7 @@ func TestPayoutIntegration_AmbiguousStateOnDifferentTransferID(t *testing.T) {
 
 	// Batch should be marked 'ambiguous'.
 	var status string
-	pool.QueryRow(ctx, `SELECT status FROM commission_schema.payout_batches WHERE id=$1`, batchID).Scan(&status)
+	pool.QueryRow(ctx, `SELECT status FROM sellerpayout_schema.payout_batches WHERE id=$1`, batchID).Scan(&status)
 	if status != "ambiguous" {
 		t.Errorf("want status=ambiguous, got %s", status)
 	}
@@ -314,7 +314,7 @@ func TestPayoutIntegration_ShadowMode(t *testing.T) {
 	// Verify psp_transfer_id stored starts with "shadow_synthetic_".
 	var pspTransferID string
 	pool.QueryRow(ctx, `
-		SELECT psp_transfer_id FROM commission_schema.payout_batches
+		SELECT psp_transfer_id FROM sellerpayout_schema.payout_batches
 		WHERE seller_id=$1 AND payout_date=$2`,
 		sellerID, payoutDate.Format("2006-01-02"),
 	).Scan(&pspTransferID)
@@ -338,7 +338,7 @@ func TestPayoutIntegration_FraudHoldMidProcessing(t *testing.T) {
 	// Insert batch stuck in 'processing' with psp_transfer_id stored.
 	var batchID int64
 	pool.QueryRow(ctx, `
-		INSERT INTO commission_schema.payout_batches
+		INSERT INTO sellerpayout_schema.payout_batches
 			(seller_id, currency, payout_date, total_amount_minor, status,
 			 idempotency_key, market, attempt_count, psp_transfer_id, last_attempt_at)
 		VALUES ($1,'TRY',$2,10000,'processing',$3,'TR',1,'transfer_xyz',now()-interval '15 minutes')
@@ -360,7 +360,7 @@ func TestPayoutIntegration_FraudHoldMidProcessing(t *testing.T) {
 
 	// Batch should STILL be 'processing' (Tx2 skipped due to open alert).
 	var status string
-	pool.QueryRow(ctx, `SELECT status FROM commission_schema.payout_batches WHERE id=$1`, batchID).Scan(&status)
+	pool.QueryRow(ctx, `SELECT status FROM sellerpayout_schema.payout_batches WHERE id=$1`, batchID).Scan(&status)
 	if status != "processing" {
 		t.Errorf("want status=processing (Tx2 blocked by fraud hold), got %s", status)
 	}
@@ -420,7 +420,7 @@ func TestPayoutIntegration_BatchingAggregation_VaryingN(t *testing.T) {
 		// Verify batch total matches sum of payout amounts.
 		var dbTotal int64
 		pool.QueryRow(ctx, `
-			SELECT total_amount_minor FROM commission_schema.payout_batches
+			SELECT total_amount_minor FROM sellerpayout_schema.payout_batches
 			WHERE seller_id=$1 AND payout_date=$2`,
 			sellerID, payoutDate.Format("2006-01-02"),
 		).Scan(&dbTotal)
@@ -471,7 +471,7 @@ func TestPayoutIntegration_ConcurrentSchedule_Idempotent(t *testing.T) {
 	// Exactly 1 payout row per seller.
 	var count int
 	pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM commission_schema.seller_payouts
+		SELECT COUNT(*) FROM sellerpayout_schema.seller_payouts
 		WHERE order_id=$1`, orderID,
 	).Scan(&count)
 	if count != 1 {
@@ -524,7 +524,7 @@ func TestSchedulePayoutsForOrder_ConcurrentNoSideEffectLoss(t *testing.T) {
 	// Exactly 2 payout rows — one per seller regardless of goroutine count.
 	var payoutCount int
 	pool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM commission_schema.seller_payouts WHERE order_id=$1`, orderID,
+		`SELECT COUNT(*) FROM sellerpayout_schema.seller_payouts WHERE order_id=$1`, orderID,
 	).Scan(&payoutCount)
 	if payoutCount != 2 {
 		t.Errorf("want 2 payout rows (1 per seller), got %d", payoutCount)
@@ -533,7 +533,7 @@ func TestSchedulePayoutsForOrder_ConcurrentNoSideEffectLoss(t *testing.T) {
 	// 0 payout_batches rows — scheduling does not create batches.
 	var batchCount int
 	pool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM commission_schema.payout_batches WHERE seller_id IN ($1,$2)`,
+		`SELECT COUNT(*) FROM sellerpayout_schema.payout_batches WHERE seller_id IN ($1,$2)`,
 		sellerA, sellerB,
 	).Scan(&batchCount)
 	if batchCount != 0 {

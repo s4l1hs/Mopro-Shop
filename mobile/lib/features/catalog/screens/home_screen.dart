@@ -16,6 +16,7 @@ import 'package:mopro/features/catalog/widgets/mood_stories_strip.dart';
 import 'package:mopro/features/catalog/widgets/product_list_rail.dart';
 import 'package:mopro/features/catalog/widgets/product_rail.dart';
 import 'package:mopro/features/catalog/widgets/trust_bar.dart';
+import 'package:mopro/features/home/home_recommendations_provider.dart';
 import 'package:mopro/features/home/providers/flash_deals_provider.dart';
 // ignore: lines_longer_than_80_chars
 import 'package:mopro/features/home/providers/home_wallet_summary_provider.dart';
@@ -108,6 +109,12 @@ class CatalogHomeScreen extends ConsumerWidget {
                   .toList(),
             ),
 
+            // ── "Senin için seçtiklerimiz" / "Popüler ürünler" ──
+            // Recommendation rail (feat/recommendation-surfaces). Personalized
+            // co-view recs for an authed+consented user with history; popularity
+            // fallback for everyone else. Hidden (zero space) when empty/error.
+            const SliverToBoxAdapter(child: _RecommendationsSliver()),
+
             // ── "Son baktıkların" — analytics-driven recently-viewed rail ──
             // Client-driven (not a server rail). Hidden (zero space) when the
             // build flag is off, the user is a guest, consent is off, history is
@@ -134,6 +141,29 @@ class CatalogHomeScreen extends ConsumerWidget {
 /// centered content column. The companion "Recently viewed" column is omitted
 /// while there is no local recently-viewed history provider (hide-when-empty,
 /// §6.1) — the row is therefore single-column / full-width.
+/// Recommendation rail backed by [homeRecommendationsProvider]. The title
+/// switches on the served `source`: "Senin için seçtiklerimiz" for personalized
+/// co-view recs, "Popüler ürünler" for the popularity fallback. Renders zero
+/// space when empty (no data / fetch error), keeping the layout unchanged.
+class _RecommendationsSliver extends ConsumerWidget {
+  const _RecommendationsSliver();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recs = ref.watch(homeRecommendationsProvider).valueOrNull ??
+        HomeRecommendations.empty;
+    if (recs.products.isEmpty) return const SizedBox.shrink();
+    final title = recs.personalized
+        ? 'home.rails.recommendations.personalized_title'.tr()
+        : 'home.rails.recommendations.popular_title'.tr();
+    final rail = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: ProductListRail(products: recs.products, title: title),
+    );
+    return context.isMobile ? rail : CenteredContentColumn(child: rail);
+  }
+}
+
 /// "Son baktıkların" rail, gated by [recentlyViewedProvider]. Renders zero space
 /// when the provider yields an empty list (ineligible / no history / error), so
 /// the home layout is unchanged in the common case (Tranche 4c).
@@ -149,7 +179,7 @@ class _RecentlyViewedSliver extends ConsumerWidget {
       child: ProductListRail(
         products: products,
         title: 'home.rails.recently_viewed.title'.tr(),
-        // No /account/browsing-history screen yet — "Tümünü gör" omitted (Backlog).
+        onSeeAll: () => context.go('/account/browsing-history'),
       ),
     );
     return context.isMobile ? rail : CenteredContentColumn(child: rail);

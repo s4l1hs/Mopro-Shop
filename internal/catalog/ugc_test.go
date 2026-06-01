@@ -58,6 +58,12 @@ func (f *fakeUGCRepo) ListUserQuestions(context.Context, int64, int, int) ([]Que
 	return nil, nil
 }
 func (f *fakeUGCRepo) CountUserQuestions(context.Context, int64) (int, error) { return 0, nil }
+func (f *fakeUGCRepo) ListSellerInboxQuestions(context.Context, []int64, bool, int, int) ([]Question, error) {
+	return nil, nil
+}
+func (f *fakeUGCRepo) CountSellerInboxQuestions(context.Context, []int64, bool) (int, error) {
+	return 0, nil
+}
 
 func TestCreateReview_Validation(t *testing.T) {
 	s := NewUGCService(&fakeUGCRepo{})
@@ -91,7 +97,7 @@ func TestCreateAnswer_IsSellerFalse(t *testing.T) {
 		t.Fatal(err)
 	}
 	if a.IsSeller || repo.lastIsSeller {
-		t.Error("is_seller must be false (no seller association in v1)")
+		t.Error("is_seller defaults false at the service layer (handler computes it from the seller binding)")
 	}
 }
 
@@ -102,5 +108,16 @@ func TestQAValidation(t *testing.T) {
 	}
 	if _, err := s.CreateAnswer(context.Background(), AnswerInput{Body: ""}); !errors.Is(err, ErrEmptyBody) {
 		t.Errorf("empty answer: %v", err)
+	}
+}
+
+func TestListSellerQuestions_EmptyProductsShortCircuits(t *testing.T) {
+	svc := NewUGCService(&fakeUGCRepo{})
+	items, total, err := svc.ListSellerQuestions(context.Background(), nil, false, 20, 0)
+	if err != nil {
+		t.Fatalf("ListSellerQuestions: %v", err)
+	}
+	if len(items) != 0 || total != 0 {
+		t.Errorf("want empty/0, got len=%d total=%d", len(items), total)
 	}
 }

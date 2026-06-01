@@ -5,7 +5,9 @@ import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/account/account_screen.dart';
+import 'package:mopro/features/account/browsing_history_screen.dart';
 import 'package:mopro/features/account/cards_screen.dart';
+import 'package:mopro/features/account/current_user_provider.dart';
 import 'package:mopro/features/account/privacy/privacy_settings_screen.dart';
 import 'package:mopro/features/account/profile_screen.dart';
 import 'package:mopro/features/account/questions/my_questions_screen.dart';
@@ -49,6 +51,14 @@ import 'package:mopro/features/order/presentation/order_history_screen.dart';
 import 'package:mopro/features/order/presentation/order_return_flow_screen.dart';
 import 'package:mopro/features/order/presentation/return_detail_screen.dart';
 import 'package:mopro/features/order/presentation/returns_list_screen.dart';
+import 'package:mopro/features/seller/data/seller_repository.dart';
+import 'package:mopro/features/seller/screens/seller_dashboard_screen.dart';
+import 'package:mopro/features/seller/screens/seller_question_detail_screen.dart';
+import 'package:mopro/features/seller/screens/seller_questions_inbox_screen.dart';
+import 'package:mopro/features/seller/screens/seller_return_detail_screen.dart';
+import 'package:mopro/features/seller/screens/seller_returns_inbox_screen.dart';
+import 'package:mopro/features/seller/screens/seller_storefront_screen.dart';
+import 'package:mopro/features/seller/user_is_seller_provider.dart';
 import 'package:mopro/features/wallet/plan_detail_screen.dart';
 import 'package:mopro/features/wallet/wallet_screen.dart';
 import 'package:mopro/shell/app_shell.dart';
@@ -90,6 +100,16 @@ String moproPageTitle(String location, {String? name}) {
   if (location.startsWith('/products/')) {
     return name == null ? loading : t(name);
   }
+  if (location == '/seller/dashboard') return t('Satıcı Paneli');
+  if (location == '/seller/returns') return t('İadeler');
+  if (location.startsWith('/seller/returns/')) {
+    return name == null ? t('İade') : t('İade #$name');
+  }
+  if (location == '/seller/questions') return t('Sorular');
+  if (location.startsWith('/seller/questions/')) return t('Soru');
+  if (location.startsWith('/sellers/')) {
+    return name == null ? t('Mağaza') : t(name);
+  }
   if (location.startsWith('/checkout/result')) return t('Sipariş Sonucu');
   if (location.startsWith('/checkout')) return t('Ödeme');
   if (location == '/profile/addresses/new') return t('Yeni Adres');
@@ -112,6 +132,7 @@ String moproPageTitle(String location, {String? name}) {
   if (location == '/account/reviews') return t('Yorumlarım');
   if (location == '/account/questions') return t('Sorularım');
   if (location == '/account/privacy') return t('Gizlilik');
+  if (location == '/account/browsing-history') return t('Geçmişim');
   if (location == '/account/notifications/preferences') {
     return t('Bildirim Ayarları');
   }
@@ -167,7 +188,8 @@ String? computeAuthRedirect({
       location.startsWith('/account/cards') ||
       location.startsWith('/account/reviews') ||
       location.startsWith('/account/questions') ||
-      location.startsWith('/account/privacy');
+      location.startsWith('/account/privacy') ||
+      location.startsWith('/account/browsing-history');
 
   return switch (auth) {
     null || AuthUnauthenticated() => isAuthRoute
@@ -179,6 +201,26 @@ String? computeAuthRedirect({
       location == '/auth/profile' ? null : '/auth/profile',
     AuthAuthenticated() => isAuthRoute ? '/' : null,
   };
+}
+
+/// One-shot snackbar message key set by a redirect (e.g. role-gate denial) and
+/// consumed + cleared by the app-root listener. Stores an easy_localization key.
+final pendingSnackbarProvider = StateProvider<String?>((_) => null);
+
+/// Role gate for `/seller/*` routes. Returns `/` when a seller route is
+/// requested by a non-seller once the role is known; null otherwise.
+///
+/// [sellerKnown] is false while `/me` is still loading — we defer (null) rather
+/// than redirect, to avoid bouncing a seller off their own page mid-fetch (the
+/// router re-runs this when currentUserProvider resolves).
+String? computeSellerRedirect({
+  required String location,
+  required bool isSeller,
+  required bool sellerKnown,
+}) {
+  if (!location.startsWith('/seller/')) return null;
+  if (!sellerKnown) return null;
+  return isSeller ? null : '/';
 }
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -206,9 +248,22 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final authAsync = ref.read(authNotifierProvider);
       if (authAsync.isLoading) return null;
+      final location = state.matchedLocation;
+      // Seller role gate (before the generic auth gate so the denial snackbar
+      // fires). Deferred while /me is still resolving.
+      final sellerGate = computeSellerRedirect(
+        location: location,
+        isSeller: ref.read(userIsSellerProvider),
+        sellerKnown: !ref.read(currentUserProvider).isLoading,
+      );
+      if (sellerGate != null) {
+        ref.read(pendingSnackbarProvider.notifier).state =
+            'seller.access_denied';
+        return sellerGate;
+      }
       return computeAuthRedirect(
         auth: authAsync.valueOrNull,
-        location: state.matchedLocation,
+        location: location,
       );
     },
     routes: [
@@ -273,6 +328,94 @@ final routerProvider = Provider<GoRouter>((ref) {
           return _titledLoc(
             '/products/$id',
             ProductDetailScreen(productId: id),
+          );
+        },
+      ),
+      // Public seller storefront (Tranche 5a). Deep-linkable by slug; guests welcome.
+      GoRoute(
+        path: '/sellers/:slug',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) {
+          final slug = state.pathParameters['slug'] ?? '';
+          if (slug.isEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => rootNavigatorKey.currentContext?.go('/'),
+            );
+            return const SizedBox.shrink();
+          }
+          return _titledLoc('/sellers/$slug', SellerStorefrontScreen(slug: slug));
+        },
+      ),
+      // ── Seller panel (role-gated by the top-level redirect; Tranche 5) ────────
+      GoRoute(
+        path: '/seller/dashboard',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, __) =>
+            _titledLoc('/seller/dashboard', const SellerDashboardScreen()),
+      ),
+      GoRoute(
+        path: '/seller/returns',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) => _titledLoc(
+          '/seller/returns',
+          SellerReturnsInboxScreen(
+            initialStatus: state.uri.queryParameters['status'] ?? 'submitted',
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/seller/returns/:id',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '');
+          if (id == null || id <= 0) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => rootNavigatorKey.currentContext?.go('/seller/returns'),
+            );
+            return const SizedBox.shrink();
+          }
+          return _titledLoc(
+            '/seller/returns/$id',
+            SellerReturnDetailScreen(
+              returnId: id,
+              initial: state.extra is SellerReturn
+                  ? state.extra! as SellerReturn
+                  : null,
+            ),
+            name: '$id',
+          );
+        },
+      ),
+      GoRoute(
+        path: '/seller/questions',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) => _titledLoc(
+          '/seller/questions',
+          SellerQuestionsInboxScreen(
+            initialUnanswered:
+                state.uri.queryParameters['unanswered'] != 'false',
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/seller/questions/:id',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '');
+          if (id == null || id <= 0) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => rootNavigatorKey.currentContext?.go('/seller/questions'),
+            );
+            return const SizedBox.shrink();
+          }
+          return _titledLoc(
+            '/seller/questions/$id',
+            SellerQuestionDetailScreen(
+              questionId: id,
+              initial: state.extra is SellerQuestion
+                  ? state.extra! as SellerQuestion
+                  : null,
+            ),
           );
         },
       ),
@@ -423,6 +566,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/account/privacy',
             builder: (_, __) => const PrivacySettingsScreen(),
+          ),
+          GoRoute(
+            path: '/account/browsing-history',
+            builder: (_, __) => const BrowsingHistoryScreen(),
           ),
           GoRoute(
             path: '/account/notifications',
@@ -609,6 +756,9 @@ final routerProvider = Provider<GoRouter>((ref) {
 
 class _AuthStateListenable extends ChangeNotifier {
   _AuthStateListenable(Ref ref) {
-    ref.listen(authNotifierProvider, (_, __) => notifyListeners());
+    ref
+      ..listen(authNotifierProvider, (_, __) => notifyListeners())
+      // Re-run redirects when /me resolves so the deferred seller gate decides.
+      ..listen(currentUserProvider, (_, __) => notifyListeners());
   }
 }

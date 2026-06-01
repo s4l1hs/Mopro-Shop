@@ -90,6 +90,10 @@
     "rails": {
       "recently_viewed": {
         "title": "Son baktıkların"
+      },
+      "recommendations": {
+        "personalized_title": "Senin için seçtiklerimiz",
+        "popular_title": "Popüler ürünler"
       }
     }
   },
@@ -191,7 +195,8 @@
     "returns": "İadelerim",
     "rail_reviews": "Yorumlarım",
     "rail_questions": "Sorularım",
-    "rail_privacy": "Gizlilik"
+    "rail_privacy": "Gizlilik",
+    "rail_history": "Geçmişim"
   },
   "address": {
     "list_title": "Adreslerim",
@@ -222,6 +227,7 @@
     "buy_now": "Hemen Al",
     "sold_by": "{seller} tarafından satılmaktadır",
     "go_to_store": "Mağazaya git",
+    "go_to_store_a11y": "Satıcı mağazasını görüntüle",
     "lowest_30d": "Son 30 günün en düşük fiyatı: {price}",
     "stock_left": "Son {count} ürün",
     "select_variant": "Seçenek",
@@ -501,7 +507,88 @@
     "commission": "Komisyon",
     "kdv": "KDV",
     "net": "Net Ödeme",
-    "payout_date": "Tahmini Ödeme: {date}"
+    "payout_date": "Tahmini Ödeme: {date}",
+    "access_denied": "Bu sayfaya erişim için satıcı hesabı gereklidir.",
+    "panel_title": "Satıcı Paneli",
+    "role_owner": "Sahip",
+    "role_staff": "Personel",
+    "card_pending_returns": "Bekleyen iadeler",
+    "card_unanswered_questions": "Cevaplanmamış sorular",
+    "card_approved_this_month": "Bu ay yapılan onaylar",
+    "go_to_returns": "İadelere git",
+    "answer_questions": "Soruları yanıtla",
+    "view_storefront": "Mağaza sayfanı görüntüle",
+    "all_done_title": "İşleri hallettin!",
+    "all_done_body": "Bekleyen işlem yok. İyi iş çıkardın.",
+    "customer_label": "Müşteri #{id}",
+    "returns_title": "İadeler",
+    "filter_pending": "Bekleyen",
+    "filter_approved": "Onaylanan",
+    "filter_rejected": "Reddedilen",
+    "returns_empty": "Bu kategoride iade bulunmuyor.",
+    "return_detail_title": "İade #{id}",
+    "item_count": "{count} ürün",
+    "refund_estimate": "Tahmini iade: {amount}",
+    "buyer_note": "Müşteri notu",
+    "approve": "Onayla",
+    "reject": "Reddet",
+    "approve_confirm_title": "İadeyi onaylamak istediğine emin misin?",
+    "approve_confirm_body": "Onay sonrası müşteriye {amount} iade edilecek. Bu işlem geri alınamaz.",
+    "cancel": "Vazgeç",
+    "approved_toast": "İade onaylandı. İade işlemi başlatıldı.",
+    "reject_title": "İadeyi neden reddediyorsun?",
+    "reject_reason_not_as_returned": "Ürün iade koşullarına uymuyor",
+    "reject_reason_outside_policy": "İade süresi dışında",
+    "reject_reason_damaged_by_customer": "Müşteri kaynaklı hasar",
+    "reject_reason_other": "Diğer",
+    "reject_note_hint": "Not (isteğe bağlı)",
+    "rejected_toast": "İade reddedildi.",
+    "status_submitted": "Bekliyor",
+    "status_approved": "Onaylandı",
+    "status_rejected": "Reddedildi",
+    "questions_title": "Sorular",
+    "filter_unanswered": "Cevaplanmamış",
+    "filter_all": "Tümü",
+    "q_awaiting": "Cevap bekleniyor",
+    "q_answered": "Cevaplandı",
+    "questions_empty_unanswered": "Tüm sorular cevaplanmış",
+    "questions_empty_all": "Henüz soru bulunmuyor.",
+    "question_title": "Soru",
+    "answer_sent_toast": "Cevabın gönderildi.",
+    "load_more": "Daha fazla",
+    "error_generic": "Bir şeyler ters gitti. Tekrar dene."
+  },
+  "seller_storefront": {
+    "title": "Mağaza",
+    "tab_about": "Hakkımızda",
+    "tab_products": "Ürünler",
+    "tab_reviews": "Yorumlar",
+    "rating_summary": "{avg} ({count} değerlendirme)",
+    "no_ratings": "Henüz değerlendirme yok",
+    "no_products": "Bu mağazada henüz ürün yok",
+    "no_reviews": "Bu mağaza için henüz yorum yok",
+    "load_error": "Mağaza yüklenemedi",
+    "retry": "Tekrar dene"
+  },
+  "share": {
+    "share": "Paylaş",
+    "link_copied": "Bağlantı kopyalandı.",
+    "share_a11y": "Paylaş: {title}"
+  },
+  "seo": {
+    "category_description": "{category} kategorisindeki ürünleri keşfedin."
+  },
+  "browsing_history": {
+    "title": "Geçmişin",
+    "subtitle": "Son baktığın ürünler. Geçmişini istediğin zaman silebilirsin.",
+    "clear": "Geçmişi sil",
+    "empty_title": "Henüz ürün incelememişsin.",
+    "empty_cta": "Keşfetmeye başla",
+    "confirm_title": "Geçmişi silmek istediğinden emin misin?",
+    "confirm_body": "Bu işlem geri alınamaz. Geçmiş silindikten sonra önerilerimiz değişebilir.",
+    "confirm_cancel": "Vazgeç",
+    "confirm_delete": "Sil",
+    "deleted_toast": "Geçmişin silindi."
   },
   "error": {
     "unauthorized": "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",

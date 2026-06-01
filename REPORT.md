@@ -2656,3 +2656,674 @@ features, no parity change.
 - **Pending-legal-review entries** (4a/4b/4c) marked **✅ CLOSED** pointing here.
 
 The analytics arc (PRs #27/#28/#29) is now fully production-ready.
+
+## Tranche 5a PR — Seller-Facing: Storefronts + Return Approval + Q&A Inbox
+
+**Branch:** `feat/reviews-helpful-sort-pagination` (Tranche 5 split per §1.6).
+Scope chosen via `AskUserQuestion`: ship **5a Seller-facing** this turn (5b
+platform-growth deferred); architecture **Option C** (single consumer app —
+storefronts are public consumer routes, the seller dashboard is a role-gated
+`/seller/*` surface); **full 5a** attempted.
+
+### Baseline (`tool/audit/tranche5_baseline.md`, committed in §2)
+Pre-existing: `/seller/orders/{id}/breakdown` (seller payout transparency,
+read-only) and the `seller_id` soft column on products — no seller _module_, no
+storefront, no role gating. Built the module from the stub.
+
+### §3 Backend — `feat(api): seller storefronts + return approval + Q&A inbox + migration 0078`
+- **Migration 0078** (`seller_schema`): `sellers` (slug-unique, `bio_translations`
+  JSONB, status active|suspended) + `seller_users` (seller_id FK, `user_id` soft
+  ref, role). Seeds 3 sellers + binds user 1 → seller 1. Round-trip verified.
+- **`internal/seller`**: `Service`/`Repository` — `GetBySlug`/`GetByID` (active-only,
+  `ErrSellerNotFound` for unknown/suspended) + `ResolveSellerForUser`.
+- **`catalog.SellerStorefrontReader`** (separate from `catalog.Service`):
+  products/review-summary/reviews by seller + `ProductIDsBySeller` /
+  `ProductSellerID`. Review reads filter `status='published'`.
+- **`order.ReturnService`** += `ListSellerReturns` + `SellerApprove`/`SellerReject`,
+  **seller-scoped** (`ReturnProductIDs` ∩ seller product ids, all within
+  order_schema), pending-only guard, `ErrReturnNotOwned`→404 (no id-probing).
+- **`catalog` Q&A** += `ListSellerQuestions` (inbox; `unanswered` = NOT EXISTS a
+  seller answer) and `AnswerInput.IsSeller` threaded.
+- **`middleware.RequireSellerRole`** (lookup-func, no identity→seller import):
+  resolves the binding after `RequireAuth`, 403s non-sellers, puts `seller_id` in ctx.
+- **Routes**: `GET /sellers/{slug}[/products|/reviews]` (public);
+  `GET /seller/returns`, `POST /seller/returns/{id}/{approve,reject}`,
+  `GET /seller/questions` (role-gated). `handleCreateAnswer` computes `is_seller`.
+- **Tests**: migration round-trip + seller repo (suspended hidden, slug 404,
+  user→seller binding); storefront reader (active-only list, summary excludes
+  soft-deleted, product_title join); seller return approve/reject/scoping/
+  not-owned/already-transitioned; Q&A inbox unanswered filter. All green
+  (`go test -race`), boundaries OK, 3 binaries build.
+
+### §4 Frontend — `feat(mobile): seller storefront screen + /sellers/:slug`
+- Deep-linkable `SellerStorefrontScreen` (3 tabs: Hakkımızda / Ürünler / Yorumlar),
+  repo + DTOs over the public endpoints, profile FutureProvider + paginated
+  products/reviews notifiers (load-more on scroll), `GET /sellers/:slug` route +
+  page title, `seller_storefront.*` i18n (tr-TR + en-US; de/ar fall back per 2b).
+- Golden: about-tab mobile 375 + desktop 1440 (Linux-baselined via rebaseline
+  workflow). `flutter analyze lib` clean; router/title tests green.
+
+### Reconciliations (locked design / CONTRIBUTING > prompt)
+- Separate `SellerStorefrontReader`/`ReturnService` interfaces over widening
+  `catalog.Service`/`order.Service` (mock-churn avoidance, per CONTRIBUTING).
+- Seller-write authorization scopes by product-id intersection inside
+  order_schema — no cross-schema JOIN, no trust of the path id.
+- Reused the recently-viewed cashback field-name mapper (`monthly_amount_minor`
+  → `monthlyCoinMinor`) for the storefront products tab.
+
+### Carried to 5a-2 (partial-and-green per §1.6)
+- **Seller dashboard UI** (returns inbox + Q&A inbox screens + "Satıcı Paneli"
+  account-rail entry). The backend (role gating + all endpoints) is shipped and
+  tested; only the Flutter dashboard surface is carried.
+  ✅ **CLOSED** by the `seller dashboard UI PR` (see below).
+- **PDP "Mağazaya git" wiring**: needs the seller **slug** on the product-detail
+  payload (generated `Product` has only `sellerId`/`sellerName`) → an OpenAPI
+  codegen change. Storefront is fully deep-linkable by slug meanwhile.
+  ✅ **CLOSED** by the `seller.slug DTO PR` (see below).
+
+### Deferred to 5b (next tranche, pre-authorized)
+Share infra, SEO meta tags, JSON-LD, sitemap/robots, Recently-Viewed see-all.
+
+### Parity
+Backend for all of 5a + storefront frontend ship; ~52% → ~56% (full 5a incl. the
+carried dashboard UI targets ~58%).
+
+### Goldens
+2 new (`seller_storefront_about_{mobile_375,desktop_1440}.png`) — baseline on
+Linux via the rebaseline workflow; no existing goldens changed.
+
+### Risk notes
+- POST approve/reject call `requireIdempotencyKey` inline; the audit's
+  "Idempotent?" column reads "no" because it detects a middleware wrapper, not the
+  inline guard — enforcement is present in the handler.
+- de/ar storefront strings fall back to the configured `tr-TR` fallback (the de/ar
+  files are curated subsets), consistent with the existing `seller.*` block.
+
+## seller.slug DTO PR — `chore/seller-slug-in-product-dto`
+
+Operational unblock, not a feature: makes the Tranche 5a PDP→storefront link work
+by adding the missing field at its source (OpenAPI spec → regen → wire).
+
+1. **Closed carry** — closes the Tranche 5a "PDP Mağazaya git wiring" carry
+   (REPORT §"Carried to 5a-2", marked ✅ above). 5a is **not** merged to main, so
+   this branched off `feat/seller-facing-and-platform-growth` (stacking), not
+   main — flagged in `tool/audit/seller_slug_dto_baseline.md`.
+2. **DTO change** — `seller_slug` (string, **nullable**) added to the `Product`
+   (detail) schema only (`api/openapi.yaml`); `ProductSummary` intentionally
+   untouched (list cards don't navigate to storefronts).
+3. **Handler update** — `cmd/core-svc/catalog_handlers.go` `handleGetProductDetail`
+   now resolves `seller.Service.GetByID(p.SellerID)` and emits `seller_slug`
+   (null on `ErrSellerNotFound`) + `seller_name` (`""` unresolved) via a struct
+   embedding `catalog.Product`. This also fixed a latent gap: `seller_name` was
+   schema-required but never populated (handler returned `catalog.Product`
+   directly). Wired in `cmd/core-svc/main.go`.
+4. **Frontend wiring** — `mobile/lib/features/catalog/screens/product_detail_screen.dart:444`
+   passes `onTap: () => context.push('/sellers/$slug')` when `sellerSlug != null`,
+   else null (the card hides the link). `PdpSellerCard` link wrapped in
+   `Semantics(button, label: product.go_to_store_a11y)`.
+5. **No parity change** — operational unblock; no capability flipped.
+
+**Codegen:** `make api-gen` (oapi-codegen Go + openapi-generator Dart) **+**
+`dart run build_runner build` (the `*.g.dart` that actually (de)serializes).
+`api-check-sync` green; diff scoped to the Product schema.
+
+**Drive-by fixes (§7):** `build_runner` regenerated `product_summary.g.dart`,
+which had been missing `flash_price_minor` (de)serialization — a prior PR added
+the field to the spec/DTO but never re-ran `build_runner`, so flash-deal prices
+silently weren't serializing. Corrected here (the exact drift the new CONTRIBUTING
+"Generated DTOs are source-of-truth" note warns about).
+
+**Goldens:** the 8 `pdp_two_col_*` goldens render the PDP incl. the seller card.
+Fixtures gained `sellerSlug: 'acme-store'` so the (now functional) link renders
+exactly as before — `Semantics` adds no pixels → byte-identical, **no rebaseline**
+(CI's Linux golden job is the arbiter). 2 new card tests + 1 a11y-guard test.
+
+**Tests:** `go test ./...` green; full backend incl. 2 new product-detail handler
+tests (slug+name resolved; unresolved → null slug + empty name). Flutter:
+556 passed / 121 failed where **all 121 are the macOS golden platform guard**
+(baselined on Linux CI) — no logic regressions. `flutter analyze` clean;
+`flutter build web --release` succeeds (`main.dart.js` 4.73 MB, within the +1%
+budget — change is one field + one handler).
+
+## Tranche 5b PR — Platform Growth (share + SEO + JSON-LD + sitemap + browsing history)
+
+Closes the last named roadmap item. Five additive growth surfaces; no new domain
+schema. Branched off `feat/seller-facing-and-platform-growth` (5a+slug; not yet
+on main — same stacking precedent as the slug PR; flagged in
+`tool/audit/tranche5b_baseline.md`).
+
+### 1. Baseline → final
+| Gate | Baseline (5a) | Final (5b) |
+|---|---|---|
+| `go test ./...` | green | green |
+| `flutter analyze` | clean | clean |
+| `flutter test` | 556 pass / 121 macOS-golden-fail | pass + new growth tests; golden fails are macOS-only (Linux-baselined) |
+| `flutter build web --release` | 4.73 MB main.dart.js | 4.75 MB (**+0.3%**, budget +6%) |
+| boundaries / golangci-lint | OK / 0 | OK / 0 |
+
+### 2. Audit confirmation (§2)
+Share infra, JSON-LD, sitemap/robots: all **absent** (confirmed). `web/index.html`
+was the **default Flutter shell** (`description="A new Flutter project."`,
+`<title>mopro</title>`) — pure SPA, no per-route templating. recentlyViewed
+provider + rail (onSeeAll omitted) + AccountLeftRail confirmed intact.
+
+### 3. SEO injection strategy (§5.1)
+**Runtime DOM mutation** via `package:web` (not deprecated `dart:html`),
+conditional-import noop off-web. **§1.6 trigger #1 did NOT fire** — no JS-less
+crawler requirement; the runtime trade-off (legacy non-JS crawlers see only the
+shell) is accepted per non-goals and documented. The shell `index.html` now ships
+real default meta (drive-by) so even pre-JS state is sane.
+
+### 4. Share infrastructure
+Package: **share_plus ^10.1.1** (ecosystem standard). Behavior:
+| Platform | Path |
+|---|---|
+| Mobile (iOS/Android) | native share sheet (share_plus) |
+| Web + Web Share API | `navigator.share` (via share_plus) |
+| Web w/o Web Share | clipboard fallback + "Bağlantı kopyalandı." snackbar |
+
+`MoproShareButton` (brand-orange, 44dp, semantic label) on PDP, category, help
+article, seller storefront. `webBaseUrlProvider` (`WEB_BASE_URL`, default
+`https://mopro.shop`) builds absolute URLs (products/categories id-based).
+
+### 5. Meta tags per route
+| Route | title | description | canonical | og:type |
+|---|---|---|---|---|
+| PDP | `{title} — Mopro` | desc (160) | `/products/{id}` | product |
+| Category | `{name} — Mopro` | seo.category_description | `/categories/{id}` | website |
+| Help article | `{title} — Mopro Yardım` | body (160) | `/help/article/{slug}` | article |
+| Storefront | `{name} — Mopro` | bio (160) | `/sellers/{slug}` | website |
+Plus OG/Twitter card + image (PDP first image, storefront banner). Applied via
+`SeoHead` (post-frame, idempotent, re-applies on input change).
+
+### 6. JSON-LD per route
+PDP `Product` (+ Offer from cheapest variant), category `BreadcrumbList`
+(Mopro → category), help article `Article`, storefront `Organization`. Single
+`<script type="application/ld+json">` replaced per route.
+
+### 7. Sitemap + robots
+`GET /sitemap.xml` (core-svc): active products (`/products/{id}`, daily) +
+categories (`/categories/{id}`, weekly) + active sellers (`/sellers/{slug}`) +
+published help articles (`/help/article/{slug}`) + static (`/`, `/help`,
+`/categories`). 1h app cache, `Cache-Control: max-age=3600`. Auth-gated prefixes
+excluded (verified by test). `GET /robots.txt` allows all, disallows auth-gated,
+points at the sitemap. Per-module `SitemapReader` (no cross-schema JOIN). Single
+file (<50k URLs); sitemap-index pagination is Backlog-when-triggered. **Deploy
+note:** a Caddy route to core-svc exposes both at the web origin.
+
+### 8. Browsing history see-all
+`/account/browsing-history` (auth+consent gated): header + responsive
+ProductCard grid (2/4/5) + empty state; "Geçmişi sil" → confirm → DELETE
+/me/analytics-data → rail invalidate + snackbar. Home rail `onSeeAll` wired;
+"Geçmişim" account-rail entry. Page title per PR #20.
+
+### 9. Flows JJ–NN
+JJ/NN (SeoHead drives meta + JSON-LD), KK (share success/clipboard), LL (rail →
+browsing history) — green (`flow_growth_test.dart`). MM (sitemap/robots) covered
+by the handler unit test + catalog reader integration (no triple-schema boot
+harness for a deterministic XML endpoint).
+
+### 10. Drive-by fixes
+- `web/index.html`: replaced the default Flutter placeholder meta/title with real
+  Mopro shell defaults.
+
+### 11. Backlog (deferred from 5b)
+Full SSR for SEO; search-engine submission automation; image OG card
+optimization; marketing pixels (FB/GTM); hreflang multi-locale signaling; JSON-LD
+schema.org validator tooling; sitemap-index pagination (>50k URLs); native
+iOS/Android share extensions; share buttons on auth-gated routes.
+
+### 12. Parity
+Flipped: social/share meta (Missing→Complete), structured data JSON-LD
+(Missing→Complete), SEO sitemap/robots (Missing→Complete), browsing-history
+surface (Stubbed→Complete). Roll-up ~54–55% → **~58%**.
+
+### 13. Risk notes
+- SEO relies on JS-aware crawlers (Googlebot/Bingbot OK; legacy bots see the
+  shell only) — documented trade-off, SSR is the escape path.
+- Sitemap 1h cache: newly published products/sellers/articles appear up to an
+  hour late (acceptable; not real-time-critical).
+- Share/canonical URLs depend on `WEB_BASE_URL` being set correctly per env;
+  misconfig yields wrong absolute URLs (default is the launch domain).
+- JSON-LD field omissions only affect individual rich-result eligibility (Google),
+  never the page; validation tooling is Backlog.
+- New + changed goldens (share button, browsing history, storefront/PDP/category
+  AppBar, account rail/hover) are baselined on the Linux CI rebaseline run — that
+  job is the arbiter, not local macOS.
+
+## Seller Dashboard UI PR — `feat/seller-dashboard-ui`
+
+Closes the last 5a implementation carry: the Flutter seller surfaces consuming
+the 5a role-gated backend. Branched off `feat/seller-facing-and-platform-growth`
+(5a+slug+5b accumulation; not yet on main — same stacking precedent).
+
+### 1. Baseline → final
+| Gate | Final |
+|---|---|
+| `go test ./...` | green (seller BindingForUser integration + resolveSellerBinding) |
+| `flutter analyze` | clean |
+| `flutter build web --release` | 4.56 MB main.dart.js (**+0.77%** vs 5b 4.53 MB; budget +6%) |
+| seller non-golden tests | 67 pass |
+| api-check-sync / boundaries | OK / OK |
+
+### 2. Audit + §2.2 gate
+`/me` carried **no** seller binding → §3.2 applied. Bounded (seller svc already
+wired since 5a, `seller_users` exists, no migration, no auth-middleware change)
+→ **§1.6 escape did NOT fire**. Also found: no seller-scoped
+`GET /seller/returns/:id` (5a shipped list + actions only) → detail renders from
+the inbox header; itemized breakdown is Backlog.
+
+### 3. Backend Inputs (consumed)
+5a's `GET /seller/returns` (`{data,hasMore}`, no total), `POST
+/seller/returns/{id}/{approve,reject}` (`reason_code` any string), `GET
+/seller/questions` (`{data,total,hasMore}`, `?unanswered`), `RequireSellerRole`
+(403), and the answer endpoint's server-side `is_seller`.
+
+### 4. `/me` extension
+`seller_binding` (nullable {seller_id, seller_slug, seller_name, role}) added to
+the `User` schema via a seller `GetBindingForUser` (single JOIN) + handler enrich
++ OpenAPI/regen (Go+Dart+build_runner) + `CurrentUser.sellerBinding` mapping.
+
+### 5. Providers
+`userIsSellerProvider` (bool) + `currentSellerBindingProvider` (SellerBinding?),
+derived from `currentUserProvider` (shape #1).
+
+### 6. Customer anonymization (decision)
+Seller surfaces never show buyer names. Returns carry only `order_id` (no
+user/product data on the list) → anonymized as `Müşteri #{orderId}`; questions
+carry `user_id` → `Müşteri #{userId}`. If disputes ever need real-name context,
+that's a separate product decision.
+
+### 7. Screens + gating
+- **Dashboard** (`/seller/dashboard`): name + role chip, 2 overview cards
+  (pending returns w/ "+", unanswered questions; "approved this month" omitted —
+  endpoint has no date filter), quick actions, all-done empty state.
+- **Returns** inbox (status chips, pagination, anonymized cards) + detail
+  (approve confirm dialog / reject adaptive sheet w/ 4 reason codes + note;
+  status banner for resolved).
+- **Questions** inbox (unanswered/all chips, answered/awaiting, celebration
+  empty) + detail (reuses `questionThreadProvider` + `AnswerRow` + `openAnswer` →
+  server `is_seller=true`).
+- **Role gating**: `computeSellerRedirect` (pure, loading-deferred) + redirect
+  wiring + `pendingSnackbarProvider` → app-root snackbar (`seller.access_denied`)
+  + `refreshListenable` on `currentUserProvider`. Page titles per PR #20.
+- **Rail**: "Satıcı Paneli" row, seller-only, active highlight on `/seller/*`.
+
+### 8. Flows
+HH (dashboard→returns→detail→approve, full UI) + OO (gate decisions) green
+(`flow_seller_dashboard_test.dart`). II (Q&A answer) covered by the questions
+tests + the reused `openAnswer` submit path. A11y guards green (dashboard).
+
+### 9. DTO regen impact
+`User` DTO gains `sellerBinding` (SellerBinding?); new `SellerBinding` model.
+`api-check-sync` green.
+
+### 10. Drive-by
+None.
+
+### 11. Backlog (deferred)
+Seller self-service signup; bulk actions; seller analytics; notification
+subscriptions (needs the ticket→notification bridge); multi-seller account
+switching; seller-scoped return-detail-with-items endpoint (itemized breakdown);
+"approved this month" counter (needs a date filter on `/seller/returns`);
+real-name display policy (currently anonymized).
+
+### 12. Parity
+Flipped: seller returns inbox (Backlog→Complete), seller Q&A inbox
+(Backlog→Complete), seller dashboard (Missing→Complete). "Seller chat" stays
+Missing; "follow" stays storefront-indirect. Roll-up ~58% → **~60%**.
+
+### 13. Risk notes
+- Customer anonymization may be insufficient if disputes need real-name context.
+- Dashboard counts cache (autoDispose) can lag an inbox action until re-entry/
+  refresh.
+- Role-gate defers while `/me` loads (avoids the bounce race); a seller sees the
+  panel only after `/me` resolves.
+- Return detail has no itemized breakdown (no 5a endpoint) — header + actions only.
+- New + changed goldens (seller screens + account rail) baseline on the Linux
+  rebaseline run — that job is the arbiter, not local macOS.
+
+## Photo Upload Shared Infra PR — `feat/photo-upload-shared-infra`
+
+Ships the shared photo-upload **infrastructure**. Per §1.6 escape-hatch #1
+(storage unprovisioned) + the storage-backend decision, the consumer surfaces
+(review/return pickers + display) are **dormant and carried to a 4b follow-up**
+once an app bucket is provisioned. Branched off
+`feat/seller-facing-and-platform-growth` (the unmerged accumulation chain).
+
+### 1. Baseline → final
+| Gate | Final |
+|---|---|
+| `go test ./...` (+ attachments/storage) | green |
+| migration 0079 round-trip | green (integration) |
+| boundaries / audit-test | OK / clean (script extended for `attachments`) |
+| 3 binaries build | OK |
+| Flutter | **untouched** this turn (no consumer UI — §1.6 #1) |
+
+### 2. Audit + storage decision
+Storage was unprovisioned: `internal/media` an empty stub, no S3/B2 SDK, no dev
+container, B2 creds only for Restic backups. **Decision (AskUserQuestion →
+Option A):** S3-compatible — Backblaze B2 in prod (the locked stack), MinIO in
+dev/CI. Recorded in **ADR-0004** (human-approved; the new MinIO tool + S3 SDK
+required an ADR per CLAUDE.md §8/§2.2).
+
+### 3. Module-placement escalation (CLAUDE.md §12)
+`internal/media` is **jobs-svc-only** (§2.3 = product-image pipeline). The
+upload concern is core-svc (reviews/returns live there). Surfaced via
+AskUserQuestion → **Option B**: a new `internal/attachments` (core-svc) owns
+`attachments_schema`; `internal/media` stays the untouched jobs-svc stub; the
+boundary script's allow-list was extended for `attachments` (module↔schema
+consistent). ADR-0004 records the split.
+
+### 4. Backend
+- Migration 0079: `attachments_schema.photo_attachments` (storage_key, sniffed
+  content_type, dims, soft refs, `entity_id NULL` = orphan; entity + orphan
+  indexes). Cross-schema soft refs only.
+- `internal/storage`: `PhotoStorage` (S3 impl via aws-sdk-go-v2, path-style for
+  B2/MinIO; filesystem impl for tests/dev) + `STORAGE_ENABLED` gate.
+- `internal/attachments`: Upload (store + orphan insert), AttachInTx (two-phase
+  attach; ownership + orphan-state + per-entity-limit, sort_order by index),
+  ListByEntity (PublicURL via CDNUrl).
+- `POST /uploads/photos` (auth): 5MB cap, **magic-number MIME sniff** (jpeg/png/
+  webp, not the client header), dimension decode (200–4096), 50/user/hr in-memory
+  rate limit, **503 when STORAGE_ENABLED off**. Returns the orphan attachment.
+- MinIO in `deploy/docker-compose.yml` (dev/CI only; NOT prod).
+
+### 5. Moderation + virus-scan hooks
+Documented no-op placeholders at the upload path (`MODERATION_HOOK` /
+`VIRUS_SCAN_HOOK` in `upload_handlers.go`). Named Backlog (ADR-0004).
+
+### 6. Two-phase commit pattern
+Orphan upload → atomic attach inside the entity submit tx → scheduled orphan
+cleanup. Documented in CONTRIBUTING for reuse (tickets, drafts, …).
+
+### 7. Deps
+`aws-sdk-go-v2` (S3 client — B2/MinIO/AWS one code path) + `golang.org/x/image`
+(webp dimension decode; stdlib `image` lacks webp). Both justified (CLAUDE.md §10).
+
+### 8. Tests
+storage fs round-trip; upload validation gauntlet (valid jpeg/png/webp, oversize
+413, wrong-MIME 415, exe-renamed-.jpg caught 415, bad-dims 422, bad entity 422,
+rate-limit 429, disabled 503 — generated PNGs, no DB); attachments integration
+(0079 round-trip + attach ownership/re-attach/limit).
+
+### 9. Drive-by
+`scripts/check-module-boundaries.sh` allow-list extended for the `attachments`
+module/schema (the script doesn't enforce module→binary, which is why the §2.3
+issue surfaced via review, not the script).
+
+### 10. Closed carries — PARTIAL
+Tranche 1 (return photos) + Tranche 3 (review photos): **backend infrastructure
+shipped**; the consumer UI (pickers, PDP/return/seller display, lightbox) is
+**carried to 4b** (dormant until provisioning). Not marked fully ✅ — the
+end-to-end capability lands in 4b.
+
+### 11. Backlog
+Frontend consumer surfaces (§4–§8: PhotoUploadService, PhotoPicker, PhotoLightbox,
+review + return wiring) → **4b**; ops provisioning (app B2 bucket + creds +
+`STORAGE_ENABLED=true`); orphan cleanup job (cron); image moderation + virus-scan
+integrations; transcoding/thumbnails/AVIF; presigned-URL flow; image
+editing/crop; video; profile + seller-product image upload; Redis-backed upload
+rate limiter (currently in-memory, fine on single VDS).
+
+### 12. Parity
+Image-upload infrastructure: Backlog → **Partial** (backend present + tested;
+consumer surfaces + provisioning pending in 4b). Moderation: Missing → Partial
+(hooks present, integration pending). Net roll-up ~+0.5% this turn; the +1–2%
+capability flip completes with 4b.
+
+### 13. Risk notes
+- `STORAGE_ENABLED=false` until ops provisions the bucket — uploads 503 by
+  design; 4b's UI must not ship before provisioning.
+- In-memory rate limiter is per-instance (acceptable on the single VDS;
+  Redis-backed is Backlog).
+- EXIF privacy: originals are stored as-uploaded (no EXIF stripping) — flag for
+  the 4b/moderation work.
+- B2 public-access egress costs at scale if not CDN-fronted (CDNUrl is the
+  intended front).
+
+## Recommendation Surfaces PR — `feat/recommendation-surfaces`
+
+Closes the Tranche 4 analytics loop: the first surfaces that consume the
+pipeline. Stacked on `feat/seller-facing-and-platform-growth`.
+
+### 1. Baseline → final
+- Branched off `feat/seller-facing-and-platform-growth` (tip `2c71e77a`,
+  migration 0079). `make verify` green at branch point.
+- Final: Go unit + integration (analytics) green; `flutter analyze` clean;
+  flows SS/TT/UU green. Goldens (5) baselined via the ubuntu rebaseline
+  workflow post-push.
+
+### 2. Audit + algorithm decision (§2.1)
+- `tool/audit/recommendation_surfaces_baseline.md`: `/recommendations` was a
+  200-empty stub; PDP related rail was a generic `sort:'recommended'` rail (not
+  co-view); analytics substrate (events + recently-viewed projection +
+  read→hydrate) ready to consume.
+- Owner chose **C — Hybrid**: popularity home rail + co-view PDP rail. Both
+  projection tables ship; co-view self-populates as prod traffic accumulates,
+  popularity covers cold-start.
+
+### 3. Backend (core-svc + jobs-svc + fin-svc untouched)
+- Migration `0080`: `analytics_schema.popular_products` +
+  `product_co_views` (soft BIGINT product refs, no cross-schema FK).
+- `analytics.Service` gains `RefreshRecommendations` (truncate+rebuild, 30d
+  popularity top-1000 + co-view 1h-session-window top-50/product, 30-min
+  timeout) wired into the jobs-svc cron at **05:00**; plus read methods
+  `PopularProductIDs` / `HomeRecommendationIDs` / `SimilarProductIDs`.
+- Endpoints (replace the stub): `GET /recommendations/home` (OptionalAuth,
+  personalized vs popular, `source` field) + `GET /products/{id}/similar`
+  (co-view + popularity pad, self-excluded, `source` field). Both read→hydrate
+  via `catalog.ListProductsByIDs`.
+- Tests: fake-repo unit (home fallback + seed exclusion) + real-DB integration
+  (co-view self-join SQL) + handler tests (consent gate, cold-start, source
+  tagging, self-exclusion, pad).
+
+### 4. Frontend
+- `product_summary_api.dart`: shared mapper for the hand-written
+  `buildProductSummaryJSON` shape (recently-viewed refactored onto it).
+- `homeRecommendationsProvider` (exposes `personalized` from `source`) +
+  `similarProductsProvider(productId)` family. Both fail to **empty data**
+  (defensive layering), never an error state.
+
+### 5. Surfaces
+- Home: `_RecommendationsSliver` above the recently-viewed rail; title switches
+  on source ("Senin için seçtiklerimiz" / "Popüler ürünler"), hidden when empty.
+- PDP: both related surfaces (desktop grid + mobile description tab) rewired
+  from `productsRailProvider('recommended')` to `similarProductsProvider`.
+- i18n: `home.rails.recommendations.{personalized_title,popular_title}` in 4
+  locales.
+
+### 6. Flows + goldens
+- Flows SS/TT/UU (container-level): source variant, similar fetch, errors→empty.
+- 5 goldens: ProductListRail with the 3 recommendation titles × viewport/theme.
+
+### 7. Backlog (deferred)
+- **Per-category popularity** (`scope='category:{id}'`): needs product→category,
+  which is `catalog_schema` (jobs-svc can't cross-schema JOIN). Options: carry
+  `categoryId` on the `product_view` payload (small ingest change) or a catalog
+  snapshot pipeline. `scope` column already in place. PDP fallback is co-view →
+  global-popular until then.
+- OpenAPI: `/recommendations` stub entry in `api/openapi.yaml` is now stale
+  (route renamed); left as-is (consistent with recently-viewed/consent, which
+  are also served only via the raw mux and absent from the spec). Reconciling
+  the analytics-area endpoints into the spec is a separate doc pass.
+- A/B testing, real-time recs, guest cross-session continuity, explanation
+  tooltips, ML ranking — explicit non-goals.
+
+### 8. Parity
+- ≈60% → ≈62%. Home + PDP now surface real recommendations; the analytics
+  pipeline investment (Tranche 4) has its first consumers.
+
+### 9. Risk notes
+- Co-view is **empty until prod `product_view` volume accumulates** (§1.6 #1);
+  popularity fallback + the server-side fallback chain cover this — the rails
+  render from day one and enrich automatically via the daily refresh.
+- The co-view rebuild self-join is the one heavy query; bounded by the
+  session/time window, the top-N caps, and the 30-min timeout. Watch its
+  duration as event volume grows (candidate for incremental/materialized
+  approaches later).
+
+## Sellerpayout Schema Split PR — `chore/sellerpayout-schema-split`
+
+Architectural cleanup. Closes the PR #8 boundaries-guard exemption that let
+`internal/sellerpayout/` read `commission_schema` by relocating the three
+sellerpayout-owned tables into a dedicated `sellerpayout_schema`. Stacked on
+`feat/recommendation-surfaces` (recommendation PR #35 unmerged; main at #30).
+
+### 1. Baseline vs. final
+| | Baseline | Final |
+|---|---|---|
+| `make boundaries` | `boundaries OK` (sellerpayout exempted on commission_schema) | `boundaries OK` (exemption gone; new sellerpayout_schema guard) |
+| sellerpayout unit + integration (:6434) | green | green (on new schema) |
+| `go test ./...` | green | green |
+| 3 binaries | build | build |
+| Migration round-trip | n/a | up→down→re-up clean |
+
+### 2. Audit findings
+- **Tables relocated (3, all exclusively sellerpayout-owned):** `seller_payouts`,
+  `payout_batches`, `seller_psp_accounts` + the immutable-trigger function
+  `enforce_payout_immutable`. `capture_postings` stays in `commission_schema`
+  (commission-owned; sellerpayout reads it via the `commission.CaptureRecorder`
+  in-process seam, no direct SQL).
+- **References updated:** 17 non-test SQL refs in `internal/sellerpayout/`
+  (`repository.go` ×13, `domain.go` ×3, `service.go` ×1) + 21 in its tests;
+  e2e fixtures/assertions (4 files); zero `commission_schema` refs remain in
+  `internal/sellerpayout/`.
+- **Dual schema source of truth:** `deploy/postgres-ledger/init/` (fresh DBs) +
+  `migrations/ledger/` (deployed). Both updated; the migration is idempotent so
+  the test harness (init + migrations on a fresh DB) no-ops the move.
+
+### 3. Boundaries guard diff
+- Removed `internal/sellerpayout/` from the `commission_schema` regression-guard
+  exempt list (+ removed the "consider splitting … future refactor" note).
+- Added a parallel **`sellerpayout_schema` regression guard** (every SQL op, not
+  just `FROM`); recognized callers = `internal/sellerpayout/`, `internal/e2e/`,
+  `migrations/`, `deploy/postgres-ledger/init/`.
+- Added `sellerpayout` to the generic cross-schema `SCHEMAS` list.
+- Retargeted the immutable-UPDATE guard to `sellerpayout_schema.seller_payouts`.
+- **Smoke test:** injecting `// SELECT * FROM sellerpayout_schema.seller_payouts`
+  into `internal/wallet/api.go` →
+  `ERROR: sellerpayout_schema.* access outside the recognized callers` +
+  `internal/wallet/api.go:158`; reverting → `boundaries OK`.
+
+### 4. Migration round-trip
+`migrations/ledger/0080_sellerpayout_schema_split.{up,down}.sql`. Verified on the
+:6434 ledger DB: up → tables in `sellerpayout_schema` (+ function); down → back
+in `commission_schema`, schema dropped (`schemata` count 0); re-up → back in
+`sellerpayout_schema`. Fresh `pg-ledger-test-up` (init + all migrations) ends
+with `seller_payouts/payout_batches/seller_psp_accounts` in `sellerpayout_schema`
+and `capture_postings` still in `commission_schema`.
+
+### 5. Tests
+- `go test -tags=integration ./internal/sellerpayout/` green (8.6s) on the new
+  schema; no test logic changed beyond schema-name updates.
+- `go test ./...` green.
+
+### 6. Cross-schema review
+- FK `seller_payouts.batch_id → payout_batches(id)` is now intra-
+  `sellerpayout_schema` (both moved together; constraint stayed valid across
+  `SET SCHEMA`).
+- `sellerpayout_schema → wallet_schema.ledger_alerts` (escalation INSERT) stays
+  — a write to a wallet-owned table that already went through the established
+  Phase 2.3 grant, not a new cross-domain read.
+- `reconcile_user` keeps read-only `SELECT` on `seller_payouts` (now in
+  `sellerpayout_schema`, USAGE granted) for invariant checks.
+- sellerpayout no longer touches `commission_schema` at all.
+
+### 7. Constitution / CONTRIBUTING update
+- `CLAUDE.md §5`: `commission_schema (seller payouts here)` → adds
+  `sellerpayout_schema` as an owned schema.
+- `DATA_DICTIONARY.md §2.2`: split the `commission + sellerpayout` row into
+  separate `commission` and `sellerpayout` rows; `§9` header + DDL + immutability
+  rules retargeted to `sellerpayout_schema`.
+- `CONTRIBUTING.md`: new "Relocating tables across schemas to fix a boundary
+  debt" pattern (dual source of truth, idempotent migration, trigger-function
+  move, guard smoke-test).
+
+### 8. Backlog updated
+- ✅ **Closed: "sellerpayout_schema split"** (carried from the PR #8 era through
+  the PR #21 audit; the boundaries-guard "consider splitting … in a future
+  refactor" note). The sellerpayout module now owns its own schema and the
+  guard enforces the boundary.
+
+### 9. No parity change
+Operational/architectural cleanup. No endpoints, no DTOs, no user surface.
+
+### 10. Risk notes
+- **CDC / BI consumers:** anything reading `commission_schema.seller_payouts`
+  (or `payout_batches` / `seller_psp_accounts`) directly — analytics/BI tooling,
+  external CDC — breaks on the rename. Ops must repoint to `sellerpayout_schema`
+  before/with the deploy. The migration is the coordination point.
+- **Migrate-role privilege:** `ALTER TABLE … SET SCHEMA` + `ALTER FUNCTION …
+  SET SCHEMA` + `CREATE SCHEMA … AUTHORIZATION` require the migration role to own
+  the objects / be superuser. Verified under the test container's superuser;
+  confirm the prod migrate role has the rights (or run as owner) before deploy.
+- **Pre-existing, out of scope:** the integration-tagged `internal/e2e/` suite
+  does not compile on the base branch (`cashback.ReferenceInterestRateBpsConst`
+  undefined — a cashback constant rename, unrelated to this PR). Not in any
+  `make verify` gate (vet/test run without the integration tag); my e2e edits are
+  SQL-string changes that don't affect compilation. Flagged for a separate fix.
+
+## Cashback Constant Fix PR — `chore/cashback-reference-rate-constant-fix`
+
+Resolves the `cashback.ReferenceInterestRateBpsConst undefined` reference in the
+integration-tagged `internal/e2e/` suite (flagged in PR #36's REPORT). Stacked on
+`feat/seller-facing-and-platform-growth`.
+
+### 1. Baseline
+`go vet -tags=integration ./internal/e2e/` → `undefined: cashback.ReferenceInterestRateBpsConst`.
+`make verify` green (the integration-tagged e2e build is not gated). `go test ./...`
+(no integration tag) green.
+
+### 2. Audit finding — Option C/B (migrate to v8), not restore
+Deletion commit **`127f3f07 feat(cashback): implement v8 ACCELERATED MODEL`** removed
+`const ReferenceInterestRateBpsConst = 5000` (v6 perpetual) and replaced the formula
+with `const CashbackK int64 = 156000` + `ComputePlanTerms`. The constant was
+deliberately deleted, not lost — restoring it would compile but leave the 3 e2e
+sites asserting the **live v8 plan row** against **dead v6 math**. Chosen fix
+(owner-approved): migrate the sites to the engine's own
+`cashback.ComputePlanTerms(price, bps).MonthlyAmountMinor`.
+
+### 3. Fix applied
+3 sites, all in `internal/e2e/`:
+- `order_to_cashback_test.go:273` — v6 `145` → v8 `ComputePlanTerms(50000,700)` = 224.
+- `kargo_to_cashback_test.go:424` — v6 formula → v8 `ComputePlanTerms(100000,700)` = 448.
+- `delivered_multi_seller_test.go:171` — v6 `totalComm` math → v8
+  `ComputePlanTerms(160000,700)` = 717 (order-level plan; removed unused
+  `commA1/A2/B1/totalComm`).
+
+The deleted constant now has **zero references** in `internal/` and `cmd/`
+(one stale prose comment remains in `cmd/core-svc/catalog_handlers.go:15`; left as
+a drive-by candidate, see below).
+
+### 4. Verification — partial; DoD "compiles cleanly" NOT met (scope correction)
+The prompt's premise (the constant was the *sole* blocker) proved **false**.
+Removing it surfaced that `internal/e2e/` has pervasive, pre-existing
+**multi-refactor drift** and still does not compile under `-tags=integration`:
+- `cashback.NewService` signature changed (now `WalletPoster` + `*metrics.BusinessMetrics`) — 4+ call sites on the old 6-arg form.
+- `cashback.Service.RunMonth` removed/renamed — 2 sites.
+- `cashback.Service.CreatePlanForOrder` removed/renamed — 1 site.
+- test mocks miss `cart.Service.SeedStockIfAbsent` and `catalog.Service.HomeBanners` (both interfaces grew).
+- "…too many errors" — more beyond these.
+
+These are independent of the constant (the suite has been uncompilable across
+several refactors; it isn't in `make verify`, so it went unnoticed). The v8 math
+edits above are **correct by construction** (they call the engine's own
+`ComputePlanTerms`) but **unrunnable** until the suite compiles.
+
+Non-integration gates green throughout: `go build ./...`, `go test ./...`
+(no tag), `make verify`, `flutter analyze` (no frontend changes).
+
+### 5. Backlog updated
+- **NEW: "Revive `internal/e2e` integration suite (v8 + interface migration)"** —
+  migrate `NewService` call sites to the `WalletPoster`/`BusinessMetrics`
+  signature, replace removed `RunMonth`/`CreatePlanForOrder` calls, implement
+  `SeedStockIfAbsent` + `HomeBanners` on the test mocks, then get the suite
+  compiling + passing, and add it to a CI gate so it can't silently rot again.
+- PR #36's flagged item ("`internal/e2e` doesn't compile — `ReferenceInterestRateBpsConst` undefined") is **refined, not fully closed**: the constant cause is resolved; the broader revival is the carried successor item above.
+
+### 6. Drive-by (not taken)
+- `cmd/core-svc/catalog_handlers.go:15` comment "mirrors cashback.ReferenceInterestRateBpsConst" now references a deleted symbol. Left untouched to keep the diff minimal/honest to scope; rolled into the revival Backlog.
+
+### No parity change
+Operational build fix; no capability change.
