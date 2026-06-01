@@ -12,6 +12,7 @@ import (
 
 	"github.com/mopro/platform/internal/identity"
 	"github.com/mopro/platform/internal/identity/middleware"
+	"github.com/mopro/platform/internal/seller"
 	pkgcrypto "github.com/mopro/platform/pkg/crypto"
 )
 
@@ -24,6 +25,24 @@ type authHandlers struct {
 	// are logged best-effort and do NOT fail the deletion (the soft-delete has
 	// already committed; the RTBF endpoint + nightly jobs are the backstop).
 	onUserDeleted func(ctx context.Context, userID int64) error
+	// sellerBinding, if set, enriches the /me response with the user's seller
+	// binding (null when unbound). Wired from seller.Service in main.go; a
+	// func keeps authHandlers decoupled from the seller module's construction.
+	sellerBinding func(ctx context.Context, userID int64) (*seller.Binding, error)
+}
+
+// resolveSellerBinding returns the user's seller binding for the /me response,
+// or nil (→ JSON null). A lookup failure is logged, not surfaced.
+func (a *authHandlers) resolveSellerBinding(ctx context.Context, userID int64) *seller.Binding {
+	if a.sellerBinding == nil {
+		return nil
+	}
+	b, err := a.sellerBinding(ctx, userID)
+	if err != nil {
+		a.log.Warn("me: seller binding lookup failed", "err", err)
+		return nil
+	}
+	return b
 }
 
 // registerAuthRoutes adds all identity routes to mux.
@@ -199,7 +218,9 @@ func (a *authHandlers) handleGetMe(w http.ResponseWriter, r *http.Request) {
 		a.writeIdentityError(w, err)
 		return
 	}
-	jsonOK(w, http.StatusOK, userResponse(user))
+	resp := userResponse(user)
+	resp["seller_binding"] = a.resolveSellerBinding(r.Context(), userID)
+	jsonOK(w, http.StatusOK, resp)
 }
 
 func (a *authHandlers) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
@@ -238,7 +259,9 @@ func (a *authHandlers) handleUpdateMe(w http.ResponseWriter, r *http.Request) {
 		a.writeIdentityError(w, err)
 		return
 	}
-	jsonOK(w, http.StatusOK, userResponse(user))
+	resp := userResponse(user)
+	resp["seller_binding"] = a.resolveSellerBinding(r.Context(), userID)
+	jsonOK(w, http.StatusOK, resp)
 }
 
 func (a *authHandlers) handleDeleteMe(w http.ResponseWriter, r *http.Request) {

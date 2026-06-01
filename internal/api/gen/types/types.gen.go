@@ -111,6 +111,12 @@ const (
 	ReturnRequestReasonWrongProduct   ReturnRequestReason = "wrong_product"
 )
 
+// Defines values for SellerBindingRole.
+const (
+	Owner SellerBindingRole = "owner"
+	Staff SellerBindingRole = "staff"
+)
+
 // Defines values for TokenPairTokenType.
 const (
 	Bearer TokenPairTokenType = "Bearer"
@@ -606,6 +612,17 @@ type ReturnRequest struct {
 // ReturnRequestReason defines model for ReturnRequest.Reason.
 type ReturnRequestReason string
 
+// SellerBinding A user's link to a seller account (seller_users row + seller identity).
+type SellerBinding struct {
+	Role       SellerBindingRole `json:"role"`
+	SellerId   int64             `json:"seller_id"`
+	SellerName string            `json:"seller_name"`
+	SellerSlug string            `json:"seller_slug"`
+}
+
+// SellerBindingRole defines model for SellerBinding.Role.
+type SellerBindingRole string
+
 // SellerOrderBreakdown Per-seller order transparency breakdown for the seller panel
 type SellerOrderBreakdown struct {
 	Items []struct {
@@ -666,7 +683,11 @@ type User struct {
 	NameFirst *string              `json:"name_first"`
 	NameLast  *string              `json:"name_last"`
 	Phone     string               `json:"phone"`
-	UpdatedAt time.Time            `json:"updated_at"`
+
+	// SellerBinding The user's seller-account binding, or null when the user is not bound
+	// to an active seller. Drives client-side seller-role detection.
+	SellerBinding *SellerBinding `json:"seller_binding"`
+	UpdatedAt     time.Time      `json:"updated_at"`
 }
 
 // Variant defines model for Variant.

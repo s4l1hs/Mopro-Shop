@@ -14,6 +14,14 @@ import (
 // stubSellerSvc is a minimal seller.Service for the product-detail handler test.
 type stubSellerSvc struct {
 	getByIDFn func(id int64) (seller.Seller, error)
+	bindingFn func(userID int64) (seller.Binding, bool, error)
+}
+
+func (s *stubSellerSvc) GetBindingForUser(_ context.Context, userID int64) (seller.Binding, bool, error) {
+	if s.bindingFn != nil {
+		return s.bindingFn(userID)
+	}
+	return seller.Binding{}, false, nil
 }
 
 func (s *stubSellerSvc) GetBySlug(_ context.Context, _ string) (seller.Seller, error) {

@@ -217,6 +217,7 @@ Class | Method | HTTP request | Description
  - [ReturnRequestItemsInner](doc/ReturnRequestItemsInner.md)
  - [SearchSuggest200Response](doc/SearchSuggest200Response.md)
  - [SearchTrending200Response](doc/SearchTrending200Response.md)
+ - [SellerBinding](doc/SellerBinding.md)
  - [SellerOrderBreakdown](doc/SellerOrderBreakdown.md)
  - [SellerOrderBreakdownItemsInner](doc/SellerOrderBreakdownItemsInner.md)
  - [SellerOrderBreakdownTotals](doc/SellerOrderBreakdownTotals.md)

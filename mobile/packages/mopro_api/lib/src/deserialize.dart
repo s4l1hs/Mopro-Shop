@@ -50,6 +50,7 @@ import 'package:mopro_api/src/model/return_request.dart';
 import 'package:mopro_api/src/model/return_request_items_inner.dart';
 import 'package:mopro_api/src/model/search_suggest200_response.dart';
 import 'package:mopro_api/src/model/search_trending200_response.dart';
+import 'package:mopro_api/src/model/seller_binding.dart';
 import 'package:mopro_api/src/model/seller_order_breakdown.dart';
 import 'package:mopro_api/src/model/seller_order_breakdown_items_inner.dart';
 import 'package:mopro_api/src/model/seller_order_breakdown_totals.dart';
@@ -185,6 +186,8 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return SearchSuggest200Response.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'SearchTrending200Response':
           return SearchTrending200Response.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'SellerBinding':
+          return SellerBinding.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'SellerOrderBreakdown':
           return SellerOrderBreakdown.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'SellerOrderBreakdownItemsInner':

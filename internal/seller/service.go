@@ -18,3 +18,7 @@ func (s *service) GetByID(ctx context.Context, id int64) (Seller, error) {
 func (s *service) ResolveSellerForUser(ctx context.Context, userID int64) (int64, bool, error) {
 	return s.repo.SellerIDForUser(ctx, userID)
 }
+
+func (s *service) GetBindingForUser(ctx context.Context, userID int64) (Binding, bool, error) {
+	return s.repo.BindingForUser(ctx, userID)
+}
