@@ -106,6 +106,26 @@ Examples:
 
 `golangci-lint` (depguard rules in `.golangci.yml`) enforces the same rules at lint time.
 
+## Role-gated routes via redirect + snackbar
+
+Routes gated by a user role (seller, admin, moderator, …) follow one shape: a
+`go_router` `redirect` callback reads the role provider via `ref`, returns the
+redirect target when the user lacks the role, and sets a one-shot
+`pendingSnackbarProvider` (an i18n key) that an app-root listener shows once via
+`rootNavigatorKey` then clears (mirrors `sessionRevokedProvider`).
+
+The role provider **derives from `currentUserProvider`** — auth state is the
+source of truth; role bindings are facts about that state, never their own
+network call. Keep the gate decision in a **pure function**
+(`computeXRedirect(location, hasRole, roleKnown)`) so it's unit-testable, and
+**defer while the role is still loading** (`roleKnown == false` → return null) so
+a legitimate user isn't bounced mid-`/me`-fetch; add `currentUserProvider` to the
+router's `refreshListenable` so the deferred gate re-runs on resolve.
+
+Precedent: `feat/seller-dashboard-ui` — `userIsSellerProvider` +
+`computeSellerRedirect` gate the `/seller/*` panel; non-sellers get
+`seller.access_denied`. Future role surfaces follow the same shape.
+
 ## Runtime DOM mutation for Flutter web head content
 
 Flutter web ships as an SPA; per-route head content (titles, meta tags, JSON-LD)
