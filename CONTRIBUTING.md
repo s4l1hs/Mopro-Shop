@@ -758,8 +758,13 @@ When changing financial-domain code (`internal/wallet`, `internal/cashback`,
 - **Pin pool budget in concurrency tests** (`MaxConns=4`, or `=1` for a
   single-connection contract guard) so behavior is reproducible across runner CPU
   counts — never rely on the CPU-derived default.
-- **Guard the contract with a property test.** A new tx-bearing function on the
-  financial write path gets a `MaxConns=1` hot-path test: success proves it never
-  acquires a second connection. Don't widen the pool to silence such a test.
+- **Guard the contract with a concurrency test.** A new tx-bearing function on the
+  financial write path gets a pinned-pool concurrency test (`MaxConns=4`, more
+  goroutines than connections) that deadlocks if it acquires a second connection
+  under contention — like `TestCronProperty_ConcurrentIdempotency`. (A `MaxConns=1`
+  "exactly one connection" assertion is tempting but fragile on shared-CPU CI
+  runners — a legit single op can exceed a wall-clock deadline under load; prefer a
+  counting-pool decorator if you need a precise per-op assertion.) Don't widen the
+  pool to silence such a test.
 - **Confirm singleton/concurrency invariants** and document the production pool size
   (set an explicit `DB_MAX_CONNS` rather than the implicit default).
