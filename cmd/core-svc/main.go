@@ -406,7 +406,7 @@ func main() {
 		httpTrace(http.HandlerFunc(handleListProducts(catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)
 	mux.Handle("GET /products/{id}",
-		httpTrace(http.HandlerFunc(handleGetProductDetail(catalogSvc, market, cashbackCurrency))),
+		httpTrace(http.HandlerFunc(handleGetProductDetail(catalogSvc, sellerSvc, market, cashbackCurrency))),
 	)
 	mux.Handle("POST /products/{id}/variants",
 		httpTrace(http.HandlerFunc(handleAddVariant(catalogSvc, defaultCurrency))),

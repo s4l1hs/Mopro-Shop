@@ -49,6 +49,10 @@ ProductSummary _$ProductSummaryFromJson(
         'rating_count',
         (v) => (v as num?)?.toInt() ?? 0,
       ),
+      flashPriceMinor: $checkedConvert(
+        'flash_price_minor',
+        (v) => (v as num?)?.toInt(),
+      ),
       cashbackPreview: $checkedConvert(
         'cashback_preview',
         (v) => CashbackPreview.fromJson(v as Map<String, dynamic>),
@@ -66,6 +70,7 @@ ProductSummary _$ProductSummaryFromJson(
     'discountPct': 'discount_pct',
     'ratingAvg': 'rating_avg',
     'ratingCount': 'rating_count',
+    'flashPriceMinor': 'flash_price_minor',
     'cashbackPreview': 'cashback_preview',
   },
 );
@@ -85,6 +90,7 @@ Map<String, dynamic> _$ProductSummaryToJson(ProductSummary instance) =>
       'discount_pct': ?instance.discountPct,
       'rating_avg': ?instance.ratingAvg,
       'rating_count': ?instance.ratingCount,
+      'flash_price_minor': ?instance.flashPriceMinor,
       'cashback_preview': instance.cashbackPreview.toJson(),
     };
 

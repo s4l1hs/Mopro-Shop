@@ -418,11 +418,16 @@ type Product struct {
 	CreatedAt       time.Time       `json:"created_at"`
 
 	// Description Locale-resolved. Falls back to tr-TR if requested locale unavailable.
-	Description string        `json:"description"`
-	Id          int64         `json:"id"`
-	SellerId    int64         `json:"seller_id"`
-	SellerName  string        `json:"seller_name"`
-	Status      ProductStatus `json:"status"`
+	Description string `json:"description"`
+	Id          int64  `json:"id"`
+	SellerId    int64  `json:"seller_id"`
+	SellerName  string `json:"seller_name"`
+
+	// SellerSlug URL-safe identifier for the seller; used to deep-link to the seller
+	// storefront at /sellers/:slug. Null when the product's seller_id does
+	// not resolve to an active seller (legacy/platform-direct or suspended).
+	SellerSlug *string       `json:"seller_slug"`
+	Status     ProductStatus `json:"status"`
 
 	// Title Locale-resolved from Accept-Language header
 	Title    string    `json:"title"`
