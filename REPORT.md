@@ -3081,3 +3081,84 @@ capability flip completes with 4b.
   the 4b/moderation work.
 - B2 public-access egress costs at scale if not CDN-fronted (CDNUrl is the
   intended front).
+
+## Recommendation Surfaces PR — `feat/recommendation-surfaces`
+
+Closes the Tranche 4 analytics loop: the first surfaces that consume the
+pipeline. Stacked on `feat/seller-facing-and-platform-growth`.
+
+### 1. Baseline → final
+- Branched off `feat/seller-facing-and-platform-growth` (tip `2c71e77a`,
+  migration 0079). `make verify` green at branch point.
+- Final: Go unit + integration (analytics) green; `flutter analyze` clean;
+  flows SS/TT/UU green. Goldens (5) baselined via the ubuntu rebaseline
+  workflow post-push.
+
+### 2. Audit + algorithm decision (§2.1)
+- `tool/audit/recommendation_surfaces_baseline.md`: `/recommendations` was a
+  200-empty stub; PDP related rail was a generic `sort:'recommended'` rail (not
+  co-view); analytics substrate (events + recently-viewed projection +
+  read→hydrate) ready to consume.
+- Owner chose **C — Hybrid**: popularity home rail + co-view PDP rail. Both
+  projection tables ship; co-view self-populates as prod traffic accumulates,
+  popularity covers cold-start.
+
+### 3. Backend (core-svc + jobs-svc + fin-svc untouched)
+- Migration `0080`: `analytics_schema.popular_products` +
+  `product_co_views` (soft BIGINT product refs, no cross-schema FK).
+- `analytics.Service` gains `RefreshRecommendations` (truncate+rebuild, 30d
+  popularity top-1000 + co-view 1h-session-window top-50/product, 30-min
+  timeout) wired into the jobs-svc cron at **05:00**; plus read methods
+  `PopularProductIDs` / `HomeRecommendationIDs` / `SimilarProductIDs`.
+- Endpoints (replace the stub): `GET /recommendations/home` (OptionalAuth,
+  personalized vs popular, `source` field) + `GET /products/{id}/similar`
+  (co-view + popularity pad, self-excluded, `source` field). Both read→hydrate
+  via `catalog.ListProductsByIDs`.
+- Tests: fake-repo unit (home fallback + seed exclusion) + real-DB integration
+  (co-view self-join SQL) + handler tests (consent gate, cold-start, source
+  tagging, self-exclusion, pad).
+
+### 4. Frontend
+- `product_summary_api.dart`: shared mapper for the hand-written
+  `buildProductSummaryJSON` shape (recently-viewed refactored onto it).
+- `homeRecommendationsProvider` (exposes `personalized` from `source`) +
+  `similarProductsProvider(productId)` family. Both fail to **empty data**
+  (defensive layering), never an error state.
+
+### 5. Surfaces
+- Home: `_RecommendationsSliver` above the recently-viewed rail; title switches
+  on source ("Senin için seçtiklerimiz" / "Popüler ürünler"), hidden when empty.
+- PDP: both related surfaces (desktop grid + mobile description tab) rewired
+  from `productsRailProvider('recommended')` to `similarProductsProvider`.
+- i18n: `home.rails.recommendations.{personalized_title,popular_title}` in 4
+  locales.
+
+### 6. Flows + goldens
+- Flows SS/TT/UU (container-level): source variant, similar fetch, errors→empty.
+- 5 goldens: ProductListRail with the 3 recommendation titles × viewport/theme.
+
+### 7. Backlog (deferred)
+- **Per-category popularity** (`scope='category:{id}'`): needs product→category,
+  which is `catalog_schema` (jobs-svc can't cross-schema JOIN). Options: carry
+  `categoryId` on the `product_view` payload (small ingest change) or a catalog
+  snapshot pipeline. `scope` column already in place. PDP fallback is co-view →
+  global-popular until then.
+- OpenAPI: `/recommendations` stub entry in `api/openapi.yaml` is now stale
+  (route renamed); left as-is (consistent with recently-viewed/consent, which
+  are also served only via the raw mux and absent from the spec). Reconciling
+  the analytics-area endpoints into the spec is a separate doc pass.
+- A/B testing, real-time recs, guest cross-session continuity, explanation
+  tooltips, ML ranking — explicit non-goals.
+
+### 8. Parity
+- ≈60% → ≈62%. Home + PDP now surface real recommendations; the analytics
+  pipeline investment (Tranche 4) has its first consumers.
+
+### 9. Risk notes
+- Co-view is **empty until prod `product_view` volume accumulates** (§1.6 #1);
+  popularity fallback + the server-side fallback chain cover this — the rails
+  render from day one and enrich automatically via the daily refresh.
+- The co-view rebuild self-join is the one heavy query; bounded by the
+  session/time window, the top-N caps, and the 30-min timeout. Watch its
+  duration as event volume grows (candidate for incremental/materialized
+  approaches later).
