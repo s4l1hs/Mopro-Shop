@@ -1,0 +1,54 @@
+name: make-verify
+
+# Runs the canonical `make verify` gate on every PR to main (and on main push).
+# This is the CI enforcement of the local pre-push gate — closes the gap that
+# let internal/e2e/ rot silently (PR #40). make verify orchestrates: fmt, vet,
+# go test (incl. -tags=integration e2e + property suites with Docker-bootstrapped
+# postgres/redis), golangci-lint, module boundaries, and the Flutter WCAG
+# contrast test — so this job needs Go + Flutter + golangci-lint + Docker.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install golangci-lint (v2 — matches .golangci.yml)
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.12.2/install.sh \
+            | sh -s -- -b "$(go env GOPATH)/bin" v2.12.2
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+
+      - name: Flutter deps (for verify-contrast)
+        run: flutter pub get
+        working-directory: mobile
+
+      # Docker is preinstalled on ubuntu-latest. make verify's property-* and
+      # integration-e2e sub-targets bring up their own postgres/redis containers
+      # via `docker run` (pg-ledger-test-up / e2e-test-up) — no compose services
+      # block needed here.
+      - name: make verify
+        run: make verify
+
+      - name: Tear down test containers
+        if: always()
+        run: make pg-ledger-test-down e2e-test-down || true
