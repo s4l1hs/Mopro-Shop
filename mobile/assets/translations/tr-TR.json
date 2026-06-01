@@ -90,6 +90,10 @@
     "rails": {
       "recently_viewed": {
         "title": "Son baktıkların"
+      },
+      "recommendations": {
+        "personalized_title": "Senin için seçtiklerimiz",
+        "popular_title": "Popüler ürünler"
       }
     }
   },

@@ -386,6 +386,42 @@ account-deletion erasure is wired explicitly (a `DELETE /me` handler hook), not 
 Implementation: `internal/analytics` (shared by core-svc ingest + jobs-svc
 crons), Tranche 4a.
 
+## Source-tagged recommendations + daily projection rebuild
+
+Recommendation surfaces (home "Senin için seçtiklerimiz" rail, PDP "Benzer
+ürünler" rail) read two derived projections in `analytics_schema`:
+`popular_products` (global view-count ranking) and `product_co_views`
+(co-occurrence). Unlike `user_recently_viewed` — which refreshes **incrementally
+on ingest** — these are **truncate-and-rebuild** projections: a single jobs-svc
+cron (05:00 Europe/Istanbul, alongside the prune/rebuild crons) recomputes both
+from scratch each day (`RefreshRecommendations`). Co-occurrence has no cheap
+incremental form, and recs tolerate up-to-24h staleness, so a full daily rebuild
+is the right cost trade — no on-ingest path. The co-view rebuild is a
+self-join over a session/time window; it carries a 30-min context timeout.
+
+`product_id` columns are **plain BIGINT soft references** (no cross-schema FK),
+same convention as the rest of `analytics_schema`. Reads return **ranked IDs
+only**; the HTTP handler hydrates them via `catalog.ListProductsByIDs`
+(read→hydrate, order-preserving) — never a cross-schema JOIN. Per-category
+popularity is **deliberately not built**: the product→category map lives in
+`catalog_schema`, which the jobs-svc refresh cannot read; the `scope` column is
+retained for that future tier (Backlog) and the PDP fallback is therefore
+co-view → global-popular.
+
+**Source tagging:** recommendation responses carry a `source` field so the
+client picks the right presentation without re-deriving server logic — home is
+`"personalized"` (co-view over the user's recently-viewed seeds, for an
+authed+consented user with history) or `"popular"` (the fallback for guests,
+non-consenting users, and cold-start); the PDP is `"co_view"` or `"popular"`.
+The fallback chain lives **server-side** (the handler decides + tags); the
+client only reads the tag. Combined with defensive layering (below), a sparse
+co-view table or a fetch error degrades to popularity or an empty (hidden) rail,
+never an error.
+
+Implementation: `internal/analytics` (refresh + reads) + the
+`/recommendations/home` and `/products/{id}/similar` handlers
+(`feat/recommendation-surfaces`).
+
 ## Build-flag gating for legal-review surfaces
 
 Production surfaces that depend on legal review (privacy copy, consent flows,
@@ -456,6 +492,7 @@ expected in new work. The full system inventory and gap analysis live in
 
 - [Storage-layer idempotency](#storage-layer-idempotency)
 - [Append-only event log + derived projections](#append-only-event-log--derived-projections)
+- [Source-tagged recommendations + daily projection rebuild](#source-tagged-recommendations--daily-projection-rebuild)
 - [PostgreSQL serialization retries](#postgresql-serialization-retries)
 - [URL state](#url-state)
 - [Adding a Notifier (Riverpod)](#adding-a-notifier-riverpod)

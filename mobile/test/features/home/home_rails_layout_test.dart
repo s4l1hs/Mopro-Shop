@@ -10,6 +10,7 @@ import 'package:mopro/features/catalog/providers/categories_provider.dart';
 import 'package:mopro/features/catalog/providers/home_provider.dart';
 import 'package:mopro/features/catalog/providers/products_rail_provider.dart';
 import 'package:mopro/features/catalog/screens/home_screen.dart';
+import 'package:mopro/features/home/home_recommendations_provider.dart';
 import 'package:mopro/features/home/providers/flash_deals_provider.dart';
 import 'package:mopro_api/mopro_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,11 +32,18 @@ class _EmptyCategories extends CategoriesNotifier {
   CategoriesState build() => const CategoriesState(categories: AsyncData([]));
 }
 
+class _EmptyHomeRecs extends HomeRecommendationsNotifier {
+  @override
+  AsyncValue<HomeRecommendations> build() =>
+      const AsyncValue.data(HomeRecommendations.empty);
+}
+
 late SharedPreferences _prefs;
 
 List<Override> _overrides() => [
       sharedPreferencesProvider.overrideWithValue(_prefs),
       authNotifierProvider.overrideWith(_FakeAuth.new),
+      homeRecommendationsProvider.overrideWith(_EmptyHomeRecs.new),
       categoriesProvider.overrideWith(_EmptyCategories.new),
       flashDealsProvider.overrideWith((ref) async => null),
       homeBannersProvider.overrideWith((ref) async => const []),

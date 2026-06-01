@@ -44,6 +44,8 @@ func TestMain(m *testing.M) {
 		`DROP TABLE IF EXISTS analytics_schema.session_identity CASCADE`,
 		`DROP TABLE IF EXISTS analytics_schema.user_consent CASCADE`,
 		`DROP TABLE IF EXISTS analytics_schema.user_recently_viewed CASCADE`,
+		`DROP TABLE IF EXISTS analytics_schema.popular_products CASCADE`,
+		`DROP TABLE IF EXISTS analytics_schema.product_co_views CASCADE`,
 		`CREATE TABLE analytics_schema.analytics_events (
 		   id BIGSERIAL PRIMARY KEY, session_id TEXT NOT NULL, user_id BIGINT,
 		   event_type TEXT NOT NULL, payload JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -59,6 +61,12 @@ func TestMain(m *testing.M) {
 		   user_id BIGINT NOT NULL, product_id BIGINT NOT NULL,
 		   last_viewed_at TIMESTAMPTZ NOT NULL DEFAULT now(), view_count INTEGER NOT NULL DEFAULT 1,
 		   PRIMARY KEY (user_id, product_id))`,
+		`CREATE TABLE analytics_schema.popular_products (
+		   scope TEXT NOT NULL, product_id BIGINT NOT NULL, view_count INTEGER NOT NULL,
+		   refreshed_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (scope, product_id))`,
+		`CREATE TABLE analytics_schema.product_co_views (
+		   product_a BIGINT NOT NULL, product_b BIGINT NOT NULL, co_view_count INTEGER NOT NULL,
+		   refreshed_at TIMESTAMPTZ NOT NULL DEFAULT now(), PRIMARY KEY (product_a, product_b))`,
 	}
 	for _, s := range stmts {
 		if _, err := pool.Exec(ctx, s); err != nil {
@@ -222,5 +230,97 @@ func TestIntegration_EraseUserData(t *testing.T) {
 	_ = pool.QueryRow(ctx, `SELECT count(*) FROM analytics_schema.session_identity WHERE user_id=$1`, uid).Scan(&idCount)
 	if evCount != 0 || idCount != 0 {
 		t.Fatalf("erase should clear events+identity, got events=%d identity=%d", evCount, idCount)
+	}
+}
+
+// contains reports whether ids includes target.
+func contains(ids []int64, target int64) bool {
+	return indexOf(ids, target) >= 0
+}
+
+// indexOf returns the position of target in ids, or -1.
+func indexOf(ids []int64, target int64) int {
+	for i, id := range ids {
+		if id == target {
+			return i
+		}
+	}
+	return -1
+}
+
+func TestIntegration_RefreshRecommendations(t *testing.T) {
+	ctx := context.Background()
+	svc := newSvc()
+	// Two guest sessions. Session 1: {200,201}. Session 2: {200,202}.
+	// Popularity: 200 twice, 201 once, 202 once. Co-views of 200: {201,202}.
+	if err := svc.Ingest(ctx, analytics.IngestBatch{
+		SessionID: "a1a1a1a1-1111-2222-3333-444444444444",
+		Events:    []analytics.Event{pv(200), pv(201)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Ingest(ctx, analytics.IngestBatch{
+		SessionID: "a2a2a2a2-1111-2222-3333-444444444444",
+		Events:    []analytics.Event{pv(200), pv(202)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.RefreshRecommendations(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// Shared DB: sibling tests view other products, so assert the relative rank
+	// within our own set — 200 (3 views) must out-rank 201/202 (1 view each).
+	popular, err := svc.PopularProductIDs(ctx, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if indexOf(popular, 200) < 0 {
+		t.Fatalf("product 200 should appear in popularity, got %v", popular)
+	}
+	if indexOf(popular, 200) > indexOf(popular, 201) || indexOf(popular, 200) > indexOf(popular, 202) {
+		t.Fatalf("200 (3 views) must out-rank 201/202 (1 view), got %v", popular)
+	}
+
+	similar, err := svc.SimilarProductIDs(ctx, 200, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(similar, 201) || !contains(similar, 202) {
+		t.Fatalf("co-views of 200 should include 201 and 202, got %v", similar)
+	}
+	if contains(similar, 200) {
+		t.Fatalf("a product is never its own co-view, got %v", similar)
+	}
+
+	// Home personalization: an authed+consented user who viewed 200 gets its
+	// co-views (201, 202) back, with the seed (200) excluded.
+	const uid = 2001
+	if _, err := svc.SetConsent(ctx, uid, true); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Ingest(ctx, analytics.IngestBatch{
+		SessionID: "a3a3a3a3-1111-2222-3333-444444444444", UserID: u(uid),
+		Events: []analytics.Event{pv(200)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	home, err := svc.HomeRecommendationIDs(ctx, uid, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(home, 201) || !contains(home, 202) || contains(home, 200) {
+		t.Fatalf("home recs should be {201,202} (seed 200 excluded), got %v", home)
+	}
+}
+
+func TestIntegration_HomeRecommendations_NoHistoryEmpty(t *testing.T) {
+	ctx := context.Background()
+	ids, err := newSvc().HomeRecommendationIDs(ctx, 999999, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 0 {
+		t.Fatalf("user with no history → empty (popular fallback), got %v", ids)
 	}
 }

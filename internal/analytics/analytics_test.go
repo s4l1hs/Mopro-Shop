@@ -16,6 +16,9 @@ type fakeRepo struct {
 	identities map[string]int64
 	events     []StoredEvent
 	recently   map[[2]int64]*RecentlyViewedItem
+	popular    []int64           // ordered global-popular product IDs
+	coViews    map[int64][]int64 // product_a → ordered partners
+	refreshed  bool              // RefreshRecommendations was invoked
 }
 
 func newFakeRepo() *fakeRepo {
@@ -23,6 +26,7 @@ func newFakeRepo() *fakeRepo {
 		consent:    map[int64]Consent{},
 		identities: map[string]int64{},
 		recently:   map[[2]int64]*RecentlyViewedItem{},
+		coViews:    map[int64][]int64{},
 	}
 }
 
@@ -111,6 +115,44 @@ func (f *fakeRepo) ListRecentlyViewed(_ context.Context, userID int64, limit int
 }
 func (f *fakeRepo) PruneEvents(_ context.Context, _ time.Time, _ int) (int64, error) { return 0, nil }
 func (f *fakeRepo) RebuildRecentlyViewed(_ context.Context, _ time.Time) error       { return nil }
+
+func (f *fakeRepo) RebuildPopular(_ context.Context, _ time.Time, _ int) error {
+	f.refreshed = true
+	return nil
+}
+func (f *fakeRepo) RebuildCoViews(_ context.Context, _, _ int) error { return nil }
+
+func (f *fakeRepo) PopularGlobalIDs(_ context.Context, limit int) ([]int64, error) {
+	return clampSlice(f.popular, limit), nil
+}
+
+func (f *fakeRepo) CoViewIDs(_ context.Context, productID int64, limit int) ([]int64, error) {
+	return clampSlice(f.coViews[productID], limit), nil
+}
+
+func (f *fakeRepo) CoViewIDsForSeeds(_ context.Context, seedIDs []int64, limit int) ([]int64, error) {
+	seen := map[int64]bool{}
+	for _, s := range seedIDs {
+		seen[s] = true
+	}
+	var out []int64
+	for _, s := range seedIDs {
+		for _, p := range f.coViews[s] {
+			if !seen[p] {
+				seen[p] = true
+				out = append(out, p)
+			}
+		}
+	}
+	return clampSlice(out, limit), nil
+}
+
+func clampSlice(s []int64, limit int) []int64 {
+	if limit > 0 && len(s) > limit {
+		return s[:limit]
+	}
+	return s
+}
 
 func ptr(i int64) *int64 { return &i }
 
@@ -273,5 +315,72 @@ func TestSetConsent_Toggle(t *testing.T) {
 	off, _ := svc.SetConsent(context.Background(), 1, false)
 	if off.AnalyticsEnabled || off.RevokedAt == nil {
 		t.Fatal("disable should set revokedAt")
+	}
+}
+
+func TestHomeRecommendationIDs_NoHistory_Empty(t *testing.T) {
+	repo := newFakeRepo()
+	ids, err := NewService(repo).HomeRecommendationIDs(context.Background(), 9, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 0 {
+		t.Fatalf("no history → empty (caller falls back to popular), got %v", ids)
+	}
+}
+
+func TestHomeRecommendationIDs_AggregatesCoViewsExcludingSeeds(t *testing.T) {
+	repo := newFakeRepo()
+	// User viewed product 1 and 2.
+	repo.recently[[2]int64{9, 1}] = &RecentlyViewedItem{ProductID: 1}
+	repo.recently[[2]int64{9, 2}] = &RecentlyViewedItem{ProductID: 2}
+	// Co-views: 1→{2,3}, 2→{3,4}. Seeds (1,2) must be excluded; 3 appears via both.
+	repo.coViews[1] = []int64{2, 3}
+	repo.coViews[2] = []int64{3, 4}
+	ids, err := NewService(repo).HomeRecommendationIDs(context.Background(), 9, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range ids {
+		if id == 1 || id == 2 {
+			t.Fatalf("seed products must be excluded, got %v", ids)
+		}
+	}
+	if len(ids) != 2 || ids[0] != 3 || ids[1] != 4 {
+		t.Fatalf("want [3 4] (deduped, seeds excluded), got %v", ids)
+	}
+}
+
+func TestSimilarProductIDs_ReturnsCoViews(t *testing.T) {
+	repo := newFakeRepo()
+	repo.coViews[42] = []int64{7, 8, 9}
+	ids, err := NewService(repo).SimilarProductIDs(context.Background(), 42, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 2 || ids[0] != 7 || ids[1] != 8 {
+		t.Fatalf("want top-2 co-views [7 8], got %v", ids)
+	}
+}
+
+func TestPopularProductIDs_ClampsLimit(t *testing.T) {
+	repo := newFakeRepo()
+	repo.popular = []int64{1, 2, 3, 4, 5}
+	ids, err := NewService(repo).PopularProductIDs(context.Background(), 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != 3 {
+		t.Fatalf("want 3 popular IDs, got %v", ids)
+	}
+}
+
+func TestRefreshRecommendations_RebuildsBothTables(t *testing.T) {
+	repo := newFakeRepo()
+	if err := NewService(repo).RefreshRecommendations(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !repo.refreshed {
+		t.Fatal("RefreshRecommendations must rebuild popular_products")
 	}
 }

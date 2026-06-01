@@ -40,6 +40,28 @@ type Service interface {
 	// RebuildRecentlyViewed recomputes the projection from events since `since`
 	// (drift backstop). Driven by the jobs-svc rebuild cron.
 	RebuildRecentlyViewed(ctx context.Context, since time.Time) error
+
+	// RefreshRecommendations truncate-and-rebuilds the recommendation
+	// projections (popular_products + product_co_views) from analytics_events.
+	// Driven by the jobs-svc 05:00 cron. Idempotent (full rebuild each run).
+	RefreshRecommendations(ctx context.Context) error
+
+	// PopularProductIDs returns the globally most-viewed product IDs (popularity
+	// fallback + home rail for non-personalized users). Product enrichment is
+	// the caller's job — no cross-schema JOIN.
+	PopularProductIDs(ctx context.Context, limit int) ([]int64, error)
+
+	// HomeRecommendationIDs returns personalized product IDs for an authed,
+	// consented user: co-views aggregated over the user's recently-viewed seeds,
+	// excluding products the user has already seen. Empty slice when the user has
+	// no history or co-view data is too sparse — the caller falls back to
+	// PopularProductIDs.
+	HomeRecommendationIDs(ctx context.Context, userID int64, limit int) ([]int64, error)
+
+	// SimilarProductIDs returns co-viewed product IDs for a PDP ("Benzer
+	// ürünler"). Empty when co-view data is sparse — the caller pads with
+	// PopularProductIDs (the §3.3 fallback chain).
+	SimilarProductIDs(ctx context.Context, productID int64, limit int) ([]int64, error)
 }
 
 // StoredEvent is a row ready for insertion (resolved user_id applied).
@@ -72,4 +94,21 @@ type Repository interface {
 
 	PruneEvents(ctx context.Context, before time.Time, capPerRun int) (int64, error)
 	RebuildRecentlyViewed(ctx context.Context, since time.Time) error
+
+	// RebuildPopular truncates popular_products and recomputes 'global' scope
+	// from product_view events on/after `since`, keeping the top `limit`.
+	RebuildPopular(ctx context.Context, since time.Time, limit int) error
+	// RebuildCoViews truncates product_co_views and recomputes co-occurrence
+	// from product_view pairs sharing a session within `windowSeconds`, keeping
+	// the top `capPerProduct` partners per product.
+	RebuildCoViews(ctx context.Context, windowSeconds, capPerProduct int) error
+
+	// PopularGlobalIDs returns the top global product IDs by view_count.
+	PopularGlobalIDs(ctx context.Context, limit int) ([]int64, error)
+	// CoViewIDs returns the top co-viewed partners of a single product.
+	CoViewIDs(ctx context.Context, productID int64, limit int) ([]int64, error)
+	// CoViewIDsForSeeds aggregates co-views across multiple seed products
+	// (home personalization), excluding the seeds themselves, ranked by summed
+	// co-view count.
+	CoViewIDsForSeeds(ctx context.Context, seedIDs []int64, limit int) ([]int64, error)
 }

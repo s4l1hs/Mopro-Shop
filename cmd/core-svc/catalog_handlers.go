@@ -214,14 +214,6 @@ func handleListBanners() http.HandlerFunc {
 	}
 }
 
-// handleListRecommendations is a 200-empty stub. GET /recommendations
-func handleListRecommendations() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		slog.Debug("recommendations: stub called")
-		jsonOK(w, http.StatusOK, map[string]any{"data": []any{}})
-	}
-}
-
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 type cashbackPreviewJSON struct {

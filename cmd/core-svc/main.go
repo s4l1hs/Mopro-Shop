@@ -466,8 +466,15 @@ func main() {
 	mux.Handle("GET /banners",
 		httpTrace(http.HandlerFunc(handleListBanners())),
 	)
-	mux.Handle("GET /recommendations",
-		httpTrace(http.HandlerFunc(handleListRecommendations())),
+	mux.Handle("GET /recommendations/home",
+		httpTrace(optionalAuth(http.HandlerFunc(
+			handleHomeRecommendations(analyticsSvc, catalogSvc, defaultLocale, market, cashbackCurrency),
+		))),
+	)
+	mux.Handle("GET /products/{id}/similar",
+		httpTrace(http.HandlerFunc(
+			handleSimilarProducts(analyticsSvc, catalogSvc, defaultLocale, market, cashbackCurrency),
+		)),
 	)
 
 	// ── Home composition + batch ──────────────────────────────────────────────

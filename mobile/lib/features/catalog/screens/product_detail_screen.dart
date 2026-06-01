@@ -15,11 +15,11 @@ import 'package:mopro/design/tokens.dart';
 import 'package:mopro/design/widgets/mopro_share_button.dart';
 import 'package:mopro/features/analytics/analytics_service.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
+import 'package:mopro/features/catalog/data/similar_products_provider.dart';
 import 'package:mopro/features/catalog/pdp/qa/pdp_qa_tab.dart';
 import 'package:mopro/features/catalog/pdp/reviews/pdp_reviews_tab.dart';
 import 'package:mopro/features/catalog/pdp/reviews/reviews_provider.dart';
 import 'package:mopro/features/catalog/providers/product_detail_provider.dart';
-import 'package:mopro/features/catalog/providers/products_rail_provider.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_image_pager.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_price_block.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_seller_card.dart';
@@ -27,7 +27,7 @@ import 'package:mopro/features/catalog/widgets/pdp/pdp_sticky_cta.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_variant_selector.dart';
 import 'package:mopro/features/catalog/widgets/pdp_image_gallery.dart';
 import 'package:mopro/features/catalog/widgets/product_card.dart';
-import 'package:mopro/features/catalog/widgets/product_rail.dart';
+import 'package:mopro/features/catalog/widgets/product_list_rail.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
 import 'package:mopro/features/growth/meta_tags_service.dart';
 import 'package:mopro/features/growth/seo_head.dart';
@@ -386,13 +386,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
                 child: _buildWideTabs(context, product),
               ),
               const SizedBox(height: 24),
-              ProductRail(
-                title: 'product.related_title'.tr(),
-                sort: 'recommended',
-                layout: RailLayout.grid,
-                gridColumns: context.isDesktop ? 6 : 3,
-                maxItems: 6,
-              ),
+              _SimilarProductsRail(productId: product.id),
               const SizedBox(height: 32),
             ],
           ),
@@ -775,7 +769,7 @@ class _DescriptionTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final relatedAsync = ref.watch(productsRailProvider('recommended'));
+    final relatedAsync = ref.watch(similarProductsProvider(productId));
 
     return SingleChildScrollView(
       child: Column(
@@ -836,6 +830,27 @@ class _DescriptionTab extends ConsumerWidget {
           const SizedBox(height: 16),
         ],
       ),
+    );
+  }
+}
+
+/// "Benzer ürünler" rail fed by co-view recommendations
+/// ([similarProductsProvider]). Renders zero space while loading or on
+/// empty/error (defensive layering) — the PDP layout is unchanged when there
+/// are no recommendations.
+class _SimilarProductsRail extends ConsumerWidget {
+  const _SimilarProductsRail({required this.productId});
+
+  final int productId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final products =
+        ref.watch(similarProductsProvider(productId)).valueOrNull ?? const [];
+    if (products.isEmpty) return const SizedBox.shrink();
+    return ProductListRail(
+      products: products,
+      title: 'product.related_title'.tr(),
     );
   }
 }
