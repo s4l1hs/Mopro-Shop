@@ -360,7 +360,7 @@ func TestE2E_KargoWebhookToCashbackPlan(t *testing.T) { //nolint:gocyclo,cyclop
 
 	cashbackRepo := cashback.NewRepository(ledgerPool)
 	cashbackOutboxRepo := outbox.NewRepository("wallet_schema.outbox")
-	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutboxRepo, calLoader, coinCurrency, nil, nil)
+	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutboxRepo, calLoader, coinCurrency, nil, nil, nil)
 
 	payoutRepo := sellerpayout.NewRepository(ledgerPool)
 	payoutSvc := sellerpayout.NewService(payoutRepo, nil, nil, calLoader, payoutCurrency, nil)
@@ -382,15 +382,26 @@ func TestE2E_KargoWebhookToCashbackPlan(t *testing.T) { //nolint:gocyclo,cyclop
 	}
 
 	deliveredAtForFin := *gotOrderDeliveredAt
-	if err := cashbackSvc.CreatePlanForOrder(ctx, cashback.OrderDeliveredEvent{
-		OrderID:     evPayload.OrderID,
-		UserID:      evPayload.UserID,
-		DeliveredAt: deliveredAtForFin,
-		Market:      market,
-		Currency:    payoutCurrency,
-		Items:       cbItems,
+	// v8 direct fields, derived from the item snapshot like internal/cashback/consumer.go.
+	var cbPriceMinor int64
+	for _, it := range cbItems {
+		cbPriceMinor += it.UnitPriceMinor * int64(it.Qty)
+	}
+	cbCommissionBps := 0
+	if len(cbItems) > 0 {
+		cbCommissionBps = cbItems[0].CommissionPctBps
+	}
+	if _, err := cashbackSvc.CreatePlanFromDelivery(ctx, cashback.OrderDeliveredEvent{
+		OrderID:       evPayload.OrderID,
+		UserID:        evPayload.UserID,
+		DeliveredAt:   deliveredAtForFin,
+		Market:        market,
+		Currency:      payoutCurrency,
+		PriceMinor:    cbPriceMinor,
+		CommissionBps: cbCommissionBps,
+		Items:         cbItems,
 	}); err != nil {
-		t.Fatalf("CreatePlanForOrder: %v", err)
+		t.Fatalf("CreatePlanFromDelivery: %v", err)
 	}
 
 	spItems := make([]sellerpayout.DeliveredItem, len(evPayload.Items))

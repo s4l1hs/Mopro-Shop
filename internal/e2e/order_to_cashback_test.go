@@ -99,7 +99,7 @@ func TestE2E_OrderToCashbackAndPayout(t *testing.T) { //nolint:gocyclo,cyclop
 
 	cashbackRepo := cashback.NewRepository(ledgerPool)
 	cashbackOutbox := outbox.NewRepository("wallet_schema.outbox")
-	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutbox, calLoader, coinCurrency, nil, nil)
+	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutbox, calLoader, coinCurrency, nil, nil, nil)
 
 	payoutRepo := sellerpayout.NewRepository(ledgerPool)
 	payoutSvc := sellerpayout.NewService(payoutRepo, nil, nil, calLoader, payoutCurrency, nil)
@@ -232,22 +232,37 @@ func TestE2E_OrderToCashbackAndPayout(t *testing.T) { //nolint:gocyclo,cyclop
 		}
 	}
 
-	cbEv := cashback.OrderDeliveredEvent{
-		OrderID:     createdOrder.ID,
-		UserID:      createdOrder.UserID,
-		DeliveredAt: deliveredAt,
-		Market:      market,
-		Currency:    payoutCurrency,
-		Items:       cbItems,
+	// v8: CreatePlanFromDelivery reads PriceMinor + CommissionBps directly from the
+	// event (the "v8 direct fields"). Derive them from the item snapshot exactly as
+	// the production consumer does (internal/cashback/consumer.go) so a missing price
+	// doesn't silently trip the PriceMinor<=0 skip guard.
+	var cbPriceMinor int64
+	for _, it := range cbItems {
+		cbPriceMinor += it.UnitPriceMinor * int64(it.Qty)
+	}
+	cbCommissionBps := 0
+	if len(cbItems) > 0 {
+		cbCommissionBps = cbItems[0].CommissionPctBps
 	}
 
-	if err := cashbackSvc.CreatePlanForOrder(ctx, cbEv); err != nil {
-		t.Fatalf("CreatePlanForOrder: %v", err)
+	cbEv := cashback.OrderDeliveredEvent{
+		OrderID:       createdOrder.ID,
+		UserID:        createdOrder.UserID,
+		DeliveredAt:   deliveredAt,
+		Market:        market,
+		Currency:      payoutCurrency,
+		PriceMinor:    cbPriceMinor,
+		CommissionBps: cbCommissionBps,
+		Items:         cbItems,
+	}
+
+	if _, err := cashbackSvc.CreatePlanFromDelivery(ctx, cbEv); err != nil {
+		t.Fatalf("CreatePlanFromDelivery: %v", err)
 	}
 
 	// Idempotent second call.
-	if err := cashbackSvc.CreatePlanForOrder(ctx, cbEv); err != nil {
-		t.Fatalf("CreatePlanForOrder idempotent: %v", err)
+	if _, err := cashbackSvc.CreatePlanFromDelivery(ctx, cbEv); err != nil {
+		t.Fatalf("CreatePlanFromDelivery idempotent: %v", err)
 	}
 
 	// Verify plan was created.

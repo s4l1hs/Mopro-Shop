@@ -192,7 +192,7 @@ func TestE2E_DeliveredEventTwoSellersIdempotent(t *testing.T) { //nolint:gocyclo
 
 	cashbackRepo := cashback.NewRepository(ledgerPool)
 	cashbackOutboxRepo := outbox.NewRepository("wallet_schema.outbox")
-	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutboxRepo, calLoader, coinCurrency, walletSvc, slog.Default())
+	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutboxRepo, calLoader, coinCurrency, walletSvc, slog.Default(), nil)
 
 	payoutRepo := sellerpayout.NewRepository(ledgerPool)
 	payoutSvc := sellerpayout.NewService(payoutRepo, nil, nil, calLoader, payoutCurrency, slog.Default())
@@ -403,13 +403,14 @@ func TestE2E_DeliveredEventTwoSellersIdempotent(t *testing.T) { //nolint:gocyclo
 
 	// ── Step 9: Cashback monthly cron — first run creates 1 payment ──────────────
 	now := time.Now().UTC()
-	period := now.Year()*100 + int(now.Month())
 
-	result, err := cashbackSvc.RunMonth(ctx, period, now, coinCurrency)
+	// v8: PayMonthlyInstallments derives the period from runDate; the coin currency
+	// is fixed at NewService time (replaces the old RunMonth(period, now, currency)).
+	result, err := cashbackSvc.PayMonthlyInstallments(ctx, now)
 	if err != nil {
-		t.Fatalf("RunMonth: %v", err)
+		t.Fatalf("PayMonthlyInstallments: %v", err)
 	}
-	t.Logf("RunMonth result: processed=%d skipped=%d failed=%d", result.Processed, result.Skipped, result.Failed)
+	t.Logf("PayMonthlyInstallments result: processed=%d skipped=%d failed=%d", result.Processed, result.Skipped, result.Failed)
 
 	if result.Failed > 0 {
 		t.Errorf("RunMonth: %d plan(s) failed", result.Failed)
@@ -428,13 +429,13 @@ func TestE2E_DeliveredEventTwoSellersIdempotent(t *testing.T) { //nolint:gocyclo
 	t.Logf("monthly cron first run OK: payments=%d", paymentCount2)
 
 	// ── Step 10: Second cron run same period — idempotent ────────────────────────
-	result2, err := cashbackSvc.RunMonth(ctx, period, now, coinCurrency)
+	result2, err := cashbackSvc.PayMonthlyInstallments(ctx, now)
 	if err != nil {
-		t.Fatalf("RunMonth (idempotent): %v", err)
+		t.Fatalf("PayMonthlyInstallments (idempotent): %v", err)
 	}
 	// All plans skipped (already paid this period).
 	if result2.Processed != 0 {
-		t.Errorf("second RunMonth: want 0 processed (idempotent), got %d", result2.Processed)
+		t.Errorf("second PayMonthlyInstallments: want 0 processed (idempotent), got %d", result2.Processed)
 	}
 
 	var paymentCount3 int
