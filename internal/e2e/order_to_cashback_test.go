@@ -314,7 +314,7 @@ func TestE2E_OrderToCashbackAndPayout(t *testing.T) { //nolint:gocyclo,cyclop
 	var unlockAt time.Time
 	if err := ledgerPool.QueryRow(ctx,
 		`SELECT id, amount_minor, status, unlock_at
-		 FROM commission_schema.seller_payouts
+		 FROM sellerpayout_schema.seller_payouts
 		 WHERE order_id = $1 AND seller_id = $2`,
 		createdOrder.ID, sellerID,
 	).Scan(&payoutID, &payoutAmount, &payoutStatus, &unlockAt); err != nil {
@@ -487,13 +487,14 @@ func setupLedgerSchema(ctx context.Context) error {
 	_, err := ledgerPool.Exec(ctx, `
 CREATE SCHEMA IF NOT EXISTS cashback_schema;
 CREATE SCHEMA IF NOT EXISTS commission_schema;
+CREATE SCHEMA IF NOT EXISTS sellerpayout_schema;
 CREATE SCHEMA IF NOT EXISTS wallet_schema;
 
 DROP TABLE IF EXISTS wallet_schema.event_dlq CASCADE;
 DROP TABLE IF EXISTS wallet_schema.event_delivery_attempts CASCADE;
 DROP TABLE IF EXISTS cashback_schema.payments CASCADE;
 DROP TABLE IF EXISTS cashback_schema.plans CASCADE;
-DROP TABLE IF EXISTS commission_schema.seller_payouts CASCADE;
+DROP TABLE IF EXISTS sellerpayout_schema.seller_payouts CASCADE;
 DROP TABLE IF EXISTS wallet_schema.ledger_entries CASCADE;
 DROP TABLE IF EXISTS wallet_schema.transactions CASCADE;
 DROP TABLE IF EXISTS wallet_schema.accounts CASCADE;
@@ -536,7 +537,7 @@ CREATE TABLE cashback_schema.payments (
   UNIQUE (plan_id, period_yyyymm)
 );
 
-CREATE TABLE commission_schema.seller_payouts (
+CREATE TABLE sellerpayout_schema.seller_payouts (
   id              BIGSERIAL PRIMARY KEY,
   order_id        BIGINT NOT NULL,
   seller_id       BIGINT NOT NULL,

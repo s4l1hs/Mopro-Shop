@@ -4,14 +4,14 @@
 -- can update all constituent payouts atomically as part of Tx1.
 -- Also adds a recovery index for reconcile_processing.
 
-ALTER TABLE commission_schema.seller_payouts
+ALTER TABLE sellerpayout_schema.seller_payouts
     ADD COLUMN IF NOT EXISTS batch_id BIGINT
-        REFERENCES commission_schema.payout_batches(id);
+        REFERENCES sellerpayout_schema.payout_batches(id);
 
 CREATE INDEX IF NOT EXISTS seller_payouts_batch_idx
-    ON commission_schema.seller_payouts(batch_id)
+    ON sellerpayout_schema.seller_payouts(batch_id)
     WHERE batch_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS seller_payouts_processing_idx
-    ON commission_schema.seller_payouts(status, last_attempt_at)
+    ON sellerpayout_schema.seller_payouts(status, last_attempt_at)
     WHERE status = 'processing';

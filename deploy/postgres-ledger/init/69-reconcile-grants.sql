@@ -29,6 +29,10 @@ GRANT USAGE ON SCHEMA cashback_schema TO reconcile_user;
 GRANT SELECT ON cashback_schema.payments        TO reconcile_user;
 GRANT SELECT ON cashback_schema.plans           TO reconcile_user;
 
--- commission_schema: SELECT only (for future Check 4/5 in Phase 5)
+-- commission_schema: USAGE only (kept for future Check 4/5 in Phase 5).
 GRANT USAGE ON SCHEMA commission_schema TO reconcile_user;
-GRANT SELECT ON commission_schema.seller_payouts TO reconcile_user;
+
+-- sellerpayout_schema: SELECT on seller_payouts (relocated here by the schema
+-- split; reconcile reads it for payout invariant checks).
+GRANT USAGE ON SCHEMA sellerpayout_schema TO reconcile_user;
+GRANT SELECT ON sellerpayout_schema.seller_payouts TO reconcile_user;

@@ -2,7 +2,7 @@ package sellerpayout
 
 import "time"
 
-// PayoutStatus enumerates valid commission_schema.seller_payouts.status values.
+// PayoutStatus enumerates valid sellerpayout_schema.seller_payouts.status values.
 type PayoutStatus string
 
 const (
@@ -14,7 +14,7 @@ const (
 	PayoutStatusReversed   PayoutStatus = "reversed"
 )
 
-// BatchStatus enumerates valid commission_schema.payout_batches.status values.
+// BatchStatus enumerates valid sellerpayout_schema.payout_batches.status values.
 type BatchStatus string
 
 const (
@@ -26,7 +26,7 @@ const (
 	BatchStatusCancelled  BatchStatus = "cancelled"
 )
 
-// Payout is the in-memory representation of commission_schema.seller_payouts.
+// Payout is the in-memory representation of sellerpayout_schema.seller_payouts.
 // amount_minor and unlock_at are IMMUTABLE once created (CLAUDE.md § 4.8).
 type Payout struct {
 	ID                  int64

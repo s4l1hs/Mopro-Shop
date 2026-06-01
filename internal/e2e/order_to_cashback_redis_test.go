@@ -199,7 +199,7 @@ func TestE2E_FullCheckoutToPayoutViaRedis(t *testing.T) { //nolint:gocyclo,cyclo
 		var unlockAt time.Time
 		err := ledgerPool.QueryRow(ctx,
 			`SELECT amount_minor, status, unlock_at
-			 FROM commission_schema.seller_payouts
+			 FROM sellerpayout_schema.seller_payouts
 			 WHERE order_id = $1 AND seller_id = $2`,
 			createdOrder.ID, sellerID,
 		).Scan(&amount, &status, &unlockAt)
@@ -252,7 +252,7 @@ func TestE2E_FullCheckoutToPayoutViaRedis(t *testing.T) { //nolint:gocyclo,cyclo
 
 	var payoutCount int
 	if err := ledgerPool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM commission_schema.seller_payouts WHERE order_id = $1`,
+		`SELECT COUNT(*) FROM sellerpayout_schema.seller_payouts WHERE order_id = $1`,
 		createdOrder.ID,
 	).Scan(&payoutCount); err != nil {
 		t.Fatalf("count payouts: %v", err)
