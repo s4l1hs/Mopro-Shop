@@ -106,6 +106,41 @@ Examples:
 
 `golangci-lint` (depguard rules in `.golangci.yml`) enforces the same rules at lint time.
 
+## Photo upload integration pattern
+
+Photo uploads are a **two-phase commit**: (1) `POST /uploads/photos` validates +
+stores the bytes and returns an orphan attachment row (`entity_id = NULL`); (2)
+the entity submission endpoint (review POST, return POST) accepts `photo_ids` and
+atomically attaches them inside its transaction (ownership-scoped, orphan-state
++ per-entity-limit checked). Orphans older than 24h are deleted by a cleanup job
+(Backlog). Form abandonment is clean — abandoned uploads disappear within the
+window.
+
+Server-side validation **never trusts the client `Content-Type`** — MIME is
+determined by magic-number sniffing (`http.DetectContentType`); dimensions by
+decoding the image header; size is capped before any storage write. Moderation +
+virus-scan are documented placeholder no-ops at the upload path; integrations
+slot in there without changing the upload contract.
+
+Storage is S3-compatible (`internal/storage`, B2 in prod / MinIO in dev) behind
+`STORAGE_ENABLED`. **Placement:** consumer-UGC photos for core-svc entities live
+in `internal/attachments` (core-svc, owns `attachments_schema`) — NOT
+`internal/media` (jobs-svc-only per CLAUDE.md §2.3, the product-image-resize
+pipeline). When a new upload concern appears, match the module to the binary that
+owns the entity, and give it its own schema (the boundary script keys on
+module↔schema). Precedent + rationale: ADR-0004.
+
+## Two-phase commit for cross-entity attachments
+
+Broader than photos: when an entity (review, return, support ticket) must
+reference data uploaded *before the entity exists*, use two-phase commit —
+(1) upload to an orphan table keyed by the uploading user, (2) atomically attach
+via the entity's submission endpoint (verify ownership + unattached state inside
+the tx), (3) clean up orphans on a schedule. The pattern survives form
+abandonment and avoids dangling references. Attach happens via the owning
+module's repository inside the submission tx (a `pgx.Tx` is threaded in), never a
+cross-schema write from the consumer module.
+
 ## Role-gated routes via redirect + snackbar
 
 Routes gated by a user role (seller, admin, moderator, …) follow one shape: a

@@ -19,6 +19,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/mopro/platform/internal/analytics"
+	"github.com/mopro/platform/internal/attachments"
 	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/eventbus"
@@ -44,6 +45,7 @@ import (
 	"github.com/mopro/platform/internal/shipping/hepsijet"
 	"github.com/mopro/platform/internal/shipping/mng"
 	"github.com/mopro/platform/internal/shipping/surat"
+	"github.com/mopro/platform/internal/storage"
 	"github.com/mopro/platform/internal/support"
 	"github.com/mopro/platform/pkg/logx"
 	"github.com/mopro/platform/pkg/metrics"
@@ -173,6 +175,17 @@ func main() {
 	// the catalog-side read surface used by the storefront + dashboard handlers.
 	sellerSvc := seller.NewService(seller.NewRepository(pool))
 	storefrontReader := catalog.NewStorefrontReader(pool)
+
+	// Media uploads (photos) — gated by STORAGE_ENABLED until an app bucket is
+	// provisioned (ADR-0004). When disabled, the upload route 503s and the
+	// consumer surfaces stay dormant.
+	var attachmentsSvc attachments.Service
+	if photoStore, perr := storage.New(initCtx); perr == nil {
+		attachmentsSvc = attachments.NewService(attachments.NewRepository(pool), photoStore)
+	} else if !errors.Is(perr, storage.ErrDisabled) {
+		slog.Error("media: storage init failed", "err", perr)
+	}
+	uploadLim := newUploadLimiter()
 
 	// Payment module wired before order so orderSvc can receive the PSP reference.
 	paymentRepo := payment.NewRepository(pool)
@@ -690,6 +703,13 @@ func main() {
 	)
 	mux.Handle("GET /seller/questions",
 		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleSellerQuestions(storefrontReader, ugcSvc))))),
+	)
+
+	// ── Media upload (photos) — auth-gated; 503 until STORAGE_ENABLED (ADR-0004) ─
+	mux.Handle("POST /uploads/photos",
+		httpTrace(requireAuth(http.HandlerFunc(
+			handleUploadPhoto(attachmentsSvc, storage.Enabled(), uploadLim),
+		))),
 	)
 
 	// ── Analytics pipeline (Tranche 4a) ─────────────────────────────────────────
