@@ -384,6 +384,48 @@ func (m *catalogMock) GetVariantByID(_ context.Context, _ int64) (catalog.Varian
 	return m.variant, nil
 }
 
+// E2E_MOCK: the discovery/reviews surface (Phase 4.4a+) that catalog.Service grew.
+// Stubs for interface compliance; no behavior asserted by current e2e scenarios.
+func (m *catalogMock) ListCategories(_ context.Context, _ string, _ int) ([]catalog.CategoryRow, error) {
+	return nil, nil
+}
+func (m *catalogMock) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return nil, 0, nil
+}
+func (m *catalogMock) SearchSummary(_ context.Context, _, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return nil, 0, nil
+}
+func (m *catalogMock) ListProductsByIDs(_ context.Context, _ []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {
+	return nil, nil
+}
+func (m *catalogMock) HomeRails(_ context.Context, _ string) ([]catalog.HomeRailRow, error) {
+	return nil, nil
+}
+func (m *catalogMock) HomeBanners(_ context.Context) ([]catalog.HomeBannerRow, error) {
+	return nil, nil
+}
+func (m *catalogMock) HomeMoodStories(_ context.Context) ([]catalog.HomeMoodStoryRow, error) {
+	return nil, nil
+}
+func (m *catalogMock) HomeFlashDeals(_ context.Context, _ string, _ *int64) (*catalog.FlashDealsResult, error) {
+	return nil, nil
+}
+func (m *catalogMock) ListReviews(_ context.Context, _ int64, _ catalog.ReviewSort, _, _ int, _ int64) ([]catalog.ProductReviewRow, int, error) {
+	return nil, 0, nil
+}
+func (m *catalogMock) ReviewsSummary(_ context.Context, _ int64) (catalog.ReviewsSummary, error) {
+	return catalog.ReviewsSummary{}, nil
+}
+func (m *catalogMock) ReviewProductID(_ context.Context, _ int64) (int64, error) {
+	return 0, nil
+}
+func (m *catalogMock) ToggleHelpfulVote(_ context.Context, _, _ int64) (catalog.HelpfulVoteResult, error) {
+	return catalog.HelpfulVoteResult{}, nil
+}
+func (m *catalogMock) ListAllVariantStocks(_ context.Context) ([]catalog.VariantStock, error) {
+	return nil, nil
+}
+
 type cartMock struct {
 	items []cart.CartItem
 }
@@ -399,6 +441,10 @@ func (m *cartMock) Reserve(_ context.Context, _ int64) (string, time.Time, error
 func (m *cartMock) Release(_ context.Context, _ string) error           { return nil }
 func (m *cartMock) CommitReservation(_ context.Context, _ string) error { return nil }
 func (m *cartMock) SeedStock(_ context.Context, _ int64, _ int) error   { return nil }
+
+// E2E_MOCK: cart.Service grew SeedStockIfAbsent (startup SET-NX). Stub for interface
+// compliance; no behavior asserted by current e2e scenarios.
+func (m *cartMock) SeedStockIfAbsent(_ context.Context, _ int64, _ int) error { return nil }
 
 // ── schema setup ─────────────────────────────────────────────────────────────
 
