@@ -53,6 +53,8 @@ import 'package:mopro/features/order/presentation/return_detail_screen.dart';
 import 'package:mopro/features/order/presentation/returns_list_screen.dart';
 import 'package:mopro/features/seller/data/seller_repository.dart';
 import 'package:mopro/features/seller/screens/seller_dashboard_screen.dart';
+import 'package:mopro/features/seller/screens/seller_question_detail_screen.dart';
+import 'package:mopro/features/seller/screens/seller_questions_inbox_screen.dart';
 import 'package:mopro/features/seller/screens/seller_return_detail_screen.dart';
 import 'package:mopro/features/seller/screens/seller_returns_inbox_screen.dart';
 import 'package:mopro/features/seller/screens/seller_storefront_screen.dart';
@@ -381,6 +383,39 @@ final routerProvider = Provider<GoRouter>((ref) {
                   : null,
             ),
             name: '$id',
+          );
+        },
+      ),
+      GoRoute(
+        path: '/seller/questions',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) => _titledLoc(
+          '/seller/questions',
+          SellerQuestionsInboxScreen(
+            initialUnanswered:
+                state.uri.queryParameters['unanswered'] != 'false',
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/seller/questions/:id',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '');
+          if (id == null || id <= 0) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => rootNavigatorKey.currentContext?.go('/seller/questions'),
+            );
+            return const SizedBox.shrink();
+          }
+          return _titledLoc(
+            '/seller/questions/$id',
+            SellerQuestionDetailScreen(
+              questionId: id,
+              initial: state.extra is SellerQuestion
+                  ? state.extra! as SellerQuestion
+                  : null,
+            ),
           );
         },
       ),
