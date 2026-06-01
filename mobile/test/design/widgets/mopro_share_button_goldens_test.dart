@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mopro/design/theme.dart';
 import 'package:mopro/design/widgets/mopro_share_button.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Baselines generated on Linux/CI via the golden-rebaseline workflow.
 
@@ -43,6 +44,7 @@ void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     GoogleFonts.config.allowRuntimeFetching = false;
+    SharedPreferences.setMockInitialValues(<String, Object>{});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/path_provider'),
