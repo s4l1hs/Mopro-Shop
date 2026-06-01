@@ -83,6 +83,14 @@ deletions. All scenarios migrate mechanically.
 5. CI runner (§5.3): check whether CI runs `make verify`; if not, the gate only fires locally →
    Backlog item.
 
-## §1.6 triggers fired during audit
+## §1.6 triggers fired
 
-None. 5 breakage classes (< 10), all mechanically migratable, no scenario gaps. Default single-PR ships.
+- **At audit (compile) time: none.** 5 compile-breakage classes (< 10), all mechanically migratable.
+- **During execution: trigger #2 fired.** Compile-green ≠ runtime-green — running the suite
+  surfaced a deeper second front the static audit could not see: hand-rolled schema drift
+  (orders `seller_id`; ledger `plans` missing 7 v8 columns), a concurrent-map race in the dlq
+  property test, a stale v6 assertion, and DLQ timing flakiness. Surfaced to the user with
+  concrete data; user chose **"go deeper in this PR"** (apply real ledger migrations + de-flake).
+  Outcome: ledger hand-rolled DDL replaced with real init+migrations; ecom real-migration switch
+  **deferred to Backlog** (blocked by a pre-existing init-vs-0078 `sellers` schema divergence);
+  flaky DLQ property test skip-guarded (`REVIVAL_GAP`) + Backlogged. See REPORT.md "E2e Revival PR".
