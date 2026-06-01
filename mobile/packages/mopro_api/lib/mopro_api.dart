@@ -75,6 +75,7 @@ export 'package:mopro_api/src/model/return_request.dart';
 export 'package:mopro_api/src/model/return_request_items_inner.dart';
 export 'package:mopro_api/src/model/search_suggest200_response.dart';
 export 'package:mopro_api/src/model/search_trending200_response.dart';
+export 'package:mopro_api/src/model/seller_binding.dart';
 export 'package:mopro_api/src/model/seller_order_breakdown.dart';
 export 'package:mopro_api/src/model/seller_order_breakdown_items_inner.dart';
 export 'package:mopro_api/src/model/seller_order_breakdown_totals.dart';

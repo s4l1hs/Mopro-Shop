@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/core/di/providers.dart';
+import 'package:mopro_api/mopro_api.dart';
 
 /// View-model for the authed user's identity, exposed for menu headers,
 /// profile chrome, and anywhere else the display name / email is shown.
@@ -17,9 +18,14 @@ class CurrentUser {
     required this.displayName,
     this.email,
     this.avatarUrl,
+    this.sellerBinding,
   });
 
   final int id;
+
+  /// The user's seller-account binding from `/me`, or null when not a seller.
+  /// Drives `userIsSellerProvider` + the seller dashboard. (Tranche 5 seller UI.)
+  final SellerBinding? sellerBinding;
 
   /// Computed: `name_first + ' ' + name_last` when both present, else
   /// `name_first`, else local-part of the email, else null.
@@ -73,6 +79,7 @@ final currentUserProvider = FutureProvider<CurrentUser?>((ref) async {
       id: user.id,
       displayName: name,
       email: user.email,
+      sellerBinding: user.sellerBinding,
     );
   } on DioException {
     // Network errors surface as AsyncError; UI shows fallback header.

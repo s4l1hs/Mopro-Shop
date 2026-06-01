@@ -159,119 +159,119 @@ hand-registered route, whether the same method+path is declared in
 
 | Method | Path | Service | File:Line | In OpenAPI |
 |---|---|---|---|---|
-| POST | `/auth/register` | core-svc | `cmd/core-svc/auth_handlers.go:33` | no |
-| POST | `/auth/login` | core-svc | `cmd/core-svc/auth_handlers.go:36` | no |
-| POST | `/auth/verify-email` | core-svc | `cmd/core-svc/auth_handlers.go:40` | no |
-| POST | `/auth/resend-verification` | core-svc | `cmd/core-svc/auth_handlers.go:43` | no |
-| POST | `/auth/forgot-password` | core-svc | `cmd/core-svc/auth_handlers.go:46` | no |
-| POST | `/auth/reset-password` | core-svc | `cmd/core-svc/auth_handlers.go:49` | no |
-| POST | `/auth/mfa/verify` | core-svc | `cmd/core-svc/auth_handlers.go:52` | no |
-| POST | `/auth/otp/request` | core-svc | `cmd/core-svc/auth_handlers.go:56` | yes |
-| POST | `/auth/otp/verify` | core-svc | `cmd/core-svc/auth_handlers.go:59` | yes |
-| POST | `/auth/token/refresh` | core-svc | `cmd/core-svc/auth_handlers.go:62` | yes |
-| POST | `/auth/logout` | core-svc | `cmd/core-svc/auth_handlers.go:67` | yes |
-| POST | `/auth/mfa/enroll` | core-svc | `cmd/core-svc/auth_handlers.go:70` | no |
-| POST | `/auth/mfa/confirm` | core-svc | `cmd/core-svc/auth_handlers.go:73` | no |
-| DELETE | `/auth/mfa` | core-svc | `cmd/core-svc/auth_handlers.go:76` | no |
-| GET | `/me` | core-svc | `cmd/core-svc/auth_handlers.go:79` | yes |
-| PATCH | `/me` | core-svc | `cmd/core-svc/auth_handlers.go:82` | yes |
-| POST | `/me/password` | core-svc | `cmd/core-svc/auth_handlers.go:85` | yes |
-| DELETE | `/me` | core-svc | `cmd/core-svc/auth_handlers.go:88` | yes |
-| POST | `/auth/step-up/request` | core-svc | `cmd/core-svc/auth_handlers.go:91` | no |
-| POST | `/auth/step-up/verify` | core-svc | `cmd/core-svc/auth_handlers.go:94` | no |
-| POST | `/me/devices` | core-svc | `cmd/core-svc/auth_handlers.go:97` | yes |
+| POST | `/auth/register` | core-svc | `cmd/core-svc/auth_handlers.go:52` | no |
+| POST | `/auth/login` | core-svc | `cmd/core-svc/auth_handlers.go:55` | no |
+| POST | `/auth/verify-email` | core-svc | `cmd/core-svc/auth_handlers.go:59` | no |
+| POST | `/auth/resend-verification` | core-svc | `cmd/core-svc/auth_handlers.go:62` | no |
+| POST | `/auth/forgot-password` | core-svc | `cmd/core-svc/auth_handlers.go:65` | no |
+| POST | `/auth/reset-password` | core-svc | `cmd/core-svc/auth_handlers.go:68` | no |
+| POST | `/auth/mfa/verify` | core-svc | `cmd/core-svc/auth_handlers.go:71` | no |
+| POST | `/auth/otp/request` | core-svc | `cmd/core-svc/auth_handlers.go:75` | yes |
+| POST | `/auth/otp/verify` | core-svc | `cmd/core-svc/auth_handlers.go:78` | yes |
+| POST | `/auth/token/refresh` | core-svc | `cmd/core-svc/auth_handlers.go:81` | yes |
+| POST | `/auth/logout` | core-svc | `cmd/core-svc/auth_handlers.go:86` | yes |
+| POST | `/auth/mfa/enroll` | core-svc | `cmd/core-svc/auth_handlers.go:89` | no |
+| POST | `/auth/mfa/confirm` | core-svc | `cmd/core-svc/auth_handlers.go:92` | no |
+| DELETE | `/auth/mfa` | core-svc | `cmd/core-svc/auth_handlers.go:95` | no |
+| GET | `/me` | core-svc | `cmd/core-svc/auth_handlers.go:98` | yes |
+| PATCH | `/me` | core-svc | `cmd/core-svc/auth_handlers.go:101` | yes |
+| POST | `/me/password` | core-svc | `cmd/core-svc/auth_handlers.go:104` | yes |
+| DELETE | `/me` | core-svc | `cmd/core-svc/auth_handlers.go:107` | yes |
+| POST | `/auth/step-up/request` | core-svc | `cmd/core-svc/auth_handlers.go:110` | no |
+| POST | `/auth/step-up/verify` | core-svc | `cmd/core-svc/auth_handlers.go:113` | no |
+| POST | `/me/devices` | core-svc | `cmd/core-svc/auth_handlers.go:116` | yes |
 | GET | `/healthz` | core-svc | `cmd/core-svc/main.go:368` | yes |
 | GET | `/__version` | core-svc | `cmd/core-svc/main.go:371` | no |
 | GET | `/sitemap.xml` | core-svc | `cmd/core-svc/main.go:374` | no |
 | GET | `/robots.txt` | core-svc | `cmd/core-svc/main.go:381` | no |
-| GET | `/dev/email-code` | core-svc | `cmd/core-svc/main.go:404` | no |
-| POST | `/products` | core-svc | `cmd/core-svc/main.go:420` | yes |
-| GET | `/products` | core-svc | `cmd/core-svc/main.go:423` | yes |
-| GET | `/products/{id}` | core-svc | `cmd/core-svc/main.go:426` | yes |
-| POST | `/products/{id}/variants` | core-svc | `cmd/core-svc/main.go:429` | no |
-| PUT | `/products/{id}/translations/{locale}` | core-svc | `cmd/core-svc/main.go:432` | no |
-| GET | `/categories` | core-svc | `cmd/core-svc/main.go:435` | yes |
-| GET | `/categories/{id}/commission` | core-svc | `cmd/core-svc/main.go:438` | yes |
-| GET | `/search` | core-svc | `cmd/core-svc/main.go:441` | yes |
-| GET | `/banners` | core-svc | `cmd/core-svc/main.go:444` | yes |
-| GET | `/recommendations` | core-svc | `cmd/core-svc/main.go:447` | yes |
-| GET | `/home/banners` | core-svc | `cmd/core-svc/main.go:452` | no |
-| GET | `/home/rails` | core-svc | `cmd/core-svc/main.go:455` | no |
-| GET | `/home/stories` | core-svc | `cmd/core-svc/main.go:458` | no |
-| GET | `/home/flash-deals` | core-svc | `cmd/core-svc/main.go:461` | no |
-| POST | `/products/batch` | core-svc | `cmd/core-svc/main.go:464` | no |
-| GET | `/products/{id}/reviews` | core-svc | `cmd/core-svc/main.go:468` | no |
-| POST | `/products/{id}/reviews/{reviewId}/helpful` | core-svc | `cmd/core-svc/main.go:472` | no |
-| GET | `/search/trending` | core-svc | `cmd/core-svc/main.go:475` | yes |
-| POST | `/favorites/sync` | core-svc | `cmd/core-svc/main.go:478` | no |
-| POST | `/cart/merge` | core-svc | `cmd/core-svc/main.go:482` | no |
-| GET | `/addresses` | core-svc | `cmd/core-svc/main.go:508` | yes |
-| POST | `/addresses` | core-svc | `cmd/core-svc/main.go:511` | yes |
-| GET | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:514` | no |
-| PUT | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:517` | yes |
-| DELETE | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:520` | yes |
-| POST | `/cart/items` | core-svc | `cmd/core-svc/main.go:525` | yes |
-| DELETE | `/cart/items/{variant_id}` | core-svc | `cmd/core-svc/main.go:528` | yes |
-| GET | `/cart` | core-svc | `cmd/core-svc/main.go:531` | yes |
-| POST | `/cart/reserve` | core-svc | `cmd/core-svc/main.go:534` | yes |
-| POST | `/cart/release` | core-svc | `cmd/core-svc/main.go:537` | yes |
-| POST | `/checkout/initiate` | core-svc | `cmd/core-svc/main.go:542` | no |
-| POST | `/orders` | core-svc | `cmd/core-svc/main.go:552` | yes |
-| GET | `/orders/{id}` | core-svc | `cmd/core-svc/main.go:555` | yes |
-| GET | `/orders` | core-svc | `cmd/core-svc/main.go:558` | yes |
-| POST | `/orders/{id}/status` | core-svc | `cmd/core-svc/main.go:561` | no |
-| POST | `/orders/{id}/deliver` | core-svc | `cmd/core-svc/main.go:564` | no |
-| POST | `/orders/{id}/cancel` | core-svc | `cmd/core-svc/main.go:567` | yes |
-| POST | `/orders/{id}/refund` | core-svc | `cmd/core-svc/main.go:570` | yes |
-| POST | `/orders/{id}/returns` | core-svc | `cmd/core-svc/main.go:573` | yes |
-| GET | `/returns` | core-svc | `cmd/core-svc/main.go:576` | no |
-| GET | `/returns/{id}` | core-svc | `cmd/core-svc/main.go:579` | no |
-| GET | `/notifications` | core-svc | `cmd/core-svc/main.go:583` | no |
-| GET | `/notifications/unread-count` | core-svc | `cmd/core-svc/main.go:586` | no |
-| POST | `/notifications/{id}/read` | core-svc | `cmd/core-svc/main.go:589` | no |
-| POST | `/notifications/read-all` | core-svc | `cmd/core-svc/main.go:592` | no |
-| GET | `/notifications/preferences` | core-svc | `cmd/core-svc/main.go:595` | no |
-| PUT | `/notifications/preferences` | core-svc | `cmd/core-svc/main.go:598` | no |
-| POST | `/push-tokens` | core-svc | `cmd/core-svc/main.go:601` | no |
-| DELETE | `/push-tokens` | core-svc | `cmd/core-svc/main.go:604` | no |
-| GET | `/help/categories` | core-svc | `cmd/core-svc/main.go:608` | no |
-| GET | `/help/categories/{slug}/articles` | core-svc | `cmd/core-svc/main.go:611` | no |
-| GET | `/help/articles/{slug}` | core-svc | `cmd/core-svc/main.go:614` | no |
-| GET | `/help/search` | core-svc | `cmd/core-svc/main.go:617` | no |
-| POST | `/support/tickets` | core-svc | `cmd/core-svc/main.go:621` | no |
-| GET | `/support/tickets` | core-svc | `cmd/core-svc/main.go:624` | no |
-| GET | `/support/tickets/{id}` | core-svc | `cmd/core-svc/main.go:627` | no |
-| POST | `/products/{productId}/reviews` | core-svc | `cmd/core-svc/main.go:631` | no |
-| PUT | `/products/{productId}/reviews/{reviewId}` | core-svc | `cmd/core-svc/main.go:634` | no |
-| DELETE | `/products/{productId}/reviews/{reviewId}` | core-svc | `cmd/core-svc/main.go:637` | no |
-| GET | `/me/reviews` | core-svc | `cmd/core-svc/main.go:640` | no |
-| GET | `/products/{id}/review-eligibility` | core-svc | `cmd/core-svc/main.go:643` | no |
-| POST | `/products/{productId}/questions` | core-svc | `cmd/core-svc/main.go:647` | no |
-| GET | `/products/{productId}/questions` | core-svc | `cmd/core-svc/main.go:650` | no |
-| GET | `/products/{productId}/questions/{questionId}` | core-svc | `cmd/core-svc/main.go:653` | no |
-| POST | `/products/{productId}/questions/{questionId}/answers` | core-svc | `cmd/core-svc/main.go:656` | no |
-| GET | `/me/questions` | core-svc | `cmd/core-svc/main.go:659` | no |
-| GET | `/sellers/{slug}` | core-svc | `cmd/core-svc/main.go:664` | no |
-| GET | `/sellers/{slug}/products` | core-svc | `cmd/core-svc/main.go:667` | no |
-| GET | `/sellers/{slug}/reviews` | core-svc | `cmd/core-svc/main.go:670` | no |
-| GET | `/seller/returns` | core-svc | `cmd/core-svc/main.go:673` | no |
-| POST | `/seller/returns/{id}/approve` | core-svc | `cmd/core-svc/main.go:676` | no |
-| POST | `/seller/returns/{id}/reject` | core-svc | `cmd/core-svc/main.go:679` | no |
-| GET | `/seller/questions` | core-svc | `cmd/core-svc/main.go:682` | no |
-| POST | `/analytics/events` | core-svc | `cmd/core-svc/main.go:688` | no |
-| POST | `/analytics/sessions/identify` | core-svc | `cmd/core-svc/main.go:691` | no |
-| GET | `/me/consent` | core-svc | `cmd/core-svc/main.go:694` | no |
-| PUT | `/me/consent` | core-svc | `cmd/core-svc/main.go:697` | no |
-| DELETE | `/me/analytics-data` | core-svc | `cmd/core-svc/main.go:700` | no |
-| GET | `/me/recently-viewed` | core-svc | `cmd/core-svc/main.go:703` | no |
-| GET | `/seller/orders/{id}/breakdown` | core-svc | `cmd/core-svc/main.go:709` | yes |
-| POST | `/payments` | core-svc | `cmd/core-svc/main.go:714` | no |
-| GET | `/payments/{provider_ref}/status` | core-svc | `cmd/core-svc/main.go:717` | no |
-| GET | `/payments/{invoiceID}/intent-status` | core-svc | `cmd/core-svc/main.go:721` | no |
-| POST | `/payments/webhook/sipay` | core-svc | `cmd/core-svc/main.go:726` | no |
-| POST | `/shipping/webhook/surat` | core-svc | `cmd/core-svc/main.go:731` | no |
-| POST | `/shipping/webhook/mng` | core-svc | `cmd/core-svc/main.go:734` | no |
-| POST | `/shipping/webhook/hepsijet` | core-svc | `cmd/core-svc/main.go:737` | no |
+| GET | `/dev/email-code` | core-svc | `cmd/core-svc/main.go:413` | no |
+| POST | `/products` | core-svc | `cmd/core-svc/main.go:429` | yes |
+| GET | `/products` | core-svc | `cmd/core-svc/main.go:432` | yes |
+| GET | `/products/{id}` | core-svc | `cmd/core-svc/main.go:435` | yes |
+| POST | `/products/{id}/variants` | core-svc | `cmd/core-svc/main.go:438` | no |
+| PUT | `/products/{id}/translations/{locale}` | core-svc | `cmd/core-svc/main.go:441` | no |
+| GET | `/categories` | core-svc | `cmd/core-svc/main.go:444` | yes |
+| GET | `/categories/{id}/commission` | core-svc | `cmd/core-svc/main.go:447` | yes |
+| GET | `/search` | core-svc | `cmd/core-svc/main.go:450` | yes |
+| GET | `/banners` | core-svc | `cmd/core-svc/main.go:453` | yes |
+| GET | `/recommendations` | core-svc | `cmd/core-svc/main.go:456` | yes |
+| GET | `/home/banners` | core-svc | `cmd/core-svc/main.go:461` | no |
+| GET | `/home/rails` | core-svc | `cmd/core-svc/main.go:464` | no |
+| GET | `/home/stories` | core-svc | `cmd/core-svc/main.go:467` | no |
+| GET | `/home/flash-deals` | core-svc | `cmd/core-svc/main.go:470` | no |
+| POST | `/products/batch` | core-svc | `cmd/core-svc/main.go:473` | no |
+| GET | `/products/{id}/reviews` | core-svc | `cmd/core-svc/main.go:477` | no |
+| POST | `/products/{id}/reviews/{reviewId}/helpful` | core-svc | `cmd/core-svc/main.go:481` | no |
+| GET | `/search/trending` | core-svc | `cmd/core-svc/main.go:484` | yes |
+| POST | `/favorites/sync` | core-svc | `cmd/core-svc/main.go:487` | no |
+| POST | `/cart/merge` | core-svc | `cmd/core-svc/main.go:491` | no |
+| GET | `/addresses` | core-svc | `cmd/core-svc/main.go:517` | yes |
+| POST | `/addresses` | core-svc | `cmd/core-svc/main.go:520` | yes |
+| GET | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:523` | no |
+| PUT | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:526` | yes |
+| DELETE | `/addresses/{id}` | core-svc | `cmd/core-svc/main.go:529` | yes |
+| POST | `/cart/items` | core-svc | `cmd/core-svc/main.go:534` | yes |
+| DELETE | `/cart/items/{variant_id}` | core-svc | `cmd/core-svc/main.go:537` | yes |
+| GET | `/cart` | core-svc | `cmd/core-svc/main.go:540` | yes |
+| POST | `/cart/reserve` | core-svc | `cmd/core-svc/main.go:543` | yes |
+| POST | `/cart/release` | core-svc | `cmd/core-svc/main.go:546` | yes |
+| POST | `/checkout/initiate` | core-svc | `cmd/core-svc/main.go:551` | no |
+| POST | `/orders` | core-svc | `cmd/core-svc/main.go:561` | yes |
+| GET | `/orders/{id}` | core-svc | `cmd/core-svc/main.go:564` | yes |
+| GET | `/orders` | core-svc | `cmd/core-svc/main.go:567` | yes |
+| POST | `/orders/{id}/status` | core-svc | `cmd/core-svc/main.go:570` | no |
+| POST | `/orders/{id}/deliver` | core-svc | `cmd/core-svc/main.go:573` | no |
+| POST | `/orders/{id}/cancel` | core-svc | `cmd/core-svc/main.go:576` | yes |
+| POST | `/orders/{id}/refund` | core-svc | `cmd/core-svc/main.go:579` | yes |
+| POST | `/orders/{id}/returns` | core-svc | `cmd/core-svc/main.go:582` | yes |
+| GET | `/returns` | core-svc | `cmd/core-svc/main.go:585` | no |
+| GET | `/returns/{id}` | core-svc | `cmd/core-svc/main.go:588` | no |
+| GET | `/notifications` | core-svc | `cmd/core-svc/main.go:592` | no |
+| GET | `/notifications/unread-count` | core-svc | `cmd/core-svc/main.go:595` | no |
+| POST | `/notifications/{id}/read` | core-svc | `cmd/core-svc/main.go:598` | no |
+| POST | `/notifications/read-all` | core-svc | `cmd/core-svc/main.go:601` | no |
+| GET | `/notifications/preferences` | core-svc | `cmd/core-svc/main.go:604` | no |
+| PUT | `/notifications/preferences` | core-svc | `cmd/core-svc/main.go:607` | no |
+| POST | `/push-tokens` | core-svc | `cmd/core-svc/main.go:610` | no |
+| DELETE | `/push-tokens` | core-svc | `cmd/core-svc/main.go:613` | no |
+| GET | `/help/categories` | core-svc | `cmd/core-svc/main.go:617` | no |
+| GET | `/help/categories/{slug}/articles` | core-svc | `cmd/core-svc/main.go:620` | no |
+| GET | `/help/articles/{slug}` | core-svc | `cmd/core-svc/main.go:623` | no |
+| GET | `/help/search` | core-svc | `cmd/core-svc/main.go:626` | no |
+| POST | `/support/tickets` | core-svc | `cmd/core-svc/main.go:630` | no |
+| GET | `/support/tickets` | core-svc | `cmd/core-svc/main.go:633` | no |
+| GET | `/support/tickets/{id}` | core-svc | `cmd/core-svc/main.go:636` | no |
+| POST | `/products/{productId}/reviews` | core-svc | `cmd/core-svc/main.go:640` | no |
+| PUT | `/products/{productId}/reviews/{reviewId}` | core-svc | `cmd/core-svc/main.go:643` | no |
+| DELETE | `/products/{productId}/reviews/{reviewId}` | core-svc | `cmd/core-svc/main.go:646` | no |
+| GET | `/me/reviews` | core-svc | `cmd/core-svc/main.go:649` | no |
+| GET | `/products/{id}/review-eligibility` | core-svc | `cmd/core-svc/main.go:652` | no |
+| POST | `/products/{productId}/questions` | core-svc | `cmd/core-svc/main.go:656` | no |
+| GET | `/products/{productId}/questions` | core-svc | `cmd/core-svc/main.go:659` | no |
+| GET | `/products/{productId}/questions/{questionId}` | core-svc | `cmd/core-svc/main.go:662` | no |
+| POST | `/products/{productId}/questions/{questionId}/answers` | core-svc | `cmd/core-svc/main.go:665` | no |
+| GET | `/me/questions` | core-svc | `cmd/core-svc/main.go:668` | no |
+| GET | `/sellers/{slug}` | core-svc | `cmd/core-svc/main.go:673` | no |
+| GET | `/sellers/{slug}/products` | core-svc | `cmd/core-svc/main.go:676` | no |
+| GET | `/sellers/{slug}/reviews` | core-svc | `cmd/core-svc/main.go:679` | no |
+| GET | `/seller/returns` | core-svc | `cmd/core-svc/main.go:682` | no |
+| POST | `/seller/returns/{id}/approve` | core-svc | `cmd/core-svc/main.go:685` | no |
+| POST | `/seller/returns/{id}/reject` | core-svc | `cmd/core-svc/main.go:688` | no |
+| GET | `/seller/questions` | core-svc | `cmd/core-svc/main.go:691` | no |
+| POST | `/analytics/events` | core-svc | `cmd/core-svc/main.go:697` | no |
+| POST | `/analytics/sessions/identify` | core-svc | `cmd/core-svc/main.go:700` | no |
+| GET | `/me/consent` | core-svc | `cmd/core-svc/main.go:703` | no |
+| PUT | `/me/consent` | core-svc | `cmd/core-svc/main.go:706` | no |
+| DELETE | `/me/analytics-data` | core-svc | `cmd/core-svc/main.go:709` | no |
+| GET | `/me/recently-viewed` | core-svc | `cmd/core-svc/main.go:712` | no |
+| GET | `/seller/orders/{id}/breakdown` | core-svc | `cmd/core-svc/main.go:718` | yes |
+| POST | `/payments` | core-svc | `cmd/core-svc/main.go:723` | no |
+| GET | `/payments/{provider_ref}/status` | core-svc | `cmd/core-svc/main.go:726` | no |
+| GET | `/payments/{invoiceID}/intent-status` | core-svc | `cmd/core-svc/main.go:730` | no |
+| POST | `/payments/webhook/sipay` | core-svc | `cmd/core-svc/main.go:735` | no |
+| POST | `/shipping/webhook/surat` | core-svc | `cmd/core-svc/main.go:740` | no |
+| POST | `/shipping/webhook/mng` | core-svc | `cmd/core-svc/main.go:743` | no |
+| POST | `/shipping/webhook/hepsijet` | core-svc | `cmd/core-svc/main.go:746` | no |
 
 ### B. OpenAPI operation catalogue (`api/openapi.yaml`)
 
@@ -400,55 +400,60 @@ guess, shell membership). Tab titles resolve through `moproPageTitle` (PR #20).
 <!-- BEGIN:gen:routes -->
 | Path | Source | Screen (guess) | Shell |
 |---|---|---|---|
-| `/splash` | `app_router.dart:223` | SplashScreen | — |
-| `/auth/login` | `app_router.dart:228` | SignInScreen | — |
-| `/auth/register` | `app_router.dart:232` | SignUpScreen | — |
-| `/auth/verify-email` | `app_router.dart:236` | EmailVerifyScreen | — |
-| `/auth/forgot-password` | `app_router.dart:242` | ForgotPasswordScreen | — |
-| `/auth/mfa` | `app_router.dart:246` | MFAChallengeScreen | — |
-| `/auth/profile` | `app_router.dart:256` | ProfileCompletionScreen | — |
-| `/search` | `app_router.dart:260` | SearchScreen | — |
-| `/products/:id` | `app_router.dart:269` | (builder) | — |
-| `/sellers/:slug` | `app_router.dart:288` | (builder) | — |
-| `/products/:id/questions` | `app_router.dart:304` | (builder) | — |
-| `:qid` | `app_router.dart:322` | (builder) | — |
-| `/orders/:id/return` | `app_router.dart:344` | (builder) | — |
-| `/categories/:id` | `app_router.dart:365` | (builder) | — |
-| `/checkout` | `app_router.dart:382` | CheckoutAddressScreen | — |
-| `payment` | `app_router.dart:387` | CheckoutPaymentScreen | — |
-| `review` | `app_router.dart:391` | CheckoutReviewScreen | — |
-| `redirect` | `app_router.dart:395` | CheckoutRedirectScreen | — |
-| `result` | `app_router.dart:402` | CheckoutResultScreen | — |
-| `/account/profile` | `app_router.dart:426` | AccountProfileScreen | ShellRoute |
-| `/account/security` | `app_router.dart:430` | SecurityScreen | ShellRoute |
-| `/account/cards` | `app_router.dart:434` | CardsScreen | ShellRoute |
-| `/account/reviews` | `app_router.dart:438` | MyReviewsScreen | ShellRoute |
-| `/account/questions` | `app_router.dart:442` | MyQuestionsScreen | ShellRoute |
-| `/account/privacy` | `app_router.dart:446` | PrivacySettingsScreen | ShellRoute |
-| `/account/browsing-history` | `app_router.dart:450` | BrowsingHistoryScreen | ShellRoute |
-| `/account/notifications` | `app_router.dart:454` | NotificationsScreen | ShellRoute |
-| `preferences` | `app_router.dart:458` | NotificationPreferencesScreen | ShellRoute |
-| `/help` | `app_router.dart:464` | HelpIndexScreen | ShellRoute |
-| `category/:slug` | `app_router.dart:468` | HelpCategoryScreen | ShellRoute |
-| `article/:slug` | `app_router.dart:473` | HelpArticleScreen | ShellRoute |
-| `search` | `app_router.dart:478` | HelpSearchScreen | ShellRoute |
-| `contact` | `app_router.dart:484` | ContactFormScreen | ShellRoute |
-| `/orders` | `app_router.dart:496` | OrderHistoryScreen | ShellRoute |
-| `:id` | `app_router.dart:500` | (builder) | ShellRoute |
-| `/returns` | `app_router.dart:516` | ReturnsListScreen | ShellRoute |
-| `:id` | `app_router.dart:520` | (builder) | ShellRoute |
-| `/wallet` | `app_router.dart:536` | WalletScreen | ShellRoute |
-| `plans/:id` | `app_router.dart:540` | (builder) | ShellRoute |
-| `/profile/addresses` | `app_router.dart:556` | AddressListScreen | ShellRoute |
-| `new` | `app_router.dart:560` | AddressFormScreen | ShellRoute |
-| `:id/edit` | `app_router.dart:564` | AddressFormScreen | ShellRoute |
-| `/` | `app_router.dart:584` | CatalogHomeScreen | StatefulShellRoute |
-| `/categories` | `app_router.dart:594` | CategoryScreen | StatefulShellRoute |
-| `/favorites` | `app_router.dart:604` | FavoritesScreen | StatefulShellRoute |
-| `/cart` | `app_router.dart:614` | CartScreen | StatefulShellRoute |
-| `/account` | `app_router.dart:624` | AccountScreen | StatefulShellRoute |
+| `/splash` | `app_router.dart:271` | SplashScreen | — |
+| `/auth/login` | `app_router.dart:276` | SignInScreen | — |
+| `/auth/register` | `app_router.dart:280` | SignUpScreen | — |
+| `/auth/verify-email` | `app_router.dart:284` | EmailVerifyScreen | — |
+| `/auth/forgot-password` | `app_router.dart:290` | ForgotPasswordScreen | — |
+| `/auth/mfa` | `app_router.dart:294` | MFAChallengeScreen | — |
+| `/auth/profile` | `app_router.dart:304` | ProfileCompletionScreen | — |
+| `/search` | `app_router.dart:308` | SearchScreen | — |
+| `/products/:id` | `app_router.dart:317` | (builder) | — |
+| `/sellers/:slug` | `app_router.dart:336` | (builder) | — |
+| `/seller/dashboard` | `app_router.dart:351` | SellerDashboardScreen | — |
+| `/seller/returns` | `app_router.dart:357` | SellerReturnsInboxScreen | — |
+| `/seller/returns/:id` | `app_router.dart:367` | (builder) | — |
+| `/seller/questions` | `app_router.dart:390` | SellerQuestionsInboxScreen | — |
+| `/seller/questions/:id` | `app_router.dart:401` | (builder) | — |
+| `/products/:id/questions` | `app_router.dart:425` | (builder) | — |
+| `:qid` | `app_router.dart:443` | (builder) | — |
+| `/orders/:id/return` | `app_router.dart:465` | (builder) | — |
+| `/categories/:id` | `app_router.dart:486` | (builder) | — |
+| `/checkout` | `app_router.dart:503` | CheckoutAddressScreen | — |
+| `payment` | `app_router.dart:508` | CheckoutPaymentScreen | — |
+| `review` | `app_router.dart:512` | CheckoutReviewScreen | — |
+| `redirect` | `app_router.dart:516` | CheckoutRedirectScreen | — |
+| `result` | `app_router.dart:523` | CheckoutResultScreen | — |
+| `/account/profile` | `app_router.dart:547` | AccountProfileScreen | ShellRoute |
+| `/account/security` | `app_router.dart:551` | SecurityScreen | ShellRoute |
+| `/account/cards` | `app_router.dart:555` | CardsScreen | ShellRoute |
+| `/account/reviews` | `app_router.dart:559` | MyReviewsScreen | ShellRoute |
+| `/account/questions` | `app_router.dart:563` | MyQuestionsScreen | ShellRoute |
+| `/account/privacy` | `app_router.dart:567` | PrivacySettingsScreen | ShellRoute |
+| `/account/browsing-history` | `app_router.dart:571` | BrowsingHistoryScreen | ShellRoute |
+| `/account/notifications` | `app_router.dart:575` | NotificationsScreen | ShellRoute |
+| `preferences` | `app_router.dart:579` | NotificationPreferencesScreen | ShellRoute |
+| `/help` | `app_router.dart:585` | HelpIndexScreen | ShellRoute |
+| `category/:slug` | `app_router.dart:589` | HelpCategoryScreen | ShellRoute |
+| `article/:slug` | `app_router.dart:594` | HelpArticleScreen | ShellRoute |
+| `search` | `app_router.dart:599` | HelpSearchScreen | ShellRoute |
+| `contact` | `app_router.dart:605` | ContactFormScreen | ShellRoute |
+| `/orders` | `app_router.dart:617` | OrderHistoryScreen | ShellRoute |
+| `:id` | `app_router.dart:621` | (builder) | ShellRoute |
+| `/returns` | `app_router.dart:637` | ReturnsListScreen | ShellRoute |
+| `:id` | `app_router.dart:641` | (builder) | ShellRoute |
+| `/wallet` | `app_router.dart:657` | WalletScreen | ShellRoute |
+| `plans/:id` | `app_router.dart:661` | (builder) | ShellRoute |
+| `/profile/addresses` | `app_router.dart:677` | AddressListScreen | ShellRoute |
+| `new` | `app_router.dart:681` | AddressFormScreen | ShellRoute |
+| `:id/edit` | `app_router.dart:685` | AddressFormScreen | ShellRoute |
+| `/` | `app_router.dart:705` | CatalogHomeScreen | StatefulShellRoute |
+| `/categories` | `app_router.dart:715` | CategoryScreen | StatefulShellRoute |
+| `/favorites` | `app_router.dart:725` | FavoritesScreen | StatefulShellRoute |
+| `/cart` | `app_router.dart:735` | CartScreen | StatefulShellRoute |
+| `/account` | `app_router.dart:745` | AccountScreen | StatefulShellRoute |
 
-_Total: 47 route declarations._
+_Total: 52 route declarations._
 <!-- END:gen:routes -->
 
 Notable: `/account/notifications` and `/help` both resolve to
@@ -498,7 +503,8 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `catalogApiProvider` | `Provider` | `mobile/lib/api/client.dart:16` |
 | `categoryTreeProvider` | `Provider` | `mobile/lib/features/catalog/providers/category_tree_provider.dart:29` |
 | `checkoutRepositoryProvider` | `Provider` | `mobile/lib/features/checkout/application/checkout_controller.dart:13` |
-| `currentUserProvider` | `FutureProvider` | `mobile/lib/features/account/current_user_provider.dart:49` |
+| `currentSellerBindingProvider` | `Provider` | `mobile/lib/features/seller/user_is_seller_provider.dart:16` |
+| `currentUserProvider` | `FutureProvider` | `mobile/lib/features/account/current_user_provider.dart:55` |
 | `dioProvider` | `Provider` | `mobile/lib/core/di/providers.dart:57` |
 | `guestCartCountProvider` | `Provider` | `mobile/lib/features/cart/application/guest_cart_provider.dart:115` |
 | `helpCategoriesProvider` | `FutureProvider` | `mobile/lib/features/help/application/help_providers.dart:6` |
@@ -513,6 +519,7 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `notificationsProvider` | `NotifierProviderFamily` | `mobile/lib/features/notifications/application/notifications_provider.dart:88` |
 | `orderRepositoryProvider` | `Provider` | `mobile/lib/features/order/application/orders_provider.dart:13` |
 | `ordersApiProvider` | `Provider` | `mobile/lib/api/client.dart:32` |
+| `pendingSnackbarProvider` | `StateProvider` | `mobile/lib/core/router/app_router.dart:208` |
 | `planDetailProvider` | `AutoDisposeNotifierProviderFamily` | `mobile/lib/features/wallet/providers/plan_detail_provider.dart:51` |
 | `productsByCategoryProvider` | `NotifierProviderFamily` | `mobile/lib/features/catalog/providers/products_by_category_provider.dart:40` |
 | `productsRailProvider` | `FutureProvider` | `mobile/lib/features/catalog/providers/products_rail_provider.dart:5` |
@@ -520,7 +527,7 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `questionThreadProvider` | `FutureProvider` | `mobile/lib/features/catalog/pdp/qa/qa_provider.dart:179` |
 | `returnDetailProvider` | `NotifierProviderFamily` | `mobile/lib/features/order/application/returns_provider.dart:43` |
 | `reviewWriteRepositoryProvider` | `Provider` | `mobile/lib/features/catalog/pdp/reviews/review_write_provider.dart:176` |
-| `routerProvider` | `Provider` | `mobile/lib/core/router/app_router.dart:202` |
+| `routerProvider` | `Provider` | `mobile/lib/core/router/app_router.dart:237` |
 | `searchApiProvider` | `Provider` | `mobile/lib/api/client.dart:36` |
 | `secureStorageProvider` | `Provider` | `mobile/lib/core/di/providers.dart:26` |
 | `sellerApiProvider` | `Provider` | `mobile/lib/api/client.dart:40` |
@@ -532,6 +539,7 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `tokenStorageProvider` | `Provider` | `mobile/lib/core/di/providers.dart:32` |
 | `trProvincesProvider` | `FutureProvider` | `mobile/lib/features/address/providers/tr_provinces_provider.dart:13` |
 | `trendingSearchesProvider` | `FutureProvider` | `mobile/lib/features/catalog/providers/home_provider.dart:109` |
+| `userIsSellerProvider` | `Provider` | `mobile/lib/features/seller/user_is_seller_provider.dart:9` |
 | `walletApiProvider` | `Provider` | `mobile/lib/api/client.dart:24` |
 | `webBaseUrlProvider` | `Provider` | `mobile/lib/core/di/providers.dart:24` |
 
@@ -563,15 +571,16 @@ subclasses). Notifier-shape taxonomy is documented in `CONTRIBUTING.md`.
 | `ReturnsNotifier` | `Notifier<AsyncValue<List<ReturnListItemDto>>>` | `mobile/lib/features/order/application/returns_provider.dart:14` |
 | `ReviewsNotifier` | `FamilyNotifier<ReviewsState, int>` | `mobile/lib/features/catalog/pdp/reviews/reviews_provider.dart:141` |
 | `SearchNotifier` | `Notifier<SearchState>` | `mobile/lib/features/catalog/providers/search_provider.dart:51` |
+| `SellerReturnsNotifier` | `FamilyNotifier<SellerReturnsState, String>` | `mobile/lib/features/seller/providers/seller_returns_provider.dart:40` |
 | `SignInNotifier` | `Notifier<SignInState>` | `mobile/lib/features/auth/auth_signin_notifier.dart:40` |
 | `SignUpNotifier` | `Notifier<SignUpState>` | `mobile/lib/features/auth/auth_signup_notifier.dart:33` |
 | `ThemeController` | `StateNotifier<ThemeMode>` | `mobile/lib/design/theme_controller.dart:14` |
 | `UnreadCountNotifier` | `Notifier<int>` | `mobile/lib/features/notifications/application/notifications_provider.dart:20` |
 | `UserConsentNotifier` | `Notifier<UserConsent>` | `mobile/lib/features/analytics/user_consent_provider.dart:51` |
 | `WalletNotifier` | `Notifier<WalletState>` | `mobile/lib/features/wallet/providers/wallet_provider.dart:56` |
-| `_AuthStateListenable` | `ChangeNotifier` | `mobile/lib/core/router/app_router.dart:636` |
+| `_AuthStateListenable` | `ChangeNotifier` | `mobile/lib/core/router/app_router.dart:757` |
 
-_Totals: 54 provider declarations; 31 Notifier subclasses._
+_Totals: 57 provider declarations; 32 Notifier subclasses._
 <!-- END:gen:providers -->
 
 ### 3.5 Routing-time concerns
@@ -590,14 +599,14 @@ tests, which don't load assets). Completeness audit by
 `tool/audit/check_i18n.sh`:
 
 <!-- BEGIN:gen:i18n -->
-### Translation completeness (master: `tr-TR.json`, 689 keys)
+### Translation completeness (master: `tr-TR.json`, 738 keys)
 
 | Locale | Keys | Missing vs master | Extra vs master | Completeness |
 |---|---|---|---|---|
-| `ar-AE.json` | 278 | 411 | 0 | 40% |
-| `de-DE.json` | 278 | 411 | 0 | 40% |
-| `en-US.json` | 615 | 74 | 0 | 89% |
-| `tr-TR.json` | 689 | — | — | master |
+| `ar-AE.json` | 278 | 460 | 0 | 37% |
+| `de-DE.json` | 278 | 460 | 0 | 37% |
+| `en-US.json` | 664 | 74 | 0 | 89% |
+| `tr-TR.json` | 738 | — | — | master |
 <!-- END:gen:i18n -->
 
 ### 3.7 Theme system

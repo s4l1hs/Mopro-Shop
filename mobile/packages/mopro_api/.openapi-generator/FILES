@@ -65,6 +65,7 @@ doc/SearchApi.md
 doc/SearchSuggest200Response.md
 doc/SearchTrending200Response.md
 doc/SellerApi.md
+doc/SellerBinding.md
 doc/SellerOrderBreakdown.md
 doc/SellerOrderBreakdownItemsInner.md
 doc/SellerOrderBreakdownTotals.md
@@ -151,6 +152,7 @@ lib/src/model/return_request.dart
 lib/src/model/return_request_items_inner.dart
 lib/src/model/search_suggest200_response.dart
 lib/src/model/search_trending200_response.dart
+lib/src/model/seller_binding.dart
 lib/src/model/seller_order_breakdown.dart
 lib/src/model/seller_order_breakdown_items_inner.dart
 lib/src/model/seller_order_breakdown_totals.dart
@@ -163,3 +165,4 @@ lib/src/model/variant.dart
 lib/src/model/verify_otp_request.dart
 lib/src/model/wallet_balance.dart
 lib/src/model/wallet_transaction.dart
+test/seller_binding_test.dart

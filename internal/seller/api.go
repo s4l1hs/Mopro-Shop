@@ -13,6 +13,9 @@ type Service interface {
 	GetByID(ctx context.Context, id int64) (Seller, error)
 	// ResolveSellerForUser returns the seller id a user owns/staffs, if any.
 	ResolveSellerForUser(ctx context.Context, userID int64) (sellerID int64, isSeller bool, err error)
+	// GetBindingForUser returns the user's seller binding (id+slug+name+role) for
+	// the bound active seller, if any. (false, nil) when the user is not a seller.
+	GetBindingForUser(ctx context.Context, userID int64) (Binding, bool, error)
 }
 
 // Repository is the seller_schema persistence boundary.
@@ -20,4 +23,5 @@ type Repository interface {
 	GetBySlug(ctx context.Context, slug string) (Seller, error)
 	GetByID(ctx context.Context, id int64) (Seller, error)
 	SellerIDForUser(ctx context.Context, userID int64) (int64, bool, error)
+	BindingForUser(ctx context.Context, userID int64) (Binding, bool, error)
 }

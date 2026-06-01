@@ -48,6 +48,24 @@ func (r *pgxRepository) GetByID(ctx context.Context, id int64) (Seller, error) {
 	return s, err
 }
 
+func (r *pgxRepository) BindingForUser(ctx context.Context, userID int64) (Binding, bool, error) {
+	var b Binding
+	err := r.pool.QueryRow(ctx,
+		`SELECT s.id, s.slug, s.display_name, su.role
+		   FROM seller_schema.seller_users su
+		   JOIN seller_schema.sellers s ON s.id = su.seller_id
+		  WHERE su.user_id = $1 AND s.status = 'active'
+		  ORDER BY su.seller_id LIMIT 1`, userID).
+		Scan(&b.SellerID, &b.Slug, &b.Name, &b.Role)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Binding{}, false, nil
+	}
+	if err != nil {
+		return Binding{}, false, err
+	}
+	return b, true, nil
+}
+
 func (r *pgxRepository) SellerIDForUser(ctx context.Context, userID int64) (int64, bool, error) {
 	var sellerID int64
 	err := r.pool.QueryRow(ctx,

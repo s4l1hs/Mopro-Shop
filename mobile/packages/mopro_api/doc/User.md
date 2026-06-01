@@ -16,6 +16,7 @@ Name | Type | Description | Notes
 **locale** | **String** |  | 
 **createdAt** | [**DateTime**](DateTime.md) |  | 
 **updatedAt** | [**DateTime**](DateTime.md) |  | 
+**sellerBinding** | [**SellerBinding**](SellerBinding.md) | The user's seller-account binding, or null when the user is not bound to an active seller. Drives client-side seller-role detection.  | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

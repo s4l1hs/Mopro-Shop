@@ -151,3 +151,29 @@ func TestIntegration_SellerIDForUser(t *testing.T) {
 		t.Error("unbound user reported as seller")
 	}
 }
+
+func TestIntegration_BindingForUser(t *testing.T) {
+	ctx := context.Background()
+	svc := seller.NewService(seller.NewRepository(integPool))
+
+	// user 1 → seller 1 (acme-store, owner) per the 0078 seed.
+	b, ok, err := svc.GetBindingForUser(ctx, 1)
+	if err != nil {
+		t.Fatalf("GetBindingForUser(1): %v", err)
+	}
+	if !ok {
+		t.Fatal("user 1: want bound, got not-bound")
+	}
+	if b.SellerID != 1 || b.Slug != "acme-store" || b.Name != "Acme Store" || b.Role != "owner" {
+		t.Errorf("binding mismatch: %#v", b)
+	}
+
+	// Unbound user → (Binding{}, false, nil).
+	_, ok, err = svc.GetBindingForUser(ctx, 999999)
+	if err != nil {
+		t.Fatalf("GetBindingForUser(999999): %v", err)
+	}
+	if ok {
+		t.Error("unbound user reported a binding")
+	}
+}

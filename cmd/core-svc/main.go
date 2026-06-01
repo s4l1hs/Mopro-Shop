@@ -395,6 +395,15 @@ func main() {
 		svc:           identitySvc,
 		log:           slog.Default(),
 		onUserDeleted: analyticsSvc.DeleteUserData,
+		// Enrich /me with the seller binding (null when unbound) for client-side
+		// role detection (seller dashboard).
+		sellerBinding: func(ctx context.Context, userID int64) (*seller.Binding, error) {
+			b, ok, err := sellerSvc.GetBindingForUser(ctx, userID)
+			if err != nil || !ok {
+				return nil, err
+			}
+			return &b, nil
+		},
 	}
 	auth.registerRoutes(mux, requireAuth)
 
