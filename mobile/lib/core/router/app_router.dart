@@ -7,6 +7,7 @@ import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/account/account_screen.dart';
 import 'package:mopro/features/account/browsing_history_screen.dart';
 import 'package:mopro/features/account/cards_screen.dart';
+import 'package:mopro/features/account/current_user_provider.dart';
 import 'package:mopro/features/account/privacy/privacy_settings_screen.dart';
 import 'package:mopro/features/account/profile_screen.dart';
 import 'package:mopro/features/account/questions/my_questions_screen.dart';
@@ -51,6 +52,7 @@ import 'package:mopro/features/order/presentation/order_return_flow_screen.dart'
 import 'package:mopro/features/order/presentation/return_detail_screen.dart';
 import 'package:mopro/features/order/presentation/returns_list_screen.dart';
 import 'package:mopro/features/seller/screens/seller_storefront_screen.dart';
+import 'package:mopro/features/seller/user_is_seller_provider.dart';
 import 'package:mopro/features/wallet/plan_detail_screen.dart';
 import 'package:mopro/features/wallet/wallet_screen.dart';
 import 'package:mopro/shell/app_shell.dart';
@@ -188,6 +190,26 @@ String? computeAuthRedirect({
   };
 }
 
+/// One-shot snackbar message key set by a redirect (e.g. role-gate denial) and
+/// consumed + cleared by the app-root listener. Stores an easy_localization key.
+final pendingSnackbarProvider = StateProvider<String?>((_) => null);
+
+/// Role gate for `/seller/*` routes. Returns `/` when a seller route is
+/// requested by a non-seller once the role is known; null otherwise.
+///
+/// [sellerKnown] is false while `/me` is still loading — we defer (null) rather
+/// than redirect, to avoid bouncing a seller off their own page mid-fetch (the
+/// router re-runs this when currentUserProvider resolves).
+String? computeSellerRedirect({
+  required String location,
+  required bool isSeller,
+  required bool sellerKnown,
+}) {
+  if (!location.startsWith('/seller/')) return null;
+  if (!sellerKnown) return null;
+  return isSeller ? null : '/';
+}
+
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 final _homeNavKey = GlobalKey<NavigatorState>(debugLabel: 'homeNav');
 final _categoriesNavKey =
@@ -213,9 +235,22 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final authAsync = ref.read(authNotifierProvider);
       if (authAsync.isLoading) return null;
+      final location = state.matchedLocation;
+      // Seller role gate (before the generic auth gate so the denial snackbar
+      // fires). Deferred while /me is still resolving.
+      final sellerGate = computeSellerRedirect(
+        location: location,
+        isSeller: ref.read(userIsSellerProvider),
+        sellerKnown: !ref.read(currentUserProvider).isLoading,
+      );
+      if (sellerGate != null) {
+        ref.read(pendingSnackbarProvider.notifier).state =
+            'seller.access_denied';
+        return sellerGate;
+      }
       return computeAuthRedirect(
         auth: authAsync.valueOrNull,
-        location: state.matchedLocation,
+        location: location,
       );
     },
     routes: [
@@ -635,6 +670,9 @@ final routerProvider = Provider<GoRouter>((ref) {
 
 class _AuthStateListenable extends ChangeNotifier {
   _AuthStateListenable(Ref ref) {
-    ref.listen(authNotifierProvider, (_, __) => notifyListeners());
+    ref
+      ..listen(authNotifierProvider, (_, __) => notifyListeners())
+      // Re-run redirects when /me resolves so the deferred seller gate decides.
+      ..listen(currentUserProvider, (_, __) => notifyListeners());
   }
 }

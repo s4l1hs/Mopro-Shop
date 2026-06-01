@@ -50,7 +50,17 @@ class MoproApp extends ConsumerWidget {
           duration: Duration(seconds: 6),
         ),
       );
-    });
+    })
+      // One-shot snackbar from a redirect (e.g. seller role-gate denial).
+      ..listen<String?>(pendingSnackbarProvider, (_, key) {
+        if (key == null) return;
+        ref.read(pendingSnackbarProvider.notifier).state = null;
+        final ctx = rootNavigatorKey.currentContext;
+        if (ctx == null) return;
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(key.tr())),
+        );
+      });
 
     return MaterialApp.router(
       title: 'Mopro',

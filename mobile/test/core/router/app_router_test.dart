@@ -141,4 +141,61 @@ void main() {
       });
     }
   });
+
+  group('computeSellerRedirect — /seller/* role gate', () {
+    test('non-seller is redirected to / once role is known', () {
+      expect(
+        computeSellerRedirect(
+          location: '/seller/dashboard',
+          isSeller: false,
+          sellerKnown: true,
+        ),
+        '/',
+      );
+    });
+
+    test('seller passes through (null)', () {
+      expect(
+        computeSellerRedirect(
+          location: '/seller/returns/123',
+          isSeller: true,
+          sellerKnown: true,
+        ),
+        isNull,
+      );
+    });
+
+    test('deferred while role unknown (/me still loading)', () {
+      expect(
+        computeSellerRedirect(
+          location: '/seller/dashboard',
+          isSeller: false,
+          sellerKnown: false,
+        ),
+        isNull,
+      );
+    });
+
+    test('non-/seller routes are never gated', () {
+      expect(
+        computeSellerRedirect(
+          location: '/account/profile',
+          isSeller: false,
+          sellerKnown: true,
+        ),
+        isNull,
+      );
+    });
+
+    test('deep sub-route gated for non-seller', () {
+      expect(
+        computeSellerRedirect(
+          location: '/seller/questions/456',
+          isSeller: false,
+          sellerKnown: true,
+        ),
+        '/',
+      );
+    });
+  });
 }
