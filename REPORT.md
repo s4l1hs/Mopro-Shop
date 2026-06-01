@@ -2982,3 +2982,102 @@ Missing; "follow" stays storefront-indirect. Roll-up ~58% → **~60%**.
 - Return detail has no itemized breakdown (no 5a endpoint) — header + actions only.
 - New + changed goldens (seller screens + account rail) baseline on the Linux
   rebaseline run — that job is the arbiter, not local macOS.
+
+## Photo Upload Shared Infra PR — `feat/photo-upload-shared-infra`
+
+Ships the shared photo-upload **infrastructure**. Per §1.6 escape-hatch #1
+(storage unprovisioned) + the storage-backend decision, the consumer surfaces
+(review/return pickers + display) are **dormant and carried to a 4b follow-up**
+once an app bucket is provisioned. Branched off
+`feat/seller-facing-and-platform-growth` (the unmerged accumulation chain).
+
+### 1. Baseline → final
+| Gate | Final |
+|---|---|
+| `go test ./...` (+ attachments/storage) | green |
+| migration 0079 round-trip | green (integration) |
+| boundaries / audit-test | OK / clean (script extended for `attachments`) |
+| 3 binaries build | OK |
+| Flutter | **untouched** this turn (no consumer UI — §1.6 #1) |
+
+### 2. Audit + storage decision
+Storage was unprovisioned: `internal/media` an empty stub, no S3/B2 SDK, no dev
+container, B2 creds only for Restic backups. **Decision (AskUserQuestion →
+Option A):** S3-compatible — Backblaze B2 in prod (the locked stack), MinIO in
+dev/CI. Recorded in **ADR-0004** (human-approved; the new MinIO tool + S3 SDK
+required an ADR per CLAUDE.md §8/§2.2).
+
+### 3. Module-placement escalation (CLAUDE.md §12)
+`internal/media` is **jobs-svc-only** (§2.3 = product-image pipeline). The
+upload concern is core-svc (reviews/returns live there). Surfaced via
+AskUserQuestion → **Option B**: a new `internal/attachments` (core-svc) owns
+`attachments_schema`; `internal/media` stays the untouched jobs-svc stub; the
+boundary script's allow-list was extended for `attachments` (module↔schema
+consistent). ADR-0004 records the split.
+
+### 4. Backend
+- Migration 0079: `attachments_schema.photo_attachments` (storage_key, sniffed
+  content_type, dims, soft refs, `entity_id NULL` = orphan; entity + orphan
+  indexes). Cross-schema soft refs only.
+- `internal/storage`: `PhotoStorage` (S3 impl via aws-sdk-go-v2, path-style for
+  B2/MinIO; filesystem impl for tests/dev) + `STORAGE_ENABLED` gate.
+- `internal/attachments`: Upload (store + orphan insert), AttachInTx (two-phase
+  attach; ownership + orphan-state + per-entity-limit, sort_order by index),
+  ListByEntity (PublicURL via CDNUrl).
+- `POST /uploads/photos` (auth): 5MB cap, **magic-number MIME sniff** (jpeg/png/
+  webp, not the client header), dimension decode (200–4096), 50/user/hr in-memory
+  rate limit, **503 when STORAGE_ENABLED off**. Returns the orphan attachment.
+- MinIO in `deploy/docker-compose.yml` (dev/CI only; NOT prod).
+
+### 5. Moderation + virus-scan hooks
+Documented no-op placeholders at the upload path (`MODERATION_HOOK` /
+`VIRUS_SCAN_HOOK` in `upload_handlers.go`). Named Backlog (ADR-0004).
+
+### 6. Two-phase commit pattern
+Orphan upload → atomic attach inside the entity submit tx → scheduled orphan
+cleanup. Documented in CONTRIBUTING for reuse (tickets, drafts, …).
+
+### 7. Deps
+`aws-sdk-go-v2` (S3 client — B2/MinIO/AWS one code path) + `golang.org/x/image`
+(webp dimension decode; stdlib `image` lacks webp). Both justified (CLAUDE.md §10).
+
+### 8. Tests
+storage fs round-trip; upload validation gauntlet (valid jpeg/png/webp, oversize
+413, wrong-MIME 415, exe-renamed-.jpg caught 415, bad-dims 422, bad entity 422,
+rate-limit 429, disabled 503 — generated PNGs, no DB); attachments integration
+(0079 round-trip + attach ownership/re-attach/limit).
+
+### 9. Drive-by
+`scripts/check-module-boundaries.sh` allow-list extended for the `attachments`
+module/schema (the script doesn't enforce module→binary, which is why the §2.3
+issue surfaced via review, not the script).
+
+### 10. Closed carries — PARTIAL
+Tranche 1 (return photos) + Tranche 3 (review photos): **backend infrastructure
+shipped**; the consumer UI (pickers, PDP/return/seller display, lightbox) is
+**carried to 4b** (dormant until provisioning). Not marked fully ✅ — the
+end-to-end capability lands in 4b.
+
+### 11. Backlog
+Frontend consumer surfaces (§4–§8: PhotoUploadService, PhotoPicker, PhotoLightbox,
+review + return wiring) → **4b**; ops provisioning (app B2 bucket + creds +
+`STORAGE_ENABLED=true`); orphan cleanup job (cron); image moderation + virus-scan
+integrations; transcoding/thumbnails/AVIF; presigned-URL flow; image
+editing/crop; video; profile + seller-product image upload; Redis-backed upload
+rate limiter (currently in-memory, fine on single VDS).
+
+### 12. Parity
+Image-upload infrastructure: Backlog → **Partial** (backend present + tested;
+consumer surfaces + provisioning pending in 4b). Moderation: Missing → Partial
+(hooks present, integration pending). Net roll-up ~+0.5% this turn; the +1–2%
+capability flip completes with 4b.
+
+### 13. Risk notes
+- `STORAGE_ENABLED=false` until ops provisions the bucket — uploads 503 by
+  design; 4b's UI must not ship before provisioning.
+- In-memory rate limiter is per-instance (acceptable on the single VDS;
+  Redis-backed is Backlog).
+- EXIF privacy: originals are stored as-uploaded (no EXIF stripping) — flag for
+  the 4b/moderation work.
+- B2 public-access egress costs at scale if not CDN-fronted (CDNUrl is the
+  intended front).
