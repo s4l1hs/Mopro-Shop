@@ -51,7 +51,10 @@ import 'package:mopro/features/order/presentation/order_history_screen.dart';
 import 'package:mopro/features/order/presentation/order_return_flow_screen.dart';
 import 'package:mopro/features/order/presentation/return_detail_screen.dart';
 import 'package:mopro/features/order/presentation/returns_list_screen.dart';
+import 'package:mopro/features/seller/data/seller_repository.dart';
 import 'package:mopro/features/seller/screens/seller_dashboard_screen.dart';
+import 'package:mopro/features/seller/screens/seller_return_detail_screen.dart';
+import 'package:mopro/features/seller/screens/seller_returns_inbox_screen.dart';
 import 'package:mopro/features/seller/screens/seller_storefront_screen.dart';
 import 'package:mopro/features/seller/user_is_seller_provider.dart';
 import 'package:mopro/features/wallet/plan_detail_screen.dart';
@@ -347,6 +350,39 @@ final routerProvider = Provider<GoRouter>((ref) {
         parentNavigatorKey: rootNavigatorKey,
         builder: (_, __) =>
             _titledLoc('/seller/dashboard', const SellerDashboardScreen()),
+      ),
+      GoRoute(
+        path: '/seller/returns',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) => _titledLoc(
+          '/seller/returns',
+          SellerReturnsInboxScreen(
+            initialStatus: state.uri.queryParameters['status'] ?? 'submitted',
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/seller/returns/:id',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) {
+          final id = int.tryParse(state.pathParameters['id'] ?? '');
+          if (id == null || id <= 0) {
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => rootNavigatorKey.currentContext?.go('/seller/returns'),
+            );
+            return const SizedBox.shrink();
+          }
+          return _titledLoc(
+            '/seller/returns/$id',
+            SellerReturnDetailScreen(
+              returnId: id,
+              initial: state.extra is SellerReturn
+                  ? state.extra! as SellerReturn
+                  : null,
+            ),
+            name: '$id',
+          );
+        },
       ),
       // Public Q&A: standalone questions list + single-question thread. Reads
       // are open to guests; the ask/answer CTAs gate via the login presenter.
