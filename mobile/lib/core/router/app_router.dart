@@ -51,6 +51,7 @@ import 'package:mopro/features/order/presentation/order_history_screen.dart';
 import 'package:mopro/features/order/presentation/order_return_flow_screen.dart';
 import 'package:mopro/features/order/presentation/return_detail_screen.dart';
 import 'package:mopro/features/order/presentation/returns_list_screen.dart';
+import 'package:mopro/features/seller/screens/seller_dashboard_screen.dart';
 import 'package:mopro/features/seller/screens/seller_storefront_screen.dart';
 import 'package:mopro/features/seller/user_is_seller_provider.dart';
 import 'package:mopro/features/wallet/plan_detail_screen.dart';
@@ -94,6 +95,13 @@ String moproPageTitle(String location, {String? name}) {
   if (location.startsWith('/products/')) {
     return name == null ? loading : t(name);
   }
+  if (location == '/seller/dashboard') return t('Satıcı Paneli');
+  if (location == '/seller/returns') return t('İadeler');
+  if (location.startsWith('/seller/returns/')) {
+    return name == null ? t('İade') : t('İade #$name');
+  }
+  if (location == '/seller/questions') return t('Sorular');
+  if (location.startsWith('/seller/questions/')) return t('Soru');
   if (location.startsWith('/sellers/')) {
     return name == null ? t('Mağaza') : t(name);
   }
@@ -332,6 +340,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           }
           return _titledLoc('/sellers/$slug', SellerStorefrontScreen(slug: slug));
         },
+      ),
+      // ── Seller panel (role-gated by the top-level redirect; Tranche 5) ────────
+      GoRoute(
+        path: '/seller/dashboard',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, __) =>
+            _titledLoc('/seller/dashboard', const SellerDashboardScreen()),
       ),
       // Public Q&A: standalone questions list + single-question thread. Reads
       // are open to guests; the ask/answer CTAs gate via the login presenter.
