@@ -20,6 +20,7 @@ func NewFSStorage(base string) (*fsStorage, error) {
 	if base == "" {
 		return nil, fmt.Errorf("storage(fs): PHOTO_STORAGE_PATH is empty")
 	}
+	//nolint:gosec // base is the trusted PHOTO_STORAGE_PATH env config, not user input.
 	if err := os.MkdirAll(base, 0o750); err != nil {
 		return nil, fmt.Errorf("storage(fs): mkdir base: %w", err)
 	}
@@ -33,21 +34,21 @@ func (s *fsStorage) path(key string) string {
 }
 
 func (s *fsStorage) Put(_ context.Context, key, _ string, r io.Reader, _ int64) error {
-	p := s.path(key)
-	if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
+	p := s.path(key)                                            // server-generated key, path-cleaned in path()
+	if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil { //nolint:gosec // see path()
 		return err
 	}
-	f, err := os.Create(p)
+	f, err := os.Create(p) //nolint:gosec // key is server-generated + path-cleaned
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, err = io.Copy(f, r)
 	return err
 }
 
 func (s *fsStorage) Get(_ context.Context, key string) (io.ReadCloser, string, error) {
-	f, err := os.Open(s.path(key))
+	f, err := os.Open(s.path(key)) //nolint:gosec // key is server-generated + path-cleaned
 	if err != nil {
 		return nil, "", err
 	}
