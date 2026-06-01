@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -357,21 +358,27 @@ func TestProperty_DLQContainsExactlyPermanentFailures(t *testing.T) {
 	for k := range permanentKeys {
 		counts[k] = &counter{}
 	}
-	var countsMu atomic.Value // stores map[string]*counter
-	countsMu.Store(counts)
+	// eventbus dispatches a batch across multiple goroutines, so the handler runs
+	// concurrently. Guard the map insert with a mutex — the previous atomic.Value
+	// pattern stored the map but still mutated it in place, which is a concurrent
+	// map write (caught by -race once the suite became a make-verify gate). The
+	// per-key counter stays atomic, so only the check-and-insert needs the lock.
+	var countsMu sync.Mutex
 
 	handler := func(_ context.Context, ev eventbus.Event) error {
 		key := ev.IdempotencyKey
-		m := countsMu.Load().(map[string]*counter)
 		if _, isPermanent := permanentKeys[key]; isPermanent {
 			return fmt.Errorf("permanent failure for %s", key)
 		}
 		// Transient: fail (DLQThreshold-1) times then succeed.
-		if _, exists := m[key]; !exists {
-			m[key] = &counter{}
-			countsMu.Store(m)
+		countsMu.Lock()
+		c, exists := counts[key]
+		if !exists {
+			c = &counter{}
+			counts[key] = c
 		}
-		n := m[key].n.Add(1)
+		countsMu.Unlock()
+		n := c.n.Add(1)
 		if int(n) < eventbus.DLQThreshold {
 			return fmt.Errorf("transient failure #%d for %s", n, key)
 		}

@@ -507,6 +507,12 @@ CREATE TABLE order_schema.orders (
   cashback_eligible BOOLEAN      NOT NULL DEFAULT TRUE,
   cashback_currency TEXT         NOT NULL DEFAULT 'TRY_COIN',
   idempotency_key   TEXT         NOT NULL UNIQUE,
+  -- v8 multi-seller checkout (migration 0059_orders_v8); both nullable, repo
+  -- writes NULL via NULLIF for the legacy single-order flow. FK on
+  -- checkout_session_id omitted — the e2e schema has no checkout_sessions table
+  -- and only ever inserts NULL here.
+  seller_id           BIGINT,
+  checkout_session_id TEXT,
   created_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
