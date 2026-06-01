@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/core/di/providers.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/utils/debouncer.dart';
 import 'package:mopro/core/utils/uri_ext.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/design/responsive/responsive.dart';
+import 'package:mopro/design/widgets/mopro_share_button.dart';
 import 'package:mopro/features/catalog/plp/plp_filters.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_codec.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
@@ -134,7 +136,15 @@ class _CategoryProductsScreenState
     );
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.categoryName)),
+      appBar: AppBar(
+        title: Text(widget.categoryName),
+        actions: [
+          MoproShareButton(
+            url: '${ref.watch(webBaseUrlProvider)}/categories/${widget.categoryId}',
+            title: widget.categoryName,
+          ),
+        ],
+      ),
       body: context.isMobile ? shell : _buildWide(context, products, shell),
     );
   }

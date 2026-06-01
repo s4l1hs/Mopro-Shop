@@ -436,6 +436,23 @@
     "load_error": "Could not load the store",
     "retry": "Try again"
   },
+  "share": {
+    "share": "Share",
+    "link_copied": "Link copied.",
+    "share_a11y": "Share: {title}"
+  },
+  "browsing_history": {
+    "title": "Your history",
+    "subtitle": "Products you recently viewed. You can clear your history anytime.",
+    "clear": "Clear history",
+    "empty_title": "You haven't viewed any products yet.",
+    "empty_cta": "Start exploring",
+    "confirm_title": "Are you sure you want to clear your history?",
+    "confirm_body": "This can't be undone. Our recommendations may change after clearing.",
+    "confirm_cancel": "Cancel",
+    "confirm_delete": "Delete",
+    "deleted_toast": "Your history was cleared."
+  },
   "error": {
     "unauthorized": "Your session has expired. Please sign in again.",
     "not_found": "{resource} not found.",

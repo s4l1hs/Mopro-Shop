@@ -3,6 +3,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/core/di/providers.dart';
+import 'package:mopro/design/widgets/mopro_share_button.dart';
 import 'package:mopro/features/catalog/widgets/product_grid.dart';
 import 'package:mopro/features/seller/data/seller_storefront_repository.dart';
 import 'package:mopro/features/seller/providers/seller_storefront_provider.dart';
@@ -35,12 +37,19 @@ class _SellerStorefrontScreenState extends ConsumerState<SellerStorefrontScreen>
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(sellerProfileProvider(widget.slug));
 
+    final profile = profileAsync.valueOrNull;
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          profileAsync.valueOrNull?.displayName ??
-              'seller_storefront.title'.tr(),
+          profile?.displayName ?? 'seller_storefront.title'.tr(),
         ),
+        actions: [
+          if (profile != null)
+            MoproShareButton(
+              url: '${ref.watch(webBaseUrlProvider)}/sellers/${widget.slug}',
+              title: profile.displayName,
+            ),
+        ],
         bottom: TabBar(
           controller: _tabs,
           tabs: [

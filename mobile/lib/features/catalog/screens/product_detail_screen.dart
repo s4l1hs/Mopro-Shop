@@ -5,12 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/core/di/providers.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/utils/coin_formatter.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/design/responsive/pointer_kind.dart';
 import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/design/widgets/mopro_share_button.dart';
 import 'package:mopro/features/analytics/analytics_service.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/catalog/pdp/qa/pdp_qa_tab.dart';
@@ -157,6 +159,10 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
                     : 'product.add_to_favorites'.tr(),
                 onPressed: () =>
                     ref.read(favoritesProvider.notifier).toggle(product.id),
+              ),
+              MoproShareButton(
+                url: '${ref.watch(webBaseUrlProvider)}/products/${product.id}',
+                title: product.title,
               ),
               const SizedBox(width: 4),
             ],

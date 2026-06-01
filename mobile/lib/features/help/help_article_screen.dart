@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/core/di/providers.dart';
+import 'package:mopro/design/widgets/mopro_share_button.dart';
 import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 import 'package:mopro/features/help/application/help_providers.dart';
 
@@ -42,6 +44,14 @@ class HelpArticleScreen extends ConsumerWidget {
               },
               styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
                 a: TextStyle(color: Theme.of(context).colorScheme.primary),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: MoproShareButton(
+                url: '${ref.watch(webBaseUrlProvider)}/help/article/$slug',
+                title: a.title,
               ),
             ),
             const SizedBox(height: 24),
