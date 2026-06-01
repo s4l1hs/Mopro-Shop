@@ -36,7 +36,7 @@ func (r *pgxPayoutRepository) WithTx(ctx context.Context, level pgx.TxIsoLevel, 
 
 func (r *pgxPayoutRepository) InsertPayout(ctx context.Context, tx pgx.Tx, p Payout) (Payout, error) {
 	const q = `
-		INSERT INTO commission_schema.seller_payouts
+		INSERT INTO sellerpayout_schema.seller_payouts
 			(order_id, seller_id, amount_minor, currency,
 			 delivered_at, unlock_at, status, market, idempotency_key)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
@@ -64,7 +64,7 @@ func (r *pgxPayoutRepository) FindPayoutByKey(ctx context.Context, idempotencyKe
 		       market, ledger_transaction_id, idempotency_key, batch_id,
 		       attempt_count, last_attempt_at, last_error,
 		       created_at, updated_at
-		FROM commission_schema.seller_payouts
+		FROM sellerpayout_schema.seller_payouts
 		WHERE idempotency_key = $1`
 
 	return r.scanPayout(r.pool.QueryRow(ctx, q, idempotencyKey))
@@ -77,7 +77,7 @@ func (r *pgxPayoutRepository) FetchScheduledPayouts(ctx context.Context, payoutD
 		       market, ledger_transaction_id, idempotency_key, batch_id,
 		       attempt_count, last_attempt_at, last_error,
 		       created_at, updated_at
-		FROM commission_schema.seller_payouts
+		FROM sellerpayout_schema.seller_payouts
 		WHERE status = 'scheduled'
 		  AND currency = $1
 		  AND unlock_at <= $2
@@ -104,7 +104,7 @@ func (r *pgxPayoutRepository) FetchScheduledPayouts(ctx context.Context, payoutD
 
 func (r *pgxPayoutRepository) UpdatePayoutBatchID(ctx context.Context, tx pgx.Tx, payoutID, batchID int64) error {
 	_, err := tx.Exec(ctx,
-		`UPDATE commission_schema.seller_payouts SET batch_id=$1, updated_at=now() WHERE id=$2`,
+		`UPDATE sellerpayout_schema.seller_payouts SET batch_id=$1, updated_at=now() WHERE id=$2`,
 		batchID, payoutID,
 	)
 	return err
@@ -114,7 +114,7 @@ func (r *pgxPayoutRepository) UpdatePayoutBatchID(ctx context.Context, tx pgx.Tx
 
 func (r *pgxPayoutRepository) InsertBatch(ctx context.Context, tx pgx.Tx, b PayoutBatch) (PayoutBatch, error) {
 	const q = `
-		INSERT INTO commission_schema.payout_batches
+		INSERT INTO sellerpayout_schema.payout_batches
 			(seller_id, currency, payout_date, total_amount_minor, status,
 			 idempotency_key, market, attempt_count, last_attempt_at)
 		VALUES ($1,$2,$3,$4,'processing',$5,$6,1,now())
@@ -141,7 +141,7 @@ func (r *pgxPayoutRepository) FindBatchByKey(ctx context.Context, idempotencyKey
 		       psp_transfer_id, status, ledger_transaction_id, paid_at,
 		       idempotency_key, attempt_count, last_attempt_at, last_error,
 		       market, created_at, updated_at
-		FROM commission_schema.payout_batches
+		FROM sellerpayout_schema.payout_batches
 		WHERE idempotency_key = $1`
 
 	return r.scanBatch(r.pool.QueryRow(ctx, q, idempotencyKey))
@@ -149,7 +149,7 @@ func (r *pgxPayoutRepository) FindBatchByKey(ctx context.Context, idempotencyKey
 
 func (r *pgxPayoutRepository) UpdateBatchPspTransferID(ctx context.Context, batchID int64, pspTransferID string) error {
 	_, err := r.pool.Exec(ctx,
-		`UPDATE commission_schema.payout_batches
+		`UPDATE sellerpayout_schema.payout_batches
 		 SET psp_transfer_id=$1, updated_at=now()
 		 WHERE id=$2`,
 		pspTransferID, batchID,
@@ -159,7 +159,7 @@ func (r *pgxPayoutRepository) UpdateBatchPspTransferID(ctx context.Context, batc
 
 func (r *pgxPayoutRepository) UpdateBatchPaid(ctx context.Context, tx pgx.Tx, batchID, ledgerTxnID int64, pspTransferID string, paidAt time.Time) error {
 	_, err := tx.Exec(ctx,
-		`UPDATE commission_schema.payout_batches
+		`UPDATE sellerpayout_schema.payout_batches
 		 SET status='paid', psp_transfer_id=$1, ledger_transaction_id=$2,
 		     paid_at=$3, updated_at=now()
 		 WHERE id=$4`,
@@ -170,7 +170,7 @@ func (r *pgxPayoutRepository) UpdateBatchPaid(ctx context.Context, tx pgx.Tx, ba
 
 func (r *pgxPayoutRepository) MarkPayoutsPaidByBatch(ctx context.Context, tx pgx.Tx, batchID int64) error {
 	_, err := tx.Exec(ctx,
-		`UPDATE commission_schema.seller_payouts
+		`UPDATE sellerpayout_schema.seller_payouts
 		 SET status='paid', updated_at=now()
 		 WHERE batch_id=$1 AND status='scheduled'`,
 		batchID,
@@ -180,7 +180,7 @@ func (r *pgxPayoutRepository) MarkPayoutsPaidByBatch(ctx context.Context, tx pgx
 
 func (r *pgxPayoutRepository) UpdateBatchStatus(ctx context.Context, batchID int64, status BatchStatus, lastError string) error {
 	_, err := r.pool.Exec(ctx,
-		`UPDATE commission_schema.payout_batches
+		`UPDATE sellerpayout_schema.payout_batches
 		 SET status=$1, last_error=$2, last_attempt_at=now(),
 		     attempt_count=attempt_count+1, updated_at=now()
 		 WHERE id=$3`,
@@ -196,7 +196,7 @@ func (r *pgxPayoutRepository) FetchProcessingBatches(ctx context.Context) ([]Pay
 		       psp_transfer_id, status, ledger_transaction_id, paid_at,
 		       idempotency_key, attempt_count, last_attempt_at, last_error,
 		       market, created_at, updated_at
-		FROM commission_schema.payout_batches
+		FROM sellerpayout_schema.payout_batches
 		WHERE status = 'processing'
 		  AND (last_attempt_at IS NULL OR last_attempt_at < now() - interval '10 minutes')
 		FOR UPDATE SKIP LOCKED`
@@ -222,7 +222,7 @@ func (r *pgxPayoutRepository) FetchProcessingBatches(ctx context.Context) ([]Pay
 
 func (r *pgxPayoutRepository) UpsertSellerPspAccount(ctx context.Context, acc SellerPspAccount) error {
 	_, err := r.pool.Exec(ctx,
-		`INSERT INTO commission_schema.seller_psp_accounts (seller_id, psp_member_id, market, status)
+		`INSERT INTO sellerpayout_schema.seller_psp_accounts (seller_id, psp_member_id, market, status)
 		 VALUES ($1, $2, $3, 'active')
 		 ON CONFLICT (seller_id) DO UPDATE
 		   SET psp_member_id = EXCLUDED.psp_member_id,
@@ -237,7 +237,7 @@ func (r *pgxPayoutRepository) UpsertSellerPspAccount(ctx context.Context, acc Se
 func (r *pgxPayoutRepository) FindSellerPspAccount(ctx context.Context, sellerID int64) (SellerPspAccount, error) {
 	const q = `
 		SELECT id, seller_id, psp_member_id, market, status, created_at, updated_at
-		FROM commission_schema.seller_psp_accounts
+		FROM sellerpayout_schema.seller_psp_accounts
 		WHERE seller_id = $1`
 
 	var acc SellerPspAccount

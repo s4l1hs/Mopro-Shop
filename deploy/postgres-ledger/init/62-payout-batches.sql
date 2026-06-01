@@ -1,4 +1,4 @@
--- 62-payout-batches.sql — commission_schema.payout_batches aggregation table.
+-- 62-payout-batches.sql — sellerpayout_schema.payout_batches aggregation table.
 --
 -- One batch per (seller_id, currency, payout_date); groups all seller_payouts
 -- for that seller on that date into a single Sipay transfer.
@@ -11,7 +11,7 @@
 --
 -- reconcile_processing scans 'processing' batches older than 10 min and retries.
 
-CREATE TABLE commission_schema.payout_batches (
+CREATE TABLE sellerpayout_schema.payout_batches (
   id                    BIGSERIAL PRIMARY KEY,
   seller_id             BIGINT NOT NULL,
   currency              TEXT NOT NULL,
@@ -32,12 +32,12 @@ CREATE TABLE commission_schema.payout_batches (
 );
 
 CREATE INDEX payout_batches_pending_idx
-    ON commission_schema.payout_batches(payout_date, status)
+    ON sellerpayout_schema.payout_batches(payout_date, status)
     WHERE status IN ('pending','processing');
 
 CREATE INDEX payout_batches_processing_recovery_idx
-    ON commission_schema.payout_batches(status, last_attempt_at)
+    ON sellerpayout_schema.payout_batches(status, last_attempt_at)
     WHERE status = 'processing';
 
 CREATE INDEX payout_batches_seller_idx
-    ON commission_schema.payout_batches(seller_id, payout_date DESC);
+    ON sellerpayout_schema.payout_batches(seller_id, payout_date DESC);

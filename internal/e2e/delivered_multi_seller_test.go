@@ -301,7 +301,7 @@ func TestE2E_DeliveredEventTwoSellersIdempotent(t *testing.T) { //nolint:gocyclo
 	deadline = time.Now().Add(8 * time.Second)
 	for time.Now().Before(deadline) {
 		if err := ledgerPool.QueryRow(ctx,
-			`SELECT COUNT(*) FROM commission_schema.seller_payouts WHERE order_id = $1`,
+			`SELECT COUNT(*) FROM sellerpayout_schema.seller_payouts WHERE order_id = $1`,
 			createdOrder.ID,
 		).Scan(&payoutCount); err == nil && payoutCount == 2 {
 			break
@@ -319,7 +319,7 @@ func TestE2E_DeliveredEventTwoSellersIdempotent(t *testing.T) { //nolint:gocyclo
 		status      string
 	}
 	rows, err := ledgerPool.Query(ctx,
-		`SELECT seller_id, amount_minor, status FROM commission_schema.seller_payouts WHERE order_id = $1`,
+		`SELECT seller_id, amount_minor, status FROM sellerpayout_schema.seller_payouts WHERE order_id = $1`,
 		createdOrder.ID,
 	)
 	if err != nil {

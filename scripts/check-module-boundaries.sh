@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCHEMAS="identity|catalog|cart|order|payment|seller|search|wallet|commission|treasury|cashback|shipping|notification|support|media|sizefinder|attachments"
+SCHEMAS="identity|catalog|cart|order|payment|seller|search|wallet|commission|sellerpayout|treasury|cashback|shipping|notification|support|media|sizefinder|attachments"
 
 # Cross-module-schema reads in raw SQL (ref_schema is exempt).
 # Migrations are exempt because they own the schema and routinely seed
@@ -50,7 +50,7 @@ if grep -rE 'UPDATE\s+cashback_schema\.plans.*\b(monthly_amount_minor|start_date
 fi
 
 # Seller payout UPDATE attempts (status field allowed; core fields blocked by DB trigger)
-if grep -rE 'UPDATE\s+commission_schema\.seller_payouts.*\b(amount_minor|unlock_at|currency|order_id|seller_id)\b' \
+if grep -rE 'UPDATE\s+sellerpayout_schema\.seller_payouts.*\b(amount_minor|unlock_at|currency|order_id|seller_id)\b' \
     --include='*.sql' --include='*.go' internal/ migrations/ ; then
     echo "ERROR: seller_payouts core fields are immutable; use reversal pattern"
     exit 1
@@ -89,20 +89,19 @@ fi
 #
 # Recognized callers (exempt):
 #   - internal/commission/          — the owner.
-#   - internal/sellerpayout/        — owns seller_payouts (table grouped
-#                                     into commission_schema by historical
-#                                     schema-naming choice; consider
-#                                     splitting into sellerpayout_schema
-#                                     in a future refactor).
 #   - internal/e2e/                 — end-to-end tests routinely span
 #                                     schemas to seed and verify state.
 #   - migrations/, deploy/postgres-ledger/init/
 #                                   — DDL / schema source of truth.
+#
+# NOTE: internal/sellerpayout/ is NO LONGER exempt here — the sellerpayout
+# tables were relocated to sellerpayout_schema (chore/sellerpayout-schema-split),
+# so sellerpayout has zero commission_schema access. Cross-domain reads of
+# commission truth go through the commission.CaptureRecorder seam.
 COMMISSION_VIOLATORS=$(grep -rEn 'commission_schema\.[a-z_]+' \
     --include='*.sql' --include='*.go' \
     internal/ migrations/ deploy/postgres-ledger/init/ \
     | grep -vE '^internal/commission/' \
-    | grep -vE '^internal/sellerpayout/' \
     | grep -vE '^internal/e2e/' \
     | grep -vE '^migrations/' \
     | grep -vE '^deploy/postgres-ledger/init/' \
@@ -111,6 +110,34 @@ if [ -n "$COMMISSION_VIOLATORS" ]; then
     echo "ERROR: commission_schema.* access outside the recognized callers" >&2
     echo "$COMMISSION_VIOLATORS" >&2
     echo "Use commission.CaptureRecorder (or add a new commission-owned interface)." >&2
+    exit 1
+fi
+
+# sellerpayout_schema regression guard.
+#
+# seller_payouts, payout_batches and seller_psp_accounts live in
+# sellerpayout_schema, owned by internal/sellerpayout/. This guard fails the
+# build if any code outside the recognized callers touches the schema directly
+# (every SQL operation, not just FROM). Cross-domain consumers must go through a
+# sellerpayout-owned interface seam, not direct SQL.
+#
+# Recognized callers (exempt):
+#   - internal/sellerpayout/        — the owner.
+#   - internal/e2e/                 — end-to-end tests span schemas to seed/verify.
+#   - migrations/, deploy/postgres-ledger/init/
+#                                   — DDL / schema source of truth.
+SELLERPAYOUT_VIOLATORS=$(grep -rEn 'sellerpayout_schema\.[a-z_]+' \
+    --include='*.sql' --include='*.go' \
+    internal/ migrations/ deploy/postgres-ledger/init/ \
+    | grep -vE '^internal/sellerpayout/' \
+    | grep -vE '^internal/e2e/' \
+    | grep -vE '^migrations/' \
+    | grep -vE '^deploy/postgres-ledger/init/' \
+    || true)
+if [ -n "$SELLERPAYOUT_VIOLATORS" ]; then
+    echo "ERROR: sellerpayout_schema.* access outside the recognized callers" >&2
+    echo "$SELLERPAYOUT_VIOLATORS" >&2
+    echo "Use a sellerpayout-owned interface seam, not direct schema access." >&2
     exit 1
 fi
 

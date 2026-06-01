@@ -1,14 +1,16 @@
--- 60-seller-payout-schema.sql — seller payout records (commission_schema).
--- Source: DATA_DICTIONARY.md § 9 verbatim.
+-- 60-seller-payout-schema.sql — seller payout records (sellerpayout_schema).
+-- Source: DATA_DICTIONARY.md § 9.
 --
--- seller_payouts lives in commission_schema (not a separate schema per DATA_DICTIONARY.md § 2.2).
--- Both commission_user and sellerpayout_user have DML on commission_schema (see 30-grants.sql).
+-- seller_payouts lives in sellerpayout_schema, owned by the sellerpayout module
+-- (relocated out of commission_schema by chore/sellerpayout-schema-split; see
+-- DATA_DICTIONARY.md § 2.2 / § 9). sellerpayout_user has DML on
+-- sellerpayout_schema (see 30-grants.sql).
 --
 -- unlock_at = delivered_at + 3 business days (computed via pkg/timex.AddBusinessDays).
 -- amount_minor and unlock_at are IMMUTABLE once set (enforced by 61-seller-payout-immutable-trigger.sql).
 -- Corrections happen ONLY via reversal transactions (new reversed row), never UPDATE.
 
-CREATE TABLE commission_schema.seller_payouts (
+CREATE TABLE sellerpayout_schema.seller_payouts (
   id                    BIGSERIAL PRIMARY KEY,
   order_id              BIGINT NOT NULL,                                    -- denormalized; no FK across cluster
   seller_id             BIGINT NOT NULL,
@@ -30,8 +32,8 @@ CREATE TABLE commission_schema.seller_payouts (
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX seller_payouts_due_idx
-    ON commission_schema.seller_payouts(unlock_at, status) WHERE status = 'scheduled';
+    ON sellerpayout_schema.seller_payouts(unlock_at, status) WHERE status = 'scheduled';
 CREATE INDEX seller_payouts_seller_idx
-    ON commission_schema.seller_payouts(seller_id, created_at DESC);
+    ON sellerpayout_schema.seller_payouts(seller_id, created_at DESC);
 CREATE INDEX seller_payouts_order_idx
-    ON commission_schema.seller_payouts(order_id);
+    ON sellerpayout_schema.seller_payouts(order_id);

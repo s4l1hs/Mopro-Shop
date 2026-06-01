@@ -47,7 +47,7 @@ func NewService(
 }
 
 // SchedulePayoutsForOrder aggregates seller_net_minor per seller and inserts one
-// commission_schema.seller_payouts row per seller, with unlock_at = delivered_at + 3 BD.
+// sellerpayout_schema.seller_payouts row per seller, with unlock_at = delivered_at + 3 BD.
 // Idempotent: skips any seller whose payout row already exists.
 func (s *payoutService) SchedulePayoutsForOrder(ctx context.Context, ev OrderDeliveredEvent) error {
 	// 1. Aggregate seller_net_minor by seller (one payout per seller per order).

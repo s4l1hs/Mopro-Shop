@@ -42,7 +42,7 @@ import (
 //  5. Assert ecom.order.delivered.v1 in Redis Streams (XRange)
 //  6. Simulate fin-svc consumer: cashback.CreatePlanForOrder + sellerpayout.SchedulePayoutsForOrder
 //  7. Assert cashback_schema.plans.monthly_amount_minor > 0
-//  8. Assert commission_schema.seller_payouts.status='scheduled'
+//  8. Assert sellerpayout_schema.seller_payouts.status='scheduled'
 func TestE2E_KargoWebhookToCashbackPlan(t *testing.T) { //nolint:gocyclo,cyclop
 	ctx := context.Background()
 
@@ -431,15 +431,15 @@ func TestE2E_KargoWebhookToCashbackPlan(t *testing.T) { //nolint:gocyclo,cyclop
 	// ── 10. ASSERT seller payout ───────────────────────────────────────────────
 	var payoutStatus string
 	if err := ledgerPool.QueryRow(ctx,
-		`SELECT status FROM commission_schema.seller_payouts WHERE order_id=$1 AND seller_id=$2`,
+		`SELECT status FROM sellerpayout_schema.seller_payouts WHERE order_id=$1 AND seller_id=$2`,
 		orderID, sellerID,
 	).Scan(&payoutStatus); err != nil {
-		t.Fatalf("ASSERT commission_schema.seller_payouts — FAIL: %v", err)
+		t.Fatalf("ASSERT sellerpayout_schema.seller_payouts — FAIL: %v", err)
 	}
 	if payoutStatus != "scheduled" {
 		t.Errorf("payout status: want scheduled, got %s", payoutStatus)
 	}
-	t.Logf("ASSERT commission_schema.seller_payouts status='scheduled' — PASS")
+	t.Logf("ASSERT sellerpayout_schema.seller_payouts status='scheduled' — PASS")
 
 	t.Logf("TestE2E_KargoWebhookToCashbackPlan PASS: order=%d ship=%d plan_monthly=%d payout=%s",
 		orderID, shipmentID, planMonthly, payoutStatus)
