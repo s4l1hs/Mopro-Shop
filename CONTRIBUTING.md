@@ -679,3 +679,46 @@ does the test actually need to assert?" Restoring the symbol is rarely right
 (PR #37's analysis); migrating the test to the current engine functions usually
 is — e.g. `cashback.ComputePlanTerms(price, bps).MonthlyAmountMinor` rather than
 a hardcoded monthly amount that silently encodes the old (v6) math.
+
+## Image-build workflow + manual rollout
+
+Backend service images (`core-svc`, `fin-svc`, `jobs-svc`) build automatically on
+`main` push via `.github/workflows/build-images.yml` — each from the single
+parameterized `build/Dockerfile` (`--build-arg SERVICE=<svc>`, mirroring
+`make docker-build`), tagged `latest`, full-sha, and short-sha at
+`ghcr.io/<repo-owner>/<service>:<tag>` (owner-relative; `ghcr.io/mopro/*` under the
+`mopro` org, which `deploy/docker-compose.yml` pins).
+
+Building ≠ deploying. Rolling a new image onto a host is a manual
+`docker compose pull <svc> && docker compose up -d <svc>` step (or automatic if a
+watchtower-style auto-pull agent is configured). When merging a backend PR that
+needs to reach production, confirm the build workflow ran after merge, then trigger
+the host pull. See `docs/deploy.md`.
+
+## `make verify` as the canonical CI gate
+
+`make verify` runs on every PR to `main` via `.github/workflows/make-verify.yml`.
+It orchestrates `go test ./...` (incl. `-tags=integration` for the e2e + property
+suites, with Docker-bootstrapped postgres/redis), `golangci-lint` (v2), module
+boundary checks, and the Flutter WCAG contrast test.
+
+Anything that should block a PR from merging belongs in `make verify` — the CI
+workflow inherits it for free. Local-only gates that aren't wired into `make verify`
+silently rot: see PR #40's `internal/e2e/` revival, where a build-tagged suite went
+uncompilable across several refactors because nothing in CI ran it. (Flipping
+`make-verify` to a *required* status check in branch protection is a separate
+GitHub-UI policy step.)
+
+## Manual image build for hotfixes / out-of-band deploys
+
+If a backend change must reach production without a `main` merge (hotfix, debug
+build), build + push manually:
+
+```sh
+docker build --platform=linux/amd64 --build-arg SERVICE=core-svc \
+  -t ghcr.io/<owner>/core-svc:hotfix-<short_sha> -f build/Dockerfile .
+docker push ghcr.io/<owner>/core-svc:hotfix-<short_sha>
+```
+
+Then `docker compose pull` + `up -d` on the host. Keep `:latest` reserved for the
+`main`-built image — don't push custom tags to `:latest`.
