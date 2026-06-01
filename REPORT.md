@@ -3426,3 +3426,56 @@ Operational + test-hygiene PR; no user-facing capability added.
 - `make verify` now requires Docker for three e2e containers (consistent with existing `pg-ledger-test-up` requirement). `setupLedgerSchema` errors with a clear "run `make e2e-test-up`" message if the ledger container wasn't bootstrapped.
 - e2e containers are reused across runs (fast dev loop); a crashed run can leave dirty state — `make e2e-test-down` resets. `test-e2e` is the throwaway fresh-container variant.
 - e2e adds ~13s (race) to `make verify`.
+
+## CI Infrastructure + Cleanup PR — `chore/ci-infrastructure-and-cleanup`
+
+Closes the recurring gaps from the e2e-revival + runbook-review arc: no image-build workflow, `make verify` not in CI, the 3-session orphan file, and the runbook defects.
+
+### 1. Memory records (§2)
+Two reference memories persisted (apply to all future upload-surface work):
+- `reference_upload_endpoint_201` — `POST /uploads/photos` success is **201 Created**, not 200; assert 2xx.
+- `reference_upload_cdn_base_url` — `CDN_BASE_URL` required alongside `STORAGE_*` or `public_url` is a bare key.
+Also corrected the stale "returns 200" → "201" in the `project_photo_consumer_blocked` index line.
+
+### 2. Runbook corrections (§3) — provided as text, not applied
+The runbook is **not in the repo or any `outputs/` dir** (it's the user's external scratchpad — Claude can't edit it). The three corrections were delivered as text for the user to apply: §1.2 manual rebuild (via `build/Dockerfile --build-arg SERVICE=`, not the nonexistent `cmd/*/Dockerfile`); §3.1 add `CDN_BASE_URL`; §0/§4.3/§4.6/§6 every upload-success `200` → `201 Created` + a new 201-misread failure row.
+
+### 3. Audit findings (§4)
+- Workflows: branch-guard, e2e (Playwright), flutter-ci, golden-rebaseline, openapi-ci — **none build images or run `make verify`** (confirmed).
+- Build: **one** parameterized `build/Dockerfile` (`SERVICE` arg), not per-service; `make docker-build` already mirrors it. Prod compose pins `ghcr.io/mopro/*`.
+- §1.6 **trigger #1 fired** (registry): `ghcr.io/mopro/` not pushable from the `s4l1hs` fork → image-build workflow uses an **owner-relative namespace** (`ghcr.io/<repo-owner>/`) so it's exercisable now and auto-targets `mopro` under that org.
+- Orphan `internal/media/integration_test.go`: **DELETE** — non-compiling (`undefined: media.PhotoAttachment`; surface moved to `internal/attachments`), wrong schema (`media_schema` vs `attachments_schema`), 100% superseded by `internal/attachments/integration_test.go` (PR #34, gated). Removed (was untracked → `rm`, no commit artifact).
+
+### 4. Image-build workflow (§5)
+`.github/workflows/build-images.yml` — main-push + `workflow_dispatch`, matrix `[core-svc, fin-svc, jobs-svc]`, `build/Dockerfile` + `SERVICE`/`BUILD_SHA`/`BUILT_AT` build-args, tags `latest`/full-sha/short-sha, gha cache. `docs/deploy.md` documents owner-relative namespace + manual rollout + hotfix builds.
+**Smoke test not possible pre-merge**: `gh workflow run` → `404: workflow not found on the default branch` — GitHub allows `workflow_dispatch` only once the file is on `main`. Combined with the `ghcr.io/mopro/` org-push block, the first real run is **post-merge** (push trigger on `main`, or dispatch once present). YAML validated (`yaml.safe_load`); recipe mirrors the proven `make docker-build`. Carry: validate the first build post-merge.
+
+### 5. make-verify workflow (§6)
+`.github/workflows/make-verify.yml` — PR-to-main + main-push, Go (from go.mod) + golangci-lint v2.12.2 (matches `.golangci.yml` v2) + Flutter 3.x; Docker preinstalled, sub-targets self-bootstrap postgres/redis; 20-min timeout.
+**Smoke test (PR #41): https://github.com/s4l1hs/Mopro-Shop/actions/runs/26772827566 — FAILURE (~15.3 min), and the failure is the gate doing its job.** It ran `internal/cashback`'s `TestCronProperty_ConcurrentIdempotency` — a property suite that had **never run in CI** (openapi-ci runs `go test` without `-tags=integration`) — and hit a **pgxpool deadlock**: `wallet.PostInTx` (called inside the cashback `WithTx`) acquires a *second* pool connection via `GetAccountCurrencies` (deliberately "reads from pool not tx", `wallet/repository.go:130`); the test fires up to 8 concurrent `PayMonthlyInstallments` on a pool defaulting to `max(4,NumCPU)` = **4 on the 2-vCPU runner** → 8×2-conn-need vs 4 conns → deadlock → 600s package timeout. Passes locally (`make verify` exit 0; 6-core → larger default pool).
+**Decision (user): ship make-verify red + Backlog the fix.** Zero financial code touched here; the workflow is correct and is **not** flipped to a required check until the cashback-pool fix lands.
+
+### 6. Orphan file resolution (§7)
+Deleted (rationale in §3 above + `tool/audit/ci_infra_cleanup_baseline.md`). No REVIVAL_GAP — scenarios preserved in `internal/attachments`.
+
+### 7. Closed gaps
+- "No image-build workflow" (PR #38) → ✅ workflow shipped (owner-relative; first real push validated post-merge / from mopro-org).
+- "`make verify` not in CI" (PR #40) → ✅ make-verify workflow runs on every PR. First run is **red** — it caught a real pre-existing cashback concurrency deadlock (gate working as designed); not yet a required check (pending the Backlogged fix).
+- Orphan `internal/media/integration_test.go` (3-session carry) → ✅ deleted.
+- Runbook defects (201-vs-200, missing `CDN_BASE_URL`, unsatisfiable CI-image-build prereq) → ✅ corrected text provided.
+
+### 8. No parity change
+Operational + infrastructure PR; no user-facing capability.
+
+### 9. Backlog deltas
+- **Fix the cashback cron concurrent-idempotency pgxpool deadlock** (blocks make-verify going green). Two angles: (a) test-only — size `propCronPool`'s `MaxConns` ≥ 2× max concurrency (~16) in `cashback_cron_property_test.go` so the nested acquire has headroom on constrained runners; (b) **engine review (escalate, §12)** — `wallet.PostInTx` needing a 2nd pool connection (`GetAccountCurrencies` reads pool-not-tx by design) means concurrent `PayMonthlyInstallments` callers each need 2 conns; assess whether the prod monthly cron's concurrency + pool sizing can hit the same exhaustion, and whether `GetAccountCurrencies` should route through the tx or the cron should bound concurrency.
+- Validate the first real image push from where `mopro`-org GHCR creds exist (the §1.6#1 carry); reconcile owner-relative vs `ghcr.io/mopro/` once repo ownership is settled.
+- Flip `make-verify` to a required status check (branch-protection UI) — **after** the cashback deadlock fix lands and the gate is green.
+- Watchtower-style auto-pull on the deploy host (build→deploy automation).
+- Image vuln scanning + signing (Trivy + cosign).
+- Multi-arch matrix if ARM hosts surface.
+
+### 10. Risk notes
+- make-verify CI runtime grows as `internal/e2e/` accumulates scenarios (20-min timeout; watch the §1.6#2 15-min budget).
+- Owner-relative registry means a fork's images land under the fork's namespace — prod compose (`ghcr.io/mopro/*`) only matches when the repo is under `mopro`.
+- GHCR rate limits under heavy CI; manual rollout stays manual until auto-pull is wired.
