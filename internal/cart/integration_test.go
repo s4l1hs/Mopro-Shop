@@ -63,6 +63,40 @@ func (alwaysValidCatalog) GetCommissionForCategory(_ context.Context, _ string, 
 	return catalog.CategoryCommission{CategoryID: id}, nil
 }
 
+// REVIVAL_MOCK: catalog.Service grew a discovery/reviews surface (Phase 4.4a+)
+// after this stub was written. These no-op methods satisfy the interface; no
+// behavior is asserted by the cart scenarios (cart only uses GetVariantByID).
+func (alwaysValidCatalog) ListProductsByIDs(_ context.Context, _ []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {
+	return nil, nil
+}
+func (alwaysValidCatalog) HomeRails(_ context.Context, _ string) ([]catalog.HomeRailRow, error) {
+	return nil, nil
+}
+func (alwaysValidCatalog) HomeBanners(_ context.Context) ([]catalog.HomeBannerRow, error) {
+	return nil, nil
+}
+func (alwaysValidCatalog) HomeMoodStories(_ context.Context) ([]catalog.HomeMoodStoryRow, error) {
+	return nil, nil
+}
+func (alwaysValidCatalog) HomeFlashDeals(_ context.Context, _ string, _ *int64) (*catalog.FlashDealsResult, error) {
+	return nil, nil
+}
+func (alwaysValidCatalog) ListReviews(_ context.Context, _ int64, _ catalog.ReviewSort, _, _ int, _ int64) ([]catalog.ProductReviewRow, int, error) {
+	return nil, 0, nil
+}
+func (alwaysValidCatalog) ReviewsSummary(_ context.Context, _ int64) (catalog.ReviewsSummary, error) {
+	return catalog.ReviewsSummary{}, nil
+}
+func (alwaysValidCatalog) ReviewProductID(_ context.Context, _ int64) (int64, error) {
+	return 0, nil
+}
+func (alwaysValidCatalog) ToggleHelpfulVote(_ context.Context, _, _ int64) (catalog.HelpfulVoteResult, error) {
+	return catalog.HelpfulVoteResult{}, nil
+}
+func (alwaysValidCatalog) ListAllVariantStocks(_ context.Context) ([]catalog.VariantStock, error) {
+	return nil, nil
+}
+
 // newIntegService builds a real repo + service backed by the test Redis.
 func newIntegService(t *testing.T) cart.Service {
 	t.Helper()
@@ -230,7 +264,7 @@ func TestIntegration_CommitReservation(t *testing.T) {
 	}
 }
 
-func (alwaysValidCatalog) ListCategories(_ context.Context, _ string) ([]catalog.CategoryRow, error) {
+func (alwaysValidCatalog) ListCategories(_ context.Context, _ string, _ int) ([]catalog.CategoryRow, error) {
 	return nil, nil
 }
 

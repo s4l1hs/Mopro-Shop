@@ -39,7 +39,7 @@ func TestProperty_OTPCodeDistribution(t *testing.T) {
 	signer := newIntegSigner(t)
 	sms := &multiCaptureSMS{}
 
-	svc := identity.NewService(repo, sms, limiter, signer, "TR", "tr-TR", nil)
+	svc := identity.NewService(repo, sms, capturedEmail{}, limiter, signer, "TR", "tr-TR", nil, nil)
 
 	// Use unique phone numbers per call to avoid rate-limit hits.
 	for i := 0; i < n; i++ {
@@ -76,8 +76,13 @@ func TestProperty_OTPCodeDistribution(t *testing.T) {
 		diff := o - expected
 		chi2 += diff * diff / expected
 	}
-	// Chi-square critical value for df=9, p=0.05 is 16.919.
-	const chi2Critical = 16.919
+	// Chi-square critical value for df=9. Use p=0.001 (27.877), not p=0.05
+	// (16.919): this test runs in the make-verify gate on every PR, and a p=0.05
+	// threshold false-fails ~5% of runs on a perfectly-uniform crypto/rand source
+	// (normal statistical variance — an observed chi2=21.933 tripped it in CI
+	// while passing locally). p=0.001 cuts false-fails to ~0.1% while still
+	// catching a genuinely non-uniform generator (a real security regression).
+	const chi2Critical = 27.877
 	if chi2 > chi2Critical {
 		t.Errorf("chi-square test failed: chi2=%.3f > critical=%.3f (observed: %v)", chi2, chi2Critical, observed)
 	}
