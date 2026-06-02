@@ -307,16 +307,26 @@ func (r *walletRepository) GetBalanceStrict(ctx context.Context, accountID int64
 	return balance, nil
 }
 
-// GetSystemState reads the singleton system_state row (id=1) from the pool.
+// GetSystemState reads the singleton system_state row (id=1).
 // Returns a zero-value SystemState{ReadOnly: false} if no row exists (safe default).
-func (r *walletRepository) GetSystemState(ctx context.Context) (SystemState, error) {
+// When tx is non-nil the read runs on the caller's transaction connection; nil
+// falls back to the pool. checkReadOnly passes the active tx so the read-only
+// guard at the top of PostInTx doesn't acquire a second connection inside the
+// SERIALIZABLE tx (deadlock — fix/cashback-pgxpool-deadlock). system_state is a
+// committed singleton config row, so the tx snapshot always sees it.
+func (r *walletRepository) GetSystemState(ctx context.Context, tx pgx.Tx) (SystemState, error) {
 	var s SystemState
 	var reason *string
 	var since *time.Time
-	err := r.pool.QueryRow(ctx,
-		`SELECT read_only, read_only_reason, read_only_since
-         FROM wallet_schema.system_state WHERE id = 1`,
-	).Scan(&s.ReadOnly, &reason, &since)
+	const q = `SELECT read_only, read_only_reason, read_only_since
+         FROM wallet_schema.system_state WHERE id = 1`
+	var row pgx.Row
+	if tx != nil {
+		row = tx.QueryRow(ctx, q)
+	} else {
+		row = r.pool.QueryRow(ctx, q)
+	}
+	err := row.Scan(&s.ReadOnly, &reason, &since)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			// Should never happen after migration 67 seed. Fail safe: not read-only.

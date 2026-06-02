@@ -76,7 +76,7 @@ func (m *mockRepo) GetBalanceMV(_ context.Context, _ int64) (int64, error) {
 func (m *mockRepo) GetBalanceStrict(_ context.Context, _ int64) (int64, error) {
 	return m.balanceStrict, m.balanceStrictErr
 }
-func (m *mockRepo) GetSystemState(_ context.Context) (SystemState, error) {
+func (m *mockRepo) GetSystemState(_ context.Context, _ pgx.Tx) (SystemState, error) {
 	return m.sysState, m.sysStateErr
 }
 func (m *mockRepo) SetSystemState(_ context.Context, _ pgx.Tx, _ bool, _ string) error {
