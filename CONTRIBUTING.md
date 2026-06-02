@@ -748,6 +748,41 @@ on a 2-vCPU runner with pgx's default `MaxConns=4` × 8 concurrent payments. Loc
 6-core machines masked it (pool default is `max(4, NumCPU)`). Fix:
 `fix/cashback-pgxpool-deadlock`.
 
+### Three patterns + a decision tree (`fix/financial-domain-pool-discipline`)
+
+The in-tx read above resolves to one of three patterns:
+
+1. **`tx-routing`** — the read interleaves with writes in the same tx and the rows it
+   needs are committed before the tx opens. Take an optional `pgx.Tx`; read on it when
+   non-nil. Precedents: `wallet.GetAccountCurrencies`, `wallet.GetSystemState`.
+
+2. **`read-snapshot-before-tx`** — the read is a single check-once condition. Read it on
+   the pool **before** opening the tx and pass the value in, rather than reading inside
+   the tx (which both risks the second-connection deadlock and observes the tx's frozen
+   snapshot). Precedent: `sellerpayout.run_daily.go` reads `FindBatchByKey` as a
+   pre-check before its `WithTx`. Use when the read can't interleave with in-tx writes
+   and doesn't need to see concurrent commits.
+
+3. **`documented-pool-access`** — the read **must** observe rows committed by *concurrent*
+   transactions (idempotency lookups on a replay path), so it stays on the pool by
+   design. It gets a doc comment naming the failure mode if "fixed" via tx-routing, and
+   a regression test that depends on the pool access (so the naive fix fails loudly).
+   Precedent: `wallet.GetTransactionByIdempotencyKey`.
+
+**Decision tree** for a read reachable from inside a `WithTx`:
+
+1. Must it observe *concurrent* commits (sibling goroutines racing on the same key)?
+   → **`documented-pool-access`** (stays on pool; add the contract test).
+2. Is it a single check that can run *before* the tx opens? → **`read-snapshot-before-tx`**.
+3. Does it interleave with writes in the tx, on rows committed before tx-open?
+   → **`tx-routing`** (optional `pgx.Tx`, read on it).
+4. Ambiguous? Default to **`tx-routing`** — it's the safest when requirements are unclear.
+
+Every financial ledger write funnels through `wallet.PostInTx`, so this single function
+is the whole in-tx-pool-read surface; `TestProperty_FinancialWritePathDoesNotDeadlock`
+(MaxConns=4, N concurrent, context-timeout deadlock-detection, `pgxpool.Stat` leak check)
+is the non-fragile regression guard for it.
+
 ## Financial-domain change discipline (CLAUDE.md §12)
 
 When changing financial-domain code (`internal/wallet`, `internal/cashback`,

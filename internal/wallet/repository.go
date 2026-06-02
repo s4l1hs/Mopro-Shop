@@ -92,8 +92,24 @@ func (r *walletRepository) InsertTransaction(ctx context.Context, tx pgx.Tx, txn
 	return id, nil
 }
 
-// GetTransactionByIdempotencyKey reads the id of a committed transaction from the pool.
-// Called after ErrDuplicateIdempotency to return the original txnID.
+// GetTransactionByIdempotencyKey reads the id of a committed transaction for key.
+// Called inside PostInTx's tx after ErrDuplicateIdempotency to return the original txnID.
+//
+// documented-pool-access (see CONTRIBUTING "Connection acquisition inside transactions"):
+// this read INTENTIONALLY uses the pool, NOT the calling tx — unlike its tx-routed
+// siblings GetAccountCurrencies/GetSystemState. On the duplicate-replay path it must
+// observe the transaction a *concurrent* worker just committed for the same key; the
+// caller's SERIALIZABLE snapshot was frozen at tx-open and would return not-found,
+// breaking the idempotency contract (PostInTx would error instead of returning the
+// existing txnID). It also cannot be hoisted before the tx — the lookup is conditional
+// on the in-tx 23505 unique violation from InsertTransaction.
+//
+// Do NOT "fix" this to take pgx.Tx like its siblings. TestProperty_IdempotencyLookup-
+// ObservesConcurrentCommits asserts the concurrent-commit observability that depends on
+// this pool access and will fail if you tx-route it. The second-connection-under-tx
+// deadlock risk is covered separately by TestProperty_FinancialWritePathDoesNotDeadlock;
+// because PostInTx is singleton-cron-driven and this branch is the rare duplicate path,
+// it does not meaningfully contend the pool in practice.
 func (r *walletRepository) GetTransactionByIdempotencyKey(ctx context.Context, key string) (int64, error) {
 	var id int64
 	err := r.pool.QueryRow(ctx,

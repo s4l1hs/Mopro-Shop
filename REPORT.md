@@ -3593,3 +3593,51 @@ passed" report was true of the working tree but not of the committed/pushed code
 Caught this turn when the uncommitted changes surfaced. No business-logic change;
 no schema/API contract change.
 >>>>>>> main
+## Financial Domain Pool Discipline PR — `fix/financial-domain-pool-discipline`
+
+Architectural follow-up closing PR #42's deferred Backlog (wallet replay-path + sellerpayout idempotency lookups + a non-fragile pool-acquisition regression test).
+
+### Baseline
+`main@802bfed9` (PR #42/#43/#44 merged); `make verify` green end-to-end.
+
+### Engine review (CLAUDE.md §12) — `tool/audit/financial_pool_discipline_baseline.md`
+**Headline: every financial ledger write funnels through the shared `wallet.PostInTx`** (cashback `run_month.go:203`, sellerpayout `run_daily.go:232`, orderledger `service.go:143` — each inside its own `WithTx`). So the in-tx-pool-read surface is one function, not per-domain.
+
+| Location | Class | Action |
+|----------|-------|--------|
+| `wallet.GetAccountCurrencies` / `GetSystemState` | tx-routing | already done (#42/#43) |
+| `wallet.GetTransactionByIdempotencyKey` (replay, in-tx) | **documented-pool-access** | doc comment + contract test |
+| `sellerpayout.FindBatchByKey` | read-snapshot-before-tx (already — pre-check before `WithTx`) | none |
+| `sellerpayout.FindPayoutByKey` | n/a | **no production caller (dead)** — Backlog cleanup |
+| `orderledger.PostCapture`, `cashback`, `reconcile` | n/a (inherit PostInTx / verification reads outside tx) | none |
+
+**Diverges from the prompt's premise:** no `tx-routing` additions and no `read-snapshot-before-tx` migrations were needed — they're already in place. §1.6 #3 did **not** fire (orderledger shares PostInTx, not a separate pattern). `GetTransactionByIdempotencyKey` genuinely can't be tx-routed (must see sibling-committed rows on the 23505 replay path) nor hoisted (conditional on the in-tx duplicate) → documented-pool-access is correct.
+
+### Patterns applied
+- `tx-routing`: 0 new (2 pre-existing, #42/#43).
+- `read-snapshot-before-tx`: 0 migrations (1 pre-existing — sellerpayout's pre-check — cited as the CONTRIBUTING example).
+- `documented-pool-access`: 1 declared (`GetTransactionByIdempotencyKey` doc comment naming the failure mode + the guarding test).
+- **No code behavior change.**
+
+### Non-fragile regression suite (`internal/wallet/pool_discipline_test.go`)
+- `TestProperty_FinancialWritePathDoesNotDeadlock` — N=8 concurrent `Post` on `MaxConns=4`, unique keys (normal write path), **deadlock-detection via 15s context timeout** (not PR #42's fragile per-goroutine count) + `AcquiredConns()==0` leak check (native `pgxpool.Stat`; note: pgxpool has no `ReleaseCount()`, so the check uses `AcquiredConns`). Guards the #42/#43 tx-routing.
+- `TestProperty_IdempotencyLookupObservesConcurrentCommits` — N=8 concurrent same-key `Post` on an ample pool (the documented-pool-access replay read is a 2nd-conn-by-design, so it's tested for *correctness*, not deadlock-resistance), asserts all observe one committed txn id + exactly one row. Guards the documented-pool-access contract (fails if the lookup is tx-routed).
+- Both pass **20 `-race` runs** locally. Uses native `pgxpool.Stat` (no custom wrapper → survives pgx version bumps).
+
+### Production concurrency
+All three writers are singleton crons / single-consumer handlers (one fin-svc). No non-singleton manual-replay path for PostInTx. Prod safe; the regression tests guarantee correctness under arbitrary concurrency regardless. The singleton invariant is documented, not load-bearing.
+
+### Closed item
+PR #42 deferred Backlog "`fix/financial-domain-pool-discipline`: wallet replay-path + sellerpayout idempotency lookups + non-fragile counting-pool assertion" → ✅.
+
+### New Backlog items
+- Remove dead `sellerpayout.FindPayoutByKey` (interface + repo + mock; no production caller) — left untouched here per scope.
+- (Carried) harden docker-pull bootstraps against Docker Hub flakes before flipping make-verify to required.
+
+### No parity change
+Architectural/test PR; no capability change.
+
+### Risk notes
+- `read-snapshot-before-tx` reads observe state at check-time, not tx-time — fine for the one instance (sellerpayout batch idempotency pre-check, backed by the UNIQUE constraint).
+- The documented-pool-access read remains a 2nd-conn-under-tx acquire on the rare replay path; safe in prod (singleton) but would contend a tiny pool under high same-key concurrency — deliberately not "fixed" (tx-routing breaks correctness); the contract test pins this.
+- `pgxpool.Stat` is stable API; the leak check uses `AcquiredConns()` (no `ReleaseCount()` exists).
