@@ -20,7 +20,11 @@ if ! command -v magick >/dev/null 2>&1; then
   exit 2
 fi
 
-bytes_of() { stat -f '%z' "$1" 2>/dev/null || stat -c '%s' "$1"; }
+# Byte size, cross-platform. GNU stat (Linux/CI) first: `-c %s`. BSD stat (macOS
+# dev) doesn't support -c → fall back to `-f %z`. The previous order tried BSD
+# `-f %z` first, which on Linux means --file-system and emitted filesystem stats
+# (Block size/Inodes…) into the manifest's Bytes column → CI manifest diff.
+bytes_of() { stat -c '%s' "$1" 2>/dev/null || stat -f '%z' "$1"; }
 
 tmp="$(mktemp)"
 {
