@@ -145,9 +145,14 @@ type Repository interface {
 	// GetBalanceStrict computes live balance from wallet_schema.ledger_entries.
 	GetBalanceStrict(ctx context.Context, accountID int64) (int64, error)
 
-	// GetSystemState reads the singleton system_state row from the pool (not tx).
-	// The seed row (id=1) always exists after migration 67; pgx.ErrNoRows is not expected.
-	GetSystemState(ctx context.Context) (SystemState, error)
+	// GetSystemState reads the singleton system_state row (id=1).
+	// When tx is non-nil the read runs on the calling transaction's connection;
+	// nil falls back to the pool. Callers inside a WithTx block MUST pass the tx
+	// to avoid acquiring a second pool connection (deadlock under saturation —
+	// fix/cashback-pgxpool-deadlock). Safe on the tx: system_state is a committed
+	// singleton config row the snapshot always sees.
+	// The seed row always exists after migration 67; pgx.ErrNoRows is not expected.
+	GetSystemState(ctx context.Context, tx pgx.Tx) (SystemState, error)
 
 	// SetSystemState atomically sets read_only + reason + since in a single UPDATE WHERE id=1.
 	// Accepts an optional pgx.Tx; if tx is nil, executes against the pool directly.
