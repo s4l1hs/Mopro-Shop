@@ -12,6 +12,11 @@ linters:
     - revive
     - gosec
     - gocritic
+    - unused       # catch unused unexported code (funcs/types/vars/consts/fields).
+                   # NOTE (golangci-lint v2): `unused` treats EXPORTED library
+                   # symbols as used-externally, so exported-but-unreachable code is
+                   # NOT caught here — the `make deadcode` step (whole-program
+                   # reachability) guards that class. See CONTRIBUTING.
 
   settings:
     # depguard rules from DEVELOPMENT.md § 9 verbatim
