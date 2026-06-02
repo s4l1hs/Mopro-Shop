@@ -1,0 +1,82 @@
+name: deploy
+
+# Manually-triggered deploy: SSH to the deploy host, copy tool/audit/deploy_script.sh,
+# run it. Same script as a manual SSH session — just driven from a CI runner so no
+# human types commands into production. workflow_dispatch ONLY (no auto-deploy on push).
+#
+# Required secrets: DEPLOY_SSH_KEY (ed25519 private key; public half in the host's
+# authorized_keys), DEPLOY_HOST, DEPLOY_PORT.
+#
+# The host's deploy user needs passwordless sudo for docker/tee (the script's
+# privileged calls are individually `sudo docker`/`sudo tee`), so the script is run
+# WITHOUT an outer sudo — avoids matching a single `sudo bash` path against sudoers.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch/tag/SHA to deploy from (default: main)'
+        required: false
+        default: 'main'
+      verify_only:
+        description: 'Non-destructive: SSH/scp/discovery/compose-config only — no pull/up'
+        type: boolean
+        required: false
+        default: true
+      skip_photo_smoke:
+        description: 'Skip STEP 8 photo-upload smoke (when host test creds absent)'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+# Serialize deploys to the single host — a second trigger queues, never races.
+concurrency:
+  group: deploy-host
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout deploy script
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          sparse-checkout: |
+            tool/audit/deploy_script.sh
+          sparse-checkout-cone-mode: false
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # TOFU: trust the host on first connect. Harden later by pinning the
+          # host key in a secret (see REPORT Backlog).
+          ssh-keyscan -p "${{ secrets.DEPLOY_PORT }}" "${{ secrets.DEPLOY_HOST }}" \
+            >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Copy deploy script to host
+        run: |
+          scp -i ~/.ssh/deploy_key -P "${{ secrets.DEPLOY_PORT }}" \
+            tool/audit/deploy_script.sh \
+            "mopro@${{ secrets.DEPLOY_HOST }}:/tmp/deploy_script.sh"
+
+      - name: Execute deploy script on host
+        env:
+          VERIFY_ONLY: ${{ inputs.verify_only }}
+          SKIP_PHOTO_SMOKE: ${{ inputs.skip_photo_smoke }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT }}" \
+            "mopro@${{ secrets.DEPLOY_HOST }}" \
+            "chmod +x /tmp/deploy_script.sh && \
+             VERIFY_ONLY='${VERIFY_ONLY}' SKIP_PHOTO_SMOKE='${SKIP_PHOTO_SMOKE}' \
+             bash /tmp/deploy_script.sh"
+
+      - name: Cleanup SSH key from runner
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

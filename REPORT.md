@@ -3847,3 +3847,45 @@ Operational PR.
 ### Risk notes
 - The Docker Hub `mopro` namespace is now reserved-but-unused — a no-op; nothing pulls or pushes there. If a future decision wants Docker Hub distribution, that's Option B (separate PR: provision `DOCKERHUB_*` + confirm org ownership + add the parallel push).
 - `docker-compose.prod.yml` requires a `deploy/.env` (`env_file: [.env]`); `docker compose config` errors without it — expected, not introduced here.
+
+## Deploy Workflow PR — `chore/add-deploy-workflow`
+
+Turns deploy into `gh workflow run deploy.yml` from anywhere. Based off (and supersedes) `chore/deploy-accumulated-main-and-verify` — which introduced `tool/audit/deploy_script.sh` but was never PR'd; its script + manifest fold into this PR's diff. That branch is deleted after merge.
+
+### Baseline / path-discovery failure
+The prior `deploy_script.sh` hard-coded `cd /opt/mopro`. **User-reported (not Claude-observed — no paste-back from the prior turn):** the manual run found `/opt/mopro` had no compose file → `docker compose` "no configuration file provided." Corroborated as fragile regardless: `docs/runbooks/launch-day.md` assumes `/opt/mopro/docker-compose.yml` while the repo keeps it at `deploy/docker-compose.yml`. Secondary bug: `IMAGE_NS` was written to `/opt/mopro/.env`, but Compose reads `.env` from the compose file's dir.
+
+### Script fix
+Discovery: `COMPOSE_DIR` override → `/opt/mopro/deploy` → `/opt/mopro` → `find` fallback. `IMAGE_NS` now written to `$COMPOSE_DIR/.env` + resolved image refs printed via `docker compose config`. Added two toggles: `VERIFY_ONLY` (plumbing-only — no pull/up/POST) and `SKIP_PHOTO_SMOKE`.
+
+### Workflow YAML (`.github/workflows/deploy.yml`)
+`workflow_dispatch`-only. Inputs: `ref` (default `main`), `verify_only` (**default `true`** — non-destructive), `skip_photo_smoke`. Sparse-checkout of just the script; `ssh-keyscan` TOFU known_hosts; SSH key cleaned up on `always()`; `concurrency: deploy-host` serializes deploys. Script run **without an outer sudo** — its internal `sudo docker`/`sudo tee` are NOPASSWD-covered (avoids matching a single `sudo bash` path against the sudoers list).
+
+### User setup (done, confirmed)
+ed25519 deploy key generated + added to host `authorized_keys`; `NOPASSWD` sudo for docker/tee verified (`sudo -n docker ps` returns containers, no prompt); three secrets added via UI (`DEPLOY_SSH_KEY`, `DEPLOY_HOST`, `DEPLOY_PORT`) — confirmed present via `gh secret list`.
+
+### Smoke test — ⏳ POST-MERGE (GitHub limitation, not a failure)
+`workflow_dispatch` workflows are **only registered/dispatchable from the default branch**, so `deploy.yml` (new on this branch) 404s on `gh workflow run` / REST dispatch until merged to `main`. Confirmed via both `gh` and the REST API + the empty workflow-registry listing. This is the **same constraint that gated build-images in PR #41** (which was validated post-merge). The first deploy-workflow run is therefore necessarily post-merge: `gh workflow run deploy.yml --ref main -f verify_only=true`. YAML validated (`yaml.safe_load`) + bash `-n` on the script pre-merge.
+
+### Closed items
+- "SSH friction for every backend deploy" → ✅ closed (workflow replaces the manual SSH session).
+- "Compose-path discovery bug" (the `/opt/mopro` failure) → ✅ closed (script discovery).
+- "IMAGE_NS in wrong `.env`" → ✅ closed (writes to `$COMPOSE_DIR/.env`).
+
+### No parity change
+Operational PR.
+
+### Backlog (new + carried)
+- **Validate the first deploy-workflow run post-merge** (`verify_only=true`, then a real `verify_only=false` deploy) — carry, per the workflow_dispatch limitation.
+- Auto-deploy on tag push / `main` merge (different risk profile).
+- SSH key rotation policy (passwordless key, no expiry).
+- Pin the host key in a secret instead of `ssh-keyscan` TOFU.
+- Auto-rollback on failed health checks.
+- Deploy notifications (Slack on success/failure).
+- Multi-host deploy fan-out (when scaled past one host).
+- The accumulated-`main` deploy + photo-upload gate (the predecessor's original mission) is still un-run — invoke the workflow with `verify_only=false` once it's on `main`, then the photo gate per `photo_upload_ui_followup_prompt.md`.
+
+### Risk notes
+- The passwordless SSH key in Actions secrets grants whoever can trigger the workflow `sudo docker`/`tee` on prod; key compromise = host access. Rotation + host-key pinning are Backlog.
+- `ssh-keyscan` TOFU trusts the host on first connect (MITM window on first run).
+- `concurrency: deploy-host` queues a second trigger rather than racing, but does not guard against a deploy triggered while a manual SSH session is also mutating the host.

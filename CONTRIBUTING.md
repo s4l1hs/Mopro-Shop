@@ -812,6 +812,55 @@ docker push ghcr.io/<owner>/core-svc:hotfix-<short_sha>
 Then `docker compose pull` + `up -d` on the host. Keep `:latest` reserved for the
 `main`-built image — don't push custom tags to `:latest`.
 
+## Deploy via workflow_dispatch
+
+Deploys run through `.github/workflows/deploy.yml`, triggered manually:
+
+```sh
+gh workflow run deploy.yml --ref main                      # real deploy
+gh workflow run deploy.yml --ref main -f verify_only=true  # non-destructive check
+gh run watch
+```
+
+The workflow SSHes to the deploy host (stored SSH key), `scp`s
+`tool/audit/deploy_script.sh`, and runs it — full output streams into the run log,
+same as a manual SSH session, but nobody types commands into production. Inputs:
+
+- `ref` — branch/tag/SHA to deploy from (default `main`). Lets a feature branch's
+  deploy be exercised before merge.
+- `verify_only` (**default `true`**) — non-destructive: SSH + scp + compose-dir
+  discovery + `docker compose config`, **no** `pull`/`up`/restart and no upload POST.
+  Set `verify_only=false` for an actual deploy.
+- `skip_photo_smoke` — skip STEP 8 (photo-upload smoke) when host test creds absent.
+
+Required secrets (Settings → Secrets and variables → Actions): `DEPLOY_SSH_KEY`
+(ed25519 private key; public half in the host's `authorized_keys`), `DEPLOY_HOST`,
+`DEPLOY_PORT`. The deploy user needs **passwordless sudo** for `docker`/`tee` —
+the workflow runs the script over a non-interactive SSH session, so a sudo password
+prompt would hang the job.
+
+Trigger is `workflow_dispatch` only — no auto-deploy on push (a wrong merge auto-
+shipping to prod is a different risk profile; Backlog). **A newly-added or renamed
+deploy workflow can't be dispatched until it's merged to the default branch** —
+GitHub only registers `workflow_dispatch` workflows from the default branch, so the
+first run of any change to `deploy.yml` is necessarily post-merge (same constraint
+that gated build-images in PR #41).
+
+## Compose-path discovery (deploy script)
+
+`tool/audit/deploy_script.sh` discovers the compose directory rather than assuming
+one (a hard-coded `cd /opt/mopro` failed when the host kept compose in a
+subdirectory). Order: `COMPOSE_DIR` env override → `/opt/mopro/deploy` →
+`/opt/mopro` → `find / -maxdepth 4 -name 'docker-compose*.yml'`. Override when the
+host differs:
+
+```sh
+COMPOSE_DIR=/srv/mopro bash deploy_script.sh
+```
+
+`IMAGE_NS` is written to `$COMPOSE_DIR/.env` (where Compose actually reads it), not
+an assumed `/opt/mopro/.env`.
+
 ## Connection acquisition inside transactions
 
 A function called from within an active `pgx.Tx` block must use that tx for its
