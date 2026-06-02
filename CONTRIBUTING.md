@@ -557,6 +557,33 @@ allowlist contradicted the locked design doc's manual-event decision. Catching
 these in the audit (and reconciling toward the locked design, not the prompt's
 incidental wording) prevents wrong assumptions from cascading into implementation.
 
+## Cleanup audits
+
+Periodically (every ~6 months or ~20 PRs, whichever first), run a cleanup audit
+producing `CLEANUP_AUDIT.md` at repo root. It inventories dead code, unused assets,
+orphan dependencies, stale docs, and duplicate utilities across all stacks. **Output
+is read-only**; subsequent focused PRs act on its §10 roadmap. Run via the
+`chore/cleanup-audit` pattern; each domain (backend / frontend / docs / tooling) gets
+its own section so removal PRs target one domain cleanly. Findings carry severity
+(high/med/low) + effort (XS/S/M/L); raw analyzer outputs are committed under
+`tool/audit/cleanup_raw_outputs/` as evidence. Future audits supersede prior ones —
+keep only the most recent in repo root.
+
+Hard-won lessons from the first audit (`main@ca739bf4`):
+- **Know what the gates already enforce.** `flutter analyze` (very_good_analysis) and
+  `go test`/`go build` pre-empt whole classes of deadness, so don't re-report them.
+  Conversely, `.golangci.yml` does **not** enable `unused`/`deadcode` — that is exactly
+  where Go dead code hides. Check the config before trusting "clean."
+- **Grep cross-file deadness is false-positive-heavy.** Riverpod Notifier/State/provider
+  classes (referenced via their provider, by type inference, or composed file-internally)
+  read as "0 references" but are live. easy_localization i18n keys and interpolated golden
+  names (`'goldens/refund_card_${status}.png'`) defeat literal grep. **Label these as
+  candidate pools requiring manual review or a real usage tool — never as a dead list a
+  removal PR can act on blindly.** Verify a sample before classifying.
+- **The right tool beats grep:** `staticcheck -checks=U1000` (unexported) +
+  `deadcode -test ./...` (whole-program reachability) are reliable for Go; spot-check that
+  a flagged symbol isn't reachable only behind a build tag.
+
 ## Adaptive presenter
 
 One content widget, two presenters chosen by breakpoint. `LoginRequired`

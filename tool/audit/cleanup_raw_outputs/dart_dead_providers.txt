@@ -1,0 +1,13 @@
+apiClientProvider — lib/api/client.dart
+authInterceptorProvider — lib/core/di/providers.dart
+cartApiProvider — lib/api/client.dart
+cartRepositoryProvider — lib/features/cart/application/cart_provider.dart
+checkoutRepositoryProvider — lib/features/checkout/application/checkout_controller.dart
+guestCartCountProvider — lib/features/cart/application/guest_cart_provider.dart
+imageProvider — lib/features/catalog/widgets/pdp_image_gallery.dart
+localeStateProvider — lib/core/di/providers.dart
+notificationPreferencesProvider — lib/features/notifications/notification_preferences_screen.dart
+ordersApiProvider — lib/api/client.dart
+productsByCategoryProvider — lib/features/catalog/providers/products_by_category_provider.dart
+secureStorageProvider — lib/core/di/providers.dart
+sellerApiProvider — lib/api/client.dart

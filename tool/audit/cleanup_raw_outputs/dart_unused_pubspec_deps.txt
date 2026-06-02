@@ -1,0 +1,6 @@
+# Confirmed unused (0 `package:<dep>/` imports in mobile/lib or mobile/test):
+carousel_slider
+fl_chart
+json_annotation
+# Implicit (icon font) — NOT a finding, keep:
+# cupertino_icons
