@@ -62,7 +62,7 @@ func (s *walletService) PostInTx(ctx context.Context, tx pgx.Tx, in ledger.PostI
 	if s.outboxRepo == nil {
 		return 0, ErrOutboxNotConfigured
 	}
-	if err := s.checkReadOnly(ctx); err != nil {
+	if err := s.checkReadOnly(ctx, tx); err != nil {
 		return 0, err
 	}
 
@@ -271,14 +271,17 @@ func (s *walletService) openOrFind(ctx context.Context, accountType, ownerType s
 // checkReadOnly returns ErrSystemReadOnly if system_state.read_only=TRUE.
 // Uses a 10-second TTL cache to avoid hitting the DB on every PostInTx call.
 // On DB error, fails open (proceeds as if not read-only) to avoid blocking healthy writes.
-func (s *walletService) checkReadOnly(ctx context.Context) error {
+// tx is the caller's active transaction (PostInTx); on a cache miss the
+// system_state read runs on it rather than acquiring a second pool connection.
+// Pass nil when not inside a tx.
+func (s *walletService) checkReadOnly(ctx context.Context, tx pgx.Tx) error {
 	if time.Since(time.Unix(0, s.sysRefreshedAt.Load())) < sysStateTTL {
 		if s.sysReadOnly.Load() {
 			return ErrSystemReadOnly
 		}
 		return nil
 	}
-	state, err := s.repo.GetSystemState(ctx)
+	state, err := s.repo.GetSystemState(ctx, tx)
 	if err != nil {
 		s.log.WarnContext(ctx, "wallet: system_state refresh failed, proceeding", "err", err)
 		return nil // fail open
@@ -300,7 +303,8 @@ func (s *walletService) StartRefresher(ctx context.Context) {
 		for {
 			select {
 			case <-ticker.C:
-				state, err := s.repo.GetSystemState(ctx)
+				// Background refresher is not inside a tx → pool read.
+				state, err := s.repo.GetSystemState(ctx, nil)
 				if err != nil {
 					s.log.WarnContext(ctx, "wallet: system_state background refresh failed", "err", err)
 					continue
