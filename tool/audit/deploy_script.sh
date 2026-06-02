@@ -15,11 +15,38 @@ OUT_DIR="/tmp/deploy_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$OUT_DIR"
 exec > >(tee "$OUT_DIR/full_output.log") 2>&1
 
-COMPOSE_DIR="/opt/mopro"
 SERVICES="core-svc fin-svc jobs-svc"
 EXPECTED_SHA_PREFIX="7b8d96cc"   # PR #49 = last backend build; :latest points here
 
-cd "$COMPOSE_DIR" || { echo "FATAL: $COMPOSE_DIR missing"; exit 1; }
+# VERIFY_ONLY=true → exercise SSH/scp/discovery/compose-config WITHOUT pull/up or the
+#   photo-upload POST. Non-destructive; used to smoke-test the deploy workflow.
+# SKIP_PHOTO_SMOKE=true → skip only STEP 8 (when host test creds aren't provisioned).
+VERIFY_ONLY="${VERIFY_ONLY:-false}"
+SKIP_PHOTO_SMOKE="${SKIP_PHOTO_SMOKE:-false}"
+echo "MODE: VERIFY_ONLY=$VERIFY_ONLY  SKIP_PHOTO_SMOKE=$SKIP_PHOTO_SMOKE"
+echo
+
+# ── Compose directory discovery ─────────────────────────────────────────────────
+# Override:  COMPOSE_DIR=/path sudo bash deploy_script.sh
+# Else tries: /opt/mopro/deploy → /opt/mopro → find / (maxdepth 4).
+has_compose() { [ -f "$1/docker-compose.yml" ] || [ -f "$1/docker-compose.prod.yml" ]; }
+if [ -n "${COMPOSE_DIR:-}" ]; then
+  has_compose "$COMPOSE_DIR" || { echo "FATAL: COMPOSE_DIR=$COMPOSE_DIR has no docker-compose*.yml"; exit 1; }
+  echo "Using COMPOSE_DIR=$COMPOSE_DIR (env override)"
+elif has_compose /opt/mopro/deploy; then
+  COMPOSE_DIR=/opt/mopro/deploy; echo "Discovered: $COMPOSE_DIR"
+elif has_compose /opt/mopro; then
+  COMPOSE_DIR=/opt/mopro; echo "Discovered: $COMPOSE_DIR"
+else
+  echo "Compose file not in known locations; searching (find, maxdepth 4)..."
+  FOUND=$(find / -maxdepth 4 -name 'docker-compose*.yml' \
+    -not -path '*/proc/*' -not -path '*/sys/*' -not -path '*/.git/*' 2>/dev/null | head -1)
+  [ -n "$FOUND" ] || { echo "FATAL: no docker-compose*.yml found anywhere on host"; exit 1; }
+  COMPOSE_DIR=$(dirname "$FOUND"); echo "Discovered (via find): $COMPOSE_DIR"
+fi
+cd "$COMPOSE_DIR" || { echo "FATAL: cd $COMPOSE_DIR failed"; exit 1; }
+echo "Working directory: $(pwd)"
+echo
 dc() { sudo docker compose "$@"; }
 
 echo "===== STEP 0: PRE-DEPLOY STATE ====="
@@ -31,15 +58,25 @@ echo "--- pre-deploy core-svc /__version (current SHA before rollout) ---"
 curl -fsS -m 5 http://localhost/__version || echo "(unreachable — service may be down pre-deploy)"
 echo; echo
 
-echo "===== STEP 1: SET IMAGE_NS ====="
-if grep -q '^IMAGE_NS=' "$COMPOSE_DIR/.env" 2>/dev/null; then
-  echo "Already set: $(grep '^IMAGE_NS=' "$COMPOSE_DIR/.env" | head -1)"
+echo "===== STEP 1: SET IMAGE_NS in compose .env ====="
+# Compose reads .env from the compose file's directory — write IMAGE_NS THERE,
+# not an assumed /opt/mopro/.env (today's bug: it landed where compose never reads).
+COMPOSE_ENV="$COMPOSE_DIR/.env"
+if grep -q '^IMAGE_NS=' "$COMPOSE_ENV" 2>/dev/null; then
+  echo "Already set in $COMPOSE_ENV: $(grep '^IMAGE_NS=' "$COMPOSE_ENV" | head -1)"
 else
-  echo 'IMAGE_NS=s4l1hs' | sudo tee -a "$COMPOSE_DIR/.env" > /dev/null
-  echo "Set: IMAGE_NS=s4l1hs"
+  echo 'IMAGE_NS=s4l1hs' | sudo tee -a "$COMPOSE_ENV" > /dev/null
+  echo "Set in $COMPOSE_ENV: IMAGE_NS=s4l1hs"
 fi
 echo
+echo "--- resolved image refs (docker compose config) ---"
+dc config 2>/dev/null | grep -E 'image: ghcr' | sort -u || echo "(compose config produced no ghcr image refs — check parse)"
+echo
 
+if [ "$VERIFY_ONLY" = "true" ]; then
+  echo "===== STEP 2-3: SKIPPED (VERIFY_ONLY=true — no pull/up; plumbing-only run) ====="
+  echo
+else
 echo "===== STEP 2: DOCKER COMPOSE PULL ====="
 dc pull $SERVICES
 echo
@@ -48,6 +85,7 @@ echo "===== STEP 3: DOCKER COMPOSE UP ====="
 dc up -d $SERVICES
 sleep 15
 echo
+fi
 
 echo "===== STEP 4: POST-DEPLOY STATE ====="
 dc ps
@@ -88,7 +126,11 @@ echo
 
 echo "===== STEP 8: PHOTO UPLOAD SMOKE TEST ====="
 # Requires test creds in /root/.deploy_test_creds:  TEST_EMAIL=... / TEST_PASSWORD=...
-if [ -f /root/.deploy_test_creds ]; then
+if [ "$VERIFY_ONLY" = "true" ]; then
+  echo "SKIPPED — VERIFY_ONLY=true (the upload POST is a write; not run in plumbing-only mode)."
+elif [ "$SKIP_PHOTO_SMOKE" = "true" ]; then
+  echo "SKIPPED via SKIP_PHOTO_SMOKE=true."
+elif [ -f /root/.deploy_test_creds ]; then
   # shellcheck disable=SC1091
   . /root/.deploy_test_creds
   TOKEN=$(curl -sS -m 10 -X POST http://localhost/auth/login \
