@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/utils/coin_formatter.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
+import 'package:mopro/core/widgets/loading_spinner.dart';
 import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 import 'package:mopro/features/wallet/providers/plan_detail_provider.dart';
 import 'package:mopro/features/wallet/widgets/plan_timeline_row.dart';
@@ -51,7 +52,7 @@ class PlanDetailScreen extends ConsumerWidget {
   ) {
     if (state.plan.isLoading) {
       return [
-        const SliverToBoxAdapter(child: _LoadingSpinner()),
+        const SliverToBoxAdapter(child: LoadingSpinner()),
       ];
     }
     if (state.plan.hasError) {
@@ -95,7 +96,7 @@ class PlanDetailScreen extends ConsumerWidget {
     if (state.payments.isLoading) {
       return [
         header,
-        const SliverToBoxAdapter(child: _LoadingSpinner()),
+        const SliverToBoxAdapter(child: LoadingSpinner()),
       ];
     }
     if (state.payments.hasError) {
@@ -336,16 +337,6 @@ class _EmptyPayments extends StatelessWidget {
       ),
     );
   }
-}
-
-class _LoadingSpinner extends StatelessWidget {
-  const _LoadingSpinner();
-
-  @override
-  Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.all(32),
-        child: Center(child: CircularProgressIndicator()),
-      );
 }
 
 class _LoadMoreButton extends StatelessWidget {
