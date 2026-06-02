@@ -39,7 +39,7 @@ func TestProperty_OTPCodeDistribution(t *testing.T) {
 	signer := newIntegSigner(t)
 	sms := &multiCaptureSMS{}
 
-	svc := identity.NewService(repo, sms, limiter, signer, "TR", "tr-TR", nil)
+	svc := identity.NewService(repo, sms, capturedEmail{}, limiter, signer, "TR", "tr-TR", nil, nil)
 
 	// Use unique phone numbers per call to avoid rate-limit hits.
 	for i := 0; i < n; i++ {

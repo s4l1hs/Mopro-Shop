@@ -538,7 +538,7 @@ func TestInteg_Service_OTPVerifyFlow(t *testing.T) {
 	smsMock := &capturedSMS{}
 	signer := newIntegSigner(t)
 
-	svc := identity.NewService(repo, smsMock, limiter, signer, "TR", "tr-TR", nil)
+	svc := identity.NewService(repo, smsMock, capturedEmail{}, limiter, signer, "TR", "tr-TR", nil, nil)
 
 	phone := fmt.Sprintf("+9058%08d", time.Now().UnixNano()%100000000)
 
@@ -596,7 +596,7 @@ func TestIntegration_TokenReuse_RevokesEntireFamily(t *testing.T) {
 	limiter := ratelimit.New(integRedis)
 	sms := &capturedSMS{}
 	signer := newIntegSigner(t)
-	svc := identity.NewService(repo, sms, limiter, signer, "TR", "tr-TR", nil)
+	svc := identity.NewService(repo, sms, capturedEmail{}, limiter, signer, "TR", "tr-TR", nil, nil)
 
 	phone := fmt.Sprintf("+9062%07d", time.Now().UnixNano()%10000000)
 
@@ -662,7 +662,7 @@ func TestIntegration_StepUpOTPFlow(t *testing.T) {
 	limiter := ratelimit.New(integRedis)
 	sms := &capturedSMS{}
 	signer := newIntegSigner(t)
-	svc := identity.NewService(repo, sms, limiter, signer, "TR", "tr-TR", nil)
+	svc := identity.NewService(repo, sms, capturedEmail{}, limiter, signer, "TR", "tr-TR", nil, nil)
 
 	phone := fmt.Sprintf("+9063%07d", time.Now().UnixNano()%10000000)
 
@@ -750,3 +750,11 @@ func (c *capturedSMS) Send(_ context.Context, to, code string) error {
 	c.code = code
 	return nil
 }
+
+// capturedEmail is a no-op identity/email.Provider fake. REVIVAL_MOCK:
+// identity.NewService grew an email.Provider param; these integration scenarios
+// exercise the SMS-OTP flows, so email sends are no-ops (no behavior asserted).
+type capturedEmail struct{}
+
+func (capturedEmail) SendVerification(_ context.Context, _, _ string) error  { return nil }
+func (capturedEmail) SendPasswordReset(_ context.Context, _, _ string) error { return nil }

@@ -31,7 +31,7 @@ func newE2ESvc(t *testing.T, sms *capturedSMS) identity.Service {
 	repo := newIntegRepo(t)
 	limiter := ratelimit.New(integRedis)
 	signer := newIntegSigner(t)
-	return identity.NewService(repo, sms, limiter, signer, "TR", "tr-TR", nil)
+	return identity.NewService(repo, sms, capturedEmail{}, limiter, signer, "TR", "tr-TR", nil, nil)
 }
 
 // e2ePhone generates a unique E.164 phone for each test to avoid DB collisions.
