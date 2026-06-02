@@ -3765,3 +3765,46 @@ Operational PR.
 - Branch protection now **requires `verify` to merge** — any flake in the gate becomes a merge blocker. `enforce_admins=false` is the relief valve for the solo owner; revisit if the repo gains collaborators.
 - The deploy half assumes a reachable host with a resolved image namespace; if no watchtower-style auto-pull is configured (`docs/deploy.md` says it is not), manual `docker compose pull` is the standing rollout pattern.
 - This entry records branch protection as DONE and deploy/photo-gate as PENDING **honestly** — they are not closeable without host access that this environment lacks.
+
+## Parameterize Image Namespace PR — `chore/parameterize-image-namespace`
+
+Closes PR #50's "namespace mismatch — parameterize IMAGE_NS" Backlog item. Small, focused: compose + docs only, no code.
+
+### Baseline
+CI (`build-images.yml:43-48`) pushes owner-relative → `ghcr.io/s4l1hs/<svc>`. `deploy/docker-compose.yml` pinned `ghcr.io/mopro/<svc>` (an org namespace that doesn't exist under the current owner) → `docker compose pull` 404s. (GHCR version listing unavailable from here — `gh` token lacks `read:packages`; the green `build (<svc>)` check-runs are the push evidence.)
+
+### Audit findings (`tool/audit/image_namespace_baseline.md`)
+- **Parameterize:** `deploy/docker-compose.yml:382/421/454` (ghcr puller — the real mismatch) and `deploy/docker-compose.prod.yml:364/398/427` (Docker Hub `mopro/*` — same `IMAGE_NS` knob, but a *different registry* CI never pushes to → flagged Backlog, registry not changed).
+- **Drive-by fix:** `docs/runbooks/launch-day.md:154` — doubly-stale `ghcr.io/salihsefer36/mopro-core-svc` (owner is `s4l1hs` not `salihsefer36`; image is `core-svc` not `mopro-core-svc`).
+- **Doc updates:** `docs/deploy.md`, `CONTRIBUTING.md`.
+- **Left as-is:** `PROMPTS.md`/`INFRASTRUCTURE.md`/`SYSTEM_AUDIT.md` (descriptive/canonical; `mopro` default keeps them accurate), the `build-images.yml` pusher (non-goal), `<owner>`-placeholder hotfix examples, and historical REPORT/audit records.
+
+### Parameterization applied
+`ghcr.io/mopro/<svc>` → `ghcr.io/${IMAGE_NS:-mopro}/<svc>` (dev compose); `mopro/<svc>` → `${IMAGE_NS:-mopro}/<svc>` (prod). Backward-compatible (default `mopro`), forward-compatible (org migration = clear the override).
+
+### Smoke tests (`docker compose config`)
+| Path | Dev compose (ghcr) | Prod compose (Docker Hub) |
+|---|---|---|
+| Default (no var) | `ghcr.io/mopro/*:latest` ✅ | `mopro/*:latest` ✅ |
+| `IMAGE_NS=s4l1hs` (env) | `ghcr.io/s4l1hs/*:latest` ✅ | `s4l1hs/*:latest` ✅ |
+| `.env` file (host pattern) | `ghcr.io/s4l1hs/*:latest` ✅ | — |
+
+§4.4 (live `docker pull`) deferred to the user's host — needs GHCR creds not present here.
+
+### Closed item
+PR #50 Backlog "Resolve the CI↔deploy namespace mismatch" → ✅ (the IMAGE_NS parameterization half). The deeper *registry* discrepancy (prod compose on Docker Hub vs. CI's GHCR) is split out as a new Backlog item below.
+
+### Operational follow-up (user, one line on the host)
+```sh
+echo 'IMAGE_NS=s4l1hs' | sudo tee -a /opt/mopro/.env   # then docker compose pull
+```
+Ships the capability; setting the host env is the user's ops action. After this, the prior prompt's §5 deploy (`IMAGE_NS=s4l1hs docker compose pull`) resolves to the pushed images.
+
+### New Backlog item
+- **Reconcile `docker-compose.prod.yml`'s registry** — it targets Docker Hub `<ns>/<svc>`, but CI pushes to GHCR. Either repoint prod to `ghcr.io/<ns>/<svc>` or stand up a Docker Hub mirror. Out of this PR's namespace-only scope.
+
+### Org-migration optionality
+`mopro` default keeps the migration path open with zero code change: if the repo moves to a `mopro` org, hosts clear `IMAGE_NS` and pulls resolve to `ghcr.io/mopro/*`.
+
+### No parity change
+Operational PR.
