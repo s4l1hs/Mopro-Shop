@@ -738,8 +738,21 @@ Backend service images (`core-svc`, `fin-svc`, `jobs-svc`) build automatically o
 `main` push via `.github/workflows/build-images.yml` — each from the single
 parameterized `build/Dockerfile` (`--build-arg SERVICE=<svc>`, mirroring
 `make docker-build`), tagged `latest`, full-sha, and short-sha at
-`ghcr.io/<repo-owner>/<service>:<tag>` (owner-relative; `ghcr.io/mopro/*` under the
-`mopro` org, which `deploy/docker-compose.yml` pins).
+`ghcr.io/<repo-owner>/<service>:<tag>` — **owner-relative**: it resolves to
+`ghcr.io/s4l1hs/*` on the current fork, and `ghcr.io/mopro/*` if/when the repo
+migrates to the `mopro` org.
+
+**Image namespace parameterization.** `deploy/docker-compose.yml` pulls
+`ghcr.io/${IMAGE_NS:-mopro}/<service>`, so the puller can be pointed at the actual
+push owner without editing the file: set `IMAGE_NS` in the host's `.env` (e.g.
+`IMAGE_NS=s4l1hs`). The default `mopro` exists for the eventual org migration —
+until then, hosts set `IMAGE_NS` to the current owner; after a move to `mopro`,
+they clear the override. A PR that touches deploy config must verify
+`docker compose config` resolves correctly under **both** the default and the
+override (both paths must work). `docker-compose.prod.yml` honors the same
+`IMAGE_NS` knob, but still targets the Docker Hub registry (`<ns>/<svc>`, no
+`ghcr.io`) — reconciling that registry with the GHCR push target is a separate
+Backlog item.
 
 Building ≠ deploying. Rolling a new image onto a host is a manual
 `docker compose pull <svc> && docker compose up -d <svc>` step (or automatic if a
@@ -757,9 +770,11 @@ boundary checks, and the Flutter WCAG contrast test.
 Anything that should block a PR from merging belongs in `make verify` — the CI
 workflow inherits it for free. Local-only gates that aren't wired into `make verify`
 silently rot: see PR #40's `internal/e2e/` revival, where a build-tagged suite went
-uncompilable across several refactors because nothing in CI ran it. (Flipping
-`make-verify` to a *required* status check in branch protection is a separate
-GitHub-UI policy step.)
+uncompilable across several refactors because nothing in CI ran it. The gate is
+now a **required** status check on `main` (PR #50): the required-check context is
+`verify` (the *job* name), not `make-verify` (the *workflow* name) — branch
+protection keys on the job. `enforce_admins=false` keeps the solo owner from being
+locked out by a gate flake while still blocking non-admins on a red/missing `verify`.
 
 ## Manual image build for hotfixes / out-of-band deploys
 

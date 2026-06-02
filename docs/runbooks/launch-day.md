@@ -150,8 +150,8 @@ If a critical failure occurs within the first hour:
 ssh -p 4625 mopro@195.85.207.92
 
 cd /opt/mopro
-# List available image tags
-sudo docker images ghcr.io/salihsefer36/mopro-core-svc
+# List available image tags (IMAGE_NS matches the GHCR push owner; see docs/deploy.md)
+sudo docker images "ghcr.io/${IMAGE_NS:-mopro}/core-svc"
 
 # Roll back to previous tag
 CORE_TAG=<previous-tag> FIN_TAG=<previous-tag> JOBS_TAG=<previous-tag> \
