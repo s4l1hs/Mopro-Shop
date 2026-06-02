@@ -3630,6 +3630,9 @@ All three writers are singleton crons / single-consumer handlers (one fin-svc). 
 ### Closed item
 PR #42 deferred Backlog "`fix/financial-domain-pool-discipline`: wallet replay-path + sellerpayout idempotency lookups + non-fragile counting-pool assertion" → ✅.
 
+### Drive-by fix
+De-flaked TestProperty_OTPCodeDistribution: its chi-square used p=0.05 (critical 16.919, df=9) → ~5% false-fail per run on a uniform crypto/rand source. Gating it on every PR surfaced the flake (CI chi2=21.933). Tightened to p=0.001 (27.877): ~0.1% false-fail, still catches a genuinely non-uniform OTP generator (security property). Test-robustness only; generator unchanged.
+
 ### New Backlog items
 - Remove dead `sellerpayout.FindPayoutByKey` (interface + repo + mock; no production caller) — left untouched here per scope.
 - (Carried) harden docker-pull bootstraps against Docker Hub flakes before flipping make-verify to required.
