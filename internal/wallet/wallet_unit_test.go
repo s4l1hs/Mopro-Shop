@@ -107,29 +107,6 @@ func newUnitSvc(repo Repository, ob outbox.Repository) Service {
 	return NewService(repo, ob, nil)
 }
 
-func validInput(currencies map[int64]string) ledger.PostInput {
-	ids := make([]int64, 0, len(currencies))
-	entries := make([]ledger.Entry, 0, len(currencies))
-	first := true
-	for id := range currencies {
-		dir := ledger.Credit
-		if first {
-			dir = ledger.Debit
-			first = false
-		}
-		ids = append(ids, id)
-		entries = append(entries, ledger.Entry{AccountID: id, Direction: dir, AmountMinor: 100})
-	}
-	_ = ids
-	return ledger.PostInput{
-		Type:           "cashback_payment",
-		IdempotencyKey: "unit-test:key-1",
-		Market:         "TR",
-		Currency:       "TRY_COIN",
-		Entries:        entries,
-	}
-}
-
 // ── validation tests ──────────────────────────────────────────────────────────
 
 func TestPostInTx_EmptyIdempotencyKey(t *testing.T) {
