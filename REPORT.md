@@ -3808,3 +3808,42 @@ Ships the capability; setting the host env is the user's ops action. After this,
 
 ### No parity change
 Operational PR.
+
+## Reconcile Prod Registry PR — `chore/reconcile-prod-registry`
+
+Closes the backlog item the PR above opened. Single-line-per-service compose change + docs.
+
+### Baseline
+**CI pushes to GHCR; prod pulled from Docker Hub; nothing connected them.** `build-images.yml` → `ghcr.io/s4l1hs/<svc>`; `docker-compose.prod.yml` → `${IMAGE_NS:-mopro}/<svc>` (bare = Docker Hub). PR #51 parameterized the *namespace* of both but couldn't bridge the *registry*.
+
+### Audit findings (`tool/audit/reconcile_prod_registry_baseline.md`)
+- `gh secret list` **empty** — no `DOCKERHUB_*` creds; Docker Hub push never wired.
+- Docker Hub `mopro` namespace exists (`/orgs/mopro` → 200) but `mopro/core-svc` repo 404s (never pushed); no evidence this account owns it.
+- No new operational-file drift beyond the registry one (PR #51 already reconciled the dev compose + docs).
+
+### Decision — Option A (GHCR), user-selected via AskUserQuestion
+Rationale: GHCR is CI's actual working output; Docker Hub (Option B) would need creds + org ownership + a workflow change before it could build at all. Option A is a one-file change matching the dev compose.
+
+### Fix applied
+`deploy/docker-compose.prod.yml`: `${IMAGE_NS:-mopro}/<svc>` → `ghcr.io/${IMAGE_NS:-mopro}/<svc>` (core/fin/jobs). Both compose files now identical in registry + namespace form.
+
+### Smoke tests (`docker compose config`, temp `.env`)
+| Path | Resolves to |
+|---|---|
+| Default (no `IMAGE_NS`) | `ghcr.io/mopro/<svc>:latest` ✅ |
+| `IMAGE_NS=s4l1hs` | `ghcr.io/s4l1hs/<svc>:latest` ✅ |
+
+No bare Docker Hub refs remain (`grep` confirmed). Live `docker pull` deferred to the host (GHCR creds not present here).
+
+### Closed item
+PR #51 Backlog "Reconcile `docker-compose.prod.yml`'s registry" → ✅.
+
+### Operational follow-up (user)
+None beyond PR #51's `IMAGE_NS=s4l1hs` in the host `.env` — which now applies uniformly to whichever compose file the host uses (dev or prod). No Docker Hub secrets needed (Option A).
+
+### No parity change
+Operational PR.
+
+### Risk notes
+- The Docker Hub `mopro` namespace is now reserved-but-unused — a no-op; nothing pulls or pushes there. If a future decision wants Docker Hub distribution, that's Option B (separate PR: provision `DOCKERHUB_*` + confirm org ownership + add the parallel push).
+- `docker-compose.prod.yml` requires a `deploy/.env` (`env_file: [.env]`); `docker compose config` errors without it — expected, not introduced here.
