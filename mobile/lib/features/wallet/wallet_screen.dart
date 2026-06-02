@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/utils/coin_formatter.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
+import 'package:mopro/core/widgets/loading_spinner.dart';
 import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 import 'package:mopro/features/wallet/providers/cashback_plans_provider.dart';
 import 'package:mopro/features/wallet/providers/wallet_provider.dart';
@@ -66,7 +67,7 @@ class WalletScreen extends ConsumerWidget {
   ) {
     if (state.transactions.isLoading) {
       return [
-        const SliverToBoxAdapter(child: _LoadingSpinner()),
+        const SliverToBoxAdapter(child: LoadingSpinner()),
       ];
     }
     if (state.transactions.hasError) {
@@ -137,7 +138,7 @@ class WalletScreen extends ConsumerWidget {
   ) {
     if (state.plans.isLoading) {
       return [
-        const SliverToBoxAdapter(child: _LoadingSpinner()),
+        const SliverToBoxAdapter(child: LoadingSpinner()),
       ];
     }
     if (state.plans.hasError) {
@@ -315,16 +316,6 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
-}
-
-class _LoadingSpinner extends StatelessWidget {
-  const _LoadingSpinner();
-
-  @override
-  Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.all(32),
-        child: Center(child: CircularProgressIndicator()),
-      );
 }
 
 class _LoadMoreButton extends StatelessWidget {

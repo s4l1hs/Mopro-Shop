@@ -32,20 +32,6 @@ func IssueTestAccessToken(t *testing.T, userID int64, market string) string {
 	return token
 }
 
-// IssueTestStepUpToken issues a step-up JWT for the given userID.
-func IssueTestStepUpToken(t *testing.T, userID int64) string {
-	t.Helper()
-	signer, err := identityjwt.NewHS256Signer(testSigningKey)
-	if err != nil {
-		t.Fatalf("testutil: NewHS256Signer: %v", err)
-	}
-	token, _, err := signer.IssueStepUp(userID)
-	if err != nil {
-		t.Fatalf("testutil: IssueStepUp(%d): %v", userID, err)
-	}
-	return token
-}
-
 // TestSigner returns an identityjwt.Signer using the stable test signing key.
 // Use this to create middleware in tests that validates tokens issued by IssueTestAccessToken.
 func TestSigner(t *testing.T) *identityjwt.HS256Signer {

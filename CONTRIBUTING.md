@@ -584,6 +584,27 @@ Hard-won lessons from the first audit (`main@ca739bf4`):
   `deadcode -test ./...` (whole-program reachability) are reliable for Go; spot-check that
   a flagged symbol isn't reachable only behind a build tag.
 
+Lessons from the first cleanup *execution* (`chore/project-cleanup-confirmed`):
+- **Pair removal with the regression guard.** That PR enabled golangci `unused` (it was
+  missing — the root cause that let 37 dead symbols accumulate) in the same change that
+  removed them. Without the gate, the next audit finds the same class again. `unused` is in
+  `make verify` via `lint`. Caveat: golangci v2 `unused` only catches **unexported** dead
+  code (it treats exported library symbols as used-externally); the exported-unreachable
+  class is covered by on-demand `make deadcode`, **not** a hard gate — deadcode is
+  build-tag-config sensitive (a symbol used only by `//go:build integration` tests reads as
+  dead in the default config), so it would be a flaky gate.
+- **`deadcode -test` (default config) misses build-tagged test callers → false positives.**
+  `RefreshWorker` and the sipay `Sign*` funcs were flagged "dead" by the audit but are used
+  by `//go:build integration` tests; removing them would have broken `make verify`'s
+  integration run. **Before removing any "confirmed dead" symbol, grep ALL `*_test.go`
+  (build-tag-agnostic) and run `go vet -tags=integration` on the package.**
+- **`var _ = f` unused-suppression hides deadness.** `reconcile` kept two dead funcs alive
+  only via blank assignments; the cleanup removed the funcs AND the suppression. Watch for
+  `var _ =` when assessing whether something is really used.
+- **`git add a b c` stages NOTHING if any path is already-deleted** (errors on the missing
+  pathspec). After `git rm x`, don't re-`git add x` in a later grouped `git add`; commit the
+  `git rm` separately or `git add -A` the survivors.
+
 ## Adaptive presenter
 
 One content widget, two presenters chosen by breakpoint. `LoginRequired`
@@ -785,6 +806,24 @@ Building ≠ deploying. Rolling a new image onto a host is a manual
 watchtower-style auto-pull agent is configured). When merging a backend PR that
 needs to reach production, confirm the build workflow ran after merge, then trigger
 the host pull. See `docs/deploy.md`.
+
+## Architectural decisions retired
+
+When an explored approach is abandoned, **delete the dead code but record why**, so
+a future contributor doesn't recreate the same dead path.
+
+- **core-svc HTTP routing uses the stdlib mux, NOT the generated `gen/core`
+  StrictServerInterface.** `internal/api/core_impl.go` (a `CoreServer` with 41
+  methods returning 501 Not Implemented) was scaffolded in session-3 (2026-05-29) to
+  migrate core-svc onto the oapi-codegen strict server — but core-svc never adopted
+  it; the live routing is the stdlib `http.ServeMux` in `cmd/core-svc/main.go`. The
+  stub was wired to nothing and removed in `chore/project-cleanup-confirmed`. The
+  parallel `internal/api/fin_impl.go` (`FinServer`) **does** use the generated server
+  — so the pattern lives for fin-svc but is deliberately not used for core-svc. The
+  `gen/core` types are still regenerated from `api/openapi.yaml` by `openapi-ci.yml`
+  (used for client/model generation); they just have no server implementer. If a
+  future PR is tempted to re-add a `CoreServer`: this was a deliberate choice, not an
+  oversight — core-svc's mux is the contract.
 
 ## Operational-file drift discipline
 

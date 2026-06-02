@@ -107,12 +107,6 @@ func (cb *circuitBreaker) recordFailure() (opened bool) {
 	return false
 }
 
-func (cb *circuitBreaker) isOpen() bool {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-	return cb.state == cbOpen
-}
-
 // ── Token cache ───────────────────────────────────────────────────────────────
 
 type tokenCache struct {
@@ -214,15 +208,6 @@ func validateConfig(cfg payment.SipayConfig) error {
 	return nil
 }
 
-// redact returns the first 4 characters of s followed by "****".
-// Use on secret or PCI-sensitive field values before including them in log output.
-func redact(s string) string {
-	if len(s) <= 4 {
-		return "****"
-	}
-	return s[:4] + "****"
-}
-
 // ── Token management ──────────────────────────────────────────────────────────
 
 type tokenRequest struct {
@@ -296,12 +281,6 @@ func (a *Adapter) fetchToken(ctx context.Context) (string, error) {
 // Not safe for idempotent use with automatic backoff — use doJSONIdempotent for reads.
 func (a *Adapter) doJSON(ctx context.Context, path string, payload, dst any) error {
 	return a.doJSONWithOpts(ctx, path, payload, dst, false)
-}
-
-// doJSONIdempotent is identical to doJSON but applies exponential backoff retries
-// on transient failures. Use only for idempotent read endpoints (CheckStatus, etc.).
-func (a *Adapter) doJSONIdempotent(ctx context.Context, path string, payload, dst any) error {
-	return a.doJSONWithOpts(ctx, path, payload, dst, true)
 }
 
 // attemptResult is the outcome of a single HTTP attempt.

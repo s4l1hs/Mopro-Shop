@@ -181,10 +181,6 @@ func (r *pgxOrderRepository) SetDelivered(ctx context.Context, tx pgx.Tx, orderI
 
 // ── internal scan helpers ─────────────────────────────────────────────────────
 
-type orderScanner interface {
-	Scan(dest ...any) error
-}
-
 func (r *pgxOrderRepository) scanOrder(ctx context.Context, row pgx.Row) (Order, error) {
 	_ = ctx
 	var o Order

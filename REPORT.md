@@ -3889,3 +3889,35 @@ Operational PR.
 - The passwordless SSH key in Actions secrets grants whoever can trigger the workflow `sudo docker`/`tee` on prod; key compromise = host access. Rotation + host-key pinning are Backlog.
 - `ssh-keyscan` TOFU trusts the host on first connect (MITM window on first run).
 - `concurrency: deploy-host` queues a second trigger rather than racing, but does not guard against a deploy triggered while a manual SSH session is also mutating the host.
+
+## Project Cleanup PR — Confirmed Findings — `chore/project-cleanup-confirmed`
+
+Executes the **confirmed** half of `CLEANUP_AUDIT.md` (PR #54). Re-verification baseline: `tool/audit/cleanup_execution_baseline.md`.
+
+### Baseline → final
+- Go non-test LOC 42,143 → reduced (~30 dead symbols + 207-line `core_impl.go` + `tracing.go` removed). Dart lib 35,875 → reduced (6 widget files). `golangci-lint run`: 0 → enabling `unused` surfaced 10 → 0 after removals. `flutter analyze`: clean → clean.
+
+### Re-verification caught an audit error
+The audit claimed "spot-verified no build-tag FPs." Re-verifying **every** finding against all `*_test.go` (build-tag-agnostic) + `go vet -tags=integration` caught that **`wallet.RefreshWorker` and sipay `SignPayment3D`/`SignGetToken`/`SignWebhook` are used by `//go:build integration` tests** the audit's default-config `deadcode` didn't analyze. **Kept (not dead).** Removing them would have broken `make verify`'s integration run. The "37 symbols" became ~30.
+
+### Linter enablement (root-cause structural fix)
+`.golangci.yml`: enabled `unused` (in `make verify` via `lint`). Catches the **unexported** dead class → prevents recurrence. golangci v2 `unused` does **not** catch exported-unreachable code, so added on-demand `make deadcode` (x/tools deadcode, pinned). **Not** a hard gate — deadcode is build-tag-config sensitive (the RefreshWorker lesson) → flaky as a gate.
+
+### Removed (each verified 0-ref incl. integration tests; per-group `go build`+`go vet -tags=integration`)
+- **Go (~30):** sipay `circuitBreaker.isOpen`/`redact`/`doJSONIdempotent` + sellerpayout sipay token-cache fields; eventbus noop DLQ repo; notification noop+inTx dedup stores; identity `RequireStepUp`/`ClaimsFromCtx`/`ContextWithSellerID`/`IssueTestStepUpToken`; `pkg/tracing.Init` (whole deprecated file); `pkg/timex` pgx calendar loader; `pkg/metrics.cmdKey`; reconcile `buildCheck1/2DedupKey` **+ their `var _ =` suppression hack**; order `orderScanner`; `cmd/core-svc.handleGetProduct`; wallet `validInput` test helper.
+- **CoreServer 501-stub** (`internal/api/core_impl.go`, 41 methods) — Option B (abandoned path); deleted + CONTRIBUTING "Architectural decisions retired" note. `gen/core` still regenerates from openapi.yaml; `fin_impl.go` keeps the pattern for fin-svc.
+- **Frontend:** unadopted `Mopro*` widgets (`mopro_button`/`input`/`chip`/`sheet`/`price_display` + `shell/mopro_app_bar`); consolidated 2 identical `_LoadingSpinner` → shared `core/widgets/LoadingSpinner`.
+- **pubspec:** `carousel_slider`, `fl_chart`, `json_annotation` (cupertino_icons kept — implicit).
+
+### Closed `CLEANUP_AUDIT.md` items
+✅ §4 root cause (linter) · ✅ §3 Go dead symbols · ✅ §3.0 CoreServer · ✅ §5 frontend widgets + 1 duplicate · ✅ §6.5 pubspec deps.
+
+### Still open (deferred — candidate pools / separate PRs)
+§6.2 i18n keys (interpolation-FP), §6.4 goldens (interpolation-FP), §5.2 Riverpod inference classes, §7 docs, §8 tooling, §9 error-widget consolidation. Plus: the `git add`-fails-on-deleted-pathspec gotcha required a follow-up commit to land 5 edits (see CONTRIBUTING lessons).
+
+### No parity change
+Operational cleanup; no business logic changed (existing tests pass).
+
+### Risk notes
+- `RefreshWorker.Run`/`refresh` + 2 sipay test-skip helpers are still deadcode-flagged even with integration tags (RefreshOnce is what the test calls); left alone — trimming methods off an integration-exercised type is low-value/risky.
+- A gofmt-on-save hook reformatted files post-commit once; verified the net diff is the intended removals only.

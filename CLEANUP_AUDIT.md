@@ -5,6 +5,20 @@
 > severity, and effort; false-positive-prone heuristics are flagged as **candidate
 > pools** (manual review required), never as confirmed dead lists.
 
+> ## Execution status — `chore/project-cleanup-confirmed` (the confirmed half)
+> **✅ CLOSED:** §4 root cause (golangci `unused` enabled) · §3 Go dead symbols
+> (~30 removed) · §3.0 `core_impl.go` CoreServer stub (deleted, Option B) · §5 the
+> unadopted `Mopro*` widgets + `_LoadingSpinner` consolidation · §6.5 the 3 unused
+> pubspec deps. Added on-demand `make deadcode`.
+> **⚠️ RECLASSIFIED as build-tag false positives (KEPT, not dead):** `wallet.RefreshWorker`
+> and sipay `SignPayment3D`/`SignGetToken`/`SignWebhook` — used by `//go:build integration`
+> tests that the audit's default-config `deadcode` run didn't analyze. The audit's
+> "spot-verified no build-tag FPs" was incomplete; re-verification against all `*_test.go`
+> caught it. So the "37 Go symbols" headline was ~30 after this correction.
+> **⏳ STILL OPEN (deliberately deferred — candidate pools / separate PRs):** §6.2 i18n keys
+> (192, interpolation-FP) · §6.4 goldens (56, interpolation-FP) · §5.2 Riverpod inference
+> classes · §7 docs · §8 tooling · §9 the broader error-widget consolidation.
+
 ## Executive summary
 
 Audited at `main@ca739bf4` (2026-06-02). Backend ~42k Go LOC (366 files), frontend
