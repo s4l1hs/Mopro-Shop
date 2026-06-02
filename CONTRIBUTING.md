@@ -636,6 +636,58 @@ Precedents: PR #28 caught a `purchase_flow` regression during instrumentation
 `recentlyViewedProvider` treats fetch errors as empty data (rail hides), not error
 data (rail shows an error).
 
+## User-state-consumer discipline (`internal/identity`)
+
+Soft-delete is a **service-layer policy, not a storage filter**. `repo.GetUser`
+(and the `Find*ByEmailHash`/`Find*` repository methods) deliberately return
+soft-deleted rows with no `deleted_at` predicate — admin, audit, and account-
+recovery flows need to read deleted users. The store stays dumb; **every
+service function that returns or acts on user state owns the deleted-user
+check itself.**
+
+Because auth is stateless JWT (`RequireAuth` trusts the access-token claims and
+does not re-hit the DB per request), a user soft-deleted mid-session keeps a
+valid access token until its TTL expires. Refresh is revoked at deletion
+(`SoftDeleteWithRevoke`), so the exposure is TTL-bounded — *except* for any path
+that **mints a new session** for a deleted user, which escapes the TTL window
+entirely. `VerifyEmail` was exactly such a gap (it issued tokens on the
+already-verified branch with no state check — an effective login bypass); see
+`fix/identity-getme-deleted-user-guard` and the sweep in
+`tool/audit/identity_user_state_consumers.md`.
+
+**Decision tree for any new `internal/identity` function that loads a user:**
+
+1. Does it return user state, issue a session/step-up token, or perform an
+   authenticated action on the user? → it is a user-state consumer.
+2. Can a soft-deleted user reach it (directly, or via a token/challenge they
+   could still hold)? If a strictly-upstream consumer already rejects deleted
+   users before this one is reachable (e.g. `VerifyMFAChallenge` is gated by
+   `LoginEmail`), add a **doc comment** stating the upstream gate and stop.
+   Otherwise:
+3. Apply the guard immediately after loading the row, before any return or
+   side-effect:
+   ```go
+   if user.Status == StatusDeleted {
+       return <zero>, ErrUserDeleted
+   }
+   ```
+4. **Exception — enumeration-safe endpoints.** `ForgotPassword`,
+   `ResendVerification`, and peers return `nil` silently on unknown email so
+   they don't leak account existence. For these, a deleted user must also
+   `return nil` silently — returning `ErrUserDeleted` would leak deleted status.
+   Never branch the response in a way an attacker can distinguish.
+
+The established guard sites are `VerifyOTP`, `RefreshTokens`, `LoginEmail`
+(session issuers); mirror them. The repository layer must **never** grow a
+`deleted_at` filter to "fix" a missing service guard — that would break the
+admin/audit/recovery readers that depend on seeing deleted rows.
+
+This is a TTL-bounded confidentiality/integrity concern, not an incident: fix
+it at normal cadence with the rest of the consumer sweep, don't hotfix a single
+function in isolation (the value is the *uniform* discipline). A token denylist
+/ per-request user-state revocation would close the TTL window structurally but
+is a deliberate non-goal here (stateless-JWT tradeoff); it lives in the backlog.
+
 ## Test-suite CI gating discipline
 
 A test suite that isn't in `make verify` is one refactor away from silent rot.
