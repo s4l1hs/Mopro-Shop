@@ -79,6 +79,17 @@ test:
 lint:
 	golangci-lint run
 
+# Whole-program dead-code scan (exported-unreachable funcs that golangci's
+# `unused` can't see — it treats exported library symbols as used-externally).
+# On-demand, NOT in `verify`: deadcode's results are build-tag-config sensitive
+# (a symbol used only by //go:build integration tests reads as dead in the default
+# config), so it is FP-prone as a hard gate. Run it during cleanup audits with the
+# tags that match the symbols you're checking, e.g.:
+#   make deadcode                      # default build config
+#   make deadcode TAGS=integration     # include integration-tagged test roots
+deadcode:
+	go run golang.org/x/tools/cmd/deadcode@v0.45.0 -test $(if $(TAGS),-tags=$(TAGS)) ./cmd/... ./internal/... ./pkg/...
+
 boundaries:
 	./scripts/check-module-boundaries.sh
 
