@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/mopro/platform/internal/sellerpayout"
@@ -40,10 +39,6 @@ type Client struct {
 	appID      string
 	httpClient *http.Client
 	log        *slog.Logger
-
-	tokenMu  sync.Mutex
-	token    string
-	tokenExp time.Time
 }
 
 // New constructs a Sipay Client.
