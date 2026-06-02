@@ -3681,3 +3681,36 @@ Operational + test-hygiene PR.
 - identity gated without `-race` (deferred, above) — a minor data-race-coverage gap for identity.
 - cart + identity share `e2e-test-up`'s Redis (`cart` FlushDB's DB 0; identity uses DB 1) — safe because the sub-targets run sequentially in `make verify`.
 - `OTPCodeDistribution` is ~37s even without `-race`; the identity gate is ~40s.
+
+## Identity User-State-Consumer Guard PR — `fix/identity-getme-deleted-user-guard`
+
+Closes the ⚠️ `DeleteMe_BlocksSubsequentLogin` triage from the Cart/Identity Revival PR. Triage classified it **(B): a `GetMe` gap**, not the (C) stateless-JWT-by-design boundary. The fix is one line per consumer — but the **audit-and-sweep was load-bearing**: the prompt framed a "GetMe-only" patch, the sweep proved that wrong.
+
+### Baseline / sweep (`tool/audit/identity_user_state_consumers.md`)
+The `Status == StatusDeleted → ErrUserDeleted` discipline existed at only **3 of ~12** service-layer user-state consumers (`VerifyOTP`, `RefreshTokens`, `LoginEmail` — the session issuers). Sweep of every `Get*`/`Find*`/profile/session/authenticated-action consumer found **9 gaps**, not just `GetMe`. §1.6 trigger #1 fired (3+ gaps, one strictly more severe than `GetMe`); surfaced to the user, who chose **fix all inline in this PR**.
+
+### Severity calibration
+- **Most gaps: low–moderate, TTL-bounded.** Stateless JWT (`RequireAuth` trusts claims, no per-request DB recheck) means a user soft-deleted mid-session keeps a valid *access* token until TTL expiry; refresh is revoked at deletion (`SoftDeleteWithRevoke`). So `GetMe`/`UpdateMe`/step-up/`ChangePassword`/`EnrollMFA` exposure is capped by the access-token TTL. Normal cadence, **not** a hotfix/incident.
+- **`VerifyEmail`: HIGH — the one gap that escaped the TTL framing.** Its already-verified branch called `issueTokensForUser` with no state check → an effective **login bypass minting a fresh session/refresh token** for a soft-deleted email user. Guarded **before** the short-circuit.
+
+### Fix applied (commit `fix(identity): guard all user-state consumers…`)
+- `ErrUserDeleted`: `GetMe`, `UpdateMe`, `RequestStepUpOTP`, `VerifyStepUpOTP`, `VerifyEmail` (pre-short-circuit), `ResetPassword` (loads user via `reset.UserID`), `ChangePassword`, `EnrollMFA`.
+- **Silent `return nil`** (enumeration-safe — don't leak deleted status): `ResendVerification`, `ForgotPassword`.
+- **By-design no guard, doc-commented**: `VerifyMFAChallenge` — upstream-gated by `LoginEmail`, which a deleted user can't pass to obtain a challenge.
+- Repository stays a dumb store (no `deleted_at` filter) — admin/audit/recovery need deleted rows; the **service** owns the policy.
+
+### Verification
+`TestE2E_DeleteMe_BlocksSubsequentLogin` un-skipped (removed the `skipRevivalGap` call — it was a helper call, not a build tag). Green **5× under `-race`** + full identity integration suite green (40s). `go vet -tags=integration ./internal/identity/...` clean. CONTRIBUTING gained a "user-state-consumer discipline" section + decision tree.
+
+### Closed item
+Cart/Identity Revival Backlog: "Triage `DeleteMe_BlocksSubsequentLogin`" → ✅ (was the prioritized one). Remaining 4 identity REVIVAL_GAP scenarios (`LogoutRevokesToken`, `RateLimiter_OTPRequest_PhoneWindow`, `Service_OTPVerifyFlow`, `Integration_StepUpOTPFlow`) stay skip-guarded/Backlogged — **out of scope** here.
+
+### New Backlog item
+- **Token denylist / per-request user-state revocation** — would close the access-token TTL window structurally (a deleted user's live token is rejected immediately). Deliberate non-goal here (stateless-JWT tradeoff); the inline guards bound the window, they don't eliminate it.
+
+### No parity change
+Backend security-hygiene PR.
+
+### Risk notes
+- The TTL window for the access token remains by design (see Backlog) — guards reject deleted users at every service consumer, but a live access token still authenticates the *middleware* until expiry; the consumers it reaches now all fail closed.
+- `ResetPassword` now does an extra `GetUser(reset.UserID)` read per reset — negligible, single-row by PK.
