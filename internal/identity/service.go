@@ -252,10 +252,25 @@ func (s *serviceImpl) Logout(ctx context.Context, refreshToken string) error {
 // ── GetMe / UpdateMe / DeleteMe ───────────────────────────────────────────────
 
 func (s *serviceImpl) GetMe(ctx context.Context, userID int64) (User, error) {
-	return s.repo.GetUser(ctx, userID)
+	u, err := s.repo.GetUser(ctx, userID)
+	if err != nil {
+		return User{}, err
+	}
+	// User-state-consumer discipline: reject soft-deleted users (mirrors the
+	// session flows at VerifyOTP/RefreshTokens/LoginEmail). The repo returns
+	// deleted rows by design; the service owns the policy. See CONTRIBUTING.
+	if u.Status == StatusDeleted {
+		return User{}, ErrUserDeleted
+	}
+	return u, nil
 }
 
 func (s *serviceImpl) UpdateMe(ctx context.Context, userID int64, updates UserUpdates) (User, error) {
+	if cur, err := s.repo.GetUser(ctx, userID); err != nil {
+		return User{}, err
+	} else if cur.Status == StatusDeleted {
+		return User{}, ErrUserDeleted
+	}
 	if updates.Email != nil && *updates.Email != "" {
 		if err := validateEmail(*updates.Email); err != nil {
 			return User{}, err
@@ -285,6 +300,9 @@ func (s *serviceImpl) RequestStepUpOTP(ctx context.Context, userID int64, client
 	if err != nil {
 		return err
 	}
+	if user.Status == StatusDeleted {
+		return ErrUserDeleted
+	}
 	phoneE164, err := pkgcrypto.DecryptPII(user.PhoneEnc)
 	if err != nil {
 		return fmt.Errorf("identity: decrypt phone: %w", err)
@@ -296,6 +314,9 @@ func (s *serviceImpl) VerifyStepUpOTP(ctx context.Context, userID int64, code st
 	user, err := s.repo.GetUser(ctx, userID)
 	if err != nil {
 		return StepUpToken{}, err
+	}
+	if user.Status == StatusDeleted {
+		return StepUpToken{}, ErrUserDeleted
 	}
 	phoneE164, err := pkgcrypto.DecryptPII(user.PhoneEnc)
 	if err != nil {
@@ -581,6 +602,12 @@ func (s *serviceImpl) VerifyEmail(ctx context.Context, emailAddr, code string) (
 	if err != nil {
 		return TokenPair{}, fmt.Errorf("identity: find user: %w", err)
 	}
+	// Reject soft-deleted users BEFORE the already-verified short-circuit below
+	// or any session issuance — otherwise a deleted email user could mint a fresh
+	// session, bypassing deletion (mirrors LoginEmail). See CONTRIBUTING.
+	if user.Status == StatusDeleted {
+		return TokenPair{}, ErrUserDeleted
+	}
 	if user.EmailVerified {
 		// Already verified — just issue a new session.
 		return s.issueTokensForUser(ctx, user.ID)
@@ -614,6 +641,9 @@ func (s *serviceImpl) ResendVerification(ctx context.Context, emailAddr string) 
 	if err != nil {
 		return nil // silent
 	}
+	if user.Status == StatusDeleted {
+		return nil // silent — don't resend for deleted accounts; don't leak deleted status
+	}
 	if user.EmailVerified {
 		return nil
 	}
@@ -632,6 +662,9 @@ func (s *serviceImpl) ForgotPassword(ctx context.Context, emailAddr string) erro
 	user, err := s.repo.FindUserByEmailHash(ctx, emailHash)
 	if err != nil {
 		return nil // silent — do not leak whether email exists
+	}
+	if user.Status == StatusDeleted {
+		return nil // silent — no reset for deleted accounts; don't leak deleted status
 	}
 	token := generateOpaqueToken()
 	tokenHash := hashToken(token)
@@ -656,6 +689,11 @@ func (s *serviceImpl) ResetPassword(ctx context.Context, token, newPassword stri
 	if time.Now().After(reset.ExpiresAt) {
 		return ErrPasswordResetExpired
 	}
+	if u, uerr := s.repo.GetUser(ctx, reset.UserID); uerr != nil {
+		return uerr
+	} else if u.Status == StatusDeleted {
+		return ErrUserDeleted
+	}
 	pwHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcryptPasswordCost)
 	if err != nil {
 		return fmt.Errorf("identity: hash new password: %w", err)
@@ -675,6 +713,9 @@ func (s *serviceImpl) ChangePassword(ctx context.Context, userID int64, oldPassw
 	user, err := s.repo.GetUser(ctx, userID)
 	if err != nil {
 		return err
+	}
+	if user.Status == StatusDeleted {
+		return ErrUserDeleted
 	}
 	if user.PasswordHash == "" {
 		// Phone-only account — no password to rotate. Treat as invalid creds
@@ -707,6 +748,9 @@ func (s *serviceImpl) EnrollMFA(ctx context.Context, userID int64, phone, client
 	user, err := s.repo.GetUser(ctx, userID)
 	if err != nil {
 		return err
+	}
+	if user.Status == StatusDeleted {
+		return ErrUserDeleted
 	}
 	if user.MFAEnabled {
 		return ErrMFAAlreadyEnabled
@@ -744,6 +788,11 @@ func (s *serviceImpl) ConfirmMFAEnroll(ctx context.Context, userID int64, phone,
 	return s.repo.UpdateMFAConfig(ctx, userID, true, phoneHash, phoneEnc)
 }
 
+// VerifyMFAChallenge has no inline StatusDeleted guard by design: an MFA
+// challenge can only be created by LoginEmail (service.go ~518), which already
+// rejects soft-deleted users before issuing the challenge. A deleted user can
+// therefore never hold a valid challenge token to reach this path. See the
+// user-state-consumer discipline section in CONTRIBUTING.md.
 func (s *serviceImpl) VerifyMFAChallenge(ctx context.Context, challengeToken, code string) (TokenPair, error) {
 	challengeHash := hashToken(challengeToken)
 	challenge, err := s.repo.FindMFAChallenge(ctx, challengeHash)

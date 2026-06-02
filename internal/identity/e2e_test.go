@@ -236,7 +236,6 @@ func TestE2E_LogoutRevokesToken(t *testing.T) {
 // TestE2E_DeleteMe_BlocksSubsequentLogin verifies that after DeleteMe,
 // the same phone cannot OTP-verify into an active account.
 func TestE2E_DeleteMe_BlocksSubsequentLogin(t *testing.T) {
-	skipRevivalGap(t, "DeleteMe_BlocksSubsequentLogin: GetMe after delete returns nil instead of ErrUserDeleted — POSSIBLE SECURITY REGRESSION (deleted user gettable); needs urgent triage, not a blind assertion update")
 	ctx := context.Background()
 	integRedis.FlushDB(ctx)
 
