@@ -3714,3 +3714,54 @@ Backend security-hygiene PR.
 ### Risk notes
 - The TTL window for the access token remains by design (see Backlog) — guards reject deleted users at every service consumer, but a live access token still authenticates the *middleware* until expiry; the consumers it reaches now all fail closed.
 - `ResetPassword` now does an extra `GetUser(reset.UserID)` read per reset — negligible, single-row by PK.
+
+## Discipline Arc Close + Deploy PR — `chore/close-discipline-arc-and-deploy`
+
+Mixed-ownership operational PR. **No code commits** — audit baseline (`tool/audit/discipline_arc_close_baseline.md`) + this entry only. Claude Code owns verification; the user owns the GitHub-UI/host actions. Claude Code has **no SSH/host access in this environment**, so the deploy + storage-gate halves are surfaced and handed to the user, not faked.
+
+### Baseline
+`main@7b8d96cc` (PR #49 merged 2026-06-02). Previously-required checks: **none** (`main` was entirely unprotected). Last-deployed image SHA + storage env: **unknown** — host-side, pending user report.
+
+### Branch-protection flip — ✅ DONE (applied via API, user-approved)
+- **Correction caught:** the required check is `verify` (the *job* name), **not** `make-verify` (the *workflow* name). The prompt's repeated `make-verify` string would not have matched the dropdown. Confirmed against `7b8d96cc`'s check-runs.
+- **Correction caught:** `main` had no protection rule at all → had to *create*, not edit.
+- Applied `PUT …/branches/main/protection` with `required_status_checks.contexts=["verify"]`, `strict=false`, `enforce_admins=false`, no required reviews. Read-back confirms. `enforce_admins=false` is deliberate — keeps the solo owner from being locked out by a gate flake (see §7.10 risk) while still blocking non-admins on red/missing `verify`.
+- Smoke-test PR (§3.3) skipped as wasteful: the protection API state is authoritative and *this* PR is the live gate confirmation. No CI burned on a throwaway.
+
+### Deploy state — image builds ✅ healthy; rollout ⏳ PENDING (host, user)
+- **Builds are not the bottleneck.** `build-images.yml` (PR #41, 2026-06-01) has fired green on every backend-touching `main` push since. The `7b8d96cc` image contains **all merged backend code through #49** — a single rollout to that tag closes the entire deficit. (PR #46, docs-only, correctly skipped its build.)
+- **Rollout blocker caught:** registry-namespace mismatch. CI pushes owner-relative → `ghcr.io/s4l1hs/<svc>`; `deploy/docker-compose.yml` pins `ghcr.io/mopro/<svc>` (and `.prod.yml` pins Docker Hub `mopro/<svc>`), no env override. A naive `docker compose pull` 404s under the current owner. The user must confirm the host's effective namespace (mopro org vs. repoint compose) before §5. Documented in `docs/deploy.md`.
+- §5 host pull/restart/health + §5.3 SHA comparison: pending. The deficit (deployed→`7b8d96cc`) is unmeasurable until the host reports.
+
+### Photo-upload UI re-invoke gate — ⏳ UNDETERMINED (host, user)
+The §6.1 checks (`STORAGE_ENABLED=true`, full `STORAGE_*`+`CDN_BASE_URL`, live `POST /uploads/photos` → **201** [not 200]) all run against the deployed host — cannot be executed here. Gate status pending host report; per memory `project_photo_consumer_blocked`, storage provisioning was the open precondition. **Do not re-invoke `photo_upload_ui_followup_prompt.md` until all three checks are confirmed green on the host.**
+
+### Closed gaps
+- **"Required-check policy flip"** (carried since PR #41) → ✅ **closed** — `verify` is now a required check on `main`.
+- **"Deployed image lagging main"** → ⏳ **unblocked, not yet closed** — the image to deploy exists and is green; closing it is a host pull the user runs (after resolving the namespace).
+- **"Photo upload UI hold"** → ⏳ **still gated** — undetermined pending the host storage/upload smoke; not closeable from here.
+
+### Discipline arc tally — what the `verify` gate caught across PRs #40→#49
+Six real defects, each invisible to local 6-core hardware, each surfaced only because `make verify` runs in CI on a constrained 2-vCPU runner:
+- Cashback pgxpool deadlock (PR #42) + its `GetSystemState` half (PR #43).
+- 2-vCPU runner timeout → identity suite gated without `-race` (PR #48).
+- ImageMagick 7 / cross-platform `bytes_of` stat gap (PR #44).
+- PgxPool document-pool-access flake (PR #47).
+- Chi-square OTP-distribution statistical flake → p=0.001 threshold (PR #48).
+- Identity `GetMe` deleted-user gap + 8 sibling consumers incl. the `VerifyEmail` login-bypass (PR #49).
+The ~9-min `verify` runtime is the price of catching them before prod.
+
+### No parity change
+Operational PR.
+
+### Backlog (still pending)
+- **Photo upload UI work itself** — re-invoke `photo_upload_ui_followup_prompt.md` once §6 gate is green on host.
+- **Resolve the CI↔deploy namespace mismatch** structurally — either move the repo under the `mopro` org, or parameterize the compose `image:` namespace (env `IMAGE_NS`) so CI-built `s4l1hs` images are pullable without a manual edit. (New, from this PR's §2.)
+- **Token denylist / per-request user-state revocation** (PR #49 follow-up) — closes the access-token TTL window structurally.
+- **Docker Hub pull-flake hardening** (PR #44 follow-up).
+- **Kill identity's hand-rolled `TestMain` DDL** once the ecom `0078` migration-chain divergence is resolved (PR #44 finding).
+
+### Risk notes
+- Branch protection now **requires `verify` to merge** — any flake in the gate becomes a merge blocker. `enforce_admins=false` is the relief valve for the solo owner; revisit if the repo gains collaborators.
+- The deploy half assumes a reachable host with a resolved image namespace; if no watchtower-style auto-pull is configured (`docs/deploy.md` says it is not), manual `docker compose pull` is the standing rollout pattern.
+- This entry records branch protection as DONE and deploy/photo-gate as PENDING **honestly** — they are not closeable without host access that this environment lacks.
