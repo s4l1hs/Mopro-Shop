@@ -123,6 +123,46 @@ sudo docker compose exec core-svc env | grep -E '^(STORAGE|CDN_BASE_URL)='
 
 ---
 
+## §4.3 — Rollout manifest — [CLAUDE-VERIFIED target; host-dependent lower bound]
+
+```
+Target (main HEAD):  7b8d96cc   (build run 26807227829 ✅, all 3 services pushed)
+Currently deployed:  UNKNOWN — requires §2.3 host report
+
+Registry namespace:  CI pushed → ghcr.io/s4l1hs/<svc>
+                     compose pins → ghcr.io/mopro/<svc>  ⚠ MISMATCH (correction #3)
+                     → before pulling, confirm the host's effective namespace and
+                       either (a) operate under the mopro org, or (b) repoint the
+                       compose image: refs / pull ghcr.io/s4l1hs/<svc> explicitly.
+
+Backend code through #49 is all contained in the 7b8d96cc image, so a single
+rollout to that tag (or :latest, if :latest tracks the s4l1hs build) is sufficient.
+
+Services to roll:  core-svc (yes), fin-svc (yes), jobs-svc (yes)
+                   — all three rebuilt green on the 7b8d96cc push.
+
+Tags to pull (under the CORRECT namespace once confirmed):
+  <ns>/core-svc:7b8d96cc   (or :latest)
+  <ns>/fin-svc:7b8d96cc
+  <ns>/jobs-svc:7b8d96cc
+```
+
+## §5 — Rollout execution — [HOST — USER ACTION — NOT DONE]
+
+Blocked on host access + the namespace decision above. The §5.1/§5.2 commands
+(`docker compose pull` / `up -d` / health checks) are the user's to run. Claude
+Code will do the §5.3 post-rollout SHA comparison once the host reports its
+deployed tag.
+
+## §6 — Photo-upload UI re-invoke gate check — [HOST — USER ACTION — NOT DONE]
+
+All three §6.1 checks (`STORAGE_ENABLED=true`, full `STORAGE_*`+`CDN_BASE_URL`,
+live `POST /uploads/photos` → 201) run against the deployed host. Cannot be
+executed here. Gate status: **UNDETERMINED — pending host report** (per memory
+`project_photo_consumer_blocked`, the storage provisioning was the open gate).
+
+---
+
 ## What Claude Code can / cannot do this turn
 
 - **Can:** the full read-only audit above; apply the branch-protection rule via
