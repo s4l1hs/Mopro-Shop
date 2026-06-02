@@ -379,7 +379,7 @@ services:
   core-svc:
     <<: *go-defaults
     container_name: core-svc
-    image: ghcr.io/mopro/core-svc:${VERSION:-latest}
+    image: ghcr.io/${IMAGE_NS:-mopro}/core-svc:${VERSION:-latest}
     build:
       context: ..
       dockerfile: build/Dockerfile
@@ -418,7 +418,7 @@ services:
     <<: *go-defaults
     container_name: fin-svc
     networks: [mopro-net, mopro-fin-net]
-    image: ghcr.io/mopro/fin-svc:${VERSION:-latest}
+    image: ghcr.io/${IMAGE_NS:-mopro}/fin-svc:${VERSION:-latest}
     build:
       context: ..
       dockerfile: build/Dockerfile
@@ -451,7 +451,7 @@ services:
     mem_limit: 1.2g
     mem_reservation: 384m
     cpus: '0.8'
-    image: ghcr.io/mopro/jobs-svc:${VERSION:-latest}
+    image: ghcr.io/${IMAGE_NS:-mopro}/jobs-svc:${VERSION:-latest}
     build:
       context: ..
       dockerfile: build/Dockerfile
