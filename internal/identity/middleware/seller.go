@@ -52,12 +52,6 @@ func RequireSellerRole(lookup SellerLookup) func(http.Handler) http.Handler {
 	}
 }
 
-// ContextWithSellerID returns a copy of ctx carrying the given seller ID under
-// the key RequireSellerRole uses. Useful for tests and internal callers.
-func ContextWithSellerID(ctx context.Context, sellerID int64) context.Context {
-	return context.WithValue(ctx, ctxKeySellerID, sellerID)
-}
-
 // SellerIDFromCtx returns the resolved seller ID from the context, or 0 if the
 // RequireSellerRole middleware was not applied.
 func SellerIDFromCtx(ctx context.Context) int64 {

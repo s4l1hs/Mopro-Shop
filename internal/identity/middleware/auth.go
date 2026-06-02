@@ -82,32 +82,6 @@ func OptionalAuth(signer jwt.Signer) func(http.Handler) http.Handler {
 	}
 }
 
-// RequireStepUp validates that the request carries a valid step-up JWT (scope="high_sensitivity").
-// Must be applied AFTER RequireAuth so the base user ID is already in context.
-func RequireStepUp(signer jwt.Signer) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			tok := r.Header.Get("X-Mopro-Step-Up-Token")
-			if tok == "" {
-				http.Error(w, `{"error":"step_up_required"}`, http.StatusForbidden)
-				return
-			}
-			claims, err := signer.Verify(tok)
-			if err != nil || claims.Scope != jwt.ScopeStepUp {
-				http.Error(w, `{"error":"step_up_invalid"}`, http.StatusForbidden)
-				return
-			}
-			// Verify step-up belongs to the same user as the access token.
-			baseUserID := UserIDFromCtx(r.Context())
-			if baseUserID == 0 || claims.UserID != baseUserID {
-				http.Error(w, `{"error":"step_up_user_mismatch"}`, http.StatusForbidden)
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	}
-}
-
 // ContextWithUserID returns a copy of ctx carrying the given authenticated user
 // ID under the same key RequireAuth/OptionalAuth use. Useful for composing
 // contexts in tests and internal callers that bypass the HTTP middleware.
@@ -122,14 +96,6 @@ func UserIDFromCtx(ctx context.Context) int64 {
 		return v
 	}
 	return 0
-}
-
-// ClaimsFromCtx returns the full JWT claims from the context.
-func ClaimsFromCtx(ctx context.Context) *jwt.Claims {
-	if v, ok := ctx.Value(ctxKeyClaims).(*jwt.Claims); ok {
-		return v
-	}
-	return nil
 }
 
 // bearerToken extracts the raw token from the Authorization header.
