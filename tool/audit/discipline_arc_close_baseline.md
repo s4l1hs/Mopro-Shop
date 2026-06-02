@@ -93,6 +93,24 @@ The gap between the deployed SHA and `main` HEAD (`7b8d96cc`) is the rollout def
 No rule exists; no required status checks. (See correction #2 above.) Repo viewer
 permission: `admin: true` (so the rule can be applied via API).
 
+## §3 — Branch-protection flip — [APPLIED via API, user-approved]
+
+User chose "apply via API now". `PUT …/branches/main/protection` applied with:
+```json
+{ "required_status_checks": { "strict": false, "contexts": ["verify"] },
+  "enforce_admins": false, "required_pull_request_reviews": null, "restrictions": null }
+```
+Post-apply read-back confirms: `required_contexts: ["verify"]`, `strict: false`,
+`enforce_admins: false`, `required_reviews: null`. The check is bound to the
+github-actions app (`app_id 15368`). **`verify` is now a required check on `main`.**
+
+Smoke test (§3.3): skipped the throwaway README PR — the protection API state is
+authoritative, and this PR (`chore/close-discipline-arc-and-deploy → main`) is
+itself the live confirmation that GitHub surfaces `verify` as Required. No CI
+burned on a disposable branch. `enforce_admins=false` is deliberate: it keeps the
+solo owner from being locked out by a gate flake (the prompt's own §7.10 risk note)
+— a non-admin still cannot merge a red/missing `verify`.
+
 ## §2.5 — Storage provisioning state — [HOST — USER ACTION — NOT DONE]
 
 Requires `docker compose exec` on the host. Run there and paste back:
