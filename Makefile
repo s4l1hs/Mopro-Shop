@@ -17,14 +17,14 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
         caddy-validate caddy-reload \
         test-integration-catalog test-integration-outbox test-integration-cart test-integration-order \
-        test-integration-sellerpayout test-e2e integration-e2e e2e-test-up e2e-test-down \
+        test-integration-sellerpayout test-e2e integration-e2e integration-cart integration-identity e2e-test-up e2e-test-down \
         api-gen-models api-gen-core api-gen-fin api-gen-dart api-gen api-lint contract-test \
         docker-build release deploy deploy-staging rollback \
         seed-dry-run seed-staging seed-prod build-seed \
         smoke loadtest grafana-deploy
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order integration-e2e verify-image-manifest verify-contrast
+verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order integration-e2e integration-cart integration-identity verify-image-manifest verify-contrast
 
 # WCAG contrast check for the documented brand colour pairs. Fails if any
 # non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.
@@ -387,6 +387,24 @@ integration-e2e: e2e-test-up
 	ORDER_E2E_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
 	LEDGER_E2E_DSN=postgres://ledger_admin:test123@localhost:6436/mopro_ledger \
 	  go test -tags=integration ./internal/e2e/... -count=1 -race -timeout 5m
+
+# Cart + identity integration suites reuse e2e-test-up's containers (no new infra):
+# cart needs Redis; identity needs postgres-ecom (its TestMain applies identity_schema)
+# + Redis. Both gated so the suites can't silently rot again (revived in
+# chore/revive-cart-identity-integration-tests; precedent: integration-e2e / PR #40).
+integration-cart: e2e-test-up
+	CART_TEST_REDIS=localhost:6381 \
+	  go test -tags=integration ./internal/cart/... -count=1 -race -timeout 5m
+
+# NOTE: no -race here (unlike the other suites). identity's TestProperty_OTPCodeDistribution
+# runs 600 bcrypt-backed RequestOTP calls; -race makes that sequential distribution test
+# ~10x slower (≈6.4min local / 10-15min+ on the 2-vCPU CI runner) for zero concurrency-
+# detection value, risking the 20min CI job budget. Backlog: a targeted -race run of the
+# identity concurrency tests (token rotation / family revoke) excluding the distribution test.
+integration-identity: e2e-test-up
+	IDENTITY_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	IDENTITY_TEST_REDIS=localhost:6381 \
+	  go test -tags=integration ./internal/identity/... -count=1 -timeout 5m
 
 # ── Catalog seed ───────────────────────────────────────────────────────────────
 
