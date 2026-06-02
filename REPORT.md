@@ -3921,3 +3921,28 @@ Operational cleanup; no business logic changed (existing tests pass).
 ### Risk notes
 - `RefreshWorker.Run`/`refresh` + 2 sipay test-skip helpers are still deadcode-flagged even with integration tags (RefreshOnce is what the test calls); left alone — trimming methods off an integration-exercised type is low-value/risky.
 - A gofmt-on-save hook reformatted files post-commit once; verified the net diff is the intended removals only.
+
+## Cheap Cleanup Follow-up PR — `chore/cleanup-cheap-followup`
+
+Targeted the cheap remainder of `CLEANUP_AUDIT.md` §7/§8/§9. **Net removals: 0** — re-verification (PR #55's discipline) confirmed every candidate is a false positive or already-done. Docs-only PR: the re-verification record + a CONTRIBUTING `var _` discipline note + roadmap status.
+
+### Re-verification results (`tool/audit/cheap_cleanup_baseline.md`)
+- **`var _ = f` sweep → 0 instances.** PR #55 removed the only one (reconcile); it was a single occurrence, not a recurring pattern. Typed interface assertions (`var _ Iface = (*T)(nil)`) are a different, legitimate idiom (out of scope).
+- **`unused` linter → 0 findings.** The PR #55 gate is holding; no Go dead code accumulated.
+- **Docs (§7) → 0 stale.** CONTRIBUTING refs to `core_impl`/`CoreServer`/`RefreshWorker` are the correct PR #55 retired-decisions/lessons notes (not live-refs). No doc presents a removed symbol as live. Deploy docs current (#51-#53). REPORT entries are historical record (no history rewrite). Audit baselines retained for traceability.
+- **Tooling (§8) → 0 dead.** `api-check-sync` is a dev convenience mirroring openapi-ci's inline gen-sync check (keep). The 9 "unreferenced" scripts are cron/manual/ops — `cashback-monthly-cron.sh`/`seller-payout-daily-cron.sh` are the production financial crons (CLAUDE.md §4.7/§4.8; host crontab); removing them would break prod. "No static reference" ≠ dead for cron/manual scripts.
+
+### CONTRIBUTING
+Extended the existing `var _` lesson with forward-looking guidance (codebase now has zero; document any new one or a cleanup will remove it) — no new sections, to avoid bloat (the lessons were already captured in #55).
+
+### Closed CLEANUP_AUDIT items
+✅ §7 docs (verified not actionable) · ✅ §8 tooling (verified not actionable) · ✅ §9 `var _ =` pattern (0 instances; reconcile done in #55).
+
+### Still open — tooling-blocked (step 3)
+§6.2 i18n keys, §6.4 goldens, §5.2 Riverpod inference — all need usage-aware analyzers (easy_localization prefix-building, interpolated golden names, riverpod_lint), not grep. §9 error-widget consolidation is an optional UI-affecting refactor (not dead code), deferred.
+
+### No parity change
+Docs-only; zero code/tooling removed (nothing was actually dead).
+
+### Risk notes
+- The honest outcome is "nothing to remove." Resisting the urge to manufacture edits to match the prompt's assumed scope is the point — the cheap candidates were false positives the original audit already flagged as such, and #55 cleared the one real pattern.

@@ -15,9 +15,16 @@
 > tests that the audit's default-config `deadcode` run didn't analyze. The audit's
 > "spot-verified no build-tag FPs" was incomplete; re-verification against all `*_test.go`
 > caught it. So the "37 Go symbols" headline was ~30 after this correction.
-> **⏳ STILL OPEN (deliberately deferred — candidate pools / separate PRs):** §6.2 i18n keys
-> (192, interpolation-FP) · §6.4 goldens (56, interpolation-FP) · §5.2 Riverpod inference
-> classes · §7 docs · §8 tooling · §9 the broader error-widget consolidation.
+> **✅ VERIFIED NOT ACTIONABLE — `chore/cleanup-cheap-followup`:** §7 docs (0 rot — CONTRIBUTING
+> refs to removed symbols are the correct #55 notes; deploy docs current) · §8 tooling (0 dead —
+> `api-check-sync` is a dev convenience; the 9 "unreferenced" scripts are cron/manual/ops, incl.
+> the production `cashback-monthly-cron`/`seller-payout-daily-cron`) · §9 `var _ =` (0 instances;
+> the reconcile one was the only occurrence, removed in #55) · post-`unused`-gate findings (0).
+> Net removals that PR: 0. Evidence: `tool/audit/cheap_cleanup_baseline.md`.
+> **⏳ TOOLING-BLOCKED (need usage-aware analyzers, not grep — step 3 of the plan):** §6.2 i18n
+> keys (192, easy_localization prefix-building) · §6.4 goldens (56, interpolated names) · §5.2
+> Riverpod inference classes (riverpod_lint-style awareness). §9 error-widget consolidation
+> remains an optional UI-affecting refactor (not dead code), deferred.
 
 ## Executive summary
 
