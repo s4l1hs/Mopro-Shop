@@ -27,11 +27,6 @@ func runCheck1DCInvariant(ctx context.Context, repo Repository) ([]CheckResult, 
 	return results, nil
 }
 
-// buildCheck1DedupKey returns the PagerDuty dedup key for a check1 failure.
-func buildCheck1DedupKey(currency string) string {
-	return fmt.Sprintf("reconcile:check1_dc_invariant:%s", currency)
-}
-
 // runCheck2CashbackBackward verifies that the sum of paid cashback payments matches
 // the sum of ledger C entries linked via ledger_transaction_id, for the last 3 periods.
 func runCheck2CashbackBackward(ctx context.Context, repo Repository, asOfPeriod int) ([]CheckResult, error) {
@@ -64,11 +59,6 @@ func runCheck2CashbackBackward(ctx context.Context, repo Repository, asOfPeriod 
 	return results, nil
 }
 
-// buildCheck2DedupKey returns the PagerDuty dedup key for a check2 failure.
-func buildCheck2DedupKey(periodYYYYMM int, currency string) string {
-	return fmt.Sprintf("reconcile:check2_cashback_backward:%d:%s", periodYYYYMM, currency)
-}
-
 // prevPeriod returns the YYYYMM of the month before p.
 func prevPeriod(p int) int {
 	year, month := p/100, p%100
@@ -89,7 +79,3 @@ func periodFromTime(t time.Time) int {
 func buildDedupKey(checkName, details string) string {
 	return fmt.Sprintf("reconcile:%s:%s", checkName, details)
 }
-
-// ensure buildCheck1DedupKey and buildCheck2DedupKey are referenced to avoid unused warnings.
-var _ = buildCheck1DedupKey
-var _ = buildCheck2DedupKey

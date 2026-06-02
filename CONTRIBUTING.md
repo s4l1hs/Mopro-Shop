@@ -786,6 +786,24 @@ watchtower-style auto-pull agent is configured). When merging a backend PR that
 needs to reach production, confirm the build workflow ran after merge, then trigger
 the host pull. See `docs/deploy.md`.
 
+## Architectural decisions retired
+
+When an explored approach is abandoned, **delete the dead code but record why**, so
+a future contributor doesn't recreate the same dead path.
+
+- **core-svc HTTP routing uses the stdlib mux, NOT the generated `gen/core`
+  StrictServerInterface.** `internal/api/core_impl.go` (a `CoreServer` with 41
+  methods returning 501 Not Implemented) was scaffolded in session-3 (2026-05-29) to
+  migrate core-svc onto the oapi-codegen strict server — but core-svc never adopted
+  it; the live routing is the stdlib `http.ServeMux` in `cmd/core-svc/main.go`. The
+  stub was wired to nothing and removed in `chore/project-cleanup-confirmed`. The
+  parallel `internal/api/fin_impl.go` (`FinServer`) **does** use the generated server
+  — so the pattern lives for fin-svc but is deliberately not used for core-svc. The
+  `gen/core` types are still regenerated from `api/openapi.yaml` by `openapi-ci.yml`
+  (used for client/model generation); they just have no server implementer. If a
+  future PR is tempted to re-add a `CoreServer`: this was a deliberate choice, not an
+  oversight — core-svc's mux is the contract.
+
 ## Operational-file drift discipline
 
 When the same operational concern lives in two or more files, drift is the

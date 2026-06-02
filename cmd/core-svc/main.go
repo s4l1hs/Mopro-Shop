@@ -960,31 +960,6 @@ func handleCreateProduct(svc catalog.Service, defaultCurrency, defaultLocale str
 	}
 }
 
-func handleGetProduct(svc catalog.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
-		if err != nil {
-			jsonError(w, "invalid product id", http.StatusBadRequest)
-			return
-		}
-		p, variants, translations, err := svc.GetByID(r.Context(), id)
-		if err != nil {
-			if errors.Is(err, catalog.ErrNotFound) {
-				jsonError(w, "product not found", http.StatusNotFound)
-				return
-			}
-			slog.Error("catalog: GetByID", "err", err)
-			jsonError(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		jsonOK(w, http.StatusOK, map[string]any{
-			"product":      p,
-			"variants":     variants,
-			"translations": translations,
-		})
-	}
-}
-
 func handleAddVariant(svc catalog.Service, defaultCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !requireIdempotencyKey(w, r) {

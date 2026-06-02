@@ -34,8 +34,6 @@ func (m *RedisMetrics) Hook(svc string) redis.Hook {
 	return &redisHook{m: m, svc: svc}
 }
 
-type cmdKey struct{}
-
 type redisHook struct {
 	m   *RedisMetrics
 	svc string
