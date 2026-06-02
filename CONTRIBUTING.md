@@ -749,16 +749,38 @@ push owner without editing the file: set `IMAGE_NS` in the host's `.env` (e.g.
 until then, hosts set `IMAGE_NS` to the current owner; after a move to `mopro`,
 they clear the override. A PR that touches deploy config must verify
 `docker compose config` resolves correctly under **both** the default and the
-override (both paths must work). `docker-compose.prod.yml` honors the same
-`IMAGE_NS` knob, but still targets the Docker Hub registry (`<ns>/<svc>`, no
-`ghcr.io`) — reconciling that registry with the GHCR push target is a separate
-Backlog item.
+override (both paths must work). `docker-compose.prod.yml` uses the identical
+`ghcr.io/${IMAGE_NS:-mopro}/<service>` form — both compose files now resolve to the
+same registry and namespace as the CI push target.
 
 Building ≠ deploying. Rolling a new image onto a host is a manual
 `docker compose pull <svc> && docker compose up -d <svc>` step (or automatic if a
 watchtower-style auto-pull agent is configured). When merging a backend PR that
 needs to reach production, confirm the build workflow ran after merge, then trigger
 the host pull. See `docs/deploy.md`.
+
+## Operational-file drift discipline
+
+When the same operational concern lives in two or more files, drift is the
+default: one file evolves while its sibling stays frozen, and the mismatch
+surfaces as a deploy failure (or worse, a silent production incident) months
+later. The CI↔deploy registry arc is the canonical example — the build workflow
+(`build-images.yml`) and the deploy compose files (`docker-compose.yml`,
+`docker-compose.prod.yml`) each encode the image registry/namespace independently,
+and they drifted twice in two PRs: PR #51 caught the dev compose pinning a
+nonexistent org namespace, and the prod compose was still on a *different
+registry* entirely (Docker Hub vs GHCR) until the follow-up. The same class
+recurs elsewhere — e.g. a module's hand-rolled test-schema setup (identity's
+`TestMain` DDL) drifting from the real migrations it's supposed to mirror.
+
+Discipline: when modifying a file that has an operational sibling — a compose
+dev/prod pair, a migration + init-script pair, a test-setup + production-schema
+pair, a CI push target + a deploy pull target — **verify the sibling matches in
+the same PR.** Fix both, or document the divergence as deliberate. The audit-first
+step of an operational PR should explicitly grep for the siblings of any file it
+touches (e.g. `grep -rn '<registry-or-namespace>' deploy/ .github/`). The check is
+cheap; skipping it is how the registry mismatch survived three PRs before anyone
+pulled on the deploy host.
 
 ## `make verify` as the canonical CI gate
 
