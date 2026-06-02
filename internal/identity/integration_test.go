@@ -88,10 +88,19 @@ DROP TABLE IF EXISTS identity_schema.users CASCADE;
 DROP FUNCTION IF EXISTS identity_schema.touch_updated_at() CASCADE;
 
 CREATE TABLE identity_schema.users (
-    id          BIGSERIAL   PRIMARY KEY,
-    phone_hash  BYTEA       NOT NULL,
-    phone_enc   TEXT        NOT NULL,
-    email_enc   TEXT,
+    id             BIGSERIAL   PRIMARY KEY,
+    -- phone_hash/phone_enc are nullable since migration 0063 (email-only users).
+    phone_hash     BYTEA,
+    phone_enc      TEXT,
+    email_enc      TEXT,
+    -- email auth + MFA columns added by migration 0063_email_auth. The test
+    -- schema was hand-rolled before 0063 and drifted; these match userSelectCols.
+    email_hash     BYTEA,
+    password_hash  TEXT,
+    email_verified BOOLEAN     NOT NULL DEFAULT FALSE,
+    mfa_enabled    BOOLEAN     NOT NULL DEFAULT FALSE,
+    mfa_phone_hash BYTEA,
+    mfa_phone_enc  TEXT,
     name        TEXT        NOT NULL DEFAULT '',
     locale      TEXT        NOT NULL DEFAULT 'tr-TR',
     status      TEXT        NOT NULL DEFAULT 'active'
