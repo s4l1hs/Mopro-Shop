@@ -3538,3 +3538,58 @@ Connection-acquisition fix; no capability change.
 - The nullable-`tx` shape relies on callers passing the tx when inside one; the `MaxConns=4` concurrent test is the deadlock guard against a future caller passing nil inside a tx (a non-fragile precise single-connection assertion is Backlogged).
 - Routing `GetAccountCurrencies`/`GetSystemState` onto the SERIALIZABLE tx adds their (point/singleton) reads to its conflict scope — negligible extra 40001 on rarely-mutated rows; the existing retry loop absorbs it.
 
+
+<<<<<<< chore/make-verify-imagemagick-install
+## ImageMagick Install PR — `chore/make-verify-imagemagick-install`
+
+Closes the last `make-verify` red (PR #42 finding): `verify-image-manifest` failed in CI.
+
+### Baseline
+PR #42 run https://github.com/s4l1hs/Mopro-Shop/actions/runs/26778777465 — only `verify-image-manifest` red: `audit-images: ImageMagick 'magick' not found`.
+
+### Two CI-only bugs fixed (both block verify-image-manifest on Linux)
+1. **ImageMagick 7 not installed.** `audit-images.sh` uses the IM7 `magick` unified binary; `make-verify.yml` (PR #41) never installed it, and `ubuntu-latest` apt `imagemagick` is IM6 (no `magick`). Fix: install the official IM7 portable binary, extracted headless (runner lacks libfuse2) once and symlinked as `magick`. (Not apt, no PPA, no third-party action — `tool/audit/imagemagick_install_baseline.md`.)
+2. **`bytes_of()` was macOS-only.** It tried BSD `stat -f '%z'` first; on Linux that's `--file-system` → it emitted filesystem stats (Block size/Inodes…) into the manifest's Bytes column → CI manifest diffed the macOS-generated file. Fix: try GNU `stat -c '%s'` first, fall back to BSD. Regenerating on macOS yields a byte-identical manifest, so Linux CI now matches.
+
+### Validation
+Proven via a throwaway combined branch (GetSystemState + ImageMagick + bytes_of): `make verify` **green end-to-end** in CI — https://github.com/s4l1hs/Mopro-Shop/actions/runs/26799587860 (incl. `verify-image-manifest` with CI's IM7, `property-cashback`, e2e). Throwaway PR #45 closed + branch deleted.
+
+### Merge ordering (#43 + #44 are mutually blocking alone)
+Neither PR is green by itself: #44 (off main) deadlocks `property-cashback` (main lacks the GetSystemState fix); #43 (off main) reds `verify-image-manifest` (no ImageMagick). Both fixes must be on main together. Plan: merge **#43 (GetSystemState)** → update **#44** from main → #44 goes fully green → merge → then flip `make-verify` to a **required status check** (Settings → Branches; operational, not code).
+
+### Closed item
+PR #42 Backlog "Install ImageMagick 7 in make-verify.yml" → ✅ (plus the cross-platform `bytes_of` bug it surfaced).
+
+### New Backlog item
+`make-verify` can flake on **Docker Hub image pulls** (`pg-ledger-test-up`/`e2e-test-up` `docker run postgres:16-alpine` hit a `registry-1.docker.io` timeout in one validation run). Harden with a pull-retry wrapper (or a registry cache) around the container bootstraps before flipping make-verify to required, so transient pull timeouts don't red the gate.
+
+### No parity change
+Operational/CI PR.
+=======
+## GetSystemState Tx-Routing PR — `fix/cashback-getsystemstate-tx`
+
+Completes the PR #42 cashback deadlock fix, which shipped with **only the
+`GetAccountCurrencies` half**. The `GetSystemState` half (approved during the
+PR #42 turn) was edited but **never committed** — it sat uncommitted in the
+working tree, so local `-race` validation used it (looked complete) and CI's
+`property-cashback` (run without `-race`) passed by timing luck. `main` was left
+half-fixed: `PostInTx → checkReadOnly → GetSystemState` still acquired a second
+pool connection inside the SERIALIZABLE tx on a cold cache.
+
+**Impact:** prod stayed safe (singleton cron + sequential plans + warm
+`StartRefresher` cache + pool≈6), but `main`'s `property-cashback` was a CI
+flakiness risk (deadlocks under `-race`/high contention) and the fix was simply
+incomplete.
+
+**Fix:** `GetSystemState` + `checkReadOnly` take an optional `pgx.Tx` (non-nil →
+tx read; nil → pool; `StartRefresher` passes nil). Same pattern + correctness
+rationale as `GetAccountCurrencies` (committed singleton config row → tx snapshot
+sees it). `GetTransactionByIdempotencyKey` still stays on the pool by design.
+Validated: `TestCronProperty_ConcurrentIdempotency` passes `-race -count=10`
+(deadlocks pre-fix under `-race`).
+
+**Process note:** the gap was a missed `git add` last turn; my "20 `-race` runs
+passed" report was true of the working tree but not of the committed/pushed code.
+Caught this turn when the uncommitted changes surfaced. No business-logic change;
+no schema/API contract change.
+>>>>>>> main
