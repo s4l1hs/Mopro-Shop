@@ -42,6 +42,19 @@ jobs:
         run: flutter pub get
         working-directory: mobile
 
+      # verify-image-manifest → tool/audit-images.sh needs the IM7 `magick`
+      # unified binary. Ubuntu 24.04's apt `imagemagick` is IM6 (no `magick`),
+      # so install the official IM7 portable binary. It's an AppImage and the
+      # runner lacks libfuse2, so extract it headless once and symlink AppRun.
+      - name: Install ImageMagick 7 (for verify-image-manifest)
+        run: |
+          curl -fsSL https://imagemagick.org/archive/binaries/magick -o /tmp/magick.appimage
+          chmod +x /tmp/magick.appimage
+          ( cd /tmp && ./magick.appimage --appimage-extract >/dev/null )
+          sudo mv /tmp/squashfs-root /opt/imagemagick7
+          sudo ln -sf /opt/imagemagick7/AppRun /usr/local/bin/magick
+          magick --version
+
       # Docker is preinstalled on ubuntu-latest. make verify's property-* and
       # integration-e2e sub-targets bring up their own postgres/redis containers
       # via `docker run` (pg-ledger-test-up / e2e-test-up) — no compose services
