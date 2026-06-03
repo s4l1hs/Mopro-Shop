@@ -11,7 +11,7 @@ ARG BUILD_SHA=dev
 ARG BUILT_AT=
 
 # ── Build stage ──────────────────────────────────────────────────────────────
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25.11-alpine AS builder
 
 # Re-declare ARGs after FROM so they are visible inside this stage.
 ARG SERVICE

@@ -28,12 +28,10 @@ jobs:
         with:
           go-version-file: go.mod
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      # continue-on-error: main currently has 2 CALLED stdlib vulns
-      # (GO-2026-5039 net/textproto, GO-2026-5037 crypto/x509), tracked as
-      # TOOLING_AUDIT T-014 — both fixed by a Go 1.26.4 toolchain bump.
-      # REMOVE continue-on-error (make this a required gate) once T-014 lands.
+      # Required gate (TOOLING_AUDIT T-014 resolved): the go directive is 1.25.11
+      # (installed here via go-version-file), which fixes the previously-called
+      # stdlib vulns. govulncheck must stay clean — no continue-on-error.
       - name: govulncheck
-        continue-on-error: true
         run: |
           set -o pipefail
           govulncheck ./... | tee "$GITHUB_STEP_SUMMARY"

@@ -42,11 +42,12 @@ LATER/PARK unsequenced). Each build PR references its `T-ID`.
 5. **T3-6** `feat/nightly-and-cron-tooling` (SOON) — closes **T-009** (`nightly.yml` schedule),
    **T-008** (cron dry-run + overlap sim). ~230 LOC.
 
-**Fix follow-ups from the T3-1/T3-2 build (NEW):**
-- **T3-sweep-i18n** — remove the 163 dead keys + clear `i18n_usage_baseline.txt` (uses the T-001 analyzer).
-- **T3-fix-stdlib-vulns** (NOW) — bump Go toolchain to 1.26.4+ (closes **T-014**), then drop
-  `continue-on-error` from `govulncheck.yml` to make it required.
-- **T3-fix-missing-i18n** — add the 10 missing translations + clear `i18n_missing_baseline.txt` (closes **T-015**).
+**Fix follow-ups from the T3-1/T3-2 build:** ✅ **ALL DONE** (`chore/step3-t014-i18n-cleanup`):
+- ✅ **T3-sweep-i18n** — 163 dead keys removed across 4 locales; `i18n_usage_baseline.txt` cleared.
+- ✅ **T-014** — bumped Go to **1.25.11** (go.mod/go.work/Dockerfile/workflows); `continue-on-error`
+  removed → govulncheck is now a required gate. (Discovery corrected the target from 1.26.4: the CI
+  scan against go 1.25 showed 9 called vulns, all fixed by the same-minor 1.25.11 patch.)
+- ✅ **T-015** — 10 missing keys added to tr-TR + en-US; `i18n_missing_baseline.txt` cleared.
 
 LATER/PARK: **T-011** new-migration generator (LOW); merge_group support (LOW); 3 scripts missing
 `set -euo pipefail` (LOW tidy-up). **Corrected to EXISTS-FINE (nothing to build):** T-012 rollback

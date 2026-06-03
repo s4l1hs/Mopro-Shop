@@ -42,7 +42,6 @@
     "rail_privacy": "Privacy"
   },
   "mega_menu": {
-    "see_all": "Alle anzeigen",
     "empty_children": "Keine Unterkategorien in diesem Bereich.",
     "promo": {
       "cta": "Entdecken",
@@ -120,9 +119,7 @@
     "reason_orders_desc": "Verfolge alle Bestellungen an einem Ort."
   },
   "a11y": {
-    "skip_to_content": "Zum Inhalt springen",
-    "loading": "Wird geladen",
-    "page_not_found": "Seite nicht gefunden"
+    "skip_to_content": "Zum Inhalt springen"
   },
   "product": {
     "remove_from_favorites": "Aus Favoriten entfernen",
@@ -165,11 +162,6 @@
     "refund_issued_date": "Refund date",
     "refund_failed_hint": "Refund failed. Please contact support.",
     "flow_title": "Return Request",
-    "step_items": "Items",
-    "step_reasons": "Reasons",
-    "step_review": "Review",
-    "step_confirm": "Confirm",
-    "step_indicator": "{}/4",
     "select_items_title": "Select items to return",
     "items_selected": "{} items selected",
     "continue_cta": "Continue",
@@ -203,7 +195,6 @@
     "return_no": "Return No",
     "items_count": "{} items",
     "original_order": "View order",
-    "reviewing": "Under review",
     "detail_title": "Return #{}"
   },
   "time": {
@@ -233,13 +224,7 @@
     "ch_in_app": "In-App",
     "ch_email": "E-Mail",
     "ch_push": "Push",
-    "forced_on_warning": "Diese Benachrichtigung kann nicht deaktiviert werden.",
-    "sample_order_title": "Your order has shipped",
-    "sample_order_body": "Order #{id} is on its way.",
-    "sample_return_title": "Return request received",
-    "sample_return_body": "Your return #{id} is under review.",
-    "sample_security_title": "New sign-in detected",
-    "sample_security_body": "Your account was accessed from a new device."
+    "forced_on_warning": "Diese Benachrichtigung kann nicht deaktiviert werden."
   },
   "help": {
     "title": "Hilfe",
@@ -296,7 +281,6 @@
     "sort_most_answered": "Meiste Antworten",
     "login_to_ask": "Melden Sie sich an, um eine Frage zu stellen.",
     "login_to_answer": "Melden Sie sich an, um zu antworten.",
-    "view_all": "Alle Fragen ansehen",
     "my_title": "Meine Fragen",
     "my_empty": "Sie haben noch keine Fragen gestellt.",
     "detail_title": "Frage",

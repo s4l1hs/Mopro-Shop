@@ -35,7 +35,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.22"
+          go-version-file: go.mod
           cache: true
 
       - name: Re-generate Go types + server stubs
@@ -74,7 +74,7 @@ jobs:
 
       - uses: actions/setup-go@v6
         with:
-          go-version: "1.22"
+          go-version-file: go.mod
           cache: true
 
       - name: Build all binaries
