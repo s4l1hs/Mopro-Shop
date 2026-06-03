@@ -16,8 +16,8 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
 # `make verify` explicitly), so this is a safe, friendlier default.
 .DEFAULT_GOAL := help
 
-.PHONY: help verify fmt vet test lint govulncheck boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order \
-        verify-image-manifest update-goldens audit audit-test i18n-check i18n-usage \
+.PHONY: help bootstrap verify soak fmt vet test lint govulncheck boundaries migration-check property-cashback property-payout property-ledger integration-wallet property-timex property-order \
+        verify-image-manifest update-goldens audit audit-test i18n-check i18n-usage riverpod-check \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
         caddy-validate caddy-reload \
@@ -37,7 +37,7 @@ help: ## Show this help.
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## /{printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment verify-image-manifest verify-contrast ## Full verification gate (run before every push).
+verify: fmt vet test lint boundaries migration-check property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment verify-image-manifest verify-contrast ## Full verification gate (run before every push).
 
 # WCAG contrast check for the documented brand colour pairs. Fails if any
 # non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.
@@ -87,6 +87,18 @@ i18n-check: ## Translation completeness gate (fails on extra keys).
 i18n-usage: ## i18n dead-key / missing-key gate (ratchet vs baseline).
 	@dart run tool/audit/check_i18n_usage.dart --check
 
+# Riverpod inferred-type-provider ratchet (TOOLING_AUDIT T3-5). Notifier build()
+# shapes are inventoried (informational); only inferred-type drift is gated.
+# Zero-dep Dart. See docs/internal/riverpod-analyzer.md.
+riverpod-check: ## Riverpod inferred-type-provider gate (ratchet vs baseline).
+	@dart run tool/audit/riverpod_check.dart --check
+
+# One-command local setup for a fresh checkout (TOOLING_AUDIT T3-3): env file,
+# go mod download, git hooks, flutter pub get. Idempotent; detects (never installs)
+# toolchains. See scripts/bootstrap.sh / docs/internal/bootstrap.md.
+bootstrap: ## Set up a fresh checkout (deps + hooks + env), then run `make verify`.
+	@bash scripts/bootstrap.sh
+
 # Wire `.githooks/` into this clone (run once per machine, or after pulling
 # a new hook). Refuses commits on main/master and runs the api-gen sync check.
 hooks: ## Install .githooks into this clone (run once).
@@ -124,6 +136,12 @@ deadcode: ## Whole-program dead-code scan (on-demand; see comment).
 
 boundaries: ## Enforce module-boundary import rules.
 	./scripts/check-module-boundaries.sh
+
+# Migration-safety gate (TOOLING_AUDIT T3-4): risky destructive DDL (DROP COLUMN/
+# TABLE, SET NOT NULL) in forward *.up.sql migrations, ratcheted vs a baseline.
+# Fast/text — wired into `verify`. See scripts/lint-migrations.sh + docs/internal/lint-discipline.md.
+migration-check: ## Flag risky destructive DDL in forward migrations.
+	@bash scripts/lint-migrations.sh --strict
 
 # ── Test infrastructure: pg-ledger-test:6434 ────────────────────────────────
 #
@@ -473,6 +491,19 @@ integration-identity-race: e2e-test-up
 integration-payment: e2e-test-up
 	ORDER_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
 	  go test -tags=integration ./internal/payment/... -count=1 -race -timeout 5m
+
+# Nightly soak (TOOLING_AUDIT T3-6): the concurrency-sensitive suites Step 2
+# flagged for repeated -race stress (§6.3) — wallet RefreshWorker/reconcile (F-003),
+# payment reconciler (F-001/F-006), identity rate-limiter (F-017). Run nightly by
+# .github/workflows/nightly.yml; locally: `make soak SOAK_COUNT=10`.
+SOAK_COUNT ?= 50
+soak: pg-ledger-test-up e2e-test-up ## Stress concurrency suites (-race -count=$(SOAK_COUNT)).
+	go test -tags=integration -race -skip 'Property' ./internal/wallet/... -count=$(SOAK_COUNT) -timeout 45m
+	ORDER_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	  go test -tags=integration -race ./internal/payment/... -count=$(SOAK_COUNT) -timeout 45m
+	IDENTITY_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	IDENTITY_TEST_REDIS=localhost:6381 \
+	  go test -tags=integration -race -skip 'OTPCodeDistribution' ./internal/identity/... -count=$(SOAK_COUNT) -timeout 60m
 
 # ── Catalog seed ───────────────────────────────────────────────────────────────
 

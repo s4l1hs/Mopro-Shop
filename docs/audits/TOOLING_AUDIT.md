@@ -5,9 +5,11 @@
 > **BUILD PROGRESS:**
 > - *PR #63 (T3-1 + T3-2):* ✅ **T-003, T-004, T-010, T-001 RESOLVED**; surfaced T-014 + T-015.
 > - *T3 cleanup PR:* ✅ **T-014, T-015 RESOLVED** + **T3-sweep-i18n** done (163 dead keys removed).
->   govulncheck is now a required gate; the i18n analyzer reports 0 dead / 0 missing. No new findings.
-> - Remaining Step-3 build PRs: **T3-3** bootstrap, **T3-4** migration/discipline linters,
->   **T3-5** Riverpod detector (T-002), **T3-6** nightly/cron (see §6).
+>   govulncheck is now a required gate; the i18n analyzer reports 0 dead / 0 missing.
+> - *Step-3 closure bundle:* ✅ **T-005** (bootstrap), **T-002** (Riverpod gate), **T-006**
+>   (migration-safety), **T-009** (nightly soak) RESOLVED. **T-007** (3 flow-AST discipline
+>   checks) SPLIT → `cmd/lint-discipline` follow-up; **T-008** (cron-overlap sim) DEFERRED
+>   (needs a fin-svc harness). **Step 3 is CLOSED** but for those two carve-outs.
 
 ## TL;DR
 - **MISSING:** 9 (3 HIGH, 5 MED, 1 LOW)
@@ -70,7 +72,11 @@ outdated`/audit + (optionally) `trivy` on the built images; + `.github/dependabo
 Go modules / GitHub Actions / pub. Small (~60-line workflow + dependabot config), purely additive.
 
 ### T-009 — no scheduled (nightly) workflows
-**Status: MISSING | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
+**✅ RESOLVED (T3-6) — was MISSING/MED.** `.github/workflows/nightly.yml` (03:00 UTC +
+dispatch) runs `make soak` — the Step-2-hardened concurrency suites (wallet RefreshWorker
+F-003, payment reconciler F-001/F-006, identity rate-limiter F-017) under `-race -count=50`;
+opens an issue on failure. Closes the Step-2 §6.3 deferred ×50 -race repro.
+**Original status: MISSING | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
 ```
 $ git grep -lnE 'schedule:|cron:|merge_group' -- .github/workflows/   → (no matches)
 ```
@@ -144,7 +150,11 @@ Running + ordering + reversible pairs + fresh-DB CI application all **EXIST-FINE
 *safety-linting* and *scaffolding*, not the runner:
 
 ### T-006 — no migration linter (destructive-change / lock-duration guard)
-**Status: MISSING | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
+**✅ RESOLVED (T3-4) — was MISSING/MED.** `scripts/lint-migrations.sh` flags risky DDL
+(DROP COLUMN/TABLE, SET NOT NULL) in forward `*.up.sql` only (the 95 `*.down.sql` DROPs
+are legitimate); DROP NOT NULL / DROP CONSTRAINT treated as safe (relaxing). 0 today →
+ratcheted empty baseline. Wired into `make verify`. Canary-proven.
+**Original status: MISSING | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
 ```
 $ git grep -lniE 'new.migration|migration.lint|DROP COLUMN' -- scripts/ tool/ Makefile
   → only docs (legal_copy_baseline.md, tranche4b_blockers.md) — no linter script
@@ -171,7 +181,11 @@ the F-002/#56 lesson — these are EXISTS-FINE, not redundant). A `backup-cron-h
 dashboard monitors them. Gap:
 
 ### T-008 — no local cron dry-run / overlap simulator
-**Status: MISSING | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
+**⏳ DEFERRED (T3-6) — was MISSING/MED.** The cashback/seller-payout crons drive the
+`mopro` CLI against the ledger DB + fin-svc wiring; running them (let alone concurrently
+with clock injection) needs invasive env setup. Per §4.4.1, deferred rather than ship a
+tool nobody can run. Re-attempt when a fin-svc test harness exists.
+**Original status: MISSING | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
 The TESTING_AUDIT §5.4 asked whether the financial crons are covered by cron-overlap simulation;
 they aren't (the cron *scripts* are thin wrappers around the `mopro` CLI; the idempotency is
 tested at the engine level, but there's no tool to dry-run a cron locally with seeded data or to
@@ -234,7 +248,12 @@ a Dart static analyzer that resolves prefix/interpolation to a `key → file:lin
 gated to fail on dead keys. ~400–700 LOC Dart + a `flutter-i18n-usage` step. No prerequisites.
 
 ### T-002 — Riverpod inference-shape detector — MISSING
-**Status: MISSING | Severity: HIGH | Confidence: CONFIRMED | Priority: SOON**
+**✅ RESOLVED (T3-5) — was MISSING/HIGH.** `tool/audit/riverpod_check.dart` gates
+inferred-type providers (ratchet; 0 today → pure drift-protection) + inventories
+Notifier build() shapes (informational — the synchronous-reachability rule needs flow
+analysis textual heuristics can't enforce; §4.3.4). All 21 notifiers conform to a
+documented shape. `docs/internal/riverpod-analyzer.md`.
+**Original status: MISSING | Severity: HIGH | Confidence: CONFIRMED | Priority: SOON**
 ```
 $ sed -n '1,15p' tool/audit/list_providers.dart  → "Inventory every Riverpod provider … name, file:line, provider kind"
 ```
@@ -267,7 +286,12 @@ build queue.
 
 ### Adjacent: discipline-pattern linters
 ### T-007 — no linter for the recurring discipline patterns
-**Status: MISSING | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
+**⏳ SPLIT (T3-4 follow-up) — was MISSING/MED.** The 3 flow-sensitive checks
+(pool-acquire-inside-tx, soft-deleted-user-consumer, idempotency-surface) need
+`go/analysis` AST/flow analysis, not textual greps — discovery refuted the prompt's
+"easy" assumption (§2.3). Deferred to a focused `cmd/lint-discipline` PR rather than
+ship FP-ridden heuristics. (migration-safety, the 4th, shipped under T-006.)
+**Original status: MISSING | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
 ```
 $ git grep -lniE 'pool.*acquire.*tx|StatusDeleted|FOR UPDATE SKIP LOCKED' -- scripts/ tool/
   → only tool/audit/identity_user_state_consumers.md (a PR #49 manual-audit DOC, not a script)
@@ -284,7 +308,10 @@ hand. ~200 LOC. (Heuristic → expect false positives; design with `//lint:ok` e
 ## §3.7 Dev convenience findings
 
 ### T-005 — no `make bootstrap` / one-command local setup
-**Status: MISSING | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
+**✅ RESOLVED (T3-3) — was MISSING/MED.** `make bootstrap` → `scripts/bootstrap.sh`
+(idempotent, repo-local, detect-don't-install) + CONTRIBUTING wire. Verified: run 1 all
+✅, run 2 idempotent. `docs/internal/bootstrap.md`.
+**Original status: MISSING | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
 ```
 $ grep -nE '^(bootstrap|setup|dev):' Makefile   → (none; only grafana-deploy etc.)
 ```
