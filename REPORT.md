@@ -3979,3 +3979,18 @@ Docs-only audit. Fix PRs follow per TESTING_AUDIT §8, referencing finding IDs.
 
 ### No parity change
 Test-only PR (+ Makefile gate); no behavior change.
+
+## PR — Audit burn-down: F-006, F-011, F-012, F-002 (treasury slice) — `test/audit-burndown-identity-treasury`
+
+**Intentional 4-finding bundle** (deviation from one-finding-per-PR, per the prompt's §1; one commit per finding; split-bailout did NOT fire — treasury collapsed to an audit correction, so the PR stayed well under budget).
+
+- **F-006** ✅ RESOLVED — added `integration-identity-race` (`go test -race -skip OTPCodeDistribution ./internal/identity/...`), wired into `make verify`. **Clean: zero races over `-count=3`** (~26s). The bcrypt distribution test stays excluded (the documented CI-budget reason). No new race findings.
+- **F-012** ✅ CONFIRMED-AND-FIXED — `issue()` carried no `jti`, so same-second access/step-up tokens were byte-identical (probe `TestIssueAccess_SameSecond_DistinctJTI` reproduced it). Fixed with the trivial additive `RegisteredClaims.ID = uuid.NewString()` (uuid already a dep; `Verify` ignores it; refresh tokens independent). **Severity corrected PROBABLE-HIGH → CONFIRMED-MED** (stateless bearer access tokens; rotation security is in the opaque refresh tokens).
+- **F-011** ✅ TRIAGED — 5 skips: **3 RESTORED** (`Service_OTPVerifyFlow` via the F-012 fix; `LogoutRevokesToken` assertion broadened to accept `ErrTokenFamilyRevoked`; `StepUpOTPFlow` stale step-3 dropped — `FindLatestOTP` filters `verified_at IS NULL`), **1 → F-016** (rate-limiter; product verified correct, test-infra-fragile), **1 DOCUMENTED** (DLQ flaky-by-design). No silent leaves.
+- **F-002 (treasury slice)** ⚠️ CORRECTED — `internal/treasury` is a 12-LOC unimplemented stub (empty interfaces, unwired), not a real module. Closed as **not-actionable**, not via tests (the audit over-counted "5 files"). `search`/`media`/`sizefinder` + `payment.Service` remain open under F-002.
+- **NEW F-016** (LOW, test-infra) — identity integration tests share one `integRedis` + per-test `FlushDB` → order-fragile (the rate-limiter test is the visible symptom; limiter itself is correct). Fix = per-test Redis isolation, then un-skip.
+
+New TESTING-HOOKs: none. `make verify` green incl. the new `-race` line.
+
+### No parity change
+Test-only + one-line jti fix + Makefile gate; no product behaviour change beyond distinct token jti.

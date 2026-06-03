@@ -4,10 +4,11 @@
 
 ## TL;DR
 - **CONFIRMED HIGH:  0**
-- **CONFIRMED MED:   7** (untested live modules incl. a wired payment reconciler; identity suite not `-race`'d; 5 skipped REVIVAL_GAP tests)
+- **CONFIRMED MED:   7** (original) — burn-down status: F-001 ✅ (PR #58); F-006 ✅, F-011 ✅ triaged, F-012 ✅ confirmed+fixed (this PR); F-002-treasury ⚠️ corrected-to-stub; F-002 (search/media/sizefinder) + payment.Service still open.
 - **CONFIRMED LOW:   5** (weak determinism test; ungated staticcheck style; retry-without-backoff; legacy StateNotifiers; documented a11y FAIL)
-- **PROBABLE:        3** (JWT same-second rotation collision; `context.Background()` in DLQ insert; Flutter rebuild storms)
+- **PROBABLE:        3** (F-012 now CONFIRMED+FIXED; `context.Background()` in DLQ insert; Flutter rebuild storms)
 - **UNKNOWN / not-run-this-pass: 3** (×50 `-race` repro; N+1 / `EXPLAIN ANALYZE`; Flutter DevTools rebuild counts)
+- **NEW: F-016** (LOW, test-infra) — identity integration tests share one `integRedis`/`FlushDB` (order-fragile); surfaced triaging F-011; product verified correct.
 - **Verified-not-actionable:** §3.1 concurrency, §3.2 tx-isolation/retry, §3.4 user-state-consumer, §4.2 Flutter dispose, §5.1 soft-refs.
 
 **Honest headline:** post-cleanup (#54-#56) the codebase is healthy. There is **no confirmed correctness/financial/security defect**. The real signal is **test-coverage gaps** in a cluster of modules that escaped the property/integration nets (`payment`, `treasury`, `search`, `media`, `sizefinder`) — including a *live, wired* payment reconciler with zero tests — plus known tracked gaps (REVIVAL_GAP skips, identity-without-`-race`).
@@ -54,7 +55,14 @@ Impact: a financial worker's reconcile/transfer-orchestration logic can regress 
 Recommendation: follow-up PR adds unit tests for `payment.Service` + `Reconciler` (table-driven over PSP-result shapes; fake adapter).
 
 ### F-002 — Service modules with zero co-located tests
-**Severity: MED | Confidence: CONFIRMED**
+**Severity: MED | Confidence: CONFIRMED | ⚠️ `treasury` slice CORRECTED + closed-as-not-actionable by `test/audit-burndown-identity-treasury` (2026-06-03)**
+> **CORRECTION (the PR #57 lesson, again):** the audit counted `internal/treasury` as "5 src
+> files" without reading them. It is a **12-LOC unimplemented stub** — `Service interface{}`,
+> `Repository interface{}` (empty), empty `domain.go`/`errors.go`/`repository.go`/`service.go`,
+> and **not wired into any binary**. There is no behaviour to test. F-002-treasury is closed as
+> **not-actionable (stub)**, not via tests. The remaining F-002 modules (`search`, `media`,
+> `sizefinder`) are still real coverage gaps — verify each is a real implementation (not a stub)
+> before writing tests. (`payment.Service`/adapters folded in by PR #58 also remain.)
 ```
 $ for d in $(find internal -type d); do src=$(ls $d/*.go 2>/dev/null|grep -vc _test.go); t=$(ls $d/*_test.go 2>/dev/null|wc -l); [ $src -gt 0 ] && [ $t -eq 0 ] && echo "$d ($src src,0 test)"; done
 internal/treasury (5 src, 0 test)
@@ -109,7 +117,7 @@ PR #49 swept every consumer; 14 `StatusDeleted` guards remain in `service.go`. N
 | Module | src files | co-located tests | covered indirectly? | gap |
 |---|---|---|---|---|
 | `internal/payment` (+reconciler) | 6 | 0 (sipay subpkg has tests) | partially (sipay hmac/integration) | **MED (F-001)** |
-| `internal/treasury` | 5 | 0 | no | **MED (F-002)** |
+| `internal/treasury` | 5 (but **12 LOC empty stub**) | 0 | n/a | ⚠️ CORRECTED — unimplemented stub, not-actionable |
 | `internal/search` | 5 | 0 | no | MED (F-002) |
 | `internal/media` | 5 | 0 | no | MED (F-002) |
 | `internal/sizefinder` | 5 | 0 | no | MED (F-002) |
@@ -177,7 +185,13 @@ $ grep verify-contrast Makefile → cd mobile && flutter test test/design/contra
 `make verify`'s Flutter step is just the WCAG contrast test; the full widget+golden suite is **not** in `make verify`. It IS gated per-PR by `flutter-ci.yml` (so CI catches breaks), but a dev running `make verify` locally won't catch a Flutter widget-test regression. LOW (CI covers it; local/CI parity gap only).
 
 ### F-006 — identity integration suite runs without `-race`
-**Severity: MED | Confidence: CONFIRMED**
+**Severity: MED | Confidence: CONFIRMED | ✅ RESOLVED-BY `test/audit-burndown-identity-treasury` (2026-06-03)**
+> Added `make integration-identity-race`: `go test -race -skip 'OTPCodeDistribution'
+> ./internal/identity/...` (the targeted run the recommendation called for — excludes the
+> one bcrypt-heavy test that blows the CI budget under `-race`). Wired into `make verify`.
+> **Result: clean — zero races over `-count=3` (~26s/run).** The identity concurrency code
+> (refresh rotation, family-revoke, OTP rate-limiter, step-up) was race-safe; it had simply
+> never been checked. No new race findings.
 ```
 $ sed -n '415,419p' Makefile
 integration-identity: ... go test -tags=integration ./internal/identity/... -count=1 -timeout 5m   # NO -race
@@ -200,7 +214,30 @@ property_test.go:28:11: identical expressions on the left and right side of the 
 7 non-generated: `S1016` ×5 (use struct conversion not literal — `cashback/consumer.go:86`, `orderledger/consumer.go:65`, `sellerpayout/{consumer,fraud_event_handler,psp_event_handler}.go`), `ST1011` (`eventbus/redis_bus.go:36` unit-suffix var name). Not in the golangci enabled set, so ungated. Cosmetic; optional `staticcheck` addition to the gate is a judgment call (it also flags generated code — would need `gen/` excludes).
 
 ### F-011 — five REVIVAL_GAP tests skipped
-**Severity: MED | Confidence: CONFIRMED**
+**Severity: MED | Confidence: CONFIRMED | ✅ TRIAGED-BY `test/audit-burndown-identity-treasury` (2026-06-03)**
+> Per-test triage (ran each with overrides + in full-suite context):
+> | Test | Decision | Why |
+> |---|---|---|
+> | `Service_OTPVerifyFlow` | **RESTORED** | passes now F-012's jti fix makes rotated tokens distinct |
+> | `LogoutRevokesToken` | **RESTORED** | behaviour correct; assertion broadened to accept `ErrTokenFamilyRevoked` (the revoke-on-logout outcome) |
+> | `StepUpOTPFlow` | **RESTORED** | stale step-3 dropped — `FindLatestOTP` filters `verified_at IS NULL`, so a consumed login OTP is correctly excluded (one-time use) |
+> | `RateLimiter_OTPRequest_PhoneWindow` | **→ F-016** | limiter is correct (passes isolated; Lua `count>=max`); fails only in the shared-`integRedis` suite. Test-infra, not a product bug. Left skipped pointing at F-016 |
+> | `DLQContainsExactlyPermanentFailures` | **DOCUMENTED** | reclassified REVIVAL_GAP→FLAKY_SKIP (timing-flaky by design; deterministic siblings cover the paths) |
+> 3 restored+passing, 1 new finding, 1 documented. No silent leaves.
+
+### F-016 — identity integration tests share one `integRedis` + per-test `FlushDB` (order-fragile)
+**Severity: LOW (test-infra) | Confidence: CONFIRMED | NEW (surfaced triaging F-011)**
+```
+$ go test -run '^TestInteg_RateLimiter_OTPRequest_PhoneWindow$' ./internal/identity/   → PASS (isolated)
+$ go test -run 'RateLimiter|LogoutRevokes|OTPVerify|StepUp' ./internal/identity/        → RateLimiter FAILs (nil on 4th)
+$ grep -c integRedis.FlushDB internal/identity/integration_test.go                       → 7
+```
+7 identity tests share the package-global `integRedis` client and each `FlushDB`s at start.
+The sliding-window rate-limiter test asserts an empty window, but a sibling's `FlushDB` can
+clear its zset within the same `go test` run → false "4th not limited". **The product
+(limiter) is correct** (isolated pass + Lua `count>=max` proof). Fix is test-infra: give
+each test an isolated key namespace or its own Redis DB index, then un-skip the rate-limiter
+test. Not fixed here (F-011 was triage, not test-harness rework).
 ```
 $ git grep -nE 'REVIVAL_GAP|skipRevivalGap' -- '*.go'
 internal/e2e/dlq_e2e_test.go:325                 (flaky DLQ-membership; E2E_RUN_FLAKY_DLQ=1)
@@ -212,8 +249,20 @@ internal/identity/integration_test.go:683        Integration_StepUpOTPFlow
 Five tests are skip-guarded (run only with env overrides). Each is either a stale assertion or a real regression — unreconciled. Tracked in Backlog but not closed. The DLQ one is a known flaky-under-gate property test (aggressive autoclaim).
 Recommendation: reconcile one-by-one in a focused PR (stale → update assertion; real → file as its own bug).
 
-### F-012 — possible JWT same-second rotation collision (real-bug candidate)
-**Severity: MED | Confidence: PROBABLE**
+### F-012 — JWT same-second token collision (no jti)
+**Severity: MED | Confidence: CONFIRMED → ✅ CONFIRMED-AND-FIXED-BY `test/audit-burndown-identity-treasury` (2026-06-03)**
+> **CONFIRMED:** `issue()` set only `Subject`/`IssuedAt`(1s-resolution)/`ExpiresAt` + `uid`/
+> `mkt`/`scope`, **no `jti`** → two same-second access (and step-up) tokens were byte-identical.
+> Probe `TestIssueAccess_SameSecond_DistinctJTI` (and step-up sibling) reproduced it.
+> **Severity corrected PROBABLE-HIGH → CONFIRMED-MED:** access tokens are stateless bearer
+> JWTs (two identical same-second tokens grant identical access — no boundary crossed);
+> rotation security lives in the separate opaque refresh tokens. The jti's value is hygiene +
+> enabling a future per-token denylist (PR #49 backlog).
+> **FIXED (trivial, §4.2.3):** `RegisteredClaims.ID = uuid.NewString()` (uuid already a dep) —
+> additive, `Verify` ignores it, nothing keys on the token string, refresh tokens independent.
+> Probe green at HEAD; unblocked F-011's `Service_OTPVerifyFlow`.
+
+(original PROBABLE write-up:)
 File: `internal/identity/integration_test.go:556`
 The `Service_OTPVerifyFlow` REVIVAL_GAP reason: *"access token not different after rotation (likely JWT same-second collision)."* If two access tokens issued within the same second are byte-identical (iat-only entropy, no jti/nonce), refresh-rotation produces a token indistinguishable from its predecessor — which weakens rotation/replay semantics. Not reproduced this pass (test is skipped). PROBABLE-MED; the follow-up that reconciles F-011 should determine whether this is a stale test or a real token-entropy bug (check whether `IssueAccess` includes a unique `jti`).
 
