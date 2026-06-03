@@ -2,10 +2,14 @@
 
 **Audit-only. No code changes in this PR.** Findings are scoped into follow-up refactor PRs (§6).
 
-> **BUILD PROGRESS:** ✅ **A-001 RESOLVED** (PR A4-1 `feat/payment-gateway-inject`) — `payment.Service`
-> made testable (injected provider + `paymenttest.Fake`); discovery-shift: the interface already
-> existed, so no `payment.Gateway` was added. **T-016 subsumed + resolved.** Remaining: A4-2 (CLAUDE.md
-> reconcile, NOW), A4-3 (config injection), A4-4 (financial-core docs). A-004/A-007 PROBABLE; A-005 PARK.
+> **BUILD PROGRESS:**
+> - ✅ **A-001** (A4-1 `feat/payment-gateway-inject`) — `payment.Service` testable (injected provider
+>   + `paymenttest.Fake`); discovery-shift: interface already existed, no `payment.Gateway` added.
+>   **T-016 mock-PSP part resolved** (fin-svc harness remains).
+> - ✅ **A-002 + A-006** (A4-2/A4-4 docs bundle) — CLAUDE.md reconciled (Built-vs-Planned); the 7
+>   financial conventions consolidated in `docs/internal/financial-core.md`.
+> - Remaining: **A4-3** config injection (the one MED-SOON refactor) + the idempotency-surface
+>   analyzer carve-out. A-004/A-007 PROBABLE; A-005 PARK. **Step 4 closes when A4-3 lands.**
 
 ## TL;DR
 - **CONFIRMED HIGH:** 1 (A-001 = T-016, payment test-mode abstraction)
@@ -174,7 +178,12 @@ same no-fake shape, fold it into the same interface+inject refactor.
 ## §3.10 / §4.1 Documentation drift
 
 ### A-002 — CLAUDE.md (the constitution) drifted from the built architecture
-**Shape: UNDOCUMENTED / DRIFT | Severity: MED | Confidence: CONFIRMED | Priority: NOW (cheap, high-value)**
+**✅ RESOLVED (A4-2) — was MED/NOW.** Re-verified every §2.3 claim: marked antifraud/
+antifraud_inference/einvoice **PLANNED**; fixed pkg names (logger→logx, tracing→otelx, httpx
+middleware→otelx); flagged currency/i18n/dbx as never-built (with where each concept actually
+lives); added a Built-vs-Planned note pointing at `check-module-boundaries.sh` as authoritative;
+fixed the §4.6 `pkg/currency.Code` reference. Reconcile-only, no rule changed.
+**Original shape: UNDOCUMENTED / DRIFT | Severity: MED | Confidence: CONFIRMED | Priority: NOW**
 ```
 $ for m in einvoice antifraud antifraud_inference; do echo "$m: CLAUDE=$(grep -c internal/$m CLAUDE.md) exists=$([ -d internal/$m ] && echo yes || echo NO)"; done
   einvoice: CLAUDE=1 exists=NO   antifraud: CLAUDE=2 exists=NO   antifraud_inference: CLAUDE=1 exists=NO
@@ -189,7 +198,10 @@ agent-instruction tax. Recommendation: a doc PR marking planned modules `(planne
 `pkg/` list, and completing the module table. ~40 LOC doc; risk LOW.
 
 ### A-006 — the financial core lacks architecture docs
-**Shape: UNDOCUMENTED | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
+**✅ RESOLVED (A4-4) — was MED/SOON.** Created `docs/internal/financial-core.md` — the 7
+financial-path conventions consolidated with code sketches, a gating summary table, and a PR-time
+review checklist; cross-linked from CLAUDE.md §4 + CONTRIBUTING.
+**Original shape: UNDOCUMENTED | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
 `docs/internal/` has 8 docs (mostly tooling + a few modules) for 32 modules. Most modules are
 self-explanatory, but the **intricate financial core** — `ledger`, `outbox`, `eventbus`,
 `orderledger`, `reconcile` — has no `docs/internal/*` explaining the double-entry/outbox/event

@@ -4095,3 +4095,15 @@ First Step-4 refactor; single-finding, financial path, minimal blast radius. `ma
 
 ### No parity change
 Payment construction refactor (interface unchanged) + a test fake; no behaviour/money-flow change. `internal/payment` interface + adapters' logic untouched.
+
+## PR — A4-2 + A4-4: CLAUDE.md reconciliation + financial-core docs — `docs/reconcile-constitution-financial-core`
+
+Two safe docs findings from the Step-4 audit. Doc-only; no code.
+
+- **A4-2 (A-002): CLAUDE.md reconciled.** Re-verified every §2.3 claim on-branch (the audit was right — not CORRECTED). 3 modules marked **PLANNED** (antifraud, antifraud_inference, einvoice — absent); pkg names fixed (`logger`→`logx`, `tracing`→`otelx`, httpx middleware→`otelx`); 3 packages flagged **never-built** with where the concept actually lives (`currency` = ISO strings + ref_schema; `i18n` = mobile easy_localization; `dbx` = inline tx patterns); real pkgs added (metrics/healthcheck/mediaurl/pagerduty/slack); a **Built-vs-Planned** note added pointing at `check-module-boundaries.sh` as the authoritative module↔binary map; the §4.6 `pkg/currency.Code` stale type reference removed (rule kept). Reconcile-only — no constitutional rule changed (§8 anti-goal honored).
+- **A4-4 (A-006): `docs/internal/financial-core.md` created.** The 7 financial-path conventions consolidated with code sketches, a gating-summary table (which are perpetual-gated vs manual-review), and a PR-time review checklist: SERIALIZABLE retry (#42), pool-acquire-inside-tx (#42/#47), soft-deleted-user-consumer (#49), idempotency surface (#58, analyzer pending), outbox (#58), rate-limiter zset-member (#61/F-017), soft refs (CLAUDE.md §5). Only *enforced* conventions documented (§4.2.5). Cross-linked from CLAUDE.md §4 + CONTRIBUTING.
+
+No code changes; doc-only diff. Split-bailout: not fired. New findings: none. **Step 4 now has one refactor left: A4-3 (config injection)** — it closes Step 4 and also clears the sipay `GO_ENV` deferred from A4-1.
+
+### No parity change
+Documentation only (CLAUDE.md, a new internal doc, CONTRIBUTING cross-link, audit closure); zero code touched.

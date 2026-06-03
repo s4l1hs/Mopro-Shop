@@ -73,12 +73,14 @@ The audit landed read-only; no code changed. The architecture is gated-clean —
    `NewService(provider, cfg, repo) (Service, error)` (no `os.Getenv`/`log.Fatal`) + a configurable
    `paymenttest.Fake`. payment.Service consumers are now testable. **T-016 mock-PSP part resolved**;
    the fin-svc HTTP harness (cron-sim) remains separate. (sipay `GO_ENV` deferred to A4-3.)
-2. **A4-2** `docs/reconcile-constitution` (NOW) — **A-002 (MED)**: mark CLAUDE.md's planned modules
-   `(planned)`, fix the `pkg/` list, complete the module table. ~40 LOC doc, risk LOW.
+2. ✅ **A4-2** (`docs/reconcile-constitution-financial-core`) — **A-002 DONE**: CLAUDE.md §2.3
+   reconciled (PLANNED markers, pkg names fixed, Built-vs-Planned note); §4.6 currency.Code stale
+   ref removed.
 3. **A4-3** `refactor/config-injection` (SOON) — **A-003 (MED)**: central config loader in each
-   `main.go`, injected into the 7 env-reading modules. ~300 LOC, risk MED.
-4. **A4-4** `docs/financial-core` (SOON) — **A-006 (MED)**: `docs/internal/financial-core.md`
-   (order→ledger→outbox→event→cashback/payout map). ~150 LOC doc.
+   `main.go`, injected into the 7 env-reading modules (incl. sipay `GO_ENV`). ~300 LOC, risk MED.
+   **The last Step-4 refactor — Step 4 closes when this lands.**
+4. ✅ **A4-4** (same PR) — **A-006 DONE**: `docs/internal/financial-core.md` — 7 conventions
+   consolidated with sketches, gating table, review checklist; cross-linked from CLAUDE.md + CONTRIBUTING.
 
 LATER/PARK: **A-004** shipping carrier test-mode (PROBABLE — confirm during A4-1); **A-007** per-handler
 auth-coverage sweep (PROBABLE, maybe a small analyzer); **A-005** Flutter feature layering (PARK).
