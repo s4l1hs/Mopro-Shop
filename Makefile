@@ -16,7 +16,7 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
 # `make verify` explicitly), so this is a safe, friendlier default.
 .DEFAULT_GOAL := help
 
-.PHONY: help verify fmt vet test lint govulncheck boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order \
+.PHONY: help bootstrap verify fmt vet test lint govulncheck boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order \
         verify-image-manifest update-goldens audit audit-test i18n-check i18n-usage \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
@@ -86,6 +86,12 @@ i18n-check: ## Translation completeness gate (fails on extra keys).
 # tool/audit/i18n_*_baseline.txt. Zero-dep Dart. See docs/internal/i18n-analyzer.md.
 i18n-usage: ## i18n dead-key / missing-key gate (ratchet vs baseline).
 	@dart run tool/audit/check_i18n_usage.dart --check
+
+# One-command local setup for a fresh checkout (TOOLING_AUDIT T3-3): env file,
+# go mod download, git hooks, flutter pub get. Idempotent; detects (never installs)
+# toolchains. See scripts/bootstrap.sh / docs/internal/bootstrap.md.
+bootstrap: ## Set up a fresh checkout (deps + hooks + env), then run `make verify`.
+	@bash scripts/bootstrap.sh
 
 # Wire `.githooks/` into this clone (run once per machine, or after pulling
 # a new hook). Refuses commits on main/master and runs the api-gen sync check.

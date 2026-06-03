@@ -10,12 +10,14 @@
 ## Local setup
 
 ```bash
-cp .env.example .env.local
-chmod 600 .env.local
-make hooks                   # points core.hooksPath at .githooks/
-go mod download
-make verify
+make bootstrap   # .env.local + go mod download + git hooks + flutter pub get
+make verify      # full gate (needs Docker for the integration suites)
 ```
+
+`make bootstrap` (→ `scripts/bootstrap.sh`) is idempotent and repo-local — no
+sudo, no system packages. It **detects** but does not install toolchains
+(Go / Flutter / Docker), and does not fill secrets in `.env.local`; it lists
+those as remaining manual steps in its summary. See `docs/internal/bootstrap.md`.
 
 ### Git hooks (`.githooks/`)
 
