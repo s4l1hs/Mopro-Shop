@@ -1,0 +1,15 @@
+# i18n dynamic-key allowlist — escape hatch for tool/audit/check_i18n_usage.dart (T-001).
+#
+# The analyzer already treats a master key as USED when its literal appears
+# anywhere in mobile/lib, OR when it matches a prefix AUTO-DERIVED from an
+# interpolated site like 'catalog.sort_${x}'.tr(). Today those two rules cover
+# every dynamic family (catalog.sort_*, notifications.cat_*, notifications.ch_*,
+# returns.reason_*, returns.status_*, returns.cancel_reason_*, seller.status_*,
+# help.ticket_cat_*, and the _key(enum) switch families qa.sort_* / reviews.sort_*),
+# so this file is intentionally empty of entries.
+#
+# Add a line here only when a key is referenced in a way neither rule can see
+# (e.g. built entirely from an API response). One entry per line:
+#   exact.key.name        # suppress this exact dead-key false positive
+#   some.prefix.*         # suppress every key under this prefix
+# Blank lines and #-comments are ignored.
