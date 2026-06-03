@@ -9,7 +9,7 @@ marked complete only when its fix PRs land — not when the audit lands.
 | 1 | Cleanup (dead code / docs / tooling) | `CLEANUP_AUDIT.md` | ✅ **complete** — PRs #54 (audit) → #55 (confirmed removals + `unused` gate) → #56 (re-verify; net-zero). Tooling-blocked remainder (i18n / goldens / Riverpod) → Step 3. |
 | 2 | **Testing / correctness / concurrency** | `docs/audits/TESTING_AUDIT.md` | ✅ **CLOSED** — every finding F-001→F-017 has a terminal outcome. #58 F-001; #59 F-006/F-011/F-012; #60 F-002(partial)/F-007/F-004/F-008/F-010/F-016→F-017; closure PR: wallet-integration gate + F-003 + F-017 (+ F-016 test unskipped). Deferred non-Step-2 passes (UNKNOWN tier): ×50 -race repro, N+1/EXPLAIN, migration-safety, Flutter DevTools rebuild. |
 | 3 | **Tooling** (CI / build / migration / cron / deploy / static-analysis / dev-convenience automation) | `docs/audits/TOOLING_AUDIT.md` | ✅ **CLOSED** (PRs #62 audit → #63 → cleanup → closure bundle). All NOW/SOON findings resolved: dep-CVE scan, make help, i18n completeness+dead-key, Go bump, bootstrap, Riverpod gate, migration-safety, nightly soak. **Two carve-outs:** T-007 (3 flow-AST discipline checks) → `cmd/lint-discipline` follow-up; T-008 (cron-overlap sim) deferred (needs fin-svc harness). |
-| 4 | **Architecture / modularity** | `docs/audits/ARCHITECTURE_AUDIT.md` | ⏳ **audited** — 1 HIGH (A-001 = T-016 payment test-mode), 3 MED, 1 LOW, 2 PROBABLE; most categories VERIFIED-COMPLETE (boundaries/layers/drift are gated-clean). Refactor PRs A4-1…A4-4 pending (see below). |
+| 4 | **Architecture / modularity** | `docs/audits/ARCHITECTURE_AUDIT.md` | ✅ **CLOSED** — A-001 (payment test-mode, A4-1), A-002+A-006 (CLAUDE.md reconcile + financial-core doc, A4-2/A4-4), A-003 (config injection, A4-3) all resolved; A-004/A-007 PROBABLE, A-005 PARK. Most categories were VERIFIED-COMPLETE (boundaries/layers/drift gated-clean). |
 | 5 | Trendyol parity continuation | — | ⏳ not started |
 
 > Steps 3-5 scopes are as referenced by the step prompts; Step 2's and Step 3's findings are
@@ -64,9 +64,11 @@ LATER/PARK: **T-011** new-migration generator (LOW); merge_group support (LOW); 
 `set -euo pipefail` (LOW tidy-up). **Corrected to EXISTS-FINE (nothing to build):** T-012 rollback
 automation, T-013 golden-diff (`golden_platform.dart`).
 
-## Step 4 — refactor PRs pending (from `ARCHITECTURE_AUDIT.md` §6)
+## Step 4 — ✅ CLOSED (refactor PRs from `ARCHITECTURE_AUDIT.md` §6)
 
-The audit landed read-only; no code changed. The architecture is gated-clean — findings are narrow.
+The audit landed read-only; no code changed. The architecture is gated-clean — findings were narrow.
+All actionable findings (A-001/A-002/A-003/A-006) landed across A4-1…A4-4; A-004/A-007 PROBABLE,
+A-005 PARK (carried as ROADMAP tail, not Step-4 blockers).
 
 1. ✅ **A4-1** `feat/payment-gateway-inject` — **A-001 (HIGH) DONE**. Discovery-shift: the gateway
    interface already existed as `payment.Service`, so the fix was construction —
@@ -76,13 +78,21 @@ The audit landed read-only; no code changed. The architecture is gated-clean —
 2. ✅ **A4-2** (`docs/reconcile-constitution-financial-core`) — **A-002 DONE**: CLAUDE.md §2.3
    reconciled (PLANNED markers, pkg names fixed, Built-vs-Planned note); §4.6 currency.Code stale
    ref removed.
-3. **A4-3** `refactor/config-injection` (SOON) — **A-003 (MED)**: central config loader in each
-   `main.go`, injected into the 7 env-reading modules (incl. sipay `GO_ENV`). ~300 LOC, risk MED.
-   **The last Step-4 refactor — Step 4 closes when this lands.**
+3. ✅ **A4-3** `refactor/config-injection` — **A-003 (MED) DONE**. Discovery-shift: of the audit's 7
+   modules, payment was already cleared (#74) and **eventbus is intentional** (ADR-0003 per-stream
+   MAXLEN tuning, §2.2 — reclassified, not migrated). The 4 real reads injected: sipay
+   (`SipayConfig.Environment` — **clears the A4-1-deferred `GO_ENV` invariant**), storage (`storage.Config`),
+   shipping (`inProduction bool`), identity (`WithDevOTPBypass` functional option — zero test-caller
+   cascade on the auth core). Each prod-safety guard preserved verbatim. Final sweep: only eventbus's
+   intentional `os.Getenv` remains. **Step 4 CLOSED.**
 4. ✅ **A4-4** (same PR) — **A-006 DONE**: `docs/internal/financial-core.md` — 7 conventions
    consolidated with sketches, gating table, review checklist; cross-linked from CLAUDE.md + CONTRIBUTING.
 
 LATER/PARK: **A-004** shipping carrier test-mode (PROBABLE — confirm during A4-1); **A-007** per-handler
 auth-coverage sweep (PROBABLE, maybe a small analyzer); **A-005** Flutter feature layering (PARK).
 
-**Step-3 tail still open (adjacent):** idempotency-surface analyzer; T-016 is now A-001 (folded in).
+**Open tail carried past Step 4 (non-blocking follow-ups):** idempotency-surface analyzer (T-007
+split); cron-overlap sim (T-008, needs fin-svc HTTP harness); the PR #74 chi-square flake
+(`TestProperty_OTPCodeDistribution`, candidate finding). A-004/A-007 PROBABLE; A-005 PARK.
+
+**Next: Step 5 — Trendyol parity continuation.**

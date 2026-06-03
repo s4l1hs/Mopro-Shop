@@ -106,6 +106,13 @@ module's `Service` interface (or the event/outbox seam) — never a cross-schema
 **Gating:** `scripts/check-module-boundaries.sh` (cross-module imports) + manual review for SQL.
 **Precedent:** CLAUDE.md §5; PR #8 (`CaptureRecorder` cross-module seam).
 
+### Note — prod-safety guards read INJECTED config (not `os.Getenv`)
+Financial adapters with a production-startup invariant (e.g. sipay refusing a sandbox key when
+`Environment=="production"`) encode the environment in **injected config**, not a direct
+`os.Getenv` — so the guard is unit-testable and the process-kill happens at the caller (`main`),
+not buried in the adapter. The env-read lives once at the binary entry. **Precedent:** A-003 / A4-3
+(sipay `SipayConfig.Environment`, shipping `inProduction`, identity `WithDevOTPBypass`).
+
 ## Gating summary
 
 | Convention | Perpetual gate | Manual review |

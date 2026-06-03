@@ -4107,3 +4107,22 @@ No code changes; doc-only diff. Split-bailout: not fired. New findings: none. **
 
 ### No parity change
 Documentation only (CLAUDE.md, a new internal doc, CONTRIBUTING cross-link, audit closure); zero code touched.
+
+## PR — A4-3: config injection (closes ARCHITECTURE_AUDIT A-003; clears sipay GO_ENV invariant; Step 4 closed) — `refactor/config-injection`
+
+The last Step-4 refactor. A-003 = "config read directly in modules (no central loader)."
+
+- **Discovery-shift (re-verified at PR time, not taken on the audit's word):** the audit said **7** modules. On-branch `git grep 'os.Getenv'` showed the true set was smaller: **payment was already cleared in A4-1** (#74), and **eventbus is intentional** — its two reads (`redis_bus.go`) are per-stream `…_MAXLEN` overrides with code defaults, documented in **ADR-0003** and explicitly sanctioned by CLAUDE.md §2.2. So eventbus was **RECLASSIFIED** (documented, not migrated), leaving **4 real reads** to inject.
+- **The 4 migrations (env var name / default / validation all preserved verbatim):**
+  - **sipay** — `os.Getenv("GO_ENV")=="production"` → `cfg.Environment=="production"` on a new `SipayConfig.Environment` field; `cmd/core-svc/main.go` sets it from `os.Getenv("GO_ENV")`. **This clears the sipay `GO_ENV` invariant deferred by A4-1** (D2). The prod-refuses-sandbox guard is intact, now unit-testable.
+  - **storage** — dropped `storage.Enabled()`/internal `os.Getenv`; added a `storage.Config` struct, `New(ctx, cfg)`; main builds the Config from env. `ErrDisabled` semantics unchanged.
+  - **shipping** — `NewService(…, inProduction bool)`; the `KARGO_DEFAULT`-required-in-prod guard now reads the injected bool. Main passes `os.Getenv("GO_ENV")=="production"`.
+  - **identity** — the dev-OTP backdoor moved behind a **`WithDevOTPBypass(acceptAny, inProduction bool)` functional option** (variadic `NewService(…, opts ...Option)`), so the **8 existing callers cascade to zero** — only `main` passes it. Constructor still **panics if dev-bypass would be on in production**; test locks it via `WithDevOTPBypass(true, true)` (was `t.Setenv`).
+- **Behavior preservation (prose, not new tests — per the prompt):** every prod-safety guard fires at the same point and kills the process the same way (typed error surfaced to `main`’s `log.Fatal`, or panic). No env var renamed; no production-value set changed; no force-flag added; no config library introduced; no `go.mod` change.
+- **Tests that silently depended on the old env-reads were repaired,** not deleted: sipay `D2_ProductionGuard{,_WrongURL}` (integration tag), shipping `ProductionGuard{MissingDefault,MissingAdapter}`, identity `DevOTPAcceptAny_PanicsOnProduction` — each now sets the injected field/option instead of `t.Setenv`, so the invariant stays locked.
+- **Final sweep:** `git grep -nE 'os\.Getenv\(' -- internal/ ':!*_test.go'` → only `internal/eventbus/redis_bus.go` (the two intentional ADR-0003 reads). **A-003 fully closed.**
+- Docs: `docs/internal/config-injection.md` (discovery + verdict table), ARCHITECTURE_AUDIT A-003 → ✅ RESOLVED + **Step 4 CLOSED** banner, ROADMAP Step-4 row → CLOSED, financial-core.md note on the prod-safety injection pattern.
+- **Split-bailout:** not fired (4 small, mechanical migrations). **New findings:** none. **Lint-discipline:** both analyzers still 0 findings.
+
+### No parity change
+Refactor + docs only — internal construction wiring and audit closure; no user-facing route, screen, or endpoint changed.
