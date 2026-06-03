@@ -27,7 +27,44 @@
     "name_first": "First Name",
     "name_last": "Last Name",
     "locale": "Language",
-    "complete_profile": "Continue"
+    "complete_profile": "Continue",
+    "email_label": "Email",
+    "email_hint": "example@email.com",
+    "email_invalid": "Enter a valid email",
+    "password_label": "Password",
+    "sign_up": {
+      "title": "Create Account",
+      "subtitle": "Sign up free in a few minutes",
+      "name_first_hint": "Your first name",
+      "name_last_hint": "Your last name",
+      "required": "Required",
+      "password_hint": "At least 8 characters",
+      "password_weak": "Password isn't strong enough",
+      "password_confirm_label": "Confirm Password",
+      "password_confirm_hint": "Re-enter your password",
+      "password_mismatch": "Passwords don't match",
+      "submit": "Sign Up",
+      "have_account": "Already have an account? ",
+      "login_link": "Sign in",
+      "error_email_exists": "This email is already registered. Try signing in.",
+      "error_weak_password": "Password must be at least 8 characters."
+    },
+    "sign_in": {
+      "subtitle": "Sign in to your account",
+      "forgot_password": "Forgot password",
+      "password_min": "Enter at least 8 characters",
+      "no_account": "Don't have an account? ",
+      "register_link": "Sign up",
+      "error_invalid_credentials": "Incorrect email or password.",
+      "error_email_not_verified": "Your email isn't verified. Check your inbox.",
+      "error_rate_limited": "Too many attempts. Please wait a moment."
+    },
+    "layout": {
+      "headline": "Shop and\nearn back.",
+      "value_prop_shipping": "Free & fast delivery",
+      "value_prop_cashback": "Cash back on every purchase",
+      "value_prop_secure": "Secure payment infrastructure"
+    }
   },
   "nav": {
     "home": "Home",
@@ -679,5 +716,23 @@
     "help_search": "Search: \"{q}\"",
     "help": "Help",
     "not_found": "Page Not Found"
+  },
+  "payment": {
+    "error": {
+      "sipay": {
+        "insufficient_funds": "Your card has insufficient balance. Please try another card.",
+        "card_declined": "Your card was declined. Please contact your bank.",
+        "3ds_failed": "3D Secure verification failed. Please try again.",
+        "invalid_card": "Card details are incorrect. Please check and try again.",
+        "expired_card": "Your card has expired.",
+        "cvv_mismatch": "Incorrect CVV code.",
+        "issuer_unavailable": "Your bank isn't responding right now. Please try again in a few minutes.",
+        "fraud_suspected": "The transaction was declined by a security check. Please contact your bank.",
+        "amount_limit_exceeded": "Daily card limit exceeded.",
+        "rate_limit_exceeded": "Too many payment attempts. Please try again in 1 minute.",
+        "reservation_expired": "Your cart reservation has expired. Please try again.",
+        "unknown": "Payment could not be completed. Please try again or use another card."
+      }
+    }
   }
 }

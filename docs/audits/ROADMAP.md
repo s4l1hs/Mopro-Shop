@@ -109,13 +109,13 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
    re-baselined on Linux. **P-014 SPLIT OUT** — discovery found its true scope is ~55 strings cross-app (11 `Text()`
    + ~40 `app_router.dart` `t()` tab-titles + auth_layout + search-title) + a `t()` helper refactor, far past a
    card/PDP-polish PR (§6/§9 split). → **`feat/i18n-hardcoded-sweep`** (NOW slot).
-2. **P5-i18n-sweep** `feat/i18n-hardcoded-sweep` — **P-014 IN-PROGRESS (phased).** A second discovery-shift found
-   the true scope is **~155 strings / 27 files** (audit `Text()`-grep undercounted ~3×), not ~55 — whole screens
-   unlocalized (security 29, account 21, sign_up 15, sipay_error_map 13, sign_in 12, …). A full sweep is ~1500-2000
-   LOC → multi-PR. **Phase 1 ✅ (this PR):** `t()`→`withBrand` + 44 `router_title.*` keys (app_router title system,
-   the named deliverable; no half-done files; no golden impact). **Phases 2+ (NOW queue), by area:**
-   2a auth screens · 2b account screens · 2c sipay error map · 2d marketing/hero · 2e checkout · 2f misc singletons.
-   ~111 strings remain. Each phase: literal `'key'.tr()` (analyzer-detected), keys to tr-TR (master) + en-US.
+2. **P5-i18n-sweep** — **P-014 IN-PROGRESS (phased).** True scope keeps growing as counting improves: ~155 →
+   (diacritic grep undercounts ~2×) **≈ 250–300 strings / 27 files**. **Done:** Phase 1 (`feat/i18n-hardcoded-sweep`,
+   app_router titles, 44 keys); Phase 2a (auth: sign_up/sign_in/auth_layout, ~46) + Phase 2c (sipay error map, 12) in
+   `feat/i18n-sweep-2abc`. **Split/queued:** 2b account (security+account) → `feat/i18n-sweep-2b-account` (high variance:
+   interpolation, const dialogs, theme dedup); 2d email_verify/mfa/forgot + marketing/hero; 2e checkout; 2f singletons.
+   Each phase: literal `'key'.tr()`, keys → tr-TR (master) + en-US; goldens regen where screens render swept strings
+   (harness renders keys, so currently-hardcoded screens' goldens flip Turkish→keys).
 3. **P5-3** `feat/pdp-delivery-eta` (SOON) — closes **P-007** + lights up the dark **P-008b** UI. **Backend-gated**
    (catalog/shipping API must expose ETA + original price + lowest-30d); UI slot can land NOW, data SOON. Risk MED.
 4. **P5-4** `feat/parity-card-badges` (SOON) — closes **P-009** + confirms **P-010**. **Discovery-first** (Trendyol

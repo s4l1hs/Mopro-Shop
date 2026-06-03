@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -58,14 +59,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Hesap Oluştur',
+              'auth.sign_up.title'.tr(),
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
             const SizedBox(height: 4),
             Text(
-              'Birkaç dakikada ücretsiz kayıt olun',
+              'auth.sign_up.subtitle'.tr(),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),
@@ -77,7 +78,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const AuthFieldLabel('Ad'),
+                      AuthFieldLabel('auth.name_first'.tr()),
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: _firstCtrl,
@@ -85,11 +86,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         textInputAction: TextInputAction.next,
                         decoration: authInputDecoration(
                           context,
-                          hint: 'Adınız',
+                          hint: 'auth.sign_up.name_first_hint'.tr(),
                           prefixIcon: Icons.person_outline,
                         ),
-                        validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Zorunlu' : null,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'auth.sign_up.required'.tr()
+                            : null,
                       ),
                     ],
                   ),
@@ -99,7 +101,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const AuthFieldLabel('Soyad'),
+                      AuthFieldLabel('auth.name_last'.tr()),
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: _lastCtrl,
@@ -107,11 +109,12 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         textInputAction: TextInputAction.next,
                         decoration: authInputDecoration(
                           context,
-                          hint: 'Soyadınız',
+                          hint: 'auth.sign_up.name_last_hint'.tr(),
                           prefixIcon: Icons.person_outline,
                         ),
-                        validator: (v) =>
-                            (v == null || v.trim().isEmpty) ? 'Zorunlu' : null,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'auth.sign_up.required'.tr()
+                            : null,
                       ),
                     ],
                   ),
@@ -119,7 +122,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            const AuthFieldLabel('E-posta'),
+            AuthFieldLabel('auth.email_label'.tr()),
             const SizedBox(height: 6),
             TextFormField(
               controller: _emailCtrl,
@@ -128,16 +131,15 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               autofillHints: const [AutofillHints.newUsername],
               decoration: authInputDecoration(
                 context,
-                hint: 'ornek@email.com',
+                hint: 'auth.email_hint'.tr(),
                 prefixIcon: Icons.email_outlined,
               ),
-              validator: (v) =>
-                  (v == null || !v.contains('@'))
-                      ? 'Geçerli bir e-posta girin'
-                      : null,
+              validator: (v) => (v == null || !v.contains('@'))
+                  ? 'auth.email_invalid'.tr()
+                  : null,
             ),
             const SizedBox(height: 16),
-            const AuthFieldLabel('Parola'),
+            AuthFieldLabel('auth.password_label'.tr()),
             const SizedBox(height: 6),
             TextFormField(
               controller: _passwordCtrl,
@@ -147,7 +149,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               onChanged: (v) => setState(() => _passwordValue = v),
               decoration: authInputDecoration(
                 context,
-                hint: 'En az 8 karakter',
+                hint: 'auth.sign_up.password_hint'.tr(),
                 prefixIcon: Icons.lock_outline,
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -162,14 +164,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               ),
               validator: (v) => PasswordStrengthIndicator.isStrong(v ?? '')
                   ? null
-                  : 'Parola güçlü değil',
+                  : 'auth.sign_up.password_weak'.tr(),
             ),
             if (_passwordValue.isNotEmpty) ...[
               const SizedBox(height: 10),
               PasswordStrengthIndicator(password: _passwordValue),
             ],
             const SizedBox(height: 16),
-            const AuthFieldLabel('Parola Tekrar'),
+            AuthFieldLabel('auth.sign_up.password_confirm_label'.tr()),
             const SizedBox(height: 6),
             TextFormField(
               controller: _confirmCtrl,
@@ -178,7 +180,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               onFieldSubmitted: (_) => _submit(notifier),
               decoration: authInputDecoration(
                 context,
-                hint: 'Parolayı tekrar girin',
+                hint: 'auth.sign_up.password_confirm_hint'.tr(),
                 prefixIcon: Icons.lock_outline,
                 suffixIcon: IconButton(
                   icon: Icon(
@@ -191,8 +193,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       setState(() => _obscureConfirm = !_obscureConfirm),
                 ),
               ),
-              validator: (v) =>
-                  v != _passwordCtrl.text ? 'Parolalar eşleşmiyor' : null,
+              validator: (v) => v != _passwordCtrl.text
+                  ? 'auth.sign_up.password_mismatch'.tr()
+                  : null,
             ),
             if (state.error != null) ...[
               const SizedBox(height: 16),
@@ -201,7 +204,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
             const SizedBox(height: 24),
             AuthSubmitButton(
               isLoading: state.isLoading,
-              label: 'Kayıt Ol',
+              label: 'auth.sign_up.submit'.tr(),
               onPressed: () => _submit(notifier),
             ),
             const SizedBox(height: 32),
@@ -210,7 +213,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Zaten hesabın var mı? ',
+                    'auth.sign_up.have_account'.tr(),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.outline,
                     ),
@@ -222,9 +225,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text(
-                      'Giriş yap',
-                      style: TextStyle(
+                    child: Text(
+                      'auth.sign_up.login_link'.tr(),
+                      style: const TextStyle(
                         color: MoproTokens.primaryLight,
                         fontWeight: FontWeight.w600,
                       ),
@@ -250,11 +253,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   }
 
   String _errorMessage(AppError error) => switch (error) {
-        EmailAlreadyExistsError() =>
-          'Bu e-posta adresi zaten kayıtlı. Giriş yapmayı deneyin.',
-        WeakPasswordError() => 'Parola en az 8 karakter olmalıdır.',
-        NetworkError() =>
-          'Bağlantı hatası. İnternet bağlantınızı kontrol edin.',
-        _ => 'Bir hata oluştu. Lütfen tekrar deneyin.',
+        EmailAlreadyExistsError() => 'auth.sign_up.error_email_exists'.tr(),
+        WeakPasswordError() => 'auth.sign_up.error_weak_password'.tr(),
+        NetworkError() => 'auth.network_error'.tr(),
+        _ => 'auth.unknown_error'.tr(),
       };
 }

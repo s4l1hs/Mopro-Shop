@@ -1,32 +1,34 @@
+import 'package:easy_localization/easy_localization.dart';
+
+/// Maps a Sipay failure code to a user-facing, action-guiding message.
+///
+/// P-014: messages live under the `payment.error.sipay.<code>` i18n keys
+/// (tr-TR master + en-US). `get` resolves the code to a key and localises it;
+/// unknown/empty codes fall back to `payment.error.sipay.unknown`. The
+/// interpolated `'…$known'.tr()` lets the i18n usage analyzer auto-derive the
+/// `payment.error.sipay.` prefix, so the keys are covered without per-key
+/// `.tr()` call sites.
 class SipayErrorMap {
   const SipayErrorMap._();
 
-  static const Map<String, String> _messages = {
-    'insufficient_funds':
-        'Kartınızda yeterli bakiye bulunmuyor. Lütfen başka bir kart deneyin.',
-    'card_declined': 'Kartınız reddedildi. Lütfen bankanızla iletişime geçin.',
-    '3ds_failed': '3D Secure doğrulaması başarısız oldu. Lütfen tekrar deneyin.',
-    'invalid_card': 'Kart bilgileri hatalı. Lütfen kontrol edip tekrar deneyin.',
-    'expired_card': 'Kartınızın süresi dolmuş.',
-    'cvv_mismatch': 'CVV kodu hatalı.',
-    'issuer_unavailable':
-        'Banka şu an yanıt vermiyor. Birkaç dakika sonra tekrar deneyin.',
-    'fraud_suspected':
-        'Güvenlik kontrolü nedeniyle işlem reddedildi. Bankanızla iletişime geçin.',
-    'amount_limit_exceeded': 'Günlük kart limiti aşıldı.',
-    'rate_limit_exceeded':
-        'Çok fazla ödeme denemesi. Lütfen 1 dakika sonra tekrar deneyin.',
-    'reservation_expired':
-        'Sepet rezervasyonunun süresi doldu. Lütfen tekrar deneyin.',
-    'unknown':
-        'Ödeme tamamlanamadı. Lütfen tekrar deneyin veya başka bir kart kullanın.',
+  /// Known Sipay failure codes (each has a `payment.error.sipay.<code>` key).
+  static const Set<String> _codes = {
+    'insufficient_funds',
+    'card_declined',
+    '3ds_failed',
+    'invalid_card',
+    'expired_card',
+    'cvv_mismatch',
+    'issuer_unavailable',
+    'fraud_suspected',
+    'amount_limit_exceeded',
+    'rate_limit_exceeded',
+    'reservation_expired',
+    'unknown',
   };
 
-  static const String _fallback =
-      'Ödeme tamamlanamadı. Lütfen tekrar deneyin veya başka bir kart kullanın.';
-
   static String get(String? code) {
-    if (code == null || code.isEmpty) return _fallback;
-    return _messages[code] ?? _fallback;
+    final known = (code != null && _codes.contains(code)) ? code : 'unknown';
+    return 'payment.error.sipay.$known'.tr();
   }
 }
