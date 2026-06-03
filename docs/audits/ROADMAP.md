@@ -9,7 +9,7 @@ marked complete only when its fix PRs land — not when the audit lands.
 | 1 | Cleanup (dead code / docs / tooling) | `CLEANUP_AUDIT.md` | ✅ **complete** — PRs #54 (audit) → #55 (confirmed removals + `unused` gate) → #56 (re-verify; net-zero). Tooling-blocked remainder (i18n / goldens / Riverpod) → Step 3. |
 | 2 | **Testing / correctness / concurrency** | `docs/audits/TESTING_AUDIT.md` | ✅ **CLOSED** — every finding F-001→F-017 has a terminal outcome. #58 F-001; #59 F-006/F-011/F-012; #60 F-002(partial)/F-007/F-004/F-008/F-010/F-016→F-017; closure PR: wallet-integration gate + F-003 + F-017 (+ F-016 test unskipped). Deferred non-Step-2 passes (UNKNOWN tier): ×50 -race repro, N+1/EXPLAIN, migration-safety, Flutter DevTools rebuild. |
 | 3 | **Tooling** (CI / build / migration / cron / deploy / static-analysis / dev-convenience automation) | `docs/audits/TOOLING_AUDIT.md` | ✅ **CLOSED** (PRs #62 audit → #63 → cleanup → closure bundle). All NOW/SOON findings resolved: dep-CVE scan, make help, i18n completeness+dead-key, Go bump, bootstrap, Riverpod gate, migration-safety, nightly soak. **Two carve-outs:** T-007 (3 flow-AST discipline checks) → `cmd/lint-discipline` follow-up; T-008 (cron-overlap sim) deferred (needs fin-svc harness). |
-| 4 | Architecture / modularity audit | — | ⏳ not started |
+| 4 | **Architecture / modularity** | `docs/audits/ARCHITECTURE_AUDIT.md` | ⏳ **audited** — 1 HIGH (A-001 = T-016 payment test-mode), 3 MED, 1 LOW, 2 PROBABLE; most categories VERIFIED-COMPLETE (boundaries/layers/drift are gated-clean). Refactor PRs A4-1…A4-4 pending (see below). |
 | 5 | Trendyol parity continuation | — | ⏳ not started |
 
 > Steps 3-5 scopes are as referenced by the step prompts; Step 2's and Step 3's findings are
@@ -63,3 +63,22 @@ LATER/PARK unsequenced). Each build PR references its `T-ID`.
 LATER/PARK: **T-011** new-migration generator (LOW); merge_group support (LOW); 3 scripts missing
 `set -euo pipefail` (LOW tidy-up). **Corrected to EXISTS-FINE (nothing to build):** T-012 rollback
 automation, T-013 golden-diff (`golden_platform.dart`).
+
+## Step 4 — refactor PRs pending (from `ARCHITECTURE_AUDIT.md` §6)
+
+The audit landed read-only; no code changed. The architecture is gated-clean — findings are narrow.
+
+1. **A4-1** `feat/payment-test-adapter` (NOW) — **A-001 (= T-016, HIGH)**: in-memory `payment.Service`
+   fake + inject PSP config (no more `os.Getenv` in `payment/service.go`). Unblocks fin-svc payment
+   integration tests + the Step-3 cron-overlap sim (T-008). ~400–600 LOC, risk MED (financial path, additive).
+2. **A4-2** `docs/reconcile-constitution` (NOW) — **A-002 (MED)**: mark CLAUDE.md's planned modules
+   `(planned)`, fix the `pkg/` list, complete the module table. ~40 LOC doc, risk LOW.
+3. **A4-3** `refactor/config-injection` (SOON) — **A-003 (MED)**: central config loader in each
+   `main.go`, injected into the 7 env-reading modules. ~300 LOC, risk MED.
+4. **A4-4** `docs/financial-core` (SOON) — **A-006 (MED)**: `docs/internal/financial-core.md`
+   (order→ledger→outbox→event→cashback/payout map). ~150 LOC doc.
+
+LATER/PARK: **A-004** shipping carrier test-mode (PROBABLE — confirm during A4-1); **A-007** per-handler
+auth-coverage sweep (PROBABLE, maybe a small analyzer); **A-005** Flutter feature layering (PARK).
+
+**Step-3 tail still open (adjacent):** idempotency-surface analyzer; T-016 is now A-001 (folded in).

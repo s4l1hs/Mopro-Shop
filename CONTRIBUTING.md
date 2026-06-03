@@ -96,6 +96,21 @@ act on its findings by ID.
 - **Re-verify at PR time.** A finding is only as good as its evidence on the current branch; the
   Step-3 audit caught two from-memory false positives (rollback, golden-diff) by reading the code.
 
+## Architecture audit cadence
+
+Architecture/modularity work follows the same **audit-then-refactor** shape (Step 4).
+
+- **`docs/audits/ARCHITECTURE_AUDIT.md` is the source of truth** for refactor work. Read its §6
+  "Recommended refactor sequence" before proposing a structural change — the issue may already be
+  scoped, or the area may be VERIFIED-COMPLETE (don't "fix" a gated-clean boundary).
+- **Refactor PRs reference the `A-ID`** they close (e.g. `feat/payment-test-adapter (closes
+  ARCHITECTURE_AUDIT A-001)`).
+- **Honest-zero is allowed** (§1.3): a clean category is `VERIFIED-COMPLETE` with the
+  `go list -deps`/`git grep` command that proves it — don't pad.
+- **First-read architecture intuitions are recall-prone** (§2.3): trace BOUNDARY/TANGLED findings
+  with `go list -deps`/`git grep`, not memory; a MISSING-ABSTRACTION is only real if a useful test
+  would exist against the proposed interface. The arc has caught such misreads twice (#59→#60, #71→#72).
+
 ## Commit conventions
 
 Follow conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`.
