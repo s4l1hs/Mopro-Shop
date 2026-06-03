@@ -65,25 +65,32 @@ Adding a 4th binary requires explicit human approval and an ADR file under `/doc
 /internal/treasury/               → fin-svc only (float yield + interest watch)
 /internal/cashback/               → fin-svc only (cashback-engine: plan create + freeze + monthly cron)
 /internal/sellerpayout/           → fin-svc only (seller-payout-engine: delivered+3 BD payout cron)
-/internal/antifraud/              → core-svc only (v7: ML scoring decision module + review queue)
+/internal/antifraud/              → core-svc only (PLANNED v7 — NOT YET BUILT: ML scoring + review queue)
 /internal/notification/           → jobs-svc only
 /internal/support/                → jobs-svc only
 /internal/media/                  → jobs-svc only
 /internal/sizefinder/             → jobs-svc only
-/internal/antifraud_inference/    → jobs-svc only (v7: serves ONNX models — NLP + vision)
-/internal/einvoice/               → jobs-svc only (v7: GİB e-fatura/e-arşiv via Foriba)
+/internal/antifraud_inference/    → jobs-svc only (PLANNED v7 — NOT YET BUILT: serves ONNX models)
+/internal/einvoice/               → jobs-svc only (PLANNED v7 — NOT YET BUILT: GİB e-fatura via Foriba)
 /internal/eventbus/               → shared interface (Redis Streams impl)
 /internal/outbox/                 → shared outbox publisher
 /internal/ledger/                 → shared ledger types (fin-svc primary)
-/pkg/logger/                      → slog wrapper, market-aware
-/pkg/tracing/                     → OTel init
+/pkg/logx/                        → slog wrapper, market-aware (was pkg/logger)
+/pkg/otelx/                       → OTel init + HTTP middleware: TraceAndLog, Idempotency, Locale (was pkg/tracing + the planned pkg/httpx)
 /pkg/crypto/                      → AES-GCM PII envelope
-/pkg/currency/                    → ISO codes, Code type, validation, ref reader
-/pkg/i18n/                        → translation key resolver
-/pkg/httpx/                       → middleware (TraceAndLog, Idempotency, Locale)
-/pkg/dbx/                         → pgx helpers, transaction patterns
 /pkg/timex/                       → tz-aware helpers + AddBusinessDays(date, n, calendar)
+/pkg/metrics/                     → Prometheus business + infra metrics
+/pkg/healthcheck/ /pkg/mediaurl/ /pkg/pagerduty/ /pkg/slack/   → supporting helpers
 ```
+
+> **Built vs. Planned (reconciled — ARCHITECTURE_AUDIT A4-2):** lines marked **PLANNED** are v7
+> designs not yet in `internal/`. This tree lists the **primary domain** modules; the full built
+> set also includes `analytics, api, attachments, buildinfo, help, idempotency, inbox, orderledger,
+> reconcile, shipping, sitemap, storage` — all governed by the same boundary rules.
+> `scripts/check-module-boundaries.sh` is the **authoritative** module↔binary map. Packages
+> `pkg/currency`, `pkg/i18n`, `pkg/dbx` were never built: currency is a plain ISO string validated
+> against `ref_schema.currencies`; i18n lives mobile-side (`mobile/` easy_localization); tx patterns
+> are inline in each repository (no shared `dbx`).
 
 ---
 
@@ -118,6 +125,11 @@ EXCEPTION: Read-only HTTP API handlers in `internal/api` (fin-svc endpoints) may
 
 ## 4. FINANCIAL INVARIANTS — VIOLATING THESE BREAKS THE BUSINESS
 
+> **See also:** `docs/internal/financial-core.md` consolidates the 7 financial-path
+> conventions (SERIALIZABLE retry, pool-acquire-inside-tx, soft-deleted-user-consumer,
+> idempotency surface, outbox, rate-limiter zset-member, soft refs) with code sketches,
+> their gating (`cmd/lint-discipline`), and a PR-touching review checklist.
+
 ### 4.1 Double-Entry Ledger
 - Every financial transaction writes ≥ 2 ledger_entries rows.
 - Within a transaction: `Sum(amount WHERE direction='D') == Sum(amount WHERE direction='C')`.
@@ -150,7 +162,7 @@ EXCEPTION: Read-only HTTP API handlers in `internal/api` (fin-svc endpoints) may
 - All amounts use integer minor units (`amount_minor BIGINT`); never float types.
 - Every monetary value carries an explicit currency code.
 - Initial launch market uses `currency='TRY'` for fiat and `currency='TRY_COIN'` for coin; this is the default but NOT hardcoded.
-- Currency codes live in `ref_schema.currencies` (postgres-ecom). NEVER inline currency string literals in business logic; use the `pkg/currency.Code` type.
+- Currency codes live in `ref_schema.currencies` (postgres-ecom). NEVER inline currency string literals in business logic; read the active code from config / `ref_schema`. (There is no `pkg/currency.Code` type — A4-2: that was a planned abstraction never built; codes are validated ISO strings.)
 
 ### 4.7 Cashback Engine Rules — v6 LOCKED PERPETUAL MODEL
 
