@@ -45,13 +45,13 @@ void main() {
         backlog: false,
       ),
       (
-        // 4.26:1 < 4.5 — documented dark-theme shortfall. Brand colour change is
-        // out of scope (§18): surfaced as Backlog, not silently adjusted.
-        name: '#E36925 on surfaceDark (text)',
+        // P-020 (PARITY_AUDIT): primaryDark nudged #E36925 → #E97230 so brand
+        // orange clears AA (4.5:1) as text on surfaceDark — was 4.26:1 Backlog.
+        name: '#E97230 on surfaceDark (text)',
         fg: MoproTokens.primaryDark,
         bg: MoproTokens.surfaceDark,
         min: 4.5,
-        backlog: true,
+        backlog: false,
       ),
       (
         name: '#FFFFFF on #CA4E00 (CTA text)',
