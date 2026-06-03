@@ -4,11 +4,11 @@
 
 ## TL;DR
 - **CONFIRMED HIGH:  0**
-- **CONFIRMED MED:   7** (original) — burn-down status: F-001 ✅ (PR #58); F-006 ✅, F-011 ✅ triaged, F-012 ✅ confirmed+fixed (this PR); F-002-treasury ⚠️ corrected-to-stub; F-002 (search/media/sizefinder) + payment.Service still open.
-- **CONFIRMED LOW:   5** (weak determinism test; ungated staticcheck style; retry-without-backoff; legacy StateNotifiers; documented a11y FAIL)
-- **PROBABLE:        3** (F-012 now CONFIRMED+FIXED; `context.Background()` in DLQ insert; Flutter rebuild storms)
+- **CONFIRMED MED:   7** (original) — F-001 ✅ (#58); F-006/F-011/F-012 ✅ (#59); **F-002 ✅ PARTIAL** (4 of 5 "modules" are 12-LOC stubs → not-actionable; payment.Service REAL → sliced this PR).
+- **CONFIRMED LOW:   5** — this PR: **F-007 ✅ FIXED**; **F-008 / F-010 ✅ NOT-ACTIONABLE**; **F-004 ✅ NOT-ACTIONABLE** (Flutter OOS, valid pattern); **F-003 ⏳ DEFERRED** (needs a wallet-integration gate first); documented a11y FAIL stands.
+- **PROBABLE:        3** (`context.Background()` DLQ → NOT-ACTIONABLE; Flutter rebuild storms; F-012 was confirmed+fixed in #59)
 - **UNKNOWN / not-run-this-pass: 3** (×50 `-race` repro; N+1 / `EXPLAIN ANALYZE`; Flutter DevTools rebuild counts)
-- **NEW: F-016** (LOW, test-infra) — identity integration tests share one `integRedis`/`FlushDB` (order-fragile); surfaced triaging F-011; product verified correct.
+- **F-016** ⚠️ CORRECTED (this PR) — the PR #59 test-infra hypothesis was REFUTED; real cause is **F-017 (NEW, LOW, product)**: sliding-window limiter uses the ms timestamp as the zset member → same-ms requests undercount → partial limit bypass. Fix deferred (security-adjacent).
 - **Verified-not-actionable:** §3.1 concurrency, §3.2 tx-isolation/retry, §3.4 user-state-consumer, §4.2 Flutter dispose, §5.1 soft-refs.
 
 **Honest headline:** post-cleanup (#54-#56) the codebase is healthy. There is **no confirmed correctness/financial/security defect**. The real signal is **test-coverage gaps** in a cluster of modules that escaped the property/integration nets (`payment`, `treasury`, `search`, `media`, `sizefinder`) — including a *live, wired* payment reconciler with zero tests — plus known tracked gaps (REVIVAL_GAP skips, identity-without-`-race`).
@@ -84,7 +84,15 @@ internal/ledger   (5 src, 0 test)   ← invariants covered indirectly, see note
 So **4 of the 5 "modules" are 12-LOC stubs** — nothing to test (closed NOT-ACTIONABLE). The only REAL one is `payment.Service` (provider registry/factory), the smallest real F-002 surface → **sliced this PR** (unit tests, no DB). `internal/ledger` invariants are covered indirectly (`property-ledger` runs `go test -run Property ./internal/wallet/...`); helper-branch coverage is the only residual (LOW). **F-002 net: PARTIAL-RESOLVED — payment.Service sliced; the 4 stubs are not-actionable (they need implementation, not tests).**
 
 ### F-003 — `wallet.RefreshWorker.Run`/`refresh` loop is untested
-**Severity: LOW | Confidence: CONFIRMED**
+**Severity: LOW | Confidence: CONFIRMED | ⏳ DEFERRED-BY `test/audit-burndown-f002-f016-low` (2026-06-03)**
+> Deferred (real, but the proper fix exceeds LOW scope). The non-Property wallet integration
+> tests aren't in `make verify` — `property-ledger` runs only `go test -run Property
+> ./internal/wallet/...`, so `TestIntegration_*` (incl. the existing `RefreshOnce` coverage)
+> is **ungated**. A `RefreshWorker.Run` loop test would also be ungated; making it valuable
+> needs a gated wallet-integration target first (mirror `integration-payment`), which gates the
+> whole currently-ungated wallet integration suite at once (could surface latent failures) —
+> its own small infra PR, not a LOW drive-by. (Observation: ungated wallet integration suite is
+> itself worth a follow-up.)
 File: `internal/wallet/refresh_worker.go:32,57`
 ```
 $ git grep -ln 'RefreshWorker' -- '*_test.go'   → internal/wallet/wallet_integration_test.go
@@ -103,7 +111,7 @@ Financial paths pass `pgx.Serializable` (`cashback/run_month.go:161`, `orderledg
 $ sed -n '25,48p' internal/cashback/repository.go
   const maxRetries = 3 ; ... if isSerializationFailure(err) && attempt<maxRetries-1 { continue } ; ... return ErrMaxRetriesExceeded
 ```
-Same shape in wallet/catalog/orderledger/sellerpayout. → **F-008 (LOW):** the retry `continue`s immediately with **no jitter/backoff** (thundering-herd risk under high contention; bound of 3 keeps it small).
+Same shape in wallet/catalog/orderledger/sellerpayout. → **F-008 (LOW): ✅ NOT-ACTIONABLE-BY `test/audit-burndown-f002-f016-low` (2026-06-03)** — the retry `continue`s immediately with no jitter/backoff, but it is **bounded (3 attempts)** and SERIALIZABLE conflicts are rare + short-lived, so immediate retry is an acceptable design (not a defect). Adding backoff to 6 financial modules' tx paths is a cross-cutting optimization disproportionate to a LOW drive-by and warrants a deliberate, separately-tested change if ever wanted. Closed not-actionable.
 
 ### §3.3 Storage idempotency — VERIFIED-NOT-ACTIONABLE
 ```
@@ -141,6 +149,10 @@ Not reproduced this pass; `migrations/**` reversibility + lock-duration review f
 ## §4 Frontend findings
 
 ### §4.1 Riverpod Notifier shapes — F-004
+**✅ NOT-ACTIONABLE-BY `test/audit-burndown-f002-f016-low` (2026-06-03)** — `StateNotifier` is a
+valid (if older) Riverpod pattern, not a defect; "migration to `Notifier`" is a preference, and
+**Flutter is out of scope** for the backend-focused burn-down PRs. Not actionable here; if a
+Flutter modernization pass happens (Step 3-ish), it can revisit. The 4 files still work.
 **Severity: LOW | Confidence: CONFIRMED**
 ```
 $ rg -l 'StateNotifier' mobile/lib -g '*.dart'
@@ -174,7 +186,13 @@ CLAUDE.md §5: cross-schema refs are BIGINT with no FK by design; the user-state
 ### §5.2 Idempotency surface — covered (see §3.3); no "none" endpoints found in mutation handlers spot-check.
 
 ### F-010 — `context.Background()` in DLQ attempt-insert (durability path)
-**Severity: LOW | Confidence: PROBABLE**
+**Severity: LOW | Confidence: PROBABLE | ✅ NOT-ACTIONABLE-BY `test/audit-burndown-f002-f016-low` (2026-06-03)**
+> Re-read in context (`internal/eventbus/redis_bus.go` ~628-642): the `context.Background()`
+> uses are the **drain-on-shutdown** path (`ctx.Done()` → drain remaining attempt-log rows) and
+> a decoupled fire-and-forget durability writer — both deliberately detach from the (cancelled)
+> request ctx and log-and-continue on error. Using the live ctx there would drop attempt logs on
+> shutdown. Not a defect; intentional. A per-call timeout would be marginal background hardening,
+> not a fix. Closed not-actionable.
 File: `internal/eventbus/redis_bus.go:633,641`; also `idempotency/middleware.go:57` (lock release), `outbox/publisher.go:159` (graceful drain).
 ```
 $ git grep -nE 'context\.Background\(\)' internal/ | grep -v _test
@@ -208,7 +226,9 @@ integration-identity: ... go test -tags=integration ./internal/identity/... -cou
 Recommendation: a targeted `-race` run of identity's concurrency tests *excluding* the bcrypt distribution test (own target or nightly workflow).
 
 ### F-007 — near-tautological determinism property test
-**Severity: LOW | Confidence: CONFIRMED**
+**Severity: LOW | Confidence: CONFIRMED | ✅ RESOLVED-BY `test/audit-burndown-f002-f016-low` (2026-06-03)**
+> Fixed: `TestProperty_Key_Deterministic` now asserts `Key(userID,k) == fmt.Sprintf("idem:%d:%s",…)`
+> instead of `Key(x)==Key(x)`. Real determinism + format coverage; staticcheck SA4000 cleared.
 File: `internal/idempotency/property_test.go:28`
 ```
 $ staticcheck ./internal/idempotency/...
@@ -233,19 +253,33 @@ property_test.go:28:11: identical expressions on the left and right side of the 
 > | `DLQContainsExactlyPermanentFailures` | **DOCUMENTED** | reclassified REVIVAL_GAP→FLAKY_SKIP (timing-flaky by design; deterministic siblings cover the paths) |
 > 3 restored+passing, 1 new finding, 1 documented. No silent leaves.
 
-### F-016 — identity integration tests share one `integRedis` + per-test `FlushDB` (order-fragile)
-**Severity: LOW (test-infra) | Confidence: CONFIRMED | NEW (surfaced triaging F-011)**
+### F-016 — identity rate-limiter test fragility — ⚠️ CORRECTED → real cause is F-017
+**Severity: LOW (test-infra) | ❌ HYPOTHESIS REFUTED by `test/audit-burndown-f002-f016-low` (2026-06-03)**
+> PR #59's "shared-`integRedis` / `FlushDB` ordering" hypothesis was **WRONG**: the identity
+> tests are **sequential** (no `t.Parallel` anywhere), so a sibling's `FlushDB` cannot race the
+> rate-limiter test. Re-investigation (running `TestInteg_RateLimiter*` as a group → PhoneWindow
+> fails first, solo → passes) pointed at **timing**, and reading the Lua nailed it:
+> `slidingWindowLua` does `ZADD key now now` — the **millisecond timestamp is the zset MEMBER**,
+> so multiple `CheckOTPRequest` calls in the same millisecond collide to one member, `ZCARD`
+> undercounts, and the limit isn't enforced. Solo runs are slower (distinct ms → pass); grouped
+> runs are faster (same ms → undercount → 4th wrongly allowed). **This is a real (LOW) product
+> robustness gap, not a test-infra one.** F-016 closed as CORRECTED; product cause filed as F-017.
+
+### F-017 — sliding-window rate-limiter uses ms timestamp as zset member (same-ms undercount)
+**Severity: LOW | Confidence: CONFIRMED | NEW (surfaced correcting F-016)**
+File: `internal/identity/ratelimit/limiter.go` (`slidingWindowLua`, ~line 51)
 ```
-$ go test -run '^TestInteg_RateLimiter_OTPRequest_PhoneWindow$' ./internal/identity/   → PASS (isolated)
-$ go test -run 'RateLimiter|LogoutRevokes|OTPVerify|StepUp' ./internal/identity/        → RateLimiter FAILs (nil on 4th)
-$ grep -c integRedis.FlushDB internal/identity/integration_test.go                       → 7
+local now = tonumber(ARGV[3])     -- UnixMilli
+...
+redis.call('ZADD', key, now, now) -- score AND member = now (ms)
 ```
-7 identity tests share the package-global `integRedis` client and each `FlushDB`s at start.
-The sliding-window rate-limiter test asserts an empty window, but a sibling's `FlushDB` can
-clear its zset within the same `go test` run → false "4th not limited". **The product
-(limiter) is correct** (isolated pass + Lua `count>=max` proof). Fix is test-infra: give
-each test an isolated key namespace or its own Redis DB index, then un-skip the rate-limiter
-test. Not fixed here (F-011 was triage, not test-harness rework).
+Because the member is the ms timestamp, ≥2 requests in the same millisecond are stored as ONE
+zset element → `ZCARD` < actual request count → the per-window limit (e.g. phone 3/10min) is
+under-enforced under a same-ms burst (a scripted OTP-spam attacker could partially bypass it;
+ordinary network-spaced requests are unaffected). **Fix = unique member per request** (e.g.
+`now .. ':' .. <counter|uuid>` as the member, keeping `now` as the score). Deferred (security-
+adjacent product code; own focused PR with burst tests). The rate-limiter test stays skipped
+pointing at F-017 (it's actually a *correct* assertion exposing this gap).
 ```
 $ git grep -nE 'REVIVAL_GAP|skipRevivalGap' -- '*.go'
 internal/e2e/dlq_e2e_test.go:325                 (flaky DLQ-membership; E2E_RUN_FLAKY_DLQ=1)
