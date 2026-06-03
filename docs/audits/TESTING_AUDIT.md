@@ -3,12 +3,20 @@
 **Audit-only. No code fixed in this PR.** Findings are scoped into follow-up PRs (§8).
 
 ## TL;DR
+
+> ## ✅ STEP 2 CLOSED — `test/step2-closure-wallet-gate-f003-f017` (2026-06-03)
+> Final three items resolved: **wallet-integration gate** added + canary-proven (closes PR #60's
+> ungated-suite observation); **F-003** RESOLVED (RefreshWorker.Run unit+integration tests);
+> **F-017** RESOLVED (unique zset member → limiter enforces same-ms bursts; F-016 test unskipped).
+> Every audit finding F-001→F-017 now has a terminal outcome (RESOLVED / NOT-ACTIONABLE /
+> CORRECTED). The audit-then-fix arc (#57→#58→#59→#60→this) is structurally complete.
+
 - **CONFIRMED HIGH:  0**
 - **CONFIRMED MED:   7** (original) — F-001 ✅ (#58); F-006/F-011/F-012 ✅ (#59); **F-002 ✅ PARTIAL** (4 of 5 "modules" are 12-LOC stubs → not-actionable; payment.Service REAL → sliced this PR).
-- **CONFIRMED LOW:   5** — this PR: **F-007 ✅ FIXED**; **F-008 / F-010 ✅ NOT-ACTIONABLE**; **F-004 ✅ NOT-ACTIONABLE** (Flutter OOS, valid pattern); **F-003 ⏳ DEFERRED** (needs a wallet-integration gate first); documented a11y FAIL stands.
-- **PROBABLE:        3** (`context.Background()` DLQ → NOT-ACTIONABLE; Flutter rebuild storms; F-012 was confirmed+fixed in #59)
-- **UNKNOWN / not-run-this-pass: 3** (×50 `-race` repro; N+1 / `EXPLAIN ANALYZE`; Flutter DevTools rebuild counts)
-- **F-016** ⚠️ CORRECTED (this PR) — the PR #59 test-infra hypothesis was REFUTED; real cause is **F-017 (NEW, LOW, product)**: sliding-window limiter uses the ms timestamp as the zset member → same-ms requests undercount → partial limit bypass. Fix deferred (security-adjacent).
+- **CONFIRMED LOW:   5** — **F-007 ✅ FIXED** (#60); **F-008 / F-010 / F-004 ✅ NOT-ACTIONABLE** (#60); **F-003 ✅ RESOLVED** (closure PR — wallet gate unblocked it); documented a11y FAIL stands.
+- **PROBABLE:        3** (`context.Background()` DLQ → NOT-ACTIONABLE; Flutter rebuild storms; F-012 confirmed+fixed in #59)
+- **UNKNOWN / not-run-this-pass: 3** (×50 `-race` repro; N+1 / `EXPLAIN ANALYZE`; Flutter DevTools rebuild counts) — deferred, not part of Step 2's fix sequence.
+- **F-016** ⚠️ CORRECTED (#60) → **F-017 ✅ RESOLVED** (closure PR): unique zset member per request; limiter now enforces same-ms bursts; F-016 test unskipped + green in the full suite.
 - **Verified-not-actionable:** §3.1 concurrency, §3.2 tx-isolation/retry, §3.4 user-state-consumer, §4.2 Flutter dispose, §5.1 soft-refs.
 
 **Honest headline:** post-cleanup (#54-#56) the codebase is healthy. There is **no confirmed correctness/financial/security defect**. The real signal is **test-coverage gaps** in a cluster of modules that escaped the property/integration nets (`payment`, `treasury`, `search`, `media`, `sizefinder`) — including a *live, wired* payment reconciler with zero tests — plus known tracked gaps (REVIVAL_GAP skips, identity-without-`-race`).
@@ -84,7 +92,14 @@ internal/ledger   (5 src, 0 test)   ← invariants covered indirectly, see note
 So **4 of the 5 "modules" are 12-LOC stubs** — nothing to test (closed NOT-ACTIONABLE). The only REAL one is `payment.Service` (provider registry/factory), the smallest real F-002 surface → **sliced this PR** (unit tests, no DB). `internal/ledger` invariants are covered indirectly (`property-ledger` runs `go test -run Property ./internal/wallet/...`); helper-branch coverage is the only residual (LOW). **F-002 net: PARTIAL-RESOLVED — payment.Service sliced; the 4 stubs are not-actionable (they need implementation, not tests).**
 
 ### F-003 — `wallet.RefreshWorker.Run`/`refresh` loop is untested
-**Severity: LOW | Confidence: CONFIRMED | ⏳ DEFERRED-BY `test/audit-burndown-f002-f016-low` (2026-06-03)**
+**Severity: LOW | Confidence: CONFIRMED | ✅ RESOLVED-BY `test/step2-closure-wallet-gate-f003-f017` (2026-06-03)** (was DEFERRED in #60)
+> The blocker (no wallet-integration gate) is gone — this PR added `integration-wallet`
+> (Step 2 wallet-gate, canary-proven). Then added: a no-DB unit test (Run exits on ctx
+> cancel) + integration tests (Run loop refreshes the MV; Run survives refresh errors on a
+> closed pool without panicking). Discovery: `docs/internal/wallet-refresh-worker.md`.
+> `-race` clean, loop test stable ×3. (Also surfaced + handled: `Run` panics on a nil logger —
+> `NewRefreshWorker` defaults the interval but not the log; tests pass `slog.Default()`. Not a
+> production change; noted as a minor constructor-robustness footgun.)
 > Deferred (real, but the proper fix exceeds LOW scope). The non-Property wallet integration
 > tests aren't in `make verify` — `property-ledger` runs only `go test -run Property
 > ./internal/wallet/...`, so `TestIntegration_*` (incl. the existing `RefreshOnce` coverage)
@@ -266,7 +281,17 @@ property_test.go:28:11: identical expressions on the left and right side of the 
 > robustness gap, not a test-infra one.** F-016 closed as CORRECTED; product cause filed as F-017.
 
 ### F-017 — sliding-window rate-limiter uses ms timestamp as zset member (same-ms undercount)
-**Severity: LOW | Confidence: CONFIRMED | NEW (surfaced correcting F-016)**
+**Severity: LOW | Confidence: CONFIRMED | ✅ RESOLVED-BY `test/step2-closure-wallet-gate-f003-f017` (2026-06-03)**
+> Fixed: the Lua now takes a unique member per request (`<nowMS>:<uuid>`, ARGV[4]) instead of
+> `ZADD key now now`; the score stays nowMS so window-trimming is unchanged, and ZCARD now
+> equals the real request count. Impact pre-fix: a same-millisecond burst collapsed to one
+> zset element, so the per-window cap (phone 3/10min, 5/1hr; IP 10/1hr) was bypassable by a
+> scripted attacker firing requests in <1ms (ordinary network-spaced traffic was unaffected).
+> Burst tests (`limiter_burst_test.go`, `-race`): same-ms burst of 10 → exactly 3 allowed;
+> concurrent burst of 12 → exactly 3; under-limit all pass. The F-016 test
+> (`TestInteg_RateLimiter_OTPRequest_PhoneWindow`) is **unskipped** and passes in the full
+> identity suite (stable ×5) — confirming F-017, not the refuted F-016 test-infra hypothesis,
+> was the true cause. **F-016 fully closed.**
 File: `internal/identity/ratelimit/limiter.go` (`slidingWindowLua`, ~line 51)
 ```
 local now = tonumber(ARGV[3])     -- UnixMilli

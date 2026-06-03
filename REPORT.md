@@ -4011,3 +4011,16 @@ New findings: **F-017** (LOW, product, rate-limiter ms-member undercount). TESTI
 
 ### No parity change
 Test + audit-doc PR; one prior-untested module sliced; no product behaviour change.
+
+## PR — Step 2 closure: wallet-integration gate + F-003 + F-017 — `test/step2-closure-wallet-gate-f003-f017`
+
+Closes the final three Step 2 items. **Stacked on PR #60** (which was still open) — its audit state (F-017 definition, F-003-deferred, F-016 correction) is the base; merge #60 first.
+
+- **Wallet-integration gate** ✅ — `property-ledger` ran `-run Property` only, so the 9 `TestIntegration_*` wallet tests ran on no CI job. Added `integration-wallet` (`go test -race -skip 'Property' ./internal/wallet/...`) to `make verify`. **Proven to catch failures** by a local canary (`t.Fatal` test → gate FAILs; removed → green). Note: the canary must NOT be `_`-prefixed (Go silently ignores `_*.go` — used `gatecanary_test.go`). Resolves PR #60's ungated-suite observation.
+- **F-003** ✅ RESOLVED — `RefreshWorker.Run` loop was untested (only `RefreshOnce`). Added a no-DB unit test (Run exits on ctx cancel) + integration tests (Run loop refreshes the MV; Run survives refresh errors on a closed pool). Discovery: `docs/internal/wallet-refresh-worker.md`. `-race` clean, ×3 stable. (Surfaced: `Run` panics on a nil logger — `NewRefreshWorker` defaults the interval but not the log; tests pass `slog.Default()`; minor constructor footgun, not changed.)
+- **F-017** ✅ RESOLVED — the sliding-window Lua used the ms timestamp as the zset *member* (`ZADD key now now`), so same-ms requests collided and the per-window cap was bypassable by a sub-ms burst. Fix: unique member per request (`<nowMS>:<uuid>`, ARGV[4]); score stays nowMS. Burst tests (`-race`): same-ms burst of 10 → exactly 3 allowed; concurrent 12 → exactly 3. The **F-016 test is unskipped** and passes in the full suite (×5) — confirming F-017 (not the refuted F-016 test-infra hypothesis) was the cause. **F-016 fully closed.**
+
+New findings: none. TESTING-HOOKs: none. Split-bailout: not fired. **Step 2 is CLOSED** — every finding F-001→F-017 has a terminal outcome.
+
+### No parity change
+Test + one rate-limiter Lua fix + CI gate; the only product change is the limiter's unique-member fix.
