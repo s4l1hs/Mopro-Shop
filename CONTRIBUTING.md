@@ -68,11 +68,9 @@ Key points that trips contributors:
 ## Development workflow
 
 ```bash
-# Start all services
-make run-local
-
-# Run the full verification suite (must pass before PR)
-make verify
+make help                    # list all developer-facing make targets
+make run-local               # start all services
+make verify                  # full verification suite (must pass before PR)
 ```
 
 `make verify` runs: `gofmt`, `go vet`, `go test -race ./...`, `golangci-lint run`,

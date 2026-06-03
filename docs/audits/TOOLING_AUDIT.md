@@ -2,6 +2,11 @@
 
 **Audit-only. No tooling built in this PR.** Findings are scoped into follow-up build PRs (§6).
 
+> **BUILD PROGRESS (T3-1 + T3-2 bundle):** ✅ **T-003, T-004, T-010, T-001 RESOLVED** (4 of the
+> NOW set). Two new findings surfaced during the build: **T-014** (2 called Go stdlib vulns,
+> govulncheck) and **T-015** (10 pre-existing missing i18n keys). The i18n dead-key **sweep** and
+> the T-014/T-015 fixes are follow-up PRs. Remaining Step-3 build PRs: T3-3..T3-6 (see §6).
+
 ## TL;DR
 - **MISSING:** 9 (3 HIGH, 5 MED, 1 LOW)
 - **EXISTS-AWKWARD:** 2 (`check_i18n.sh` not CI-wired; no `make help`)
@@ -46,7 +51,11 @@ make-verify: pull_request,push,   openapi-ci: pull_request,push,
 generated-sync, and staging-smoke coverage. No overlap/redundancy found. **Mostly healthy** — two gaps:
 
 ### T-003 — no dependency-vulnerability scanning
-**Status: MISSING | Severity: HIGH | Confidence: CONFIRMED | Priority: NOW**
+**✅ RESOLVED (T3-1) — was MISSING/HIGH/NOW.** Added `.github/workflows/govulncheck.yml`
++ `.github/dependabot.yml` (gomod/actions/pub) + `make govulncheck`. The scan surfaced
+**2 called stdlib vulns → new finding T-014**; the workflow is `continue-on-error` until
+T-014 lands, then it becomes a required gate.
+**Original status: MISSING | Severity: HIGH | Confidence: CONFIRMED | Priority: NOW**
 ```
 $ ls .github/dependabot.yml 2>/dev/null            → (none)
 $ git grep -lniE 'govulncheck|trivy|osv-scanner|snyk|nancy' -- .github/ Makefile  → (no matches)
@@ -90,7 +99,10 @@ unused** (`.golangci.yml`); `make deadcode` is the on-demand whole-program scan.
 mature** (raised across #55/#58/#61) → VERIFIED-COMPLETE for the core gate. Two friction findings:
 
 ### T-004 — no `make help`; no `##` self-documenting targets
-**Status: EXISTS-AWKWARD | Severity: MED | Confidence: CONFIRMED | Priority: NOW (trivial)**
+**✅ RESOLVED (T3-1) — was EXISTS-AWKWARD/MED/NOW.** Added a `help` target +
+`.DEFAULT_GOAL := help` (bare `make` now prints help) + `## ` annotations on 31
+developer-facing targets.
+**Original status: EXISTS-AWKWARD | Severity: MED | Confidence: CONFIRMED | Priority: NOW (trivial)**
 _(The Makefile exists and works; its 64-target interface is friction-heavy to navigate — AWKWARD, not MISSING.)_
 ```
 $ grep -cE '^[a-z][a-z0-9_-]*:' Makefile     → 64 targets
@@ -102,7 +114,10 @@ $ grep -cE '^[a-z][a-z0-9_-]*:.*##' Makefile → 0   (no inline target docs)
 public-facing target + a 3-line `help:` target (the standard `awk` one-liner). ~40 LOC, no risk.
 
 ### T-010 — `check_i18n.sh` exists but is not CI-wired (translation completeness ungated)
-**Status: EXISTS-AWKWARD | Severity: MED | Confidence: CONFIRMED | Priority: NOW (trivial)**
+**✅ RESOLVED (T3-1) — was EXISTS-AWKWARD/MED/NOW.** Added a `--strict` mode (fails on
+EXTRA keys only — missing keys are by-design for unlaunched markets) + `make i18n-check` +
+a flutter-ci job. Canary-proven. **Not** superseded by T-001 (completeness ≠ usage — both run).
+**Original status: EXISTS-AWKWARD | Severity: MED | Confidence: CONFIRMED | Priority: NOW (trivial)**
 ```
 $ git grep -rn 'check_i18n' -- .github/ Makefile docs/   → (no matches — manual only)
 ```
@@ -200,7 +215,12 @@ The three "deferred analyzers" were re-examined by **reading the existing script
 classification changed for all three:
 
 ### T-001 — i18n dead-key usage analyzer (prefix-aware) — MISSING
-**Status: MISSING | Severity: HIGH | Confidence: CONFIRMED | Priority: NOW**
+**✅ RESOLVED (T3-2) — was MISSING/HIGH/NOW.** Built `tool/audit/check_i18n_usage.dart`
+(zero-dep text-based Dart, not AST — see `docs/internal/i18n-analyzer.md` for the named
+deviation) + 13 self-tests + dual baselines + flutter-ci gate. Found 163 dead + **10 missing
+keys → new finding T-015**. The dead-key **sweep** is a separate follow-up PR (this PR builds
+the gate, not the cleanup).
+**Original status: MISSING | Severity: HIGH | Confidence: CONFIRMED | Priority: NOW**
 ```
 $ sed -n '1,20p' tool/audit/check_i18n.sh   → "Audit translation COMPLETENESS … diffs every locale against the master"
 ```
@@ -355,3 +375,34 @@ NOW findings first (small + high-leverage), then SOON grouped by area. LATER/PAR
 **Total to clear NOW+SOON:** ~6 follow-up PRs, ~1450 LOC, dominated by the two analyzers (T-001, T-002).
 NOW alone (T3-1 + T3-2) closes the security gap + the highest-leverage dev-convenience + the
 deferred i18n analyzer in ~2 small PRs.
+
+---
+
+## New findings (surfaced during the T3-1 + T3-2 build)
+
+### T-014 — Go stdlib vulnerabilities (govulncheck)
+**Status: MISSING-FIX | Severity: MED | Confidence: CONFIRMED | Priority: NOW**
+Surfaced by the T-003 scan (`govulncheck ./...`, real exit 3):
+```
+Vulnerability #1: GO-2026-5039  Standard library  net/textproto@go1.26.3  → fixed in go1.26.4
+Vulnerability #2: GO-2026-5037  Standard library  crypto/x509@go1.26.3    → fixed in go1.26.4
+(+ 1 import-only vuln NOT called by our code)
+```
+Both are **called** stdlib vulns, fixed by a single Go-toolchain bump (1.26.4+). Filed as one
+finding (shared remediation). `crypto/x509` is security-relevant (cert handling). Recommendation:
+a focused PR bumping the `go` directive / CI toolchain to 1.26.4+, then remove `continue-on-error`
+from `govulncheck.yml` to make it a required gate. Per §8 this PR surfaces + tracks, does not patch.
+
+### T-015 — 10 i18n keys referenced in code but missing from the tr-TR master
+**Status: MISSING-FIX | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
+Surfaced by the T-001 analyzer (`check_i18n_usage.dart --manifest`):
+```
+checkout.cancel_payment_body/_title, checkout.payment_3ds(/_subtitle),
+checkout.payment_bank_transfer, checkout.payment_cashback, checkout.payment_coming_soon,
+checkout.secure_payment_body/_title, common.yes
+```
+Real bug: these are called via `'…'.tr()` (e.g. `checkout_payment_screen.dart`) but absent from
+`tr-TR.json` (the launched locale) **and** `en-US.json`, so the TR app renders the raw key string.
+Frozen in `tool/audit/i18n_missing_baseline.txt` (ratcheted). Recommendation: a translation-fix PR
+adds the Turkish (+ other-locale) strings and clears the baseline. Content work → out of scope for
+the gate PR (§8).

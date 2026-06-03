@@ -4,10 +4,14 @@ on:
   push:
     paths:
       - 'mobile/**'
+      - 'tool/audit/**'
+      - 'Makefile'
       - '.github/workflows/flutter-ci.yml'
   pull_request:
     paths:
       - 'mobile/**'
+      - 'tool/audit/**'
+      - 'Makefile'
       - '.github/workflows/flutter-ci.yml'
 
 defaults:
@@ -71,3 +75,34 @@ jobs:
       - name: dart analyze mopro_api
         run: dart analyze
         working-directory: mobile/packages/mopro_api
+
+  # TOOLING_AUDIT T-010: translation-completeness gate. Runs from the repo root
+  # (overrides this workflow's mobile/ default) — needs only jq + make, no
+  # Flutter. Fails on EXTRA keys; missing keys are informational (see the script
+  # header / Makefile i18n-check). jq is preinstalled on ubuntu-latest.
+  i18n-check:
+    name: i18n completeness (extras gate)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - run: make i18n-check
+
+  # TOOLING_AUDIT T-001: dead-key + missing-key ratchet. Orthogonal to
+  # i18n-check (completeness) — both run. Needs dart (zero-dep analyzer, no
+  # pub get); runs from the repo root.
+  i18n-usage:
+    name: i18n dead-key gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+      - run: make i18n-usage

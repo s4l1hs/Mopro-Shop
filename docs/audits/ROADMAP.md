@@ -29,17 +29,24 @@ marked complete only when its fix PRs land — not when the audit lands.
 The audit landed read-only; no tooling was built in it. Build sequence (NOW first, then SOON;
 LATER/PARK unsequenced). Each build PR references its `T-ID`.
 
-1. **T3-1** `chore/tooling-ci-hygiene` (NOW) — closes **T-003** (govulncheck + dependabot, the
-   security gap), **T-010** (wire `check_i18n.sh` into CI), **T-004** (`make help` + `##` docs). ~150 LOC.
-2. **T3-2** `feat/i18n-deadkey-analyzer` (NOW) — closes **T-001** (prefix-aware dead-key analyzer,
-   the long-deferred one). ~400–700 LOC Dart; split-bailout = manifest first, gate second.
-3. **T3-3** `feat/dev-bootstrap` (SOON) — closes **T-005** (`make bootstrap`). ~50 LOC.
-4. **T3-4** `feat/migration-and-discipline-linters` (SOON) — closes **T-006** (migration linter),
+1. ✅ **T3-1 + T3-2** (bundled, `feat/step3-ci-hygiene-i18n-analyzer`) — **DONE.** Closed
+   **T-003** (govulncheck + dependabot + `make govulncheck`), **T-004** (`make help` + 31
+   annotations), **T-010** (`check_i18n.sh --strict` wired), **T-001** (zero-dep prefix-aware
+   dead-key analyzer + dual baselines + CI gate). Surfaced **T-014** (2 called Go stdlib vulns)
+   and **T-015** (10 missing i18n keys).
+2. **T3-3** `feat/dev-bootstrap` (SOON) — closes **T-005** (`make bootstrap`). ~50 LOC.
+3. **T3-4** `feat/migration-and-discipline-linters` (SOON) — closes **T-006** (migration linter),
    **T-007** (pool-in-tx / soft-delete-consumer / idempotency discipline linter). ~320 LOC.
-5. **T3-5** `feat/riverpod-shape-detector` (SOON) — closes **T-002** (extend `list_providers.dart`
+4. **T3-5** `feat/riverpod-shape-detector` (SOON) — closes **T-002** (extend `list_providers.dart`
    to classify the 3 Notifier shapes + flag inference). ~300–500 LOC.
-6. **T3-6** `feat/nightly-and-cron-tooling` (SOON) — closes **T-009** (`nightly.yml` schedule),
+5. **T3-6** `feat/nightly-and-cron-tooling` (SOON) — closes **T-009** (`nightly.yml` schedule),
    **T-008** (cron dry-run + overlap sim). ~230 LOC.
+
+**Fix follow-ups from the T3-1/T3-2 build (NEW):**
+- **T3-sweep-i18n** — remove the 163 dead keys + clear `i18n_usage_baseline.txt` (uses the T-001 analyzer).
+- **T3-fix-stdlib-vulns** (NOW) — bump Go toolchain to 1.26.4+ (closes **T-014**), then drop
+  `continue-on-error` from `govulncheck.yml` to make it required.
+- **T3-fix-missing-i18n** — add the 10 missing translations + clear `i18n_missing_baseline.txt` (closes **T-015**).
 
 LATER/PARK: **T-011** new-migration generator (LOW); merge_group support (LOW); 3 scripts missing
 `set -euo pipefail` (LOW tidy-up). **Corrected to EXISTS-FINE (nothing to build):** T-012 rollback
