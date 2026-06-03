@@ -181,7 +181,7 @@ class _AccountMobileBody extends ConsumerWidget {
           // ── Settings group ──────────────────────────────────────────────
           SliverToBoxAdapter(
             child: _TileGroup(
-              header: 'Hesap Ayarları',
+              header: 'account.settings_header'.tr(),
               children: [
                 _Tile(
                   icon: Icons.person_outline_rounded,
@@ -211,7 +211,7 @@ class _AccountMobileBody extends ConsumerWidget {
           // ── Appearance group with theme toggle ──────────────────────────
           SliverToBoxAdapter(
             child: _TileGroup(
-              header: 'Görünüm',
+              header: 'account.section_appearance'.tr(),
               children: [
                 _ThemeTile(themeMode: themeMode),
               ],
@@ -284,21 +284,21 @@ class _AccountHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Merhaba! 👋',
-                      style: TextStyle(
+                      'account.greeting'.tr(),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
                         fontWeight: FontWeight.w400,
                       ),
                     ),
                     Text(
-                      'Hesabım',
-                      style: TextStyle(
+                      'account.title'.tr(),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
@@ -315,7 +315,7 @@ class _AccountHeader extends StatelessWidget {
             children: [
               _HeaderStat(
                 value: '$activeOrderCount',
-                label: 'Aktif Sipariş',
+                label: 'account.stat_active_orders'.tr(),
               ),
               _HeaderDivider(),
               _HeaderStat(
@@ -323,12 +323,12 @@ class _AccountHeader extends StatelessWidget {
                   balanceMinor,
                   currency: 'TRY_COIN',
                 ),
-                label: 'Mopro Coin',
+                label: 'account.stat_coin'.tr(),
               ),
               _HeaderDivider(),
               _HeaderStat(
                 value: '$activePlanCount',
-                label: 'Aktif Plan',
+                label: 'account.stat_active_plans'.tr(),
               ),
             ],
           ),
@@ -499,18 +499,18 @@ class _ThemeTile extends ConsumerWidget {
     final (icon, label, subLabel) = switch (themeMode) {
       ThemeMode.light => (
           Icons.light_mode_rounded,
-          'Açık Tema',
-          'Şu an aktif',
+          'account.theme_light_title'.tr(),
+          'account.theme_active'.tr(),
         ),
       ThemeMode.dark => (
           Icons.dark_mode_rounded,
-          'Koyu Tema',
-          'Şu an aktif',
+          'account.theme_dark_title'.tr(),
+          'account.theme_active'.tr(),
         ),
       ThemeMode.system => (
           Icons.brightness_auto_rounded,
-          'Sistem Teması',
-          'Cihaz ayarını takip eder',
+          'account.theme_system_title'.tr(),
+          'account.theme_system_sub'.tr(),
         ),
     };
 
@@ -648,21 +648,21 @@ class _AccountLoggedOutHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Hoş geldin!',
-                      style: TextStyle(
+                      'account.guest_greeting'.tr(),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      'Tüm fırsatlardan yararlanmak için giriş yap',
-                      style: TextStyle(
+                      'account.guest_prompt'.tr(),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -687,9 +687,9 @@ class _AccountLoggedOutHeader extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text(
-                    'Giriş Yap',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  child: Text(
+                    'auth.login'.tr(),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -705,9 +705,9 @@ class _AccountLoggedOutHeader extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  child: const Text(
-                    'Üye Ol',
-                    style: TextStyle(fontWeight: FontWeight.w700),
+                  child: Text(
+                    'account.menu_register'.tr(),
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
               ),
@@ -739,32 +739,32 @@ class _GuestMenu extends ConsumerWidget {
         children: [
           _GuestRow(
             icon: Icons.shopping_bag_outlined,
-            label: 'Siparişlerim',
-            onTap: () => softGated('Siparişlerini görmek için giriş yap.'),
+            label: 'account.orders'.tr(),
+            onTap: () => softGated('account.softgate_orders'.tr()),
           ),
           _Sep(),
           _GuestRow(
             icon: Icons.account_balance_wallet_outlined,
-            label: 'Cüzdanım',
-            onTap: () => softGated('Cüzdanını görmek için giriş yap.'),
+            label: 'account.wallet'.tr(),
+            onTap: () => softGated('account.softgate_wallet'.tr()),
           ),
           _Sep(),
           _GuestRow(
             icon: Icons.favorite_border_rounded,
-            label: 'Favorilerim',
+            label: 'account.menu_favorites'.tr(),
             onTap: () => context.go('/favorites'),
           ),
           _Sep(),
           _GuestRow(
             icon: Icons.location_on_outlined,
-            label: 'Adreslerim',
+            label: 'account.addresses'.tr(),
             onTap: () =>
-                softGated('Adreslerini yönetmek için giriş yap.'),
+                softGated('account.softgate_addresses'.tr()),
           ),
           _Sep(),
           _GuestRow(
             icon: Icons.help_outline_rounded,
-            label: 'Yardım',
+            label: 'account.menu_help'.tr(),
             onTap: () {},
           ),
           _Sep(),
@@ -791,10 +791,10 @@ class _GuestMenu extends ConsumerWidget {
             ),
             title: Text(
               themeMode == ThemeMode.dark
-                  ? 'Koyu Tema'
+                  ? 'account.theme_dark_title'.tr()
                   : themeMode == ThemeMode.light
-                      ? 'Açık Tema'
-                      : 'Sistem Teması',
+                      ? 'account.theme_light_title'.tr()
+                      : 'account.theme_system_title'.tr(),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     fontWeight: FontWeight.w500,
                   ),
