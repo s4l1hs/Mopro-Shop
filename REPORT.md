@@ -4126,3 +4126,18 @@ The last Step-4 refactor. A-003 = "config read directly in modules (no central l
 
 ### No parity change
 Refactor + docs only — internal construction wiring and audit closure; no user-facing route, screen, or endpoint changed.
+
+## PR #78 — P5-1 + P5-2: card/PDP polish + dark-mode contrast (closes PARITY_AUDIT P-005, P-006, P-020; P-014 split)
+
+First Step-5 build PR (template for the rest). Bundled two LOW-risk visual findings from the #77 parity audit; one finding split on discovery.
+
+- **P-005** (card token-drift): RESOLVED. `product_card.dart` price → `cs.primary` (was `MoproTokens.primaryLight` — the hardcoded light-mode orange rendered on the dark card surface). Light mode unchanged (`cs.primary == primaryLight`); dark mode now tracks `primaryDark`. The two heart colours on the white chip kept by design (theme-independent). **0 new tokens** (§8).
+- **P-006** (discount-pill inconsistency): RESOLVED. New shared `mobile/lib/design/widgets/discount_pill.dart` renders `%<pct>` on `cs.error` — the design system's designated *destructive*/discount token (`tokens.dart:41`). Replaces the card's one-off red hex (`0xFFE53935`) and the PDP price block's brand-orange with one widget on both surfaces. **0 new tokens** (the existing destructive token was the right target).
+- **P-020** (dark-mode AA contrast): RESOLVED. `primaryDark` `#E36925` → `#E97230` (a ~3% lighter orange — higher luminance raises contrast on a *dark* surface; the audit's illustrative darker `#D45A1F` would have *lowered* it). `verify-contrast` now measures **4.66:1** on `surfaceDark` (was 4.26:1); the pair's `backlog: true` exemption removed (hard Pass). Light-mode `primaryLight` untouched.
+- **P-014** (hardcoded strings): **SPLIT — not closed here.** Discovery re-grep showed the true scope is ~55 strings cross-app (11 `Text()` literals + ~40 `app_router.dart` `t()` tab-titles via a `'Mopro · '` prefixer that is *not* a localiser + auth_layout marketing + the search-title) **plus a `t()` helper refactor** — far past the §9 P-014 budget and a *different kind of work* (i18n infra) than card/PDP polish. Per §6/§9 ("split P-014 first — most likely to balloon") deferred to **`feat/i18n-hardcoded-sweep`**. The audit's 11-string list was a `Text()`-scoped floor (only 1 was in card/PDP). The mandated title's "P-014" is therefore **not** claimed closed — title adjusted to reflect the split.
+- **Goldens**: 35 PNGs re-baselined on Linux via the `golden-rebaseline` workflow (ubuntu, auto-committed). All explainable: ~32 `*_dark` goldens (P-020 primary shift), `product_card_dark` (P-005+P-006+P-020), `flash_deals_{desktop,mobile}` light (P-006 — flash cards carry a discount → shared pill). Light card/PDP goldens without discounts correctly unchanged. **No unexpected side effects.**
+- All 7 perpetual gates green; `make verify` green (`verify-contrast` now Pass on the formerly-Backlog pair). `flutter analyze` clean on touched files.
+- **New findings:** none. **Discipline note:** bundled per prompt §1; **split-bailout FIRED on P-014** (scope ballooned ~5×) — the prompt anticipated this exact split. One commit per finding; discovery commit first.
+
+### No new product features
+Visual polish + one a11y token fix + a shared widget extraction. No new routes/screens/endpoints; no backend change.

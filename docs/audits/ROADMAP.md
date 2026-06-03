@@ -103,11 +103,15 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
 `requireAuth` helper). So there is **no foundational PR to land first**; the sequence is fidelity polish
 + backend-data wiring + PROBABLE-confirmation. Build sequence (NOW first):
 
-1. **P5-1** `feat/parity-card-pdp-polish` (NOW) — closes **P-005** (token-adherence: card price → `cs.primary`,
-   tokenize discount/heart colors), **P-006** (one discount-pill token across card+PDP), **P-014** (11 hardcoded
-   Turkish strings → i18n keys). Pure UI, no auth, no API. ~300 LOC + dark-mode card golden. Risk LOW.
-2. **P5-2** `fix/darkmode-contrast` (NOW) — closes **P-020** (the `#E36925`-on-`surfaceDark` 4.26:1 AA fail
-   already flagged "Backlog" by `verify-contrast`). ~30 LOC token nudge + flip the gate row to Pass. Risk LOW.
+1. ✅ **P5-1 + P5-2** `feat/parity-card-pdp-polish` (PR #78) — **DONE.** Bundled. Closed **P-005** (card price →
+   `cs.primary`), **P-006** (shared `DiscountPill` on the `cs.error`/destructive token — card + PDP), **P-020**
+   (`primaryDark` #E36925 → #E97230, 4.66:1 on `surfaceDark`, contrast backlog cleared). 35 dark-mode goldens
+   re-baselined on Linux. **P-014 SPLIT OUT** — discovery found its true scope is ~55 strings cross-app (11 `Text()`
+   + ~40 `app_router.dart` `t()` tab-titles + auth_layout + search-title) + a `t()` helper refactor, far past a
+   card/PDP-polish PR (§6/§9 split). → **`feat/i18n-hardcoded-sweep`** (NOW slot).
+2. **P5-i18n-sweep** `feat/i18n-hardcoded-sweep` (NOW — split from P5-1) — closes **P-014** (re-scoped): route ~55
+   hardcoded user-facing TR strings through `.tr()` (incl. the `app_router.dart` `t()` tab-title prefixer → localiser),
+   add keys to tr-TR (master) + en-US. i18n infra, not visual. Risk LOW-MED; its own discovery doc.
 3. **P5-3** `feat/pdp-delivery-eta` (SOON) — closes **P-007** + lights up the dark **P-008b** UI. **Backend-gated**
    (catalog/shipping API must expose ETA + original price + lowest-30d); UI slot can land NOW, data SOON. Risk MED.
 4. **P5-4** `feat/parity-card-badges` (SOON) — closes **P-009** + confirms **P-010**. **Discovery-first** (Trendyol
