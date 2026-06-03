@@ -10,7 +10,7 @@ marked complete only when its fix PRs land — not when the audit lands.
 | 2 | **Testing / correctness / concurrency** | `docs/audits/TESTING_AUDIT.md` | ✅ **CLOSED** — every finding F-001→F-017 has a terminal outcome. #58 F-001; #59 F-006/F-011/F-012; #60 F-002(partial)/F-007/F-004/F-008/F-010/F-016→F-017; closure PR: wallet-integration gate + F-003 + F-017 (+ F-016 test unskipped). Deferred non-Step-2 passes (UNKNOWN tier): ×50 -race repro, N+1/EXPLAIN, migration-safety, Flutter DevTools rebuild. |
 | 3 | **Tooling** (CI / build / migration / cron / deploy / static-analysis / dev-convenience automation) | `docs/audits/TOOLING_AUDIT.md` | ✅ **CLOSED** (PRs #62 audit → #63 → cleanup → closure bundle). All NOW/SOON findings resolved: dep-CVE scan, make help, i18n completeness+dead-key, Go bump, bootstrap, Riverpod gate, migration-safety, nightly soak. **Two carve-outs:** T-007 (3 flow-AST discipline checks) → `cmd/lint-discipline` follow-up; T-008 (cron-overlap sim) deferred (needs fin-svc harness). |
 | 4 | **Architecture / modularity** | `docs/audits/ARCHITECTURE_AUDIT.md` | ✅ **CLOSED** — A-001 (payment test-mode, A4-1), A-002+A-006 (CLAUDE.md reconcile + financial-core doc, A4-2/A4-4), A-003 (config injection, A4-3) all resolved; A-004/A-007 PROBABLE, A-005 PARK. Most categories were VERIFIED-COMPLETE (boundaries/layers/drift gated-clean). |
-| 5 | Trendyol parity continuation | — | ⏳ not started |
+| 5 | **Trendyol UI parity** | `docs/audits/TRENDYOL_PARITY_AUDIT.md` | ⏳ **audited — build PRs pending.** Honest outcome: **0 CONFIRMED HIGH** (design tokens + auth-gate, the would-be HIGHs, are VERIFIED-COMPLETE); 3 MED, 7 LOW, 6 PROBABLE, 12 VERIFIED-COMPLETE surfaces. Mopro is a mature, golden-covered, guest-aware app — remaining work is fidelity polish + backend-data wiring, not surface-building. Trendyol-side coverage-constrained (only homepage fetchable; `/sr`+PDP 403). |
 
 > Steps 3-5 scopes are as referenced by the step prompts; Step 2's and Step 3's findings are
 > enumerated here (see each audit). This file is updated as each step's audit + fix PRs land.
@@ -95,4 +95,36 @@ auth-coverage sweep (PROBABLE, maybe a small analyzer); **A-005** Flutter featur
 split); cron-overlap sim (T-008, needs fin-svc HTTP harness); the PR #74 chi-square flake
 (`TestProperty_OTPCodeDistribution`, candidate finding). A-004/A-007 PROBABLE; A-005 PARK.
 
-**Next: Step 5 — Trendyol parity continuation.**
+## Step 5 — parity PRs pending (from `TRENDYOL_PARITY_AUDIT.md` §6)
+
+The audit landed read-only; no UI changed. **Honest discovery-shift:** the two findings that would
+have been foundational HIGHs — design-token systematization (P-001) and auth-gate consistency (P-025)
+— are **already VERIFIED-COMPLETE** (`design/tokens.dart`+`theme.dart`; the single guest-preserving
+`requireAuth` helper). So there is **no foundational PR to land first**; the sequence is fidelity polish
++ backend-data wiring + PROBABLE-confirmation. Build sequence (NOW first):
+
+1. **P5-1** `feat/parity-card-pdp-polish` (NOW) — closes **P-005** (token-adherence: card price → `cs.primary`,
+   tokenize discount/heart colors), **P-006** (one discount-pill token across card+PDP), **P-014** (11 hardcoded
+   Turkish strings → i18n keys). Pure UI, no auth, no API. ~300 LOC + dark-mode card golden. Risk LOW.
+2. **P5-2** `fix/darkmode-contrast` (NOW) — closes **P-020** (the `#E36925`-on-`surfaceDark` 4.26:1 AA fail
+   already flagged "Backlog" by `verify-contrast`). ~30 LOC token nudge + flip the gate row to Pass. Risk LOW.
+3. **P5-3** `feat/pdp-delivery-eta` (SOON) — closes **P-007** + lights up the dark **P-008b** UI. **Backend-gated**
+   (catalog/shipping API must expose ETA + original price + lowest-30d); UI slot can land NOW, data SOON. Risk MED.
+4. **P5-4** `feat/parity-card-badges` (SOON) — closes **P-009** + confirms **P-010**. **Discovery-first** (Trendyol
+   `/sr` is 403 — re-confirm with screenshots before building). Backend-gated (free-shipping/campaign flags). Risk MED.
+
+LATER/PARK: **P5-5** cart suggestions + saved-for-later (P-011, LOW); **P5-6** favorite collections (P-013, PARK —
+confirm product intent); **P5-7** checkout flow-shape review (P-012, PARK — don't restructure a working 3-DS stepper
+on taste). Drive-by (Step-1 family, not parity): remove the empty `mobile/lib/features/orders/` directory.
+
+**12 VERIFIED-COMPLETE surfaces** (design tokens, auth-gate/guest-browsing, global nav, home, flash deals, product
+card, PDP structure, search/PLP filters, reviews, Q&A, orders/returns, notifications/account/empty-states/responsive)
+— see audit §5. **Do not rebuild these.**
+
+**Step-5 coverage caveat:** Trendyol bot-blocks parametrized pages (403 on `/sr`, PDP, category; login-gated
+account/cart/orders). Only the homepage fetched cleanly (2026-06-03), so ~19/20 surfaces have CONFIRMED *Mopro*
+evidence but PROBABLE *Trendyol* comparison — each PROBABLE finding gets re-confirmed in its build PR's discovery
+phase (#59→#60 pattern).
+
+**Open tail (unchanged, non-blocking):** idempotency-surface analyzer (T-007 split); cron-overlap sim (T-008);
+PR #74 chi-square flake; A-004/A-007 PROBABLE; A-005 PARK.

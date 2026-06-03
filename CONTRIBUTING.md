@@ -111,6 +111,35 @@ Architecture/modularity work follows the same **audit-then-refactor** shape (Ste
   with `go list -deps`/`git grep`, not memory; a MISSING-ABSTRACTION is only real if a useful test
   would exist against the proposed interface. The arc has caught such misreads twice (#59→#60, #71→#72).
 
+## Parity audit cadence
+
+UI/UX parity work (Step 5) follows the same **audit-then-build** shape — adapted for visual evidence.
+
+- **`docs/audits/TRENDYOL_PARITY_AUDIT.md` is the source of truth** for what to build. Read its §6
+  "Recommended parity-PR sequence" before proposing a UI change — the surface may already be
+  `VERIFIED-COMPLETE` (don't re-skin a surface that already matches; e.g. design tokens and the
+  auth-gate are done — don't "systematize" them again).
+- **Parity PRs reference the `P-ID`** they close (e.g. `feat/pdp-delivery-eta (closes
+  TRENDYOL_PARITY_AUDIT P-007)`).
+- **CONFIRMED needs visual evidence on BOTH sides** (§2.1): a widget read (`file:line`) or golden
+  *and* a Trendyol fetch/screenshot. Mopro-read-only + Trendyol-from-memory = the gap is **PROBABLE**,
+  not CONFIRMED — even when the Mopro side is certain.
+- **Visual audits are the most recall-prone** (§2.5): "I remember Trendyol has X" → fetch the page;
+  "Mopro probably looks like Y" → read the widget; "a golden probably exists" → `ls .../goldens/`.
+  This audit already caught the prompt's own false sample finding (a "missing" sticky buy box that
+  exists) by reading, not trusting recall.
+- **Trendyol is a dated snapshot, not gospel** (§2.4): the audit records Trendyol as of its fetch
+  date. Build against that snapshot; if Trendyol changes dramatically, that's a follow-up audit.
+- **Intentional divergences are documented, not closed as gaps** (§1.3/§10): Mopro's cashback model
+  (Mopro Coin where Trendyol shows discounts, no discount-tier nav, wallet/seller-transparency
+  surfaces) is a product decision — see the audit's "Intentional divergences" section. Don't file
+  these as parity gaps.
+- **Coverage-constrained is an honest outcome** (§12): when Trendyol bot-blocks a surface (403 on
+  `/sr`, PDP, login-gated pages), the finding is PROBABLE and gets re-confirmed in its build PR's
+  discovery phase. Don't manufacture CONFIRMED gaps to look thorough.
+- **Honest-zero applies**: a surface that already matches is `VERIFIED-COMPLETE` with the
+  widget/golden evidence that proves it — no padding.
+
 ## Commit conventions
 
 Follow conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`.
