@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/design/widgets/discount_pill.dart';
 import 'package:mopro/design/widgets/responsive_network_image.dart';
 import 'package:mopro/features/catalog/widgets/cashback_chip.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
@@ -145,24 +146,9 @@ class ProductCard extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 1,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE53935), // discount red
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            '%$effectiveDiscountPct',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
+                        // P-006: shared DiscountPill (was a one-off red hex here,
+                        // brand-orange on the PDP — now one destructive token).
+                        DiscountPill(percent: effectiveDiscountPct!),
                       ],
                     ),
                     const SizedBox(height: 2),
