@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:mopro/design/widgets/discount_pill.dart';
 import 'package:mopro/utils/money.dart';
 
 /// Price block for the PDP buy-box: brand-orange current price, optional
@@ -48,20 +49,9 @@ class PdpPriceBlock extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: cs.primary,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  '%$_discountPct',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: cs.onPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+              // P-006: shared DiscountPill (was brand-orange here, a red hex on
+              // the product card — now one destructive token on both surfaces).
+              DiscountPill(percent: _discountPct),
             ],
           ),
         if (_hasDiscount) const SizedBox(height: 2),

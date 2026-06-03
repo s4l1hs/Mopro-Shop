@@ -16,6 +16,8 @@
 - **VERIFIED-COMPLETE surfaces (12):** Design tokens · Global navigation (bottom nav + web header) · Home composition · Product card · Flash deals · PDP structure · Search/PLP filters+sort · Reviews · Q&A · Orders/Returns/Refund · Notifications · Empty/loading/error · Responsive · Auth-gate. (Listed with evidence in §5.)
 - **Recommended NOW sequence:** **P5-1** (card+PDP fidelity polish: P-005 token-drift + P-006 discount-pill consistency + P-014 hardcoded-string sweep — pure UI, no API dep, no auth, ~300 LOC) → **P5-2** (dark-mode contrast token fix: P-020 — tiny token tweak + contrast-gate flip). Both fully CONFIRMED, zero dependencies. Everything else is SOON/LATER and either backend-data-gated or PROBABLE-pending-confirmation.
 
+**Build status (2026-06-03):** P5-1+P5-2 shipped (`feat/parity-card-pdp-polish`) — **P-005, P-006, P-020 RESOLVED**; **P-014 SPLIT** to `feat/i18n-hardcoded-sweep` (discovery found ~55 strings cross-app, not a card/PDP-scoped sweep). 3 of the 4 NOW findings closed; the parity NOW queue is now empty.
+
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
 ---
@@ -246,6 +248,7 @@ Recommendation: `P5-favorite-collections` (LATER/PARK). The add/remove interacti
 Mopro: `features/auth/` (15 files, 1797 LOC) — login (phone/OTP), OTP screen, profile completion, email verify. Golden `auth/goldens/auth_card`. The dev-OTP-bypass is injected (`identity.WithDevOTPBypass`, A4-3/#76) and **off in production** (panics if on in prod) — so it is correctly hidden from this surface in prod (prompt §3.13). Trendyol login page not fetched → PROBABLE.
 
 ### P-014 — Hardcoded Turkish strings bypass `.tr()` (auth + checkout + account + PDP + favorites)
+**⤿ SPLIT — re-scoped by P5-1 discovery.** True scope is ~55 strings cross-app (the 11 `Text()` literals below + ~40 `core/router/app_router.dart` `t()` tab-titles, where `t()` is a `'Mopro · '` prefixer, not a localiser + auth_layout marketing + the search-title) **plus a `t()` helper refactor** — far beyond a bundled card/PDP-polish PR (§6/§9 split). Deferred to **`feat/i18n-hardcoded-sweep`**. The 11-string list below was a `Text()`-scoped floor (correctly flagged as a floor). Only `product_detail_screen.dart:57` was actually in card/PDP scope.
 **Status: CONTENT | Severity: LOW | Confidence: CONFIRMED**
 Evidence (grep, this branch — 11 literal Turkish UI strings not routed through `.tr()`):
 - `features/auth/email_verify_screen.dart:64` `'Doğrulama kodu tekrar gönderildi.'`, `:162` `'Kodu tekrar gönder'`
@@ -290,6 +293,7 @@ Evidence: `core/widgets/empty_state.dart`, `core/widgets/error_banner.dart`, `co
 ## §3.17 Accessibility findings
 
 ### P-020 — Dark-mode primary-on-surface contrast fails AA (already tracked by the contrast gate)
+**✅ RESOLVED — P5-2 (`feat/parity-card-pdp-polish`).** `primaryDark` nudged `#E36925` → `#E97230`; `verify-contrast` now measures **4.66:1** on `surfaceDark` (was 4.26:1), and the pair's `backlog` exemption is removed (hard Pass). Light-mode `primaryLight` untouched. 35 dark-mode goldens re-baselined on Linux.
 **Status: VISUAL/a11y | Severity: MED | Confidence: CONFIRMED**
 Evidence: `make verify` → `verify-contrast` (`mobile/test/design/contrast_test.dart`) prints, on this branch:
 `| #E36925 on surfaceDark (text) | 4.26:1 | 4.5:1 | FAIL (Backlog) |`.
@@ -318,6 +322,7 @@ Evidence: `mobile/lib/design/tokens.dart` (83 LOC) — full palette (`primaryLig
 **Verdict:** **VERIFIED-COMPLETE.** The prompt (§13) anticipated exactly this: "If discovery during P-001 reveals tokens are already systematized … P-001 closes as VERIFIED-COMPLETE." It does. **No P-001 PR is needed.**
 
 ### P-005 — Token-adherence drift on `ProductCard` (a few hardcoded values bypass the system)
+**✅ RESOLVED — P5-1 (`feat/parity-card-pdp-polish`).** Card price → `cs.primary` (theme-aware; was the hardcoded light-mode orange on the dark card). The discount hex is gone (folded into P-006's shared pill). The two heart colours on the white chip are kept by design (theme-independent — see `docs/internal/p5-card-pdp-polish.md`). No new token added.
 **Status: VISUAL | Severity: LOW | Confidence: CONFIRMED**
 Evidence (`product_card.dart`, read): line 174 price uses `MoproTokens.primaryLight` (the **hardcoded light-mode** orange) instead of `cs.primary` → in **dark mode the price stays #CA4E00 instead of #E36925**; line 154 discount badge uses one-off `Color(0xFFE53935)` (not a token); line 220 inactive heart uses `Color(0xFF888888)` (not a token). (By contrast `pdp_price_block.dart`/`pdp_sticky_cta.dart` correctly use `cs.primary`.)
 Gap: the token *system* is complete (P-001) but a few card widgets bypass it → dark-mode/maintenance drift.
@@ -325,6 +330,7 @@ Severity: LOW (cosmetic, dark-mode card price).
 Recommendation: part of `P5-1` — swap to `cs.primary` / add a `MoproTokens.discountBadge` token; lock with a dark-mode card golden.
 
 ### P-006 — Discount-pill color inconsistent within Mopro (card red vs PDP orange)
+**✅ RESOLVED — P5-1 (`feat/parity-card-pdp-polish`).** New shared `design/widgets/discount_pill.dart` on `cs.error` (the design system's designated *destructive*/discount token), used by both card + PDP. Resolves the card's one-off red hex (P-005) and the PDP's brand-orange in one place. No new token.
 **Status: VISUAL | Severity: LOW | Confidence: CONFIRMED**
 Evidence: `product_card.dart:154` discount pill is **red** (`0xFFE53935`); `pdp_price_block.dart:51-56` discount pill is **brand-orange** (`cs.primary`). Same concept, two colors across surfaces. (Trendyol uses green discount pills — general knowledge; either color is a divergence from Trendyol, but the **intra-Mopro inconsistency** is the CONFIRMED finding.)
 Severity: LOW.
@@ -382,14 +388,14 @@ The mature-app reality: **no foundational HIGH PR is needed** (tokens + auth-gat
 
 ### NOW (fully CONFIRMED, zero dependency, low risk)
 
-**P5-1 — Card + PDP fidelity polish.** Closes **P-005** (token-adherence: `cs.primary` on card price, tokenize discount/heart colors) + **P-006** (one discount-pill token across card+PDP) + **P-014** (11 hardcoded strings → i18n keys).
+**P5-1 — Card + PDP fidelity polish.** ✅ **DONE** (`feat/parity-card-pdp-polish`). Closed **P-005** (card price → `cs.primary`) + **P-006** (shared `DiscountPill` on `cs.error`). **P-014 SPLIT out** — discovery showed it's a ~55-string cross-app sweep + a `t()` helper refactor, not card/PDP polish → `feat/i18n-hardcoded-sweep`.
 - Size: ~250–350 Flutter LOC (widget edits + tr-TR/en-US keys).
 - Risk: **LOW** (pure UI, no auth, no API).
 - Prereqs: none (design tokens already exist — P-001).
 - Goldens: **regenerate** card + PDP price-block goldens, add a **dark-mode** card golden (CI Linux baseline).
 - Split-bailout: not expected (<1500).
 
-**P5-2 — Dark-mode contrast fix.** Closes **P-020**.
+**P5-2 — Dark-mode contrast fix.** ✅ **DONE** (`feat/parity-card-pdp-polish`). Closed **P-020** — `primaryDark` → `#E97230`, 4.66:1 on `surfaceDark`, backlog cleared.
 - Size: ~30 LOC (token nudge in `tokens.dart` or large-text-only usage) + flip the `contrast_test.dart` row to Pass.
 - Risk: **LOW**. Prereqs: none. Goldens: any dark-mode golden touching `primaryDark`.
 

@@ -9,7 +9,7 @@ abstract final class MoproTokens {
   /// oklch(0.58 0.18 47) ≈ #CA4E00 — WCAG AA 4.56:1 on white
   static const Color primaryLight = Color(0xFFCA4E00);
   /// oklch(0.72 0.17 47) ≈ #E36925 — bright orange on dark backgrounds
-  static const Color primaryDark = Color(0xFFE36925);
+  static const Color primaryDark = Color(0xFFE97230);
   static const Color onPrimaryLight = Color(0xFFFFFFFF);
   /// oklch(0.14 0.005 50) — near-black for dark-mode primary text
   static const Color onPrimaryDark = Color(0xFF231E18);
