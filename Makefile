@@ -17,7 +17,7 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
 .DEFAULT_GOAL := help
 
 .PHONY: help verify fmt vet test lint govulncheck boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order \
-        verify-image-manifest update-goldens audit audit-test i18n-check \
+        verify-image-manifest update-goldens audit audit-test i18n-check i18n-usage \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
         caddy-validate caddy-reload \
@@ -80,6 +80,12 @@ audit-test: ## Smoke-test the audit scripts.
 # header). Wired into the Flutter CI workflow.
 i18n-check: ## Translation completeness gate (fails on extra keys).
 	@bash tool/audit/check_i18n.sh --strict
+
+# i18n dead-key + missing-key ratchet (TOOLING_AUDIT T-001). Orthogonal to
+# i18n-check (completeness): this checks USAGE against the baselines in
+# tool/audit/i18n_*_baseline.txt. Zero-dep Dart. See docs/internal/i18n-analyzer.md.
+i18n-usage: ## i18n dead-key / missing-key gate (ratchet vs baseline).
+	@dart run tool/audit/check_i18n_usage.dart --check
 
 # Wire `.githooks/` into this clone (run once per machine, or after pulling
 # a new hook). Refuses commits on main/master and runs the api-gen sync check.
