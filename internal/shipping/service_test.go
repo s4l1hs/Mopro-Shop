@@ -132,7 +132,7 @@ func TestProcessWebhookEvent_Delivered(t *testing.T) {
 	repo := newStubRepo(carrier, tracking, orderID)
 	orderSvc := &stubOrderSvc{}
 	svc, err := shipping.NewService("surat",
-		map[string]shipping.Adapter{"surat": &stubAdapter{}}, repo, orderSvc)
+		map[string]shipping.Adapter{"surat": &stubAdapter{}}, repo, orderSvc, false)
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestProcessWebhookEvent_NonDelivered(t *testing.T) {
 	repo := newStubRepo(carrier, tracking, 100)
 	orderSvc := &stubOrderSvc{}
 	svc, _ := shipping.NewService("surat",
-		map[string]shipping.Adapter{"surat": &stubAdapter{}}, repo, orderSvc)
+		map[string]shipping.Adapter{"surat": &stubAdapter{}}, repo, orderSvc, false)
 
 	event := shipping.WebhookEvent{
 		TrackingNumber: tracking,
@@ -190,7 +190,7 @@ func TestProcessWebhookEvent_NonDelivered(t *testing.T) {
 func TestProcessWebhookEvent_UnknownTracking(t *testing.T) {
 	repo := newStubRepo("surat", "KNOWN-001", 1)
 	svc, _ := shipping.NewService("surat",
-		map[string]shipping.Adapter{"surat": &stubAdapter{}}, repo, &stubOrderSvc{})
+		map[string]shipping.Adapter{"surat": &stubAdapter{}}, repo, &stubOrderSvc{}, false)
 
 	err := svc.ProcessWebhookEvent(context.Background(), "surat", shipping.WebhookEvent{
 		TrackingNumber: "UNKNOWN-999",
@@ -211,7 +211,7 @@ func TestProcessWebhookEvent_Concurrent(t *testing.T) {
 	repo := newStubRepo(carrier, tracking, 200)
 	orderSvc := &stubOrderSvc{}
 	svc, _ := shipping.NewService("surat",
-		map[string]shipping.Adapter{"surat": &stubAdapter{}}, repo, orderSvc)
+		map[string]shipping.Adapter{"surat": &stubAdapter{}}, repo, orderSvc, false)
 
 	event := shipping.WebhookEvent{
 		TrackingNumber: tracking,
@@ -241,8 +241,8 @@ func TestProcessWebhookEvent_Concurrent(t *testing.T) {
 // TestNewService_ProductionGuardMissingDefault verifies that GO_ENV=production
 // with empty KARGO_DEFAULT returns an error.
 func TestNewService_ProductionGuardMissingDefault(t *testing.T) {
-	t.Setenv("GO_ENV", "production")
-	_, err := shipping.NewService("", map[string]shipping.Adapter{}, nil, nil)
+	// A-003: production is now the injected inProduction=true arg (was t.Setenv GO_ENV).
+	_, err := shipping.NewService("", map[string]shipping.Adapter{}, nil, nil, true)
 	if err == nil {
 		t.Error("expected error for empty KARGO_DEFAULT in production")
 	}
@@ -251,8 +251,7 @@ func TestNewService_ProductionGuardMissingDefault(t *testing.T) {
 // TestNewService_ProductionGuardMissingAdapter verifies that GO_ENV=production
 // with KARGO_DEFAULT set but no adapter returns an error.
 func TestNewService_ProductionGuardMissingAdapter(t *testing.T) {
-	t.Setenv("GO_ENV", "production")
-	_, err := shipping.NewService("aras", map[string]shipping.Adapter{}, nil, nil)
+	_, err := shipping.NewService("aras", map[string]shipping.Adapter{}, nil, nil, true)
 	if err == nil {
 		t.Error("expected error: KARGO_DEFAULT=aras adapter not configured")
 	}

@@ -337,7 +337,7 @@ func main() {
 	}
 
 	kargDefault := os.Getenv("KARGO_DEFAULT")
-	shippingSvc, err := shipping.NewService(kargDefault, shippingAdapters, shippingRepo, orderSvc)
+	shippingSvc, err := shipping.NewService(kargDefault, shippingAdapters, shippingRepo, orderSvc, os.Getenv("GO_ENV") == "production")
 	if err != nil {
 		slog.Error("shipping: NewService failed", "err", err)
 		os.Exit(1)
