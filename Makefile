@@ -11,7 +11,7 @@ OAPI_CODEGEN_VERSION  := v2.4.1
 OPENAPI_GEN_VERSION   := v7.10.0
 OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSION)
 
-.PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order \
+.PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order \
         verify-image-manifest update-goldens audit audit-test \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
@@ -24,7 +24,7 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
         smoke loadtest grafana-deploy
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment verify-image-manifest verify-contrast
+verify: fmt vet test lint boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment verify-image-manifest verify-contrast
 
 # WCAG contrast check for the documented brand colour pairs. Fails if any
 # non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.
@@ -152,6 +152,13 @@ property-payout: pg-ledger-test-up
 
 property-ledger: pg-ledger-test-up
 	go test -tags=integration -run Property ./internal/wallet/...
+
+# integration-wallet (Step 2 closure): runs the NON-Property wallet integration tests
+# (TestIntegration_*) that property-ledger's `-run Property` filter left ungated — they ran
+# on no CI job before this. `-skip Property` avoids double-running the property suite above.
+# -race on: the F-003 RefreshWorker.Run loop test + the concurrent-open tests want it.
+integration-wallet: pg-ledger-test-up
+	go test -tags=integration -race -skip 'Property' ./internal/wallet/... -count=1 -timeout 8m
 
 # property-timex and property-order are pure-math; no DB needed.
 property-timex:
