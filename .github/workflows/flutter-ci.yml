@@ -23,7 +23,7 @@ jobs:
     name: flutter analyze
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.x'
@@ -35,7 +35,7 @@ jobs:
     name: build_runner (verify generated files up-to-date)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.x'
@@ -51,7 +51,7 @@ jobs:
     name: flutter test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.x'
@@ -64,7 +64,7 @@ jobs:
     name: dart analyze (mopro_api generated client)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.x'
@@ -87,7 +87,7 @@ jobs:
       run:
         working-directory: .
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: make i18n-check
 
   # TOOLING_AUDIT T-001: dead-key + missing-key ratchet. Orthogonal to
@@ -100,7 +100,7 @@ jobs:
       run:
         working-directory: .
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.x'

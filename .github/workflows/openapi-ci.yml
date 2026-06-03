@@ -22,7 +22,7 @@ jobs:
     name: Spectral OpenAPI lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Run Spectral
         run: npx --yes @stoplight/spectral-cli@6 lint api/openapi.yaml --ruleset api/.spectral.yaml
         # 0 errors required; warnings are acceptable
@@ -31,7 +31,7 @@ jobs:
     name: Generated files in sync
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-go@v5
         with:
@@ -70,7 +70,7 @@ jobs:
     name: Go build + contract tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: actions/setup-go@v5
         with:
@@ -93,7 +93,7 @@ jobs:
     name: Flutter analyze (dart-dio client)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: subosito/flutter-action@v2
         with:
