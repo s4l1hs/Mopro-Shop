@@ -16,7 +16,7 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
 # `make verify` explicitly), so this is a safe, friendlier default.
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap verify fmt vet test lint govulncheck boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order \
+.PHONY: help bootstrap verify soak fmt vet test lint govulncheck boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order \
         verify-image-manifest update-goldens audit audit-test i18n-check i18n-usage \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
@@ -479,6 +479,19 @@ integration-identity-race: e2e-test-up
 integration-payment: e2e-test-up
 	ORDER_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
 	  go test -tags=integration ./internal/payment/... -count=1 -race -timeout 5m
+
+# Nightly soak (TOOLING_AUDIT T3-6): the concurrency-sensitive suites Step 2
+# flagged for repeated -race stress (§6.3) — wallet RefreshWorker/reconcile (F-003),
+# payment reconciler (F-001/F-006), identity rate-limiter (F-017). Run nightly by
+# .github/workflows/nightly.yml; locally: `make soak SOAK_COUNT=10`.
+SOAK_COUNT ?= 50
+soak: pg-ledger-test-up e2e-test-up ## Stress concurrency suites (-race -count=$(SOAK_COUNT)).
+	go test -tags=integration -race -skip 'Property' ./internal/wallet/... -count=$(SOAK_COUNT) -timeout 45m
+	ORDER_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	  go test -tags=integration -race ./internal/payment/... -count=$(SOAK_COUNT) -timeout 45m
+	IDENTITY_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	IDENTITY_TEST_REDIS=localhost:6381 \
+	  go test -tags=integration -race -skip 'OTPCodeDistribution' ./internal/identity/... -count=$(SOAK_COUNT) -timeout 60m
 
 # ── Catalog seed ───────────────────────────────────────────────────────────────
 
