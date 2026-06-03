@@ -3965,3 +3965,17 @@ The Step-2 prompt assumed `services/*-svc/**` + `app/**`; real layout is `cmd/*-
 
 ### No parity change
 Docs-only audit. Fix PRs follow per TESTING_AUDIT §8, referencing finding IDs.
+
+## PR — F-001 `payment.Reconciler` test suite — `test/payment-reconciler-coverage`
+
+- **Closes TESTING_AUDIT F-001.** Added unit + integration tests for the live wired `payment.Reconciler` (previously zero tests).
+- **Zero production-code changes** — the reconciler was already testable via its interface constructor (no TESTING-HOOK needed).
+- Discovery (`docs/internal/payment-reconciler.md`) corrected several F-001-prompt assumptions against reality: no lease table (concurrency safety = `FOR UPDATE SKIP LOCKED` fetch + outbox `idempotency_key` UNIQUE backstop); `WithTx` is plain ReadCommitted with no SERIALIZABLE/40001 retry (status-update + transactional-outbox, not a ledger move); never reads user state (soft-delete case N/A).
+- Unit suite (`reconciler_test.go`, handwritten fakes): queue selection, captured/failed/refunded branches (each sets matching `*_at` + emits `ecom.payment.*.v1` keyed `reconcile:psp:<ref>`), pending/unknown leave the row, CheckStatus/FindExpired/Update/outbox errors, market+currency propagation (non-TRY), amount near MaxInt64, status→event mapping, `Run` ctx-cancel.
+- Integration suite (`reconciler_integration_test.go`, real PG): captures expired-pending; leaves non-expired; **atomicity** (outbox idempotency-UNIQUE dup rolls back the status update — no half-apply); **concurrency** (two passes → exactly one event + captured status, outbox-UNIQUE backstop). `-race` clean; concurrent case stable ×20.
+- CI: `integration-payment` (`-race`) added to `make verify` (gated per-PR via make-verify.yml); unit tests auto-picked-up by `test`.
+- **New TESTING-HOOKs:** none. **New findings during authoring:** none (the "no lease" model is by-design, verified — not a bug).
+- Edge cases excluded with reason: lease-expiration / worker-pool-as-lease / SERIALIZABLE-40001-retry / soft-deleted-user — all N/A per discovery (documented in `docs/internal/payment-reconciler.md`).
+
+### No parity change
+Test-only PR (+ Makefile gate); no behavior change.

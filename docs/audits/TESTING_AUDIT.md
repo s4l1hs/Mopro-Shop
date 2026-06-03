@@ -33,7 +33,17 @@ $ git grep -nE '\bgo func\(|type \w*Worker|\) Run\(ctx'  → 3 workers: outbox.P
 `make verify` runs `integration-e2e` and `integration-cart` **with `-race`** (green as of PR #55). Pool-acquisition-inside-tx discipline was swept in PR #42/#47; no new violations. Worker shared-state: outbox/publisher and reconciler use request/loop-scoped ctx; no unguarded shared maps found. **Carve-out:** the identity suite is not `-race`'d (→ **F-006**), so identity concurrency (token rotation, family-revoke, rate-limiter) is unverified under the detector.
 
 ### F-001 — `internal/payment` package (incl. a live wired Reconciler) has zero tests
-**Severity: MED | Confidence: CONFIRMED**
+**Severity: MED | Confidence: CONFIRMED | ✅ RESOLVED-BY `test/payment-reconciler-coverage` (2026-06-03)**
+> Resolved: added a white-box unit suite + a real-Postgres integration suite for
+> `payment.Reconciler` (`internal/payment/reconciler_test.go`,
+> `reconciler_integration_test.go`), gated by `make verify` via `integration-payment`
+> (`-race`). Discovery doc: `docs/internal/payment-reconciler.md`. **Zero production-code
+> changes** — the reconciler was already testable through its interface constructor. No new
+> bug found: the "no lease" concurrency model is by-design (outbox `idempotency_key` UNIQUE
+> backstop + `FOR UPDATE SKIP LOCKED` fetch), verified by the concurrency + atomicity tests.
+> Scope note: `payment.Service` impls and the backup adapters (`craftgate`/`iyzico`) remain
+> untested — out of this PR's scope (the *reconciler* was F-001's named risk); tracked under
+> F-002's module-coverage follow-ups.
 File: `internal/payment/*.go` (6 source files), `internal/payment/reconciler.go`
 ```
 $ ls internal/payment/*_test.go            → no matches found

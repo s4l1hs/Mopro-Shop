@@ -16,7 +16,7 @@ marked complete only when its fix PRs land — not when the audit lands.
 > enumerated here (see the audit). This file is updated as each step's audit + fix PRs land.
 
 ## Step 2 — fixes pending (from `TESTING_AUDIT.md` §8)
-1. `payment.Reconciler` + `payment.Service` tests (F-001, MED — live financial worker).
+1. ✅ `payment.Reconciler` tests (F-001) — done in `test/payment-reconciler-coverage` (unit + integration, `-race`, gated). `payment.Service` impls + backup adapters remain → folded into F-002 module coverage.
 2. identity `-race` target excluding the bcrypt distribution test (F-006, MED).
 3. Reconcile the 5 REVIVAL_GAP skips; verify F-012 (JWT same-second rotation collision) is stale-test vs real-bug (F-011/F-012, MED).
 4. Per-module coverage: `treasury` → `search` → `media` → `sizefinder` (F-002, MED).
