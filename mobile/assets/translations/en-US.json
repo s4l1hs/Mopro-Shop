@@ -6,7 +6,8 @@
     "delete": "Delete",
     "retry": "Retry",
     "loading": "Loading...",
-    "error": "Something went wrong"
+    "error": "Something went wrong",
+    "yes": "Yes"
   },
   "auth": {
     "login_title": "Sign In",
@@ -282,7 +283,16 @@
     "back_to_cart": "Back to Cart",
     "retry": "Try Again",
     "view_orders": "View My Orders",
-    "continue_shopping": "Continue Shopping"
+    "continue_shopping": "Continue Shopping",
+    "cancel_payment_title": "Cancel Payment",
+    "cancel_payment_body": "Are you sure you want to cancel the payment?",
+    "payment_3ds": "Credit/Debit Card",
+    "payment_3ds_subtitle": "Secure payment with 3D Secure",
+    "payment_bank_transfer": "Bank Transfer / EFT",
+    "payment_cashback": "Pay with Mopro Coin",
+    "payment_coming_soon": "Coming soon",
+    "secure_payment_title": "Secure Payment",
+    "secure_payment_body": "Your payment details are encrypted with 256-bit SSL and protected by 3D Secure."
   },
   "order": {
     "history_title": "My Orders",

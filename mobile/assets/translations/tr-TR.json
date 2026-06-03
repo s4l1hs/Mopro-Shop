@@ -6,7 +6,8 @@
     "delete": "Sil",
     "retry": "Tekrar Dene",
     "loading": "Yükleniyor...",
-    "error": "Bir hata oluştu"
+    "error": "Bir hata oluştu",
+    "yes": "Evet"
   },
   "auth": {
     "login_title": "Giriş Yap",
@@ -297,7 +298,16 @@
     "back_to_cart": "Sepete Dön",
     "retry": "Tekrar Dene",
     "view_orders": "Siparişlerimi Gör",
-    "continue_shopping": "Alışverişe Devam Et"
+    "continue_shopping": "Alışverişe Devam Et",
+    "cancel_payment_title": "Ödemeyi İptal Et",
+    "cancel_payment_body": "Ödeme işlemini iptal etmek istediğinizden emin misiniz?",
+    "payment_3ds": "Kredi/Banka Kartı",
+    "payment_3ds_subtitle": "3D Secure ile güvenli ödeme",
+    "payment_bank_transfer": "Banka Havalesi / EFT",
+    "payment_cashback": "Mopro Coin ile Öde",
+    "payment_coming_soon": "Çok yakında",
+    "secure_payment_title": "Güvenli Ödeme",
+    "secure_payment_body": "Ödeme bilgileriniz 256-bit SSL ile şifrelenir ve 3D Secure ile korunur."
   },
   "order": {
     "history_title": "Siparişlerim",
