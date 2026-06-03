@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -25,8 +24,8 @@ type shippingService struct {
 // must be present (D2 guard).
 // Non-default carriers with absent env vars are silently skipped in dev
 // (caller passes empty adapter for missing carriers).
-func NewService(defaultCarrier string, adapters map[string]Adapter, repo Repository, orderSvc order.Service) (Service, error) {
-	if os.Getenv("GO_ENV") == "production" {
+func NewService(defaultCarrier string, adapters map[string]Adapter, repo Repository, orderSvc order.Service, inProduction bool) (Service, error) {
+	if inProduction { // A-003: injected (was os.Getenv("GO_ENV") == "production")
 		if defaultCarrier == "" {
 			return nil, fmt.Errorf("shipping: KARGO_DEFAULT is required in production")
 		}

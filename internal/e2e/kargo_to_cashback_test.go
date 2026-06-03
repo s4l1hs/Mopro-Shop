@@ -149,7 +149,7 @@ func TestE2E_KargoWebhookToCashbackPlan(t *testing.T) { //nolint:gocyclo,cyclop
 	suratAdapter := surat.New(shipping.SuratConfig{WebhookSecret: webhookSecret})
 	shippingSvc, err := shipping.NewService(carrier,
 		map[string]shipping.Adapter{carrier: suratAdapter},
-		shippingRepo, orderSvc,
+		shippingRepo, orderSvc, false, // not production
 	)
 	if err != nil {
 		t.Fatalf("NewService: %v", err)

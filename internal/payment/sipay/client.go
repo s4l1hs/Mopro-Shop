@@ -12,7 +12,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -197,12 +196,12 @@ func validateConfig(cfg payment.SipayConfig) error {
 	if cfg.MerchantKey == "" {
 		return fmt.Errorf("sipay: SIPAY_MERCHANT_KEY is required")
 	}
-	if os.Getenv("GO_ENV") == "production" {
+	if cfg.Environment == "production" { // A-003: injected via SipayConfig (was os.Getenv("GO_ENV"))
 		if !strings.Contains(cfg.BaseURL, "provisioning.sipay.com.tr") {
-			return fmt.Errorf("sipay: production GO_ENV requires BaseURL to contain provisioning.sipay.com.tr, got %q", cfg.BaseURL)
+			return fmt.Errorf("sipay: production requires BaseURL to contain provisioning.sipay.com.tr, got %q", cfg.BaseURL)
 		}
 		if strings.HasPrefix(cfg.MerchantKey, "test_") || strings.HasPrefix(cfg.MerchantKey, "sandbox_") {
-			return fmt.Errorf("sipay: production GO_ENV detected sandbox MerchantKey prefix — refusing to start")
+			return fmt.Errorf("sipay: production detected sandbox MerchantKey prefix — refusing to start")
 		}
 	}
 	return nil

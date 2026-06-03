@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -19,14 +18,14 @@ type s3Storage struct {
 	bucket string
 }
 
-func newS3Storage(ctx context.Context) (*s3Storage, error) {
-	endpoint := os.Getenv("STORAGE_ENDPOINT")
-	bucket := os.Getenv("STORAGE_BUCKET")
-	region := os.Getenv("STORAGE_REGION")
+func newS3Storage(ctx context.Context, sc Config) (*s3Storage, error) {
+	endpoint := sc.Endpoint
+	bucket := sc.Bucket
+	region := sc.Region
 	if region == "" {
 		region = "us-east-1"
 	}
-	ak, sk := os.Getenv("STORAGE_ACCESS_KEY"), os.Getenv("STORAGE_SECRET_KEY")
+	ak, sk := sc.AccessKey, sc.SecretKey
 	if bucket == "" || ak == "" || sk == "" {
 		return nil, fmt.Errorf("storage(s3): STORAGE_BUCKET/ACCESS_KEY/SECRET_KEY required")
 	}

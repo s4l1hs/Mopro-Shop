@@ -8,8 +8,10 @@
 >   **T-016 mock-PSP part resolved** (fin-svc harness remains).
 > - ✅ **A-002 + A-006** (A4-2/A4-4 docs bundle) — CLAUDE.md reconciled (Built-vs-Planned); the 7
 >   financial conventions consolidated in `docs/internal/financial-core.md`.
-> - Remaining: **A4-3** config injection (the one MED-SOON refactor) + the idempotency-surface
->   analyzer carve-out. A-004/A-007 PROBABLE; A-005 PARK. **Step 4 closes when A4-3 lands.**
+> - ✅ **A-003** (A4-3 `refactor/config-injection`) — sipay/storage/shipping/identity migrated to
+>   injected config; eventbus reclassified intentional (ADR-0003). Cleared the A4-1-deferred sipay `GO_ENV`.
+> - **STEP 4 CLOSED.** All findings resolved (A-001/002/003/006) or PROBABLE/PARK (A-004/A-007/A-005).
+>   Step-4-adjacent open items live in the ROADMAP: idempotency-surface analyzer; cron-sim; the PR #74 flake.
 
 ## TL;DR
 - **CONFIRMED HIGH:** 1 (A-001 = T-016, payment test-mode abstraction)
@@ -89,8 +91,16 @@ intentional, not a leaky abstraction. **Not a finding** (§2.2).
 - **Idempotency:** the storage-layer pattern is gated (the migration-safety + lint-discipline arc);
   34 `ON CONFLICT` usages; the idempotency-surface analyzer (Step-3 split) will complete the gate.
 
-### A-003 — config read directly in 7 internal modules (no central loader)
-**Shape: MISSING-ABSTRACTION | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
+### A-003 — config read directly in internal modules (no central loader)
+**✅ RESOLVED (A4-3) — was MED/SOON.** Re-verified post-A4-1: of the audit's 7, payment was
+already done (#74), and **eventbus is intentional** (ADR-0003 per-stream MAXLEN tuning overrides
+with defaults — §2.2, not a violation). The 4 real reads migrated to injected config:
+**sipay** (`SipayConfig.Environment` — clears the A4-1-deferred `GO_ENV` invariant), **storage**
+(`storage.Config`), **shipping** (`inProduction bool`), **identity** (`WithDevOTPBypass` functional
+option — zero test-caller cascade on the auth core). Each prod-safety guard preserved exactly
+(typed error / panic at the same point); env-reads now live in `cmd/core-svc/main.go`. Only
+eventbus's intentional reads remain.
+**Original shape: MISSING-ABSTRACTION | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
 ```
 $ git grep -l 'os.Getenv' -- internal/ ':!*_test.go'   → eventbus, identity/service, payment/service,
                                                           payment/sipay/client, shipping/service, storage/s3, storage/storage (7)
