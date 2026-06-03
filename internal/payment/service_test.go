@@ -1,17 +1,16 @@
 package payment
 
-// Unit tests for the PSP provider registry/factory (TESTING_AUDIT F-002 slice).
-// White-box: NewService dispatches on PSP_PROVIDER over the package-global
-// providerRegistry. Pure logic, no DB. See docs/internal/payment-service.md.
+// Unit tests for the PSP provider registry/factory.
 //
-// Reuses fakeSvc (reconciler_test.go, same package, default tags) as the registered
-// adapter double. providerRegistry is saved/restored around tests that mutate it.
+// A-001 (was T-016): NewService is now caller-injected + error-returning (no
+// PSP_PROVIDER env, no log.Fatal), so every case is a plain error-return assertion.
+// The os/exec subprocess test that the old log.Fatal path required is GONE — that
+// ugliness was the finding. White-box; pure logic, no DB. Reuses fakeSvc
+// (reconciler_test.go, same package) as the registered adapter double.
 
 import (
 	"context"
 	"errors"
-	"os"
-	"os/exec"
 	"testing"
 )
 
@@ -23,7 +22,7 @@ func withCleanRegistry(t *testing.T) {
 	t.Cleanup(func() { providerRegistry = saved })
 }
 
-// Exercises the sipay path: a registered factory is invoked and its Service returned.
+// sipay path: the registered factory is invoked with the cfg and its Service returned.
 func TestNewService_Sipay_UsesRegisteredFactory(t *testing.T) {
 	withCleanRegistry(t)
 	want := &fakeSvc{}
@@ -32,9 +31,11 @@ func TestNewService_Sipay_UsesRegisteredFactory(t *testing.T) {
 		gotCfg = cfg
 		return want
 	})
-	t.Setenv("PSP_PROVIDER", "sipay")
 
-	got := NewService(SipayConfig{BaseURL: "https://psp.example"}, nil)
+	got, err := NewService("sipay", SipayConfig{BaseURL: "https://psp.example"}, nil)
+	if err != nil {
+		t.Fatalf("NewService(sipay) unexpected err: %v", err)
+	}
 	if got != want {
 		t.Errorf("NewService(sipay) must return the registered factory's Service")
 	}
@@ -43,28 +44,22 @@ func TestNewService_Sipay_UsesRegisteredFactory(t *testing.T) {
 	}
 }
 
-// Exercises the wiring-error path: PSP_PROVIDER=sipay with no registered factory panics
-// (the "forgot the blank import" startup guard).
-func TestNewService_Sipay_NotRegistered_Panics(t *testing.T) {
+// sipay with no registered factory → ErrProviderNotRegistered (was: panic).
+func TestNewService_Sipay_NotRegistered_ReturnsError(t *testing.T) {
 	withCleanRegistry(t) // empty → "sipay" not registered
-	t.Setenv("PSP_PROVIDER", "sipay")
-	defer func() {
-		if r := recover(); r == nil {
-			t.Errorf("NewService(sipay) must panic when the adapter is not registered")
-		}
-	}()
-	_ = NewService(SipayConfig{}, nil)
+	_, err := NewService("sipay", SipayConfig{}, nil)
+	if !errors.Is(err, ErrProviderNotRegistered) {
+		t.Errorf("want ErrProviderNotRegistered, got %v", err)
+	}
 }
 
-// Exercises the stub adapters: craftgate/iyzico return a stub whose every method yields
-// ErrProviderNotImplemented (the v1 "sipay only" contract).
+// craftgate/iyzico return a stub whose every method yields ErrProviderNotImplemented.
 func TestNewService_StubAdapters_NotImplemented(t *testing.T) {
 	for _, provider := range []string{"craftgate", "iyzico"} {
 		t.Run(provider, func(t *testing.T) {
-			t.Setenv("PSP_PROVIDER", provider)
-			svc := NewService(SipayConfig{}, nil)
-			if svc == nil {
-				t.Fatal("stub adapter must be non-nil")
+			svc, err := NewService(provider, SipayConfig{}, nil)
+			if err != nil {
+				t.Fatalf("NewService(%s) unexpected err: %v", provider, err)
 			}
 			ctx := context.Background()
 			checks := []func() error{
@@ -84,30 +79,27 @@ func TestNewService_StubAdapters_NotImplemented(t *testing.T) {
 	}
 }
 
+// Empty provider → ErrProviderRequired (was: log.Fatal, only testable via os/exec).
+func TestNewService_EmptyProvider_ReturnsErrProviderRequired(t *testing.T) {
+	_, err := NewService("", SipayConfig{}, nil)
+	if !errors.Is(err, ErrProviderRequired) {
+		t.Errorf("want ErrProviderRequired, got %v", err)
+	}
+}
+
+// Unknown provider → ErrUnknownProvider (was: log.Fatalf).
+func TestNewService_UnknownProvider_ReturnsErrUnknownProvider(t *testing.T) {
+	_, err := NewService("bogus", SipayConfig{}, nil)
+	if !errors.Is(err, ErrUnknownProvider) {
+		t.Errorf("want ErrUnknownProvider, got %v", err)
+	}
+}
+
 // RegisterProvider stores the factory under its name (independent of NewService).
 func TestRegisterProvider_StoresUnderName(t *testing.T) {
 	withCleanRegistry(t)
 	RegisterProvider("sipay", func(SipayConfig, Repository) Service { return &fakeSvc{} })
 	if _, ok := providerRegistry["sipay"]; !ok {
 		t.Errorf("RegisterProvider must store the factory under its name")
-	}
-}
-
-// Exercises the startup invariant: PSP_PROVIDER unset → log.Fatal (process exit).
-// Standard re-exec idiom — the child runs the same test with BE_FATAL=1 and must exit non-zero.
-func TestNewService_MissingProvider_FatalExit(t *testing.T) {
-	if os.Getenv("BE_FATAL") == "1" {
-		_ = os.Unsetenv("PSP_PROVIDER")
-		NewService(SipayConfig{}, nil) // log.Fatal → os.Exit(1)
-		return                         // unreachable if Fatal fired
-	}
-	// #nosec G204 -- standard log.Fatal test idiom: re-exec THIS test binary (os.Args[0])
-	// with a constant -test.run filter; no external/tainted input.
-	cmd := exec.Command(os.Args[0], "-test.run=^TestNewService_MissingProvider_FatalExit$") //nolint:gosec
-	cmd.Env = append(os.Environ(), "BE_FATAL=1")
-	err := cmd.Run()
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) || exitErr.Success() {
-		t.Fatalf("missing PSP_PROVIDER must exit non-zero (log.Fatal); got %v", err)
 	}
 }

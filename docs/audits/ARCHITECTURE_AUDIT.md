@@ -2,6 +2,11 @@
 
 **Audit-only. No code changes in this PR.** Findings are scoped into follow-up refactor PRs (§6).
 
+> **BUILD PROGRESS:** ✅ **A-001 RESOLVED** (PR A4-1 `feat/payment-gateway-inject`) — `payment.Service`
+> made testable (injected provider + `paymenttest.Fake`); discovery-shift: the interface already
+> existed, so no `payment.Gateway` was added. **T-016 subsumed + resolved.** Remaining: A4-2 (CLAUDE.md
+> reconcile, NOW), A4-3 (config injection), A4-4 (financial-core docs). A-004/A-007 PROBABLE; A-005 PARK.
+
 ## TL;DR
 - **CONFIRMED HIGH:** 1 (A-001 = T-016, payment test-mode abstraction)
 - **CONFIRMED MED:** 3 (A-002 constitution drift, A-003 config injection, A-006 financial-core docs)
@@ -131,7 +136,13 @@ all conforming to a documented `build()` shape — see §4.1). One LOW finding o
 ## §3.9 Testability gaps
 
 ### A-001 — payment has a PSP interface but no test/mock adapter (= T-016)
-**Shape: MISSING-ABSTRACTION | Severity: HIGH | Confidence: CONFIRMED | Priority: NOW**
+**✅ RESOLVED (A4-1) — was HIGH/NOW.** Discovery-shift: the gateway interface already existed as
+`payment.Service` (adding `payment.Gateway` would duplicate it), so the real fix was construction:
+`NewService(provider, cfg, repo) (Service, error)` (caller-injected, error-returning — no
+`os.Getenv`/`log.Fatal`) + a configurable `internal/payment/paymenttest.Fake`. The os/exec
+subprocess test is gone; `payment.Service` consumers are now testable. (Scoped out: sipay
+`client.go`'s `GO_ENV` prod-safety check → A4-3; no `payment.Gateway` duplicate.)
+**Original shape: MISSING-ABSTRACTION | Severity: HIGH | Confidence: CONFIRMED | Priority: NOW**
 The PSP adapter pattern (CLAUDE.md §9) gives a provider-agnostic interface, but every adapter is a
 real gateway and there is no fake to test against:
 ```

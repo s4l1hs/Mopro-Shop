@@ -4082,3 +4082,16 @@ New findings: **T-016** (MED, Step-4 candidate). Split-bailout: idempotency-surf
 
 ### No parity change
 Two go/analysis analyzers + a multichecker binary + docs; zero service/app logic touched (`internal/`/`mobile/lib` untouched).
+
+## PR — A4-1: payment provider injection + fake (closes ARCHITECTURE_AUDIT A-001, subsumes T-016) — `feat/payment-gateway-inject`
+
+First Step-4 refactor; single-finding, financial path, minimal blast radius. `make verify` green.
+
+- **A-001 (HIGH): RESOLVED.** Discovery-shift (§16, the expected outcome): the provider-agnostic gateway interface **already existed as `payment.Service`** (the PSP adapters implement it directly), so adding a `payment.Gateway` would duplicate it (§1.3) — I **completed the existing abstraction** instead. The real gap was construction: `NewService` read `os.Getenv("PSP_PROVIDER")` + `log.Fatal`'d, which forced an `os/exec` subprocess test. Now `NewService(provider string, cfg, repo) (Service, error)` — caller-injected, error-returning (`ErrProviderRequired`/`ErrUnknownProvider`/`ErrProviderNotRegistered`); the only production caller (`cmd/core-svc/main.go`) reads `PSP_PROVIDER` and fails fast. Added `internal/payment/paymenttest.Fake` (configurable `Service`, `httptest`-style).
+- **T-016: PARTIAL** — the mock-PSP-test-mode part is resolved (the fake + injectable construction); the fin-svc HTTP harness + a `sellerpayout`-side PSP fake (to actually run the cron-overlap sim, T-008) remain separate (payment is core-svc; sellerpayout is fin-svc with its own PSP client). **No overclaim.**
+- **Behavior preservation:** same provider names (sipay|craftgate|iyzico), same `SipayConfig` (already injected), same stub `ErrProviderNotImplemented` semantics, same error sentinels via `errors.Is`. Only the failure *mechanism* changed (typed error vs `log.Fatal`) — and the process still exits, now at the caller. The os/exec subprocess test is gone.
+- **Named deviations:** (D1) no `payment.Gateway` — `Service` is it; (D2) sipay `client.go` `GO_ENV` prod-safety check left for A4-3 (adapter-internal, HIGH-risk) — one `os.Getenv` remains in the payment tree by design; (D3) A-001 closes payment.Service testability, not the fin-svc cron-sim.
+- **Edge cases:** ✅ empty/unknown/unregistered provider (error-return tests); ✅ craftgate/iyzico stubs; ✅ fake records args + returns configured + zero-value no-op; ✅ only-caller migrated (no other `payment.NewService` in tree). New findings: none.
+
+### No parity change
+Payment construction refactor (interface unchanged) + a test fake; no behaviour/money-flow change. `internal/payment` interface + adapters' logic untouched.

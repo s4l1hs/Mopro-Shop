@@ -21,4 +21,15 @@ var (
 
 	// ErrInvalidAmount is returned when an amount is zero or negative.
 	ErrInvalidAmount = errors.New("payment: amount must be positive")
+
+	// ErrProviderRequired is returned by NewService when the provider name is empty
+	// (A-001: construction is now caller-injected + error-returning, not log.Fatal).
+	ErrProviderRequired = errors.New("payment: provider required (sipay|craftgate|iyzico)")
+
+	// ErrUnknownProvider is returned by NewService for an unrecognised provider name.
+	ErrUnknownProvider = errors.New("payment: unknown provider")
+
+	// ErrProviderNotRegistered is returned when a known provider (sipay) needs an
+	// init()-registered factory but the sub-package wasn't imported (blank import in main.go).
+	ErrProviderNotRegistered = errors.New("payment: provider factory not registered (missing blank import)")
 )

@@ -199,7 +199,11 @@ func main() {
 		ReturnURL:   os.Getenv("SIPAY_RETURN_URL"),
 		CancelURL:   os.Getenv("SIPAY_CANCEL_URL"),
 	}
-	paymentSvc := payment.NewService(sipaycfg, paymentRepo)
+	paymentSvc, err := payment.NewService(os.Getenv("PSP_PROVIDER"), sipaycfg, paymentRepo)
+	if err != nil {
+		slog.Error("payment: NewService failed", "err", err)
+		os.Exit(1)
+	}
 
 	orderSvc := order.NewServiceFull(
 		orderRepo, checkoutSessionRepo,

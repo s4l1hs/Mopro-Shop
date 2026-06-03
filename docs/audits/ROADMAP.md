@@ -68,9 +68,11 @@ automation, T-013 golden-diff (`golden_platform.dart`).
 
 The audit landed read-only; no code changed. The architecture is gated-clean — findings are narrow.
 
-1. **A4-1** `feat/payment-test-adapter` (NOW) — **A-001 (= T-016, HIGH)**: in-memory `payment.Service`
-   fake + inject PSP config (no more `os.Getenv` in `payment/service.go`). Unblocks fin-svc payment
-   integration tests + the Step-3 cron-overlap sim (T-008). ~400–600 LOC, risk MED (financial path, additive).
+1. ✅ **A4-1** `feat/payment-gateway-inject` — **A-001 (HIGH) DONE**. Discovery-shift: the gateway
+   interface already existed as `payment.Service`, so the fix was construction —
+   `NewService(provider, cfg, repo) (Service, error)` (no `os.Getenv`/`log.Fatal`) + a configurable
+   `paymenttest.Fake`. payment.Service consumers are now testable. **T-016 mock-PSP part resolved**;
+   the fin-svc HTTP harness (cron-sim) remains separate. (sipay `GO_ENV` deferred to A4-3.)
 2. **A4-2** `docs/reconcile-constitution` (NOW) — **A-002 (MED)**: mark CLAUDE.md's planned modules
    `(planned)`, fix the `pkg/` list, complete the module table. ~40 LOC doc, risk LOW.
 3. **A4-3** `refactor/config-injection` (SOON) — **A-003 (MED)**: central config loader in each
