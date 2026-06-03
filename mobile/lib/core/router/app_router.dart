@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -83,83 +84,97 @@ Widget _titledLoc(String location, Widget child, {String? name}) => Title(
 /// a [name] (product title, category name, order id, search query) and fall back
 /// to "Mopro · Yükleniyor…" while it resolves. Unknown → "Mopro · Sayfa Bulunamadı".
 String moproPageTitle(String location, {String? name}) {
-  String t(String s) => 'Mopro · $s';
-  final loading = t('Yükleniyor…');
+  // P-014: `withBrand` is the honest name for the old `t()` — it prepends the
+  // 'Mopro · ' brand prefix (a brand constant, kept inline). Localised titles
+  // pass router_title.* keys through tr() inline at each call site (kept literal
+  // so the usage analyzer records them as used).
+  String withBrand(String s) => 'Mopro · $s';
+  final loading = withBrand('router_title.loading'.tr());
 
   // Specific prefixes first.
   if (location.startsWith('/categories/')) {
-    return name == null ? loading : t(name);
+    return name == null ? loading : withBrand(name);
   }
   // Q&A sub-routes must be matched before the generic /products/ product title.
   if (RegExp(r'^/products/\d+/questions/\d+').hasMatch(location)) {
-    return t('Soru');
+    return withBrand('router_title.question'.tr());
   }
   if (RegExp(r'^/products/\d+/questions/?$').hasMatch(location)) {
-    return t('Sorular');
+    return withBrand('router_title.questions'.tr());
   }
   if (location.startsWith('/products/')) {
-    return name == null ? loading : t(name);
+    return name == null ? loading : withBrand(name);
   }
-  if (location == '/seller/dashboard') return t('Satıcı Paneli');
-  if (location == '/seller/returns') return t('İadeler');
+  if (location == '/seller/dashboard') return withBrand('router_title.seller_dashboard'.tr());
+  if (location == '/seller/returns') return withBrand('router_title.returns'.tr());
   if (location.startsWith('/seller/returns/')) {
-    return name == null ? t('İade') : t('İade #$name');
+    return name == null
+        ? withBrand('router_title.return'.tr())
+        : withBrand('router_title.return_numbered'.tr(namedArgs: {'n': name}));
   }
-  if (location == '/seller/questions') return t('Sorular');
-  if (location.startsWith('/seller/questions/')) return t('Soru');
+  if (location == '/seller/questions') return withBrand('router_title.questions'.tr());
+  if (location.startsWith('/seller/questions/')) return withBrand('router_title.question'.tr());
   if (location.startsWith('/sellers/')) {
-    return name == null ? t('Mağaza') : t(name);
+    return name == null ? withBrand('router_title.store'.tr()) : withBrand(name);
   }
-  if (location.startsWith('/checkout/result')) return t('Sipariş Sonucu');
-  if (location.startsWith('/checkout')) return t('Ödeme');
-  if (location == '/profile/addresses/new') return t('Yeni Adres');
-  if (location.startsWith('/profile/addresses/')) return t('Adresi Düzenle');
-  if (location == '/profile/addresses') return t('Adreslerim');
-  if (location.startsWith('/wallet/plans/')) return t('Kampanya Detayı');
-  if (location == '/wallet') return t('Cüzdan');
-  if (location == '/orders') return t('Siparişlerim');
-  if (location.endsWith('/return')) return t('İade Talebi');
+  if (location.startsWith('/checkout/result')) return withBrand('router_title.order_result'.tr());
+  if (location.startsWith('/checkout')) return withBrand('router_title.checkout'.tr());
+  if (location == '/profile/addresses/new') return withBrand('router_title.new_address'.tr());
+  if (location.startsWith('/profile/addresses/')) return withBrand('router_title.edit_address'.tr());
+  if (location == '/profile/addresses') return withBrand('router_title.addresses'.tr());
+  if (location.startsWith('/wallet/plans/')) return withBrand('router_title.plan_detail'.tr());
+  if (location == '/wallet') return withBrand('router_title.wallet'.tr());
+  if (location == '/orders') return withBrand('router_title.orders'.tr());
+  if (location.endsWith('/return')) return withBrand('router_title.return_request'.tr());
   if (location.startsWith('/orders/')) {
-    return name == null ? t('Siparişlerim') : t('Sipariş #$name');
+    return name == null
+        ? withBrand('router_title.orders'.tr())
+        : withBrand('router_title.order_numbered'.tr(namedArgs: {'n': name}));
   }
-  if (location == '/returns') return t('İadelerim');
+  if (location == '/returns') return withBrand('router_title.my_returns'.tr());
   if (location.startsWith('/returns/')) {
-    return name == null ? t('İadelerim') : t('İade #$name');
+    return name == null
+        ? withBrand('router_title.my_returns'.tr())
+        : withBrand('router_title.return_numbered'.tr(namedArgs: {'n': name}));
   }
-  if (location == '/account/profile') return t('Profilim');
-  if (location == '/account/security') return t('Güvenlik');
-  if (location == '/account/cards') return t('Kartlarım');
-  if (location == '/account/reviews') return t('Yorumlarım');
-  if (location == '/account/questions') return t('Sorularım');
-  if (location == '/account/privacy') return t('Gizlilik');
-  if (location == '/account/browsing-history') return t('Geçmişim');
+  if (location == '/account/profile') return withBrand('router_title.profile'.tr());
+  if (location == '/account/security') return withBrand('router_title.security'.tr());
+  if (location == '/account/cards') return withBrand('router_title.cards'.tr());
+  if (location == '/account/reviews') return withBrand('router_title.reviews'.tr());
+  if (location == '/account/questions') return withBrand('router_title.my_questions'.tr());
+  if (location == '/account/privacy') return withBrand('router_title.privacy'.tr());
+  if (location == '/account/browsing-history') return withBrand('router_title.history'.tr());
   if (location == '/account/notifications/preferences') {
-    return t('Bildirim Ayarları');
+    return withBrand('router_title.notification_settings'.tr());
   }
-  if (location == '/account/notifications') return t('Bildirimler');
-  if (location == '/account') return t('Hesabım');
-  if (location == '/categories') return t('Kategoriler');
+  if (location == '/account/notifications') return withBrand('router_title.notifications'.tr());
+  if (location == '/account') return withBrand('router_title.account'.tr());
+  if (location == '/categories') return withBrand('router_title.categories'.tr());
   if (location == '/search') {
-    return name == null || name.isEmpty ? t('Arama') : t('"$name" araması');
+    return name == null || name.isEmpty
+        ? withBrand('router_title.search'.tr())
+        : withBrand('router_title.search_query'.tr(namedArgs: {'q': name}));
   }
-  if (location == '/cart') return t('Sepetim');
-  if (location == '/favorites') return t('Favorilerim');
-  if (location == '/auth/login') return t('Giriş');
-  if (location == '/auth/register') return t('Üye Ol');
-  if (location == '/auth/verify-email') return t('E-posta Doğrulama');
-  if (location == '/auth/forgot-password') return t('Şifre Sıfırlama');
-  if (location == '/auth/mfa') return t('İki Faktör');
-  if (location == '/auth/profile') return t('Profil Tamamlama');
-  if (location == '/help/contact') return t('Bize Ulaş');
+  if (location == '/cart') return withBrand('router_title.cart'.tr());
+  if (location == '/favorites') return withBrand('router_title.favorites'.tr());
+  if (location == '/auth/login') return withBrand('router_title.login'.tr());
+  if (location == '/auth/register') return withBrand('router_title.register'.tr());
+  if (location == '/auth/verify-email') return withBrand('router_title.verify_email'.tr());
+  if (location == '/auth/forgot-password') return withBrand('router_title.forgot_password'.tr());
+  if (location == '/auth/mfa') return withBrand('router_title.mfa'.tr());
+  if (location == '/auth/profile') return withBrand('router_title.profile_completion'.tr());
+  if (location == '/help/contact') return withBrand('router_title.contact'.tr());
   if (location == '/help/search') {
-    return name == null || name.isEmpty ? t('Arama') : t('Arama: "$name"');
+    return name == null || name.isEmpty
+        ? withBrand('router_title.search'.tr())
+        : withBrand('router_title.help_search'.tr(namedArgs: {'q': name}));
   }
   if (location.startsWith('/help/category/') || location.startsWith('/help/article/')) {
-    return name == null ? t('Yardım') : t(name);
+    return name == null ? withBrand('router_title.help'.tr()) : withBrand(name);
   }
-  if (location == '/help') return t('Yardım');
+  if (location == '/help') return withBrand('router_title.help'.tr());
   if (location == '/' || location == '/splash') return 'Mopro';
-  return t('Sayfa Bulunamadı');
+  return withBrand('router_title.not_found'.tr());
 }
 
 /// Pure function exposing the auth-aware redirect rules.

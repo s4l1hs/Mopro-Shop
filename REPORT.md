@@ -4141,3 +4141,19 @@ First Step-5 build PR (template for the rest). Bundled two LOW-risk visual findi
 
 ### No new product features
 Visual polish + one a11y token fix + a shared widget extraction. No new routes/screens/endpoints; no backend change.
+
+## PR #79 — P-014 Phase 1: t() helper refactor + app_router title localization (PARITY_AUDIT P-014, phased)
+
+Closes the P-014 split from #78 — **partially**. A second discovery-shift re-scoped P-014 and the PR ships Phase 1.
+
+- **Discovery-shift (the audit undercounted ~3×):** the audit's P-014 listed 11 `Text('…')` literals. An all-sinks re-grep (`label:`/`title:`/`content:`/`SnackBar`/error maps/marketing) found **~155 hardcoded TR strings across 27 files** — whole screens unlocalized (security_screen 29, account_screen 21, sign_up 15, sipay_error_map 13, sign_in 12, email_verify 10, mfa 9, forgot 7, hero_slides 7, checkout_redirect 6, …). A full sweep is ~1500–2000 LOC / 27 files — multi-PR. Per §6/§9 split-bailout → **phased**.
+- **Phase 1 (this PR):** the **`t()` helper refactor** (the title's named deliverable) + **app_router title localization**.
+  - `app_router.dart`: local `t()` (a `'Mopro · '` prefixer, *not* a localiser despite the name) → `withBrand`; all 46 title sites routed through **44 `router_title.*` keys** via literal `'key'.tr()`. Interpolated titles use `namedArgs` (`return_numbered`/`order_numbered`/`search_query`/`help_search`); the 4 dynamic names (product/category/seller/help) pass through `withBrand(name)` unkeyed; splash stays bare `'Mopro'`.
+  - 44 keys added to tr-TR (master, verbatim) + en-US. **0 TRANSLATION_NEEDED.**
+- **Analyzer note:** the usage analyzer (`check_i18n_usage.dart`) detects only literal `'key'.tr(` — so (a) no `t(key)`-style hidden `.tr()` (would read as dead), and (b) a self-inflicted false-positive was caught: an explanatory *comment* containing `'router_title.x'.tr()` was flagged as a missing key → comment rephrased.
+- **Gates:** `make i18n-check` 0 extras; `make i18n-usage` 631 declared / 0 dead / 0 missing; `flutter analyze` clean. **No golden impact** (the `Title` widget is OS-level, not painted) — confirmed by the `flutter test` job.
+- **P-014 NOT closed.** Re-scoped to ~155/27; ~111 strings remain, phased by area (auth/account/error-map/marketing/checkout/misc) — see ROADMAP + `docs/internal/i18n-helper-refactor.md`. **Split-bailout FIRED** (the audit's "~55" was a ~3× undercount).
+- Title reflects reality: **Phase 1**, not "closes P-014."
+
+### No visual change
+Browser/tab titles only (OS-level) + i18n keys. No painted UI changed; no goldens; no backend.
