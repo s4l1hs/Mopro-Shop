@@ -305,6 +305,11 @@ drift this gate exists to prevent.
 
 ## Financial code
 
+> **Source of truth:** `docs/internal/financial-core.md` consolidates the 7
+> financial-path conventions (SERIALIZABLE retry, pool-acquire-inside-tx,
+> soft-deleted-user-consumer, idempotency, outbox, rate-limiter zset-member, soft
+> refs) with code sketches, gating, and a PR-time review checklist. Read it once.
+
 Any change to cashback calculation, seller payout, or ledger entries requires:
 
 1. Reading `LEDGER_GUIDE.md` and `CLAUDE.md §4` fully.
