@@ -1,0 +1,4 @@
+# Riverpod inferred-type-provider baseline — tool/audit/riverpod_check.dart (T3-5).
+# Providers declared without an explicit <Type>. `make riverpod-check` fails on any
+# NEW one (ratchet). Currently EMPTY: all 95 providers carry explicit types.
+# A future inferred provider gets added here only if intentional; prefer annotating it.
