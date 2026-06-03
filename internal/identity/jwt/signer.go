@@ -8,6 +8,7 @@ import (
 	"time"
 
 	libjwt "github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 // Signer signs and verifies JWTs for the identity module.
@@ -68,6 +69,12 @@ func (s *HS256Signer) issue(userID int64, market, scope string, ttl time.Duratio
 		Market: market,
 		Scope:  scope,
 		RegisteredClaims: libjwt.RegisteredClaims{
+			// CONFIRMED-AND-FIXED: F-012. A unique jti makes every token distinct even
+			// when two are issued in the same second (iat has 1s resolution). Additive,
+			// standard registered claim — Verify ignores it; nothing keys on the token
+			// string; refresh tokens are separate opaque randoms. Also unblocks a future
+			// per-token denylist (PR #49 backlog).
+			ID:        uuid.NewString(),
 			Subject:   fmt.Sprintf("%d", userID),
 			IssuedAt:  libjwt.NewNumericDate(now),
 			ExpiresAt: libjwt.NewNumericDate(exp),

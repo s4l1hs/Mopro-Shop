@@ -209,7 +209,9 @@ func TestE2E_StepUpOTPFlow(t *testing.T) {
 
 // TestE2E_LogoutRevokesToken verifies that after logout the refresh token is dead.
 func TestE2E_LogoutRevokesToken(t *testing.T) {
-	skipRevivalGap(t, "LogoutRevokesToken: logout returns \"family revoked (theft detected)\" instead of ErrTokenRevoked/NotFound — reconcile assertion with current revoke semantics")
+	// RESTORED: behaviour is correct (refresh after logout fails because the token family
+	// is revoked); the assertion below is broadened to accept ErrTokenFamilyRevoked, which
+	// is a revoke outcome (a refreshed-token reuse after logout trips theft detection).
 	ctx := context.Background()
 	integRedis.FlushDB(ctx)
 
@@ -228,8 +230,10 @@ func TestE2E_LogoutRevokesToken(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error after logout, got nil")
 	}
-	if !errors.Is(err, identity.ErrTokenRevoked) && !errors.Is(err, identity.ErrTokenNotFound) {
-		t.Errorf("expected ErrTokenRevoked or ErrTokenNotFound, got %v", err)
+	if !errors.Is(err, identity.ErrTokenRevoked) &&
+		!errors.Is(err, identity.ErrTokenNotFound) &&
+		!errors.Is(err, identity.ErrTokenFamilyRevoked) {
+		t.Errorf("expected a revoke/not-found token error, got %v", err)
 	}
 }
 

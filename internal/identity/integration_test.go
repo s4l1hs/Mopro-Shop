@@ -483,7 +483,13 @@ func TestInteg_CreateDevice(t *testing.T) {
 // ── Rate limiter integration tests ───────────────────────────────────────────
 
 func TestInteg_RateLimiter_OTPRequest_PhoneWindow(t *testing.T) {
-	skipRevivalGap(t, "RateLimiter_OTPRequest_PhoneWindow: 4th OTP request not rate-limited — phone-window threshold/semantics changed; reconcile")
+	// F-016 (test-infra): the limiter is CORRECT — this test PASSES in isolation, and the
+	// sliding-window Lua rejects the 4th request (count>=max, max=3). It fails only inside
+	// the full identity suite because all identity integration tests share one integRedis
+	// and each calls FlushDB; suite ordering can clear this test's window. The product is
+	// not at fault; the harness is order-fragile. Left skipped until F-016 (per-test Redis
+	// namespacing / isolated client) lands. Run with IDENTITY_RUN_REVIVAL_GAP=1.
+	skipRevivalGap(t, "RateLimiter_OTPRequest_PhoneWindow: blocked on F-016 (shared-integRedis suite fragility; limiter verified correct in isolation + by Lua)")
 	ctx := context.Background()
 	integRedis.FlushDB(ctx)
 	limiter := ratelimit.New(integRedis)
@@ -553,7 +559,9 @@ func TestInteg_RateLimiter_ResetVerifyFailures(t *testing.T) {
 // ── End-to-end service integration test ──────────────────────────────────────
 
 func TestInteg_Service_OTPVerifyFlow(t *testing.T) {
-	skipRevivalGap(t, "Service_OTPVerifyFlow: access token not different after rotation (likely JWT same-second collision) — make the assertion robust")
+	// RESTORED: this passes now that F-012 (same-second jti collision) is fixed — rotated
+	// access tokens are distinct (unique jti), so the "token different after rotation"
+	// assertion holds.
 	ctx := context.Background()
 	integRedis.FlushDB(ctx)
 
@@ -680,7 +688,10 @@ func TestIntegration_TokenReuse_RevokesEntireFamily(t *testing.T) {
 // - Verify step-up OTP → get step-up token with scope=high_sensitivity
 // - Using wrong code at step-up verify returns ErrOTPInvalid
 func TestIntegration_StepUpOTPFlow(t *testing.T) {
-	skipRevivalGap(t, "Integration_StepUpOTPFlow: FindLatestOTP(login) returns not-found — OTP purpose/lookup semantics changed; reconcile")
+	// RESTORED: the original step 3 asserted FindLatestOTP(login) returns the *verified*
+	// login OTP, but FindLatestOTP filters `verified_at IS NULL` (repository.go) — a
+	// consumed login OTP is correctly excluded. That stale assertion is dropped below; the
+	// real point (step-up is an independent, still-pending OTP purpose) is unchanged.
 	ctx := context.Background()
 	integRedis.FlushDB(ctx)
 	repo := newIntegRepo(t)
@@ -712,16 +723,10 @@ func TestIntegration_StepUpOTPFlow(t *testing.T) {
 	}
 	stepUpCode := sms.code
 
-	// Step 3: verify both OTP purposes exist in DB independently.
+	// Step 3: the login OTP was consumed by VerifyOTP (verified_at set) and is therefore
+	// no longer returned by FindLatestOTP (verified_at IS NULL filter) — correct one-time-use
+	// behaviour. The step-up OTP is a separate, still-pending purpose, asserted next.
 	hash := mustPhoneHash(t, phone)
-	loginOTP, err := repo.FindLatestOTP(ctx, hash, identity.OTPPurposeLogin)
-	if err != nil {
-		t.Fatalf("FindLatestOTP login: %v", err)
-	}
-	// The login OTP was already verified (VerifiedAt set); step 3 just confirms repo access.
-	if loginOTP.Purpose != identity.OTPPurposeLogin {
-		t.Errorf("expected login OTP purpose=%q, got %q", identity.OTPPurposeLogin, loginOTP.Purpose)
-	}
 
 	stepUpOTP, err := repo.FindLatestOTP(ctx, hash, identity.OTPPurposeStepUp)
 	if err != nil {
