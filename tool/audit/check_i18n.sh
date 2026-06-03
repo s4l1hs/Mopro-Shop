@@ -16,7 +16,16 @@
 # USAGE
 #   tool/audit/check_i18n.sh             # markdown summary to stdout
 #   tool/audit/check_i18n.sh --list      # also print each missing key
+#   tool/audit/check_i18n.sh --strict    # exit 1 if any locale has EXTRA keys
 #   tool/audit/check_i18n.sh --help
+#
+# STRICT GATE (T-010)
+#   --strict fails ONLY on extra keys (present in a locale, absent from master).
+#   Extras are always drift: a typo'd key, or a key added to a locale but not the
+#   tr-TR master. MISSING keys are deliberately NOT gated: per CLAUDE.md the only
+#   launched market is TR, so non-master locales (ar/de/en) are partial by design
+#   until their market launches. Gating missing keys would demand translating
+#   unlaunched markets. CI wires --strict (see .github/workflows/flutter-ci.yml).
 #
 # EXTEND
 #   $L10N_DIR = translations dir; $MASTER = master locale file basename.
@@ -29,7 +38,13 @@ case "${1:-}" in
     ;;
 esac
 LIST=0
-[ "${1:-}" = "--list" ] && LIST=1
+STRICT=0
+for arg in "$@"; do
+  case "$arg" in
+    --list)   LIST=1 ;;
+    --strict) STRICT=1 ;;
+  esac
+done
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
@@ -52,6 +67,7 @@ echo "| Locale | Keys | Missing vs master | Extra vs master | Completeness |"
 echo "|---|---|---|---|---|"
 
 declare -a MISSING_DETAIL=()
+total_extra=0
 for f in "$L10N_DIR"/*.json; do
   base="$(basename "$f")"
   keys="$(flatten "$f")"
@@ -68,6 +84,7 @@ for f in "$L10N_DIR"/*.json; do
   pct=0
   [ "$master_n" -gt 0 ] && pct=$(( present * 100 / master_n ))
   echo "| \`$base\` | $n | $nmiss | $nextra | ${pct}% |"
+  total_extra=$(( total_extra + nextra ))
   if [ "$nmiss" -gt 0 ]; then
     MISSING_DETAIL+=("$base|$missing")
   fi
@@ -86,4 +103,12 @@ if [ "$LIST" -eq 1 ]; then
     echo
     echo "</details>"
   done
+fi
+
+# T-010 strict gate: extras are always drift (missing keys are by-design — see header).
+if [ "$STRICT" -eq 1 ] && [ "$total_extra" -gt 0 ]; then
+  echo >&2
+  echo "check_i18n --strict: $total_extra extra key(s) present in a locale but absent from master ($MASTER)." >&2
+  echo "Add them to the master locale or remove them from the offending locale." >&2
+  exit 1
 fi

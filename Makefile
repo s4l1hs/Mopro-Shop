@@ -12,7 +12,7 @@ OPENAPI_GEN_VERSION   := v7.10.0
 OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSION)
 
 .PHONY: verify fmt vet test lint govulncheck boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order \
-        verify-image-manifest update-goldens audit audit-test \
+        verify-image-manifest update-goldens audit audit-test i18n-check \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
         caddy-validate caddy-reload \
@@ -60,6 +60,13 @@ audit:
 # SYSTEM_AUDIT.md generated blocks are up to date.
 audit-test:
 	@bash tool/audit/smoke_test.sh
+
+# Translation completeness gate (TOOLING_AUDIT T-010). Fails on EXTRA keys
+# (orphan/typo keys absent from the tr-TR master); missing keys stay
+# informational (unlaunched markets are partial by design — see the script
+# header). Wired into the Flutter CI workflow.
+i18n-check:
+	@bash tool/audit/check_i18n.sh --strict
 
 # Wire `.githooks/` into this clone (run once per machine, or after pulling
 # a new hook). Refuses commits on main/master and runs the api-gen sync check.
