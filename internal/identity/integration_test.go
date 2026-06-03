@@ -483,13 +483,17 @@ func TestInteg_CreateDevice(t *testing.T) {
 // ── Rate limiter integration tests ───────────────────────────────────────────
 
 func TestInteg_RateLimiter_OTPRequest_PhoneWindow(t *testing.T) {
-	// F-016 (test-infra): the limiter is CORRECT — this test PASSES in isolation, and the
-	// sliding-window Lua rejects the 4th request (count>=max, max=3). It fails only inside
-	// the full identity suite because all identity integration tests share one integRedis
-	// and each calls FlushDB; suite ordering can clear this test's window. The product is
-	// not at fault; the harness is order-fragile. Left skipped until F-016 (per-test Redis
-	// namespacing / isolated client) lands. Run with IDENTITY_RUN_REVIVAL_GAP=1.
-	skipRevivalGap(t, "RateLimiter_OTPRequest_PhoneWindow: blocked on F-016 (shared-integRedis suite fragility; limiter verified correct in isolation + by Lua)")
+	// F-016 was CORRECTED → real cause is F-017 (product, LOW). The PR #59 "shared-integRedis
+	// test-infra" hypothesis was WRONG: tests are sequential (no t.Parallel), so FlushDB can't
+	// race. The real cause is in the sliding-window Lua — `ZADD key now now` uses the
+	// millisecond timestamp as the zset MEMBER, so multiple CheckOTPRequest calls in the same
+	// millisecond collide to one member; ZCARD undercounts and the limit isn't enforced. The
+	// test is timing-sensitive (distinct-ms → pass; same-ms burst → 4th wrongly allowed),
+	// which is exactly the isolated-pass/grouped-fail pattern. This is a real (LOW) limiter
+	// robustness gap (same-ms bursts partially bypass the per-window limit). Fix = unique zset
+	// member per request; deferred to F-017 (security-adjacent product code, own PR). Left
+	// skipped pointing at F-017. Run with IDENTITY_RUN_REVIVAL_GAP=1.
+	skipRevivalGap(t, "RateLimiter_OTPRequest_PhoneWindow: blocked on F-017 (sliding-window Lua uses ms timestamp as zset member → same-ms requests collide/undercount)")
 	ctx := context.Background()
 	integRedis.FlushDB(ctx)
 	limiter := ratelimit.New(integRedis)
