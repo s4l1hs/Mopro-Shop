@@ -387,6 +387,8 @@ func main() {
 		identityRepo, smsProv, emailProv, identityLimiter, jwtSigner,
 		market, defaultLocale, slog.Default(),
 		bizM,
+		// A-003: dev OTP bypass injected (was os.Getenv in identity); NewService panics if enabled in prod.
+		identity.WithDevOTPBypass(os.Getenv("DEV_OTP_ACCEPT_ANY") == "true", os.Getenv("ENV") == "production"),
 	)
 	cleanup.StartCleanupWorker(ctx, pool, slog.Default())
 

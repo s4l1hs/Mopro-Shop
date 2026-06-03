@@ -416,16 +416,16 @@ func TestRegisterDevice_Success(t *testing.T) {
 }
 
 func TestDevOTPAcceptAny_PanicsOnProduction(t *testing.T) {
-	t.Setenv("DEV_OTP_ACCEPT_ANY", "true")
-	t.Setenv("ENV", "production")
+	// A-003: the prod-safety invariant is now the injected option (was t.Setenv DEV_OTP_ACCEPT_ANY/ENV).
 	defer func() {
 		if r := recover(); r == nil {
-			t.Error("expected panic for DEV_OTP_ACCEPT_ANY=true on production, got none")
+			t.Error("expected panic for dev OTP bypass on production, got none")
 		}
 	}()
 	identity.NewService(
 		newMockRepo(), &mockSMS{}, &mockEmail{}, &mockLimiter{}, newTestSigner(t),
 		"TR", "tr-TR", nil, nil,
+		identity.WithDevOTPBypass(true, true), // acceptAny + inProduction → panic
 	)
 }
 

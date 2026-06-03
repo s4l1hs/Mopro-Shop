@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
-	"os"
 	"regexp"
 	"strings"
 	"time"
@@ -34,19 +33,39 @@ const (
 
 // serviceImpl is the concrete Service implementation.
 type serviceImpl struct {
-	repo          Repository
-	sms           sms.Provider
-	emailProv     email.Provider
-	limiter       ratelimit.Limiter
-	signer        jwt.Signer
-	market        string
-	defaultLocale string
-	log           *slog.Logger
-	biz           *metrics.BusinessMetrics // nil disables business KPI counters
+	repo            Repository
+	sms             sms.Provider
+	emailProv       email.Provider
+	limiter         ratelimit.Limiter
+	signer          jwt.Signer
+	market          string
+	defaultLocale   string
+	log             *slog.Logger
+	biz             *metrics.BusinessMetrics // nil disables business KPI counters
+	devOTPAcceptAny bool                     // A-003: dev OTP backdoor (injected; was os.Getenv("DEV_OTP_ACCEPT_ANY"))
+}
+
+// Option configures NewService. A-003: replaces the DEV_OTP_ACCEPT_ANY / ENV env reads.
+type Option func(*serviceConfig)
+
+type serviceConfig struct {
+	devOTPAcceptAny bool
+	inProduction    bool
+}
+
+// WithDevOTPBypass enables the dev OTP backdoor (accept any OTP) and tells NewService
+// whether the process is in production. NewService panics if the backdoor is enabled in
+// production (the startup invariant, preserved). The caller (cmd/core-svc/main.go) reads
+// DEV_OTP_ACCEPT_ANY + ENV and passes the values. No option = backdoor off (safe default).
+func WithDevOTPBypass(acceptAny, inProduction bool) Option {
+	return func(c *serviceConfig) {
+		c.devOTPAcceptAny = acceptAny
+		c.inProduction = inProduction
+	}
 }
 
 // NewService constructs a Service.
-// Panics at startup if DEV_OTP_ACCEPT_ANY=true is combined with ENV=production.
+// Panics at startup if the dev OTP bypass is enabled in production (see WithDevOTPBypass).
 // biz is optional (nil disables business KPI metrics).
 func NewService(
 	repo Repository,
@@ -58,23 +77,29 @@ func NewService(
 	defaultLocale string,
 	log *slog.Logger,
 	biz *metrics.BusinessMetrics,
+	opts ...Option,
 ) Service {
-	if os.Getenv("DEV_OTP_ACCEPT_ANY") == "true" && os.Getenv("ENV") == "production" {
+	var cfg serviceConfig
+	for _, o := range opts {
+		o(&cfg)
+	}
+	if cfg.devOTPAcceptAny && cfg.inProduction {
 		panic("identity: DEV_OTP_ACCEPT_ANY=true is forbidden on ENV=production")
 	}
 	if log == nil {
 		log = slog.Default()
 	}
 	return &serviceImpl{
-		repo:          repo,
-		sms:           smsProv,
-		emailProv:     emailProv,
-		limiter:       limiter,
-		signer:        signer,
-		market:        market,
-		defaultLocale: defaultLocale,
-		log:           log,
-		biz:           biz,
+		devOTPAcceptAny: cfg.devOTPAcceptAny,
+		repo:            repo,
+		sms:             smsProv,
+		emailProv:       emailProv,
+		limiter:         limiter,
+		signer:          signer,
+		market:          market,
+		defaultLocale:   defaultLocale,
+		log:             log,
+		biz:             biz,
 	}
 }
 
@@ -127,8 +152,9 @@ func (s *serviceImpl) VerifyOTP(ctx context.Context, phoneE164 string, purpose s
 		return TokenPair{}, fmt.Errorf("identity: phone hash: %w", err)
 	}
 
-	// DEV backdoor — only active when DEV_OTP_ACCEPT_ANY=true AND ENV != production.
-	if os.Getenv("DEV_OTP_ACCEPT_ANY") == "true" {
+	// DEV backdoor — only active when the dev OTP bypass was enabled at construction
+	// (WithDevOTPBypass); NewService forbids it in production. A-003: was os.Getenv.
+	if s.devOTPAcceptAny {
 		return s.issueSessionForPhone(ctx, phoneHash, phoneE164)
 	}
 
