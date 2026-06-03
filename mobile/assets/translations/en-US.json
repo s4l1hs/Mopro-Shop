@@ -679,5 +679,23 @@
     "help_search": "Search: \"{q}\"",
     "help": "Help",
     "not_found": "Page Not Found"
+  },
+  "payment": {
+    "error": {
+      "sipay": {
+        "insufficient_funds": "Your card has insufficient balance. Please try another card.",
+        "card_declined": "Your card was declined. Please contact your bank.",
+        "3ds_failed": "3D Secure verification failed. Please try again.",
+        "invalid_card": "Card details are incorrect. Please check and try again.",
+        "expired_card": "Your card has expired.",
+        "cvv_mismatch": "Incorrect CVV code.",
+        "issuer_unavailable": "Your bank isn't responding right now. Please try again in a few minutes.",
+        "fraud_suspected": "The transaction was declined by a security check. Please contact your bank.",
+        "amount_limit_exceeded": "Daily card limit exceeded.",
+        "rate_limit_exceeded": "Too many payment attempts. Please try again in 1 minute.",
+        "reservation_expired": "Your cart reservation has expired. Please try again.",
+        "unknown": "Payment could not be completed. Please try again or use another card."
+      }
+    }
   }
 }
