@@ -7,9 +7,11 @@
 > - *T3 cleanup PR:* ✅ **T-014, T-015 RESOLVED** + **T3-sweep-i18n** done (163 dead keys removed).
 >   govulncheck is now a required gate; the i18n analyzer reports 0 dead / 0 missing.
 > - *Step-3 closure bundle:* ✅ **T-005** (bootstrap), **T-002** (Riverpod gate), **T-006**
->   (migration-safety), **T-009** (nightly soak) RESOLVED. **T-007** (3 flow-AST discipline
->   checks) SPLIT → `cmd/lint-discipline` follow-up; **T-008** (cron-overlap sim) DEFERRED
->   (needs a fin-svc harness). **Step 3 is CLOSED** but for those two carve-outs.
+>   (migration-safety), **T-009** (nightly soak) RESOLVED.
+> - *Carve-out PR:* ✅ **T-007** mostly resolved — `cmd/lint-discipline` ships pool-acquire-
+>   inside-tx + soft-deleted-user-consumer (go/analysis, 0 findings, in `verify`); **idempotency-
+>   surface** still split. **T-008** cron-sim **BLOCKED** → filed **T-016** (fin-svc HTTP harness
+>   + mock-PSP). **Step 3 is CLOSED** but for idempotency-surface (split) + T-016/T-008 (blocked).
 
 ## TL;DR
 - **MISSING:** 9 (3 HIGH, 5 MED, 1 LOW)
@@ -181,10 +183,14 @@ the F-002/#56 lesson — these are EXISTS-FINE, not redundant). A `backup-cron-h
 dashboard monitors them. Gap:
 
 ### T-008 — no local cron dry-run / overlap simulator
-**⏳ DEFERRED (T3-6) — was MISSING/MED.** The cashback/seller-payout crons drive the
-`mopro` CLI against the ledger DB + fin-svc wiring; running them (let alone concurrently
-with clock injection) needs invasive env setup. Per §4.4.1, deferred rather than ship a
-tool nobody can run. Re-attempt when a fin-svc test harness exists.
+**⛔ BLOCKED (carve-out PR) — was MISSING/MED.** Discovery correction: the crons aren't a
+`mopro` CLI call — they **`curl` a fin-svc HTTP endpoint** (`:8082/internal/v1/...`). So an
+overlap sim needs a running-fin-svc HTTP harness **and** a mock PSP (none — seller-payout
+hits a real gateway: `grep mock|fake|sandbox internal/payment` → none). And the overlap-
+safety is already gated below HTTP by idempotency-key UNIQUE constraints + the cashback/
+payout integration tests. Filed **T-016** (fin-svc HTTP harness + mock-PSP test mode — a
+Step-4 candidate); sim not built rather than ship unrunnable (§4.2.1). See
+`docs/internal/fin-svc-harness.md`.
 **Original status: MISSING | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
 The TESTING_AUDIT §5.4 asked whether the financial crons are covered by cron-overlap simulation;
 they aren't (the cron *scripts* are thin wrappers around the `mopro` CLI; the idempotency is
@@ -286,11 +292,13 @@ build queue.
 
 ### Adjacent: discipline-pattern linters
 ### T-007 — no linter for the recurring discipline patterns
-**⏳ SPLIT (T3-4 follow-up) — was MISSING/MED.** The 3 flow-sensitive checks
-(pool-acquire-inside-tx, soft-deleted-user-consumer, idempotency-surface) need
-`go/analysis` AST/flow analysis, not textual greps — discovery refuted the prompt's
-"easy" assumption (§2.3). Deferred to a focused `cmd/lint-discipline` PR rather than
-ship FP-ridden heuristics. (migration-safety, the 4th, shipped under T-006.)
+**✅ MOSTLY RESOLVED (carve-out PR) — was MISSING/MED.** Built `cmd/lint-discipline`
+(go/analysis multichecker, wired into `make verify`): **pool-acquire-inside-tx** (PR
+#42/#47) + **soft-deleted-user-consumer** (PR #49), each with analysistest + **0
+codebase findings** (required drift-gates, no baseline needed). Both surfaced a real FP
+on first run (dlq.go post-Rollback; handlers consuming the guarding `svc.GetMe`) — each
+fixed by a precise guard. **idempotency-surface still SPLIT** to its own follow-up
+(hardest; SQL-shape, FP-prone — §4.1.5). (migration-safety shipped under T-006.)
 **Original status: MISSING | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
 ```
 $ git grep -lniE 'pool.*acquire.*tx|StatusDeleted|FOR UPDATE SKIP LOCKED' -- scripts/ tool/
@@ -444,3 +452,14 @@ Real bug: these are called via `'…'.tr()` (e.g. `checkout_payment_screen.dart`
 Frozen in `tool/audit/i18n_missing_baseline.txt` (ratcheted). Recommendation: a translation-fix PR
 adds the Turkish (+ other-locale) strings and clears the baseline. Content work → out of scope for
 the gate PR (§8).
+
+### T-016 — fin-svc has no HTTP integration harness or mock-PSP test mode
+**Status: MISSING (product-adjacent) | Severity: MED | Confidence: CONFIRMED | Priority: LATER (Step 4)**
+Surfaced building the cron-overlap sim (T-008). The crons `curl` a fin-svc internal HTTP endpoint
+(`:8082/internal/v1/...`), so any HTTP-level sim needs `cmd/fin-svc` booted with its DB + router +
+auth, **and** a mock PSP — `internal/payment/` has only real adapters (sipay/craftgate/iyzico;
+`grep mock|fake|sandbox` → none) and seller-payout initiates a real transfer. Building a safe
+harness = a `payment` test adapter + a fin-svc boot harness: **product infrastructure, not tooling**
+(§8 forbids refactoring fin-svc here). Blocks T-008. Recommendation: a Step-4 PR introduces a
+mock-PSP adapter + fin-svc HTTP harness; T-008's sim then sits on top. See
+`docs/internal/fin-svc-harness.md`.

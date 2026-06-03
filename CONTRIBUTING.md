@@ -124,6 +124,15 @@ Examples:
 
 `golangci-lint` (depguard rules in `.golangci.yml`) enforces the same rules at lint time.
 
+### Discipline analyzers (`make lint-discipline`)
+
+`make lint-discipline` (in `make verify`) runs `cmd/lint-discipline`, a go/analysis
+multichecker that gates the repo-discipline patterns Steps 1–2 enforced by hand:
+**pool-acquire-inside-tx** (a `*pgxpool.Pool` call while a tx is open — PR #42/#47) and
+**soft-deleted-user-consumer** (a `*Repository` user read with no `StatusDeleted` guard —
+PR #49). Both are at 0 findings, so the gate fails on any *new* violation. Suppress an
+intentional case with `//nolint:soft-deleted-user-consumer`. See `docs/internal/lint-discipline.md`.
+
 ### Relocating tables across schemas to fix a boundary debt
 
 When a table lives in the "wrong" schema and the boundaries guard carries an

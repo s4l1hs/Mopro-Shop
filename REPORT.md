@@ -4067,3 +4067,18 @@ New findings: none. Split-bailout: **fired on T3-4** (3 of 4 checks → `cmd/lin
 
 ### No parity change
 Dev/CI tooling (bootstrap, 2 analyzers, 1 SQL linter, nightly workflow) + a Makefile soak target; zero service/app logic touched.
+
+## PR — Step 3 carve-outs: cmd/lint-discipline + cron-sim — `chore/step3-carveouts-lint-discipline`
+
+The two Step-3 carve-outs from PR #71. Quality-first: ship what's correct, split/block the rest. `make verify` green; zero product code.
+
+- **Phase 1 — `cmd/lint-discipline`** (go/analysis multichecker, wired into `make verify`): **2 of 3** analyzers shipped, both **0 findings** (required drift-gates, no baseline needed).
+  - **pool-acquire-inside-tx** (T-007/PR #42/#47): pool method after Begin/BeginTx in a func, unless Commit/Rollback closed it or it's in a defer; goroutine-after-Begin flagged. 5 analysistest cases. **First run FP** (dlq.go: pool used after `tx.Rollback`) → the canary discipline caught it → fixed with a tx-close guard → 0.
+  - **soft-deleted-user-consumer** (T-007/PR #49): `*Repository` user read (`Get*`/`Find*`, non-blank) in a func with no `StatusDeleted` guard. **First run 2 FPs** (handlers consuming the guarding `svc.GetMe`) → scoped to Repository receivers (service guards internally) → 0. Excludes discarded/`Create*`/repo-layer/test/nolint.
+  - **idempotency-surface SPLIT** (the 3rd): SQL-shape analysis is FP-prone (§4.1.5) → its own focused follow-up, not rushed into the bundle.
+- **Phase 2 — fin-svc harness + cron-sim: BLOCKED** (the §10 Blocked-end case). The crons `curl` a fin-svc HTTP endpoint, so an overlap sim needs a running-fin-svc HTTP harness **and** a mock PSP (none — seller-payout hits a real gateway). The overlap-safety is already gated below HTTP by idempotency-key UNIQUE + the cashback/payout integration tests. Filed **T-016** (fin-svc HTTP harness + mock-PSP test mode — Step-4 product infra); sim not built rather than ship unrunnable.
+
+New findings: **T-016** (MED, Step-4 candidate). Split-bailout: idempotency-surface split + Phase 2 blocked (1 split + 1 blocked-end — within the §6 band, not the 3+ "stop bundling"). Both analyzers' gate-fires-on-violations is proven by their analysistest `// want` cases. **Step 3 status: CLOSED** but for idempotency-surface (split) + T-016/T-008 (blocked, Step-4).
+
+### No parity change
+Two go/analysis analyzers + a multichecker binary + docs; zero service/app logic touched (`internal/`/`mobile/lib` untouched).

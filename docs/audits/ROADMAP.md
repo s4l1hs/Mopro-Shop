@@ -43,9 +43,15 @@ LATER/PARK unsequenced). Each build PR references its `T-ID`.
 5. ✅ **T3-6 (partial)** — closed **T-009** (`nightly.yml` + `make soak`, ×50 -race). **T-008
    DEFERRED:** cron-overlap sim needs a fin-svc test harness to run the crons safely.
 
-**Step 3 closure carve-outs (the only remaining Step-3 work):**
-- **`cmd/lint-discipline`** (T-007) — 3 `go/analysis` analyzers + `analysistest`, ratcheted.
-- **cron-overlap sim** (T-008) — revisit once a fin-svc harness exists.
+**Step 3 closure carve-outs:**
+- ✅ **`cmd/lint-discipline`** (T-007) — carve-out PR shipped **pool-acquire-inside-tx** +
+  **soft-deleted-user-consumer** (go/analysis, 0 findings, in `make verify`). **idempotency-surface**
+  still split (hardest; SQL-shape, FP-prone) → its own focused follow-up.
+- ⛔ **cron-overlap sim** (T-008) — **BLOCKED**: crons curl a fin-svc HTTP endpoint; a safe sim needs
+  a fin-svc HTTP harness + mock PSP (none exists) → filed **T-016** (Step-4 product infra). Overlap-
+  safety is already gated by idempotency-key UNIQUE + the cashback/payout integration tests.
+
+**Remaining Step-3 tail:** idempotency-surface analyzer (focused PR); T-016/T-008 (Step-4 harness).
 
 **Fix follow-ups from the T3-1/T3-2 build:** ✅ **ALL DONE** (`chore/step3-t014-i18n-cleanup`):
 - ✅ **T3-sweep-i18n** — 163 dead keys removed across 4 locales; `i18n_usage_baseline.txt` cleared.

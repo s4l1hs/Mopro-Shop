@@ -16,7 +16,7 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
 # `make verify` explicitly), so this is a safe, friendlier default.
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap verify soak fmt vet test lint govulncheck boundaries migration-check property-cashback property-payout property-ledger integration-wallet property-timex property-order \
+.PHONY: help bootstrap verify soak fmt vet test lint govulncheck boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order \
         verify-image-manifest update-goldens audit audit-test i18n-check i18n-usage riverpod-check \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
@@ -37,7 +37,7 @@ help: ## Show this help.
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## /{printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries migration-check property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment verify-image-manifest verify-contrast ## Full verification gate (run before every push).
+verify: fmt vet test lint boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment verify-image-manifest verify-contrast ## Full verification gate (run before every push).
 
 # WCAG contrast check for the documented brand colour pairs. Fails if any
 # non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.
@@ -142,6 +142,13 @@ boundaries: ## Enforce module-boundary import rules.
 # Fast/text — wired into `verify`. See scripts/lint-migrations.sh + docs/internal/lint-discipline.md.
 migration-check: ## Flag risky destructive DDL in forward migrations.
 	@bash scripts/lint-migrations.sh --strict
+
+# Repo-discipline static analyzers (TOOLING_AUDIT T-007): pool-acquire-inside-tx
+# (PR #42/#47) + soft-deleted-user-consumer (PR #49). go/analysis multichecker;
+# 0 findings today, so it's a required drift-gate (exits non-zero on any new one).
+# See cmd/lint-discipline + docs/internal/lint-discipline.md.
+lint-discipline: ## Run the repo-discipline go/analysis analyzers.
+	@go run ./cmd/lint-discipline ./internal/... ./cmd/... ./pkg/...
 
 # ── Test infrastructure: pg-ledger-test:6434 ────────────────────────────────
 #
