@@ -2,8 +2,7 @@ package payment
 
 import (
 	"context"
-	"log"
-	"os"
+	"fmt"
 )
 
 // ProviderFactory is a constructor registered by each PSP sub-package via init().
@@ -20,31 +19,39 @@ func RegisterProvider(name string, fn ProviderFactory) {
 	providerRegistry[name] = fn
 }
 
-// NewService constructs the active PSP adapter from PSP_PROVIDER env.
-// Calls log.Fatal for unknown or missing PSP_PROVIDER (startup invariant; Q1).
-// Sipay requires cfg and repo; stub adapters ignore them.
-// The sipay sub-package is registered by its init(); main.go must import it with _.
-func NewService(cfg SipayConfig, repo Repository) Service {
-	switch v := os.Getenv("PSP_PROVIDER"); v {
+// NewService constructs the PSP adapter for the given provider name.
+//
+// A-001 (was T-016): provider selection is **caller-injected and error-returning**
+// — no os.Getenv, no log.Fatal, no panic — so construction is testable without
+// process-global env or os/exec subprocess tests. The caller (cmd/core-svc/main.go)
+// reads PSP_PROVIDER and fails fast on the returned error (log.Fatal at main is the
+// correct place for a startup invariant). Sipay requires cfg + repo and its
+// sub-package to be blank-imported in main.go (its init() calls RegisterProvider);
+// the stub adapters ignore cfg/repo.
+func NewService(provider string, cfg SipayConfig, repo Repository) (Service, error) {
+	switch provider {
 	case "sipay":
 		fn, ok := providerRegistry["sipay"]
 		if !ok {
-			panic(`payment: sipay adapter not registered — add
-	import _ "github.com/mopro/platform/internal/payment/sipay"
-to cmd/core-svc/main.go`)
+			return nil, ErrProviderNotRegistered
 		}
-		return fn(cfg, repo)
+		return fn(cfg, repo), nil
 	case "craftgate":
-		return &craftgateStub{}
+		return &craftgateStub{}, nil
 	case "iyzico":
-		return &iyzicoStub{}
+		return &iyzicoStub{}, nil
 	case "":
-		log.Fatal("payment: PSP_PROVIDER env required (sipay|craftgate|iyzico)")
+		return nil, ErrProviderRequired
 	default:
-		log.Fatalf("payment: PSP_PROVIDER=%q unknown; valid: sipay|craftgate|iyzico", v)
+		return nil, fmt.Errorf("%w: %q (valid: sipay|craftgate|iyzico)", ErrUnknownProvider, provider)
 	}
-	panic("unreachable") // log.Fatal exits; compiler requires this
 }
+
+// Compile-time checks: the stub adapters satisfy Service.
+var (
+	_ Service = (*craftgateStub)(nil)
+	_ Service = (*iyzicoStub)(nil)
+)
 
 // craftgateStub is a placeholder adapter; PSP_PROVIDER=craftgate is not implemented in v1.
 type craftgateStub struct{}
