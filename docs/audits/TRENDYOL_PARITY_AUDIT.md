@@ -1,0 +1,434 @@
+# Trendyol Parity Audit — 2026-06-03 — PR #77
+
+> **Step 5 of the five-step audit-then-fix plan. Audit-only — NO UI changed in this PR.**
+> Parity work lands in follow-up PRs scoped from §6, referencing the `P-ID`.
+> **Trendyol snapshot date: 2026-06-03** (see §2.4 — the reference moves; this audit is against this snapshot, not future Trendyol).
+
+---
+
+## TL;DR
+
+- **CONFIRMED HIGH: 0.** The two findings that *would* have been HIGH on a green-field app — design-token systematization (§4.1) and auth-gate consistency (§4.4) — are **already VERIFIED-COMPLETE**. Mopro is a mature implementation, not a skeleton.
+- **CONFIRMED MED: 3** — P-007 (PDP lacks delivery-estimate, Mopro-side confirmed), P-020 (dark-mode AA contrast fail, already gate-tracked "Backlog"), P-026 (search/PLP filters render but are inert — don't re-query).
+- **CONFIRMED LOW: 6** — P-004 (card favorites-count, both sides), P-005 (card token-drift), P-006 (discount-pill inconsistency), P-011 (cart: no promo/suggestions/save-for-later), P-013 (favorites flat list), P-014 (hardcoded strings). P-011/P-013 are confirmed absent Mopro-side; their *Trendyol* comparison is PROBABLE.
+- **PROBABLE: 3 findings** — P-009 (MED, search-card merch badges), P-012 (LOW, checkout flow-shape), P-015 (LOW, PDP variant/size-guide). **Plus, by the coverage constraint, the *Trendyol-side comparison* for ~19 of 20 surfaces** (403 / login-gated) — the Mopro side of those is CONFIRMED.
+- **UNKNOWN: 2** — U-001 (Trendyol parametrized-page exact metrics, 403-blocked), U-002 (Trendyol mobile-app-only surfaces: stories, live shopping — not web-fetchable).
+- **VERIFIED-COMPLETE surfaces (12):** Design tokens · Global navigation (bottom nav + web header) · Home composition · Product card · Flash deals · PDP structure · Search/PLP filters+sort · Reviews · Q&A · Orders/Returns/Refund · Notifications · Empty/loading/error · Responsive · Auth-gate. (Listed with evidence in §5.)
+- **Recommended NOW sequence:** **P5-1** (card+PDP fidelity polish: P-005 token-drift + P-006 discount-pill consistency + P-014 hardcoded-string sweep — pure UI, no API dep, no auth, ~300 LOC) → **P5-2** (dark-mode contrast token fix: P-020 — tiny token tweak + contrast-gate flip). Both fully CONFIRMED, zero dependencies. Everything else is SOON/LATER and either backend-data-gated or PROBABLE-pending-confirmation.
+
+**Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
+
+---
+
+## Methodology
+
+Per the Step-5 prompt §2, adapted for visual work. Evidence types, in descending fidelity:
+
+1. **Widget-code evidence** — the Flutter widget for the surface, cited `file:line`. The highest-fidelity answer to "what does Mopro render *today*?" All Mopro-side CONFIRMED claims in this audit were read on this branch (`docs/trendyol-parity-audit`, off `origin/main@0a5b763c`).
+2. **Golden-test evidence** — the platform-tagged goldens (`mobile/test/_support/golden_platform.dart` harness from the Step-3 tooling arc). 149 golden PNGs exist across 22 golden suites; cited by path. **Golden-coverage gaps are themselves findings** (noted per surface).
+3. **Trendyol web evidence** — `WebFetch` of public pages. **Coverage constraint (important):** only `https://www.trendyol.com` (homepage) returned rich SSR structure on 2026-06-03. `https://www.trendyol.com/sr?q=…` (search) returned **HTTP 403**; `/cok-satanlar` returned meta-only. Trendyol bot-protects parametrized pages. **Consequence: only the HOME surface has CONFIRMED Trendyol-side evidence; every other surface's Trendyol comparison is PROBABLE (general knowledge of Trendyol patterns) and explicitly marked.**
+4. **General-knowledge evidence** — used only for PROBABLE findings, never CONFIRMED (prompt §2.1 / §10).
+5. **User-supplied screenshots** — none supplied during this audit window; the prompt (§2.1, §10) says this is fine and the affected findings are PROBABLE.
+
+**CONFIRMED requires evidence type 1, 2, or 3 on BOTH sides.** Where Mopro is read (1/2) but the Trendyol equivalent is general-knowledge (4), the *gap* is **PROBABLE**, not CONFIRMED — even when the Mopro side is certain.
+
+**Memory is a hypothesis (prompt §2.5).** This audit already caught two memory-errors the prompt's own examples assumed: the prompt's sample finding "P-007 — Mopro's buy box lacks sticky positioning" is **false** — `mobile/lib/features/catalog/widgets/pdp/pdp_sticky_cta.dart` exists and is wired (see §3.5). And the early project memory implied a thin UI; the real tree has 149 goldens and a complete design system. Both were corrected by reading, not trusting recall.
+
+---
+
+## §2.3 Surface coverage matrix
+
+"Mopro widget" = a real widget read on this branch. "Golden" = a platform-tagged golden PNG exists. "TY ref" = was the Trendyol equivalent fetchable on 2026-06-03? "Conf." = the audit's confidence in the *gap assessment* for that surface.
+
+| Surface | Mopro widget? | Golden? | TY ref accessible? | Conf. |
+|---|---|---|---|---|
+| Home / Landing | yes (`features/catalog/screens/home_screen.dart`) | yes (`home_{mobile_375,tablet_768,desktop_1440}`) | **yes (homepage)** | CONFIRMED |
+| Global nav — bottom (mobile) | yes (`shell/app_shell.dart`) | yes (`shell/goldens/bottom_nav_*`) | partial (home header) | CONFIRMED |
+| Global nav — web header | yes (`shell/web_header.dart`) | yes (`shell/goldens/web_header_{1024,1440}_*`) | yes (homepage header) | CONFIRMED |
+| Search results | yes (`catalog/screens/search_screen.dart`) | yes (`catalog/search_goldens_test`) | **no (403)** | PROBABLE |
+| Category browse | yes (`catalog/screens/category_products_screen.dart`) | yes (`catalog/plp/goldens`) | **no (403/meta-only)** | PROBABLE |
+| PDP | yes (`catalog/screens/product_detail_screen.dart` 950 LOC) | yes (`catalog/pdp/goldens`) | **no (403-class)** | PROBABLE (Mopro side CONFIRMED) |
+| Reviews | yes (`catalog/pdp/reviews/*`) | yes (`reviews/goldens`) | no (PDP-embedded) | PROBABLE (Mopro CONFIRMED) |
+| Q&A | yes (`catalog/pdp/qa/*`) | yes (`qa/goldens`) | no (PDP-embedded) | PROBABLE (Mopro CONFIRMED) |
+| Cart | yes (`features/cart/` 15 files) | yes (`cart/widgets/goldens/cart_line_card`) | no (login-gated) | PROBABLE (Mopro CONFIRMED) |
+| Checkout | yes (`features/checkout/` 13 files) | no | no (login-gated) | PROBABLE (Mopro CONFIRMED) |
+| Account / Profile | yes (`features/account/` 16 files) | yes (`account/goldens/account_{profile,security,welcome}`) | no (login-gated) | PROBABLE (Mopro CONFIRMED) |
+| Orders / Returns | yes (`features/order/` 21 files) | yes (`order/goldens/{returns_list,refund_card,timeline}`) | no (login-gated) | PROBABLE (Mopro CONFIRMED) |
+| Favorites | yes (`features/favorites/` 2 files, 220 LOC) | yes (`favorites/goldens`) | no (login-gated) | PROBABLE (Mopro CONFIRMED) |
+| Auth flow | yes (`features/auth/` 15 files) | yes (`auth/goldens/auth_card`) | partial (login page not fetched) | PROBABLE (Mopro CONFIRMED) |
+| Notifications | yes (`features/notifications/` 8 files) | yes (`notifications/goldens/*`) | no (login-gated) | PROBABLE (Mopro CONFIRMED) |
+| Help / Contact | yes (`features/help/` 10 files) | yes (`help/goldens`) | no (not fetched) | PROBABLE (Mopro CONFIRMED) |
+| Empty/loading/error | yes (`core/widgets/{empty_state,loading_spinner,error_banner}`, `widgets/skeleton_box`) | partial (per-surface) | n/a | CONFIRMED (Mopro) |
+| Accessibility | yes (`design/a11y_contrast.dart`, theme 48px targets) | n/a (contrast test gate) | n/a | CONFIRMED |
+| Responsive | yes (`design/responsive/*`) | yes (375/768/1024/1440 across suites) | n/a | CONFIRMED (Mopro) |
+| Seller panel | yes (`features/seller/` 13 files) | yes (`seller/goldens/*`) | no (seller-gated) | PROBABLE (Mopro CONFIRMED) |
+
+**Matrix summary:** 20 surfaces have a real Mopro widget; 18 have golden coverage (checkout + a couple cross-cutting lack goldens — minor coverage gap, see P-019 note). **Trendyol-side: 1 CONFIRMED-accessible (home), ~19 PROBABLE/UNKNOWN** (403 / login-gated). This is the audit's dominant uncertainty and the reason most per-surface gaps are PROBABLE despite the Mopro side being certain.
+
+---
+
+## §3.1 Home / Landing findings
+
+Mopro home (`mobile/lib/features/catalog/screens/home_screen.dart:75-132`) mounts, in order: hero carousel → `MoodStoriesStrip` → `FlashDealsRail` → `HomeCategoryGrid` → `TrustBar` → dynamic backend-driven `ProductRail`s (popular/bestseller equivalents, keyed `r.key`) → `_RecommendationsSliver` (personalized) → `_RecentlyViewedSliver` → `_EditorsPicksSection` → `HomeFooter`. Goldens: `home_mobile_375.png`, `home_tablet_768.png`, `home_desktop_1440.png`.
+
+Trendyol home (fetched 2026-06-03) shows: header (logo/search/account/cart + top links "Bugün Fiyatı Düşenler / Yemek / Ayrıcalıkları Keşfet") → campaign quick-links strip → **Popüler Ürünler** (grid, cards carry rating + price + favorites-count) → **Flaş Ürünler** (countdown "00:00:00") → **Çok Satan Ürünler** → **discount-tier nav (5/10/30/50%)** → category-discount promos → "Bunlar da İlginizi Çekebilir" search-category chips → extensive footer.
+
+### P-003 — Home section composition is at parity (with one intentional divergence)
+**Status: STRUCTURAL | Severity: — | Confidence: CONFIRMED → VERIFIED-COMPLETE**
+Evidence: Mopro `home_screen.dart:75-132` (read); Trendyol homepage (WebFetch 2026-06-03).
+Mopro covers every Trendyol home structural element: hero ✓, flash-deals-with-countdown ✓ (§3.1/P-008), category grid ✓, popular/bestseller rails ✓ (dynamic `ProductRail`), recommendations ✓, footer ✓ — **plus** Mopro-only mood-stories, recently-viewed, editors'-picks rails.
+**Verdict:** VERIFIED-COMPLETE. The one Trendyol element Mopro omits — the **discount-tier nav (5/10/30/50% off)** — is an **intentional divergence** (D-002): Mopro's model is perpetual cashback, not discount tiers (CLAUDE.md §1). Per prompt §1.3/§10 this is documented, **not filed as a gap**.
+
+### P-008 — Flash-deals rail matches Trendyol "Flaş Ürünler" including live countdown
+**Status: INTERACTION | Severity: — | Confidence: CONFIRMED → VERIFIED-COMPLETE**
+Evidence: `mobile/lib/features/home/widgets/flash_deals_rail.dart:30-119` — a 1-second `Timer.periodic` drives an `HH:MM:SS` countdown (`_fmt`, line 49-52) in a brand-orange header, with an "ended" collapse state (line 60-71); responsive body (mobile horizontal scroller / tablet 3-col / desktop 5-col, line 134-165); flash price via `ProductCard.priceOverride`. Goldens: `home/goldens/flash_deals_mobile_375.png`, `flash_deals_desktop_1440.png`. Trendyol: "Flaş Ürünler … countdown timer showing 00:00:00" (WebFetch 2026-06-03).
+**Verdict:** VERIFIED-COMPLETE — corrects any assumption that flash-deals/countdown is missing.
+
+### P-004 — Product card lacks favorites-count social proof
+**Status: CONTENT/VISUAL | Severity: LOW | Confidence: CONFIRMED (both sides)**
+Evidence: Mopro `ProductCard` (`product_card.dart:88-98`, read) has a favorite *toggle* (heart, guest-local) but **no favorites count**. Trendyol home cards show a favorites count by the heart (WebFetch 2026-06-03: "Popüler Ürünler … with ratings, prices, and **favorites counts**"). This is one of the few findings CONFIRMED on both sides — Trendyol *home* was the one fetchable surface.
+Gap: missing social-proof favorites count on the card.
+Severity: LOW (social-proof nicety; not conversion-blocking).
+Recommendation: bundle with `P5-4` (`feat/parity-card-badges`) — render a count when the catalog API exposes one. **Backend dependency:** needs a favorites-count field on the product summary.
+
+---
+
+## §3.2 Global navigation findings
+
+### P-002 — Bottom nav + web header at parity
+**Status: STRUCTURAL/VISUAL | Severity: — | Confidence: CONFIRMED → VERIFIED-COMPLETE**
+Evidence — mobile bottom nav (`mobile/lib/shell/app_shell.dart:83-129`): 5 tabs — Home (`home_outlined`), Categories (`grid_view_outlined`), Favorites (`favorite_border_rounded`), Cart (`shopping_bag_outlined`), Account (`person_outline_rounded`), all i18n (`nav.*.tr()`). Goldens `shell/goldens/bottom_nav_{light,dark}.png`. This mirrors Trendyol's 5-tab mobile nav (Anasayfa/Kategoriler/Favoriler/Sepetim/Hesabım).
+Evidence — web header (`mobile/lib/shell/web_header.dart:57-100`): logo (left) · `WebSearchPill` (center, with `SearchSuggestionsDropdown`) · favorites icon · **cart icon with live badge** (`cartCountProvider`, line 41/91) · account hover menu · MegaMenuBar. Goldens `shell/goldens/web_header_{1024,1440}_{light,dark}.png`, `account_hover_menu_{authed,guest}_1440_light.png`, `search_suggestions_populated.png`. Trendyol homepage header (WebFetch) shows the same logo/search/account/cart arrangement.
+**Verdict:** VERIFIED-COMPLETE. Search-everywhere (§4.3) is satisfied — search is 1 tap from every surface (bottom-nav-adjacent on mobile, persistent pill on web).
+
+---
+
+## §3.3 Search results findings
+
+Mopro: `catalog/screens/search_screen.dart` (253 LOC, read) + `catalog/widgets/search_input.dart`, results render `ProductCard` in a grid (`CatalogShell`), with `filter_sheet.dart` (239), `plp/widgets/filter_panel.dart` (377), `plp_filter_chips.dart` (86), `sort_sheet.dart` (71). Goldens: `catalog/search_goldens_test.dart`. **Trendyol `/sr?q=elbise` returned HTTP 403** — Trendyol-side is general-knowledge only.
+CONFIRMED Mopro internals (`search_screen.dart`, read): **empty/pre-query state** (`_EmptySearchBody`, line 154) = removable recent-search chips + clear-all (`search.recent_searches`/`search.clear_recent`) + 8 root-category `ActionChip` suggestions (`search.suggested_categories`) — matches Trendyol's pre-query suggestions. **Pagination = load-more** (`hasMore`/`loadingMore`/`loadMoreError`/`onLoadMore`, line 76-79), not infinite-scroll or paged. Mobile = 2-col `CatalogShell`; tablet/desktop = 280px `FilterPanel` sidebar + query chip + `PlpFilterChips` + 3/5-col grid (line 95-143).
+
+### P-026 — Search filters are rendered but inert (don't affect the fetch yet)
+**Status: FUNCTIONAL | Severity: MED | Confidence: CONFIRMED**
+Evidence: `search_screen.dart:88-91` — "Filters write the plp substrate keyed by the query; **like PLP, they don't yet affect the search fetch** (REPORT §5)." So the filter panel + chips render and persist, but selecting a filter does not re-query.
+Gap: filter UI present but functionally disconnected on search (and PLP).
+Severity: MED — a visible control that doesn't work is worse than an absent one; affects the core browse loop.
+Recommendation: `P5-wire-filters` — connect `plp_filters_provider` selections to the search/PLP fetch. **Backend dependency:** the catalog/search API must accept the filter params. Already a known item (REPORT §5) → not a new surface, a wiring follow-up.
+
+### P-009 — Search-result cards likely lack Trendyol merch badges (Kargo Bedava / campaign / "Çok satan")
+**Status: CONTENT/VISUAL | Severity: MED | Confidence: PROBABLE**
+Evidence: Mopro `ProductCard` (`product_card.dart`, read; see §3.1/P-004) renders heart + brand + title + rating + discount-% + price + cashback, but **no free-shipping ("Kargo Bedava"), campaign-label, or bestseller badge**. Trendyol search cards are known to carry these (general knowledge; **not fetched — 403**).
+Gap: missing merch/trust badges on result cards.
+Severity rationale: badges are part of Trendyol's at-a-glance card recognition; MED because they affect scannability, but PROBABLE because the Trendyol side wasn't fetched.
+Recommendation: confirm during the build PR's discovery (screenshots or re-fetch), then `P5-card-badges`. **Note backend dependency:** free-shipping/campaign flags must come from the catalog API; UI-only until then.
+
+### P-010 — Filters / sort UI is built (parity likely; detail PROBABLE)
+**Status: INTERACTION | Severity: LOW | Confidence: CONFIRMED (Mopro) / PROBABLE (gap)**
+Evidence: `plp/widgets/filter_panel.dart` (377 LOC, desktop sidebar), `filter_sheet.dart` (239, mobile sheet), `plp_filter_chips.dart` (active-filter chips), `sort_sheet.dart` (sort options). Trendyol's exact filter dimensions/order unverified (403).
+**Verdict:** Mopro has the Trendyol filter/sort *patterns* (sidebar on web, sheet on mobile, chips). Dimension-level parity is PROBABLE → confirm in a discovery pass. No NOW action.
+
+---
+
+## §3.4 Category browse findings
+Mopro: `catalog/screens/category_products_screen.dart` (282) reuses `CatalogShell` (consistent with search — good). Goldens `catalog/plp/goldens`. Trendyol category pages 403. **No CONFIRMED gap;** consistency with search is a positive. Detail PROBABLE → folded into P-009/P-010 discovery.
+
+---
+
+## §3.5 PDP findings
+
+Mopro PDP is the richest surface: `product_detail_screen.dart` (950 LOC) + `pdp_image_gallery.dart` (140) + `pdp/pdp_image_pager.dart` (200) + `pdp/pdp_price_block.dart` (89) + `pdp/pdp_sticky_cta.dart` (65) + reviews tab (§3.6) + Q&A tab (§3.7) + recommendations (`recs_pdp_similar_*` goldens). Goldens: `catalog/pdp/goldens`. **Trendyol PDP not fetchable (403-class).**
+CONFIRMED PDP structure (`product_detail_screen.dart`, read): a **4-tab** `TabBar` — Description / Specs / Reviews / Q&A (`product.{description,specs,reviews,qa}_tab`, line 213-219) — plus a **`_StockPill`** stock indicator (line 458), a **`PdpSellerCard`** seller-info block that deep-links to the seller storefront (`/sellers/{slug}`, hidden when the slug is null — line 471-476), and a `_SimilarProductsRail` (line 389). So every §3.5 sub-element the prompt enumerates (gallery, variants, price, buy box, description/specs, reviews, Q&A, recommendations, seller info, stock) is present.
+
+### P-027 — PDP buy box EXISTS and is sticky (corrects the prompt's sample assumption)
+**Status: INTERACTION | Severity: — | Confidence: CONFIRMED → VERIFIED-COMPLETE**
+Evidence: `pdp/pdp_sticky_cta.dart:11-65` — mobile sticky bottom CTA: selected-variant price + full-width "Sepete Ekle" (`product.add_to_cart.tr()`), disabled until a variant is selected and during cart mutation, 52px height (touch target ✓), `cs.primary` (theme-aware ✓). `pdp_price_block.dart:32-88` — brand-orange current price, strikethrough original + discount-% pill, **`lowest_30d` hint slot**.
+**Verdict:** VERIFIED-COMPLETE for sticky positioning + buy-box structure. The prompt's illustrative "P-007 — buy box lacks sticky positioning" is **factually wrong on this branch** (documented per §2.5).
+
+### P-007 — PDP buy box lacks a delivery-estimate
+**Status: STRUCTURAL | Severity: MED | Confidence: CONFIRMED (Mopro) / PROBABLE (Trendyol)**
+Evidence: `pdp_sticky_cta.dart` (read) + `pdp_price_block.dart` (read) render price + CTA + discount + lowest-30d, but **no delivery-date / "Yarın kargoda" estimate**. Trendyol prominently shows an estimated-delivery line in/near the buy box (general knowledge; PDP not fetched — the homepage meta did advertise "same-day delivery"). 
+Gap: no delivery-ETA affordance on PDP.
+Severity rationale: delivery ETA is conversion-relevant and a recognizable Trendyol element; MED. PROBABLE on the Trendyol side (not fetched).
+Recommendation: `P5-pdp-delivery-eta` — add a delivery-estimate row. **Backend dependency:** ETA must come from shipping/catalog API; this is partly out of UI scope (the slot can land with a placeholder, data SOON).
+
+### P-008b — PDP discount + lowest-30d UI present but data-dark (backend, OUT OF SCOPE)
+**Status: FUNCTIONAL | Severity: — | Confidence: CONFIRMED**
+Evidence: `pdp_price_block.dart:14-31` — `originalPriceMinor` and `lowestIn30DaysMinor` are nullable "because the catalog API does not expose them yet; when null the corresponding row is simply omitted." Same on `ProductCard` (§3.5). So the **discount + lowest-30d UI exists but never renders** (no data).
+**Verdict:** This is a **backend-data gap, not a UI parity gap** → out of Step-5 scope (prompt §1.2 "Backend changes … out of scope"). Logged so the parity PRs don't re-build existing UI; flag for a catalog-API follow-up.
+
+### P-015 — PDP variant swatches / size-guide fidelity (PROBABLE)
+**Status: VISUAL/INTERACTION | Severity: LOW | Confidence: PROBABLE**
+Evidence: Mopro PDP has variant selection (in `product_detail_screen.dart`); swatch styling vs Trendyol (color chips, size-guide link, out-of-stock treatment) unverified (PDP 403). → confirm in discovery; no NOW action.
+
+---
+
+## §3.6 Reviews findings
+
+### P-016 — Reviews surface is built end-to-end
+**Status: STRUCTURAL | Severity: — | Confidence: CONFIRMED (Mopro) → VERIFIED-COMPLETE (Mopro side)**
+Evidence: `catalog/pdp/reviews/` — `pdp_reviews_tab.dart` (243), `rating_distribution_histogram.dart` (155), `review_row.dart` (191), `review_form_content.dart` (211), `reviews_provider.dart` (280), `review_write_provider.dart` (298). Goldens: `reviews/goldens` (`pdp_reviews_tab`, `review_form`), plus `account/goldens/my_reviews_{populated,empty}`. Review submission is auth-gated via `requireAuth` (`review_row.dart:26`, `review_submission.dart:24` — see §4.4).
+**Verdict:** VERIFIED-COMPLETE on the Mopro side (list + rating histogram + write flow + verified gating). Trendyol pixel-detail PROBABLE (PDP 403). No NOW action.
+
+---
+
+## §3.7 Q&A findings
+
+### P-017 — Q&A surface is built end-to-end
+**Status: STRUCTURAL | Severity: — | Confidence: CONFIRMED (Mopro) → VERIFIED-COMPLETE (Mopro side)**
+Evidence: `catalog/pdp/qa/` — `pdp_qa_tab.dart` (202), `question_row.dart` (90), `answer_row.dart` (71), `qa_form_content.dart` (179), `qa_provider.dart` (394), `qa_submission.dart` (gated via `requireAuth`, line 16/46), `screens/question_detail_screen.dart` (158). Goldens: `qa/goldens` (`pdp_qa_tab`, `qa_widgets`, `qa_form`), `account/goldens/my_questions_populated`.
+**Verdict:** VERIFIED-COMPLETE on the Mopro side. No NOW action.
+
+---
+
+## §3.8 Cart findings
+
+Mopro cart: `features/cart/` (15 files, 1372 LOC) — `cart_screen.dart` (215), `cart_line_card.dart` (149), `order_summary_card.dart` (150), `cart_totals_summary.dart` (197), `empty_cart.dart` (48), **`guest_cart_provider.dart` (117)**. Golden: `cart/widgets/goldens/cart_line_card`. Trendyol cart is login-gated → PROBABLE.
+
+CONFIRMED cart-totals internals (`cart_totals_summary.dart`, read): grand total (`₺`, `tr_TR`, `cart.kdv_included` label), item count, **a `_CashbackSummaryBox`** (monthly Mopro Coin + `cart.cashback_perpetual` note — D-001), and limit warning chips (`cart.warning_{total,item}_limit`), then the proceed-to-checkout `FilledButton`.
+
+### P-011 — Cart lacks promo-code entry, cross-sell suggestions, and saved-for-later
+**Status: FUNCTIONAL/CONTENT | Severity: LOW | Confidence: CONFIRMED (Mopro) / PROBABLE (Trendyol)**
+Evidence (corrects an earlier draft of this finding): `cart_totals_summary.dart` (read in full) has **no promo-code field**, and the cart feature (15 files, listed) has **no cart-page suggestion rail and no saved-for-later** widget. Trendyol cart carries a coupon entry + "Bunlara da Göz At" suggestions + save-for-later (general knowledge; login-gated, not fetched).
+Gap: (a) no promo/coupon entry, (b) no cart cross-sell, (c) no save-for-later.
+Severity: LOW. **Divergence caveat:** promo/coupon absence may be intentional — Mopro's discount mechanic is **perpetual cashback**, not coupons (the `_CashbackSummaryBox` occupies the slot a coupon field would). Confirm product intent before treating (a) as a gap; (b)/(c) are additive.
+Recommendation: `P5-cart-suggestions` (LATER) — reuse `ProductListRail` for (b); (a)/(c) only if product wants coupons/save-for-later. Confirm Trendyol side first.
+**Positive:** guest cart is preserved (`guest_cart_provider.dart`) — browse + add without auth; gate only at checkout (§4.4). Matches the original ask exactly.
+
+---
+
+## §3.9 Checkout findings
+
+Mopro checkout: `features/checkout/` (13 files, 1738 LOC) — `checkout_stepper.dart` (103), `checkout_address_screen.dart` (223), `checkout_payment_screen.dart` (306), `checkout_review_screen.dart` (331), `checkout_redirect_screen.dart` (180), `checkout_result_screen.dart` (173), `sipay_webview_screen.dart` (167, 3-DS). **No goldens** (coverage gap — see P-019). Trendyol checkout login-gated → PROBABLE.
+
+CONFIRMED checkout internals (`checkout_address_screen.dart`, read): a saved-address list (`addressesProvider`) of `_SelectableAddressCard`s with a **default badge** (`address.isDefault → address.default`), an **empty state** (`address.empty` + add-address CTA), and a continue button gated on `selectedAddress != null` (line 94) — matches Trendyol's saved+default address selection. (Delivery-method options + installments not confirmed; installments are likely an intentional divergence — Mopro is cashback, not BNPL.)
+
+### P-012 — Checkout flow shape: multi-screen stepper vs Trendyol single-page
+**Status: INTERACTION | Severity: LOW | Confidence: PROBABLE**
+Evidence: Mopro uses a multi-screen linear stepper (address → payment → review → 3-DS redirect → result), with `checkout_stepper.dart` rendering progress. Trendyol web leans single-page collapse-expand (general knowledge; not fetched).
+Gap: flow-shape difference (stepper vs single-page). 
+Severity: LOW — both are valid e-commerce patterns; Mopro's stepper is coherent and the 3-DS/SAQ-A constraints (sipay) justify screen separation. PROBABLE.
+Recommendation: do **not** restructure without confirming Trendyol's current pattern + a UX rationale; PARK unless discovery shows a real friction gap. The auth gate at checkout entry (`cart_screen.dart:80 → requireAuth`) is the original ask's transition point and is correctly an adaptive prompt (§4.4), not a hard page-redirect — good.
+
+---
+
+## §3.10 Account / Profile findings
+
+### P-018 — Account surfaces are built
+**Status: STRUCTURAL | Severity: — | Confidence: CONFIRMED (Mopro) → VERIFIED-COMPLETE (Mopro side)**
+Evidence: `features/account/` (16 files, 3469 LOC). Goldens: `account/goldens/account_profile_{1024,1440}`, `account_security_{1024,1440}_{light,dark}`, `account_welcome_{guest,}_*` (the guest welcome state — confirms guest browsing of the account tab), `browsing_history_*`, `my_reviews_*`, `my_questions_*`.
+**Verdict:** VERIFIED-COMPLETE on the Mopro side (profile + security/MFA + browsing history + my-reviews/my-questions + guest welcome). See P-014 for hardcoded strings in `security_screen.dart`.
+
+---
+
+## §3.11 Orders / Returns findings
+
+### P-019 — Orders/Returns/Refund built with strong golden coverage
+**Status: STRUCTURAL | Severity: — | Confidence: CONFIRMED (Mopro) → VERIFIED-COMPLETE (Mopro side)**
+Evidence: `features/order/` (21 files, 3275 LOC). Goldens: `order/goldens/returns_list_{populated,empty}_1440_light`, `refund_card_{issued,pending,processing,failed}_light` (all 4 refund states), `timeline_{return_requested,refund_issued}_light`. Seller side: `seller/goldens/seller_returns_inbox`, `seller_return_detail_actions`.
+**Verdict:** VERIFIED-COMPLETE on the Mopro side — return initiation, status timeline, and refund-state cards all rendered + golden-locked. Trendyol detail PROBABLE (login-gated).
+**Coverage note:** `features/orders` (plural) is an **empty directory** alongside the real `features/order` (singular) — a drive-by cleanup nit (not a parity finding); flag for a Step-1-style cleanup sweep.
+
+---
+
+## §3.12 Favorites findings
+
+### P-013 — Favorites is a flat list (no collections/folders)
+**Status: STRUCTURAL/FUNCTIONAL | Severity: LOW | Confidence: CONFIRMED (Mopro) / PROBABLE (Trendyol)**
+Evidence: `features/favorites/` is **2 files, 220 LOC** (`favorites_screen.dart` + `favorites_provider.dart`) — a flat grid, no collection/folder model. Golden `favorites/goldens`. Trendyol favorites supports named lists/collections (general knowledge; login-gated, not fetched).
+Gap: no favorite-list organization (folders/collections/sharing).
+Severity: LOW. **Possibly PARK** — collections may be outside Mopro's near-term product scope (a niche-marketplace decision); confirm product intent before building.
+Recommendation: `P5-favorite-collections` (LATER/PARK). The add/remove interaction itself is at parity — heart top-right on cards (`product_card.dart:88-98`), guest-local + server-sync-on-auth.
+
+---
+
+## §3.13 Auth flow findings
+
+Mopro: `features/auth/` (15 files, 1797 LOC) — login (phone/OTP), OTP screen, profile completion, email verify. Golden `auth/goldens/auth_card`. The dev-OTP-bypass is injected (`identity.WithDevOTPBypass`, A4-3/#76) and **off in production** (panics if on in prod) — so it is correctly hidden from this surface in prod (prompt §3.13). Trendyol login page not fetched → PROBABLE.
+
+### P-014 — Hardcoded Turkish strings bypass `.tr()` (auth + checkout + account + PDP + favorites)
+**Status: CONTENT | Severity: LOW | Confidence: CONFIRMED**
+Evidence (grep, this branch — 11 literal Turkish UI strings not routed through `.tr()`):
+- `features/auth/email_verify_screen.dart:64` `'Doğrulama kodu tekrar gönderildi.'`, `:162` `'Kodu tekrar gönder'`
+- `features/checkout/presentation/checkout_redirect_screen.dart:141` `'Siparişlerime Git'`, `:146` `'Alışverişe Devam Et'`
+- `features/account/security_screen.dart:109,143,196` (MFA snackbars), `:125` `'Vazgeç'`, `:503` `'Telefon numarasını değiştir'`
+- `features/catalog/screens/product_detail_screen.dart:57` `'Ürün bulunamadı.'`
+- `features/favorites/favorites_screen.dart:174` `'Keşfet'`
+**This count is a floor:** the grep was scoped to `Text('…')`; literals in other sinks slip through — e.g. `catalog/screens/search_screen.dart:43` sets a non-localized browser-tab label `'Mopro · "$query" araması'` via `ApplicationSwitcherDescription`. The sweep PR should grep all string sinks, not just `Text(`.
+Gap: these break for any non-TR locale and bypass the Step-3 i18n completeness gate (which checks key *usage*, not literal bypass).
+Severity: LOW (mostly snackbars/buttons), but it's a clean, fully-CONFIRMED, zero-dependency fix.
+Recommendation: `P5-i18n-hardcoded-sweep` — move all 11 to `tr-TR`/`en-US` keys. **Tooling-adjacent:** consider a follow-up lint (Step-3 family) that flags user-facing string literals containing Turkish characters — the existing analyzer can't catch these. (Cross-link: ROADMAP idempotency-surface-analyzer tail.)
+
+---
+
+## §3.14 Notifications findings
+
+### P-021 — Notifications built (inbox + preferences)
+**Status: STRUCTURAL | Severity: — | Confidence: CONFIRMED (Mopro) → VERIFIED-COMPLETE (Mopro side)**
+Evidence: `features/notifications/` (8 files, 955 LOC). Goldens: `notifications/goldens/notification_rows_light`, `notifications_list_{populated,empty}_1440_{light,dark}`, `notification_preferences_1440_light`.
+**Verdict:** VERIFIED-COMPLETE on the Mopro side (in-app inbox list + read/unread rows + preferences screen). Push opt-in timing PROBABLE. No NOW action.
+
+---
+
+## §3.15 Help / Contact findings
+
+### P-022 — Help surface built
+**Status: STRUCTURAL | Severity: — | Confidence: CONFIRMED (Mopro)**
+Evidence: `features/help/` (10 files, 953 LOC). Golden `help/goldens`.
+**Verdict:** Built; Trendyol help detail PROBABLE (not fetched). No NOW action.
+
+---
+
+## §3.16 Empty / error / loading states findings
+
+### P-023 — Shared empty/error/loading primitives exist and are reused
+**Status: CONTENT/VISUAL | Severity: — | Confidence: CONFIRMED → VERIFIED-COMPLETE**
+Evidence: `core/widgets/empty_state.dart`, `core/widgets/error_banner.dart`, `core/widgets/loading_spinner.dart`, `widgets/skeleton_box.dart`; surface-level skeletons (`SkeletonProductCard` in `product_card.dart:249-290`, `_FlashSkeleton` in `flash_deals_rail.dart:168`); empty states golden-locked (`order/goldens/returns_list_empty`, `notifications_list_empty`, `account/my_reviews_empty`, `cart/empty_cart.dart`).
+**Verdict:** VERIFIED-COMPLETE — the dimension prompts most often warn is skimped is actually systematized here (shared widgets + per-surface skeletons + empty goldens).
+
+---
+
+## §3.17 Accessibility findings
+
+### P-020 — Dark-mode primary-on-surface contrast fails AA (already tracked by the contrast gate)
+**Status: VISUAL/a11y | Severity: MED | Confidence: CONFIRMED**
+Evidence: `make verify` → `verify-contrast` (`mobile/test/design/contrast_test.dart`) prints, on this branch:
+`| #E36925 on surfaceDark (text) | 4.26:1 | 4.5:1 | FAIL (Backlog) |`.
+So `MoproTokens.primaryDark` (#E36925) text on `surfaceDark` (#302A24) is **4.26:1 < 4.5:1 AA** — a known, gate-tracked backlog item.
+Gap: one dark-mode token pair below AA for normal text.
+Severity: MED (a11y; bounded to one pair, dark mode).
+Recommendation: `P5-darkmode-contrast` (NOW, tiny) — nudge `primaryDark` lighter or use it only for ≥18px/bold (large-text AA is 3:1, which it passes), then flip the contrast row from "Backlog" to "Pass". Pure token change + gate flip.
+**Positive (VERIFIED-COMPLETE elsewhere):** touch targets meet 44×44 (theme `filledButton`/`outlinedButton` `minimumSize: (64,48)`, sticky CTA 52px); contrast is *gated* (`verify-contrast`); `design/widgets/skip_to_content_link.dart` + focus goldens (`skip_to_content_link_focused_1024_*`) show keyboard/skip-link support on web. Screen-reader label coverage on icon-only buttons is PROBABLE (not exhaustively audited) → discovery item.
+
+---
+
+## §3.18 Responsive behavior findings
+
+### P-024 — Responsive system is systematized and golden-locked at 4 breakpoints
+**Status: STRUCTURAL | Severity: — | Confidence: CONFIRMED → VERIFIED-COMPLETE**
+Evidence: `design/responsive/` — `breakpoints.dart`, `breakpoint_resolver.dart` (`context.isMobile/isTablet/isDesktop`), `adaptive_value.dart`, `responsive_builder.dart`, `centered_content_column.dart`, `responsive_image_url.dart`, `hover_region.dart`/`pointer_kind.dart` (web hover vs touch). Goldens exist at **375 (mobile), 768 (tablet), 1024, 1440 (desktop)** across home/account/seller/shell suites. Flash-deals + product grids reflow by breakpoint (read in §3.1).
+**Verdict:** VERIFIED-COMPLETE for mobile-portrait/tablet/desktop. **Mobile-landscape** is not explicitly golden-tested (prompt §3.18 flags it as "often broken") → UNKNOWN-adjacent discovery item, not a CONFIRMED gap.
+
+---
+
+## §4.1 Design tokens findings
+
+### P-001 — Design-token system is complete and cross-platform (the would-be HIGH, resolved)
+**Status: VISUAL/STRUCTURAL | Severity: — | Confidence: CONFIRMED → VERIFIED-COMPLETE**
+Evidence: `mobile/lib/design/tokens.dart` (83 LOC) — full palette (`primaryLight/Dark`, surfaces, foreground, `mutedFg`, semantic `destructive/success/warning`, dedicated `ratingStar` gold), an **8-pt spacing grid** (`space2…space48`), a **radius scale** (`radiusSm…radius2xl`, `radiusFull`); comment: "derived from globals.css OKLCH tokens" → **web (`globals.css`) and mobile share a token origin** (cross-platform consistency). `theme.dart` (287 LOC) builds full M3 component themes from tokens (card, appBar, bottomNav, navigationBar, filled/outlined/text buttons, input, chip, divider, snackBar) + Inter type scale (display→label).
+**Verdict:** **VERIFIED-COMPLETE.** The prompt (§13) anticipated exactly this: "If discovery during P-001 reveals tokens are already systematized … P-001 closes as VERIFIED-COMPLETE." It does. **No P-001 PR is needed.**
+
+### P-005 — Token-adherence drift on `ProductCard` (a few hardcoded values bypass the system)
+**Status: VISUAL | Severity: LOW | Confidence: CONFIRMED**
+Evidence (`product_card.dart`, read): line 174 price uses `MoproTokens.primaryLight` (the **hardcoded light-mode** orange) instead of `cs.primary` → in **dark mode the price stays #CA4E00 instead of #E36925**; line 154 discount badge uses one-off `Color(0xFFE53935)` (not a token); line 220 inactive heart uses `Color(0xFF888888)` (not a token). (By contrast `pdp_price_block.dart`/`pdp_sticky_cta.dart` correctly use `cs.primary`.)
+Gap: the token *system* is complete (P-001) but a few card widgets bypass it → dark-mode/maintenance drift.
+Severity: LOW (cosmetic, dark-mode card price).
+Recommendation: part of `P5-1` — swap to `cs.primary` / add a `MoproTokens.discountBadge` token; lock with a dark-mode card golden.
+
+### P-006 — Discount-pill color inconsistent within Mopro (card red vs PDP orange)
+**Status: VISUAL | Severity: LOW | Confidence: CONFIRMED**
+Evidence: `product_card.dart:154` discount pill is **red** (`0xFFE53935`); `pdp_price_block.dart:51-56` discount pill is **brand-orange** (`cs.primary`). Same concept, two colors across surfaces. (Trendyol uses green discount pills — general knowledge; either color is a divergence from Trendyol, but the **intra-Mopro inconsistency** is the CONFIRMED finding.)
+Severity: LOW.
+Recommendation: part of `P5-1` — pick one discount-pill token and apply on both card + PDP.
+
+---
+
+## §4.2 Navigation patterns findings
+`go_router` route structure is comprehensive (web mirrors it: `web/app/[locale]/...` has products/[id]/[slug], search, cart, checkout(+redirect), orders/[id], account/{security,cards,favorites,profile,addresses,cashback,orders}, categories/[slug], login). Deep-linking + back-stack PROBABLE (not exercised in this audit). No CONFIRMED gap. Tab scroll-restoration UNKNOWN → discovery item.
+
+## §4.3 Cross-cutting interactions findings
+- **Cart badge** — live (`web_header.dart:41/91` `cartCountProvider`). CONFIRMED ✓.
+- **Favorites heart** — present on cards (`product_card.dart:88`), guest-local. CONFIRMED ✓.
+- **Search-everywhere** — persistent web pill + mobile nav-adjacent. CONFIRMED ✓ (§3.2).
+- **Pull-to-refresh** — home uses a `RefreshIndicator`/invalidate pattern (`home_screen.dart:64`); per-surface coverage PROBABLE. No CONFIRMED gap.
+
+## §4.4 Auth-gating consistency findings
+
+### P-025 — Auth gate is a single, consistent, guest-preserving helper (the original ask's core constraint — DONE)
+**Status: FUNCTIONAL | Severity: — | Confidence: CONFIRMED → VERIFIED-COMPLETE**
+Evidence: `core/widgets/login_required_sheet.dart` exports `requireAuth(context, ref, {onAuthed, reason})` (line 48-60): if `AuthAuthenticated` runs `onAuthed` immediately, else shows an **adaptive** prompt — bottom sheet `<600`, centered `AuthCard` dialog `>=600` (line 12-44) — with a **resume callback** (`onResume`/`onAuthed`) so post-login returns to the intended action. Every personal action routes through it:
+- cart checkout — `cart/presentation/cart_screen.dart:80 _checkout → requireAuth`
+- review submit — `pdp/reviews/review_row.dart:26`, `review_submission.dart:24`
+- Q&A submit — `pdp/qa/qa_submission.dart:16,46`
+- account guest state — `account/account_screen.dart:733 showLoginRequiredSheet` (presenting, not action-gating)
+Guests are **not** blocked from browsing, toggling favorites (local, server-sync on auth — `product_card.dart:94-96`), or building a cart (`guest_cart_provider.dart`). Golden: `core/widgets/goldens/login_required_sheet_{light,dark}.png`.
+**Verdict:** **VERIFIED-COMPLETE.** This is the prompt's "most product-critical cross-cutting concern" (§4.4) and it is a model implementation — consistent widget, consistent placement, resume-redirect present, guest browsing preserved. **No gap.**
+
+## §4.5 Localization findings
+Covered by **P-014** (11 hardcoded strings bypass `.tr()`). The Step-3 i18n gate (0 missing / 0 dead keys) holds for *keyed* strings; the gap is *literal bypass*, which that gate doesn't catch. easy_localization is wired app-wide; tr-TR/en-US are the live locales.
+
+---
+
+## §5 Verified-complete surfaces
+
+Each closed with the evidence above — **do not rebuild these; polish only per §6.**
+
+1. **Design tokens** (P-001) — `tokens.dart` + `theme.dart`, web/mobile shared OKLCH origin.
+2. **Auth-gate / guest browsing** (P-025) — single `requireAuth`, resume callback, guest-preserving. *The original ask's core constraint.*
+3. **Global navigation** (P-002) — 5-tab bottom nav + web header (logo/search/fav/cart-badge/account/megamenu); goldens.
+4. **Home composition** (P-003) — every Trendyol home element + Mopro extras; goldens at 375/768/1440.
+5. **Flash deals** (P-008) — live HH:MM:SS countdown + responsive; goldens.
+6. **Product card** (P-004 base) — Trendyol-shaped (image/heart/brand/title/rating/discount/price/cashback) + skeleton.
+7. **PDP structure** (P-027) — gallery/pager, variants, price block, **sticky CTA**, reviews + Q&A tabs, similar-products rail; goldens.
+8. **Search/PLP filters + sort** (P-010) — filter panel (web) / sheet (mobile) / chips + sort sheet; goldens.
+9. **Reviews** (P-016) & **Q&A** (P-017) — list + write flows, gated; goldens.
+10. **Orders/Returns/Refund** (P-019) — timeline + 4 refund states + returns list; goldens (+ seller side).
+11. **Notifications** (P-021), **Account** (P-018), **Empty/loading/error** (P-023), **Responsive** (P-024) — all built + golden-locked.
+
+---
+
+## §6 Recommended parity-PR sequence
+
+The mature-app reality: **no foundational HIGH PR is needed** (tokens + auth-gate are done). The sequence is fidelity polish + data wiring + PROBABLE-confirmation. Each PR follows the arc shape (discovery → build → tests/goldens → docs closure) and references its `P-ID`.
+
+### NOW (fully CONFIRMED, zero dependency, low risk)
+
+**P5-1 — Card + PDP fidelity polish.** Closes **P-005** (token-adherence: `cs.primary` on card price, tokenize discount/heart colors) + **P-006** (one discount-pill token across card+PDP) + **P-014** (11 hardcoded strings → i18n keys).
+- Size: ~250–350 Flutter LOC (widget edits + tr-TR/en-US keys).
+- Risk: **LOW** (pure UI, no auth, no API).
+- Prereqs: none (design tokens already exist — P-001).
+- Goldens: **regenerate** card + PDP price-block goldens, add a **dark-mode** card golden (CI Linux baseline).
+- Split-bailout: not expected (<1500).
+
+**P5-2 — Dark-mode contrast fix.** Closes **P-020**.
+- Size: ~30 LOC (token nudge in `tokens.dart` or large-text-only usage) + flip the `contrast_test.dart` row to Pass.
+- Risk: **LOW**. Prereqs: none. Goldens: any dark-mode golden touching `primaryDark`.
+
+### SOON (CONFIRMED but backend-data-gated, or PROBABLE pending confirmation)
+
+**P5-3 — PDP delivery-estimate + card/PDP discount data.** Closes **P-007** (delivery ETA row) and lights up the dark **P-008b** UI (original price, lowest-30d).
+- Risk: **MED** (touches PDP layout). **Backend dependency:** needs catalog/shipping API fields (delivery ETA, original price, lowest-30d) — UI slot can land NOW with a placeholder, data SOON. Coordinate with a catalog-API follow-up (out of Step-5 UI scope).
+- Goldens: PDP buy-box + card.
+
+**P5-4 — Search/category card badges + filter-dimension parity.** Closes **P-009** (Kargo Bedava / campaign / bestseller badges) + confirms **P-010**.
+- Risk: **MED**. **Discovery-first (mandatory):** Trendyol `/sr` is 403 — re-confirm with screenshots or an alternate fetch before building (the #59→#60 hypothesis pattern). Backend dependency for free-shipping/campaign flags.
+
+### LATER / PARK
+
+- **P5-5 — Cart suggestions + saved-for-later** (P-011, LOW, PROBABLE) — reuse `ProductListRail`; confirm Trendyol side.
+- **P5-6 — Favorite collections** (P-013, LOW, **PARK**) — confirm product intent first (may be an intentional niche-scope omission).
+- **P5-7 — Checkout flow-shape review** (P-012, LOW, **PARK**) — only if discovery shows real friction; don't restructure a working 3-DS stepper on taste.
+- **Drive-by (Step-1 family, not parity):** remove the empty `mobile/lib/features/orders/` directory (P-019 note).
+
+**Dependencies graph:** P5-1, P5-2 independent (ship in any order). P5-3/P5-4 depend on catalog-API fields (backend, separate track). P5-5/P5-6/P5-7 depend on a Trendyol-side discovery/confirmation pass. **No PR depends on a design-token PR** (tokens are done).
+
+---
+
+## Intentional divergences (documented, NOT filed as gaps — prompt §1.3/§10)
+
+- **D-001 — Cashback chip / Mopro Coin everywhere Trendyol shows discount.** `CashbackChip` on every product card (`product_card.dart:178`), PDP, cart, checkout. Core model (CLAUDE.md §1). Keep.
+- **D-002 — No discount-tier nav (5/10/30/50%) on home.** Trendyol's discount-tier strip has no Mopro analog by design (cashback, not discounts). Replaced by mood-stories / editors'-picks / personalized recs.
+- **D-003 — Wallet / Cashback-timeline surfaces** (`features/wallet/`, 1550 LOC) — Mopro-only; no Trendyol equivalent. Not a parity surface.
+- **D-004 — Seller transparency panel** (`features/seller/`) — Mopro's commission/KDV/net breakdown (CLAUDE.md §4.8) is a Mopro-specific transparency feature.
+
+---
+
+## Honesty note on the audit's limits (prompt §14)
+
+- **Trendyol-side coverage is thin by force, not by laziness.** Only the homepage fetched cleanly (2026-06-03); `/sr`, `/cok-satanlar`, and PDP/category/login-gated pages returned 403 or meta-only. So ~19 of 20 surfaces have **PROBABLE** Trendyol comparisons even though the **Mopro side is CONFIRMED** by code+goldens. The coverage matrix (§2.3) makes this visible. This is exactly the §12 "coverage-constrained" outcome — it is honest, not padded.
+- **This audit corrected its own and the prompt's recall errors** (§2.5): the prompt's illustrative "buy box lacks sticky positioning" is false on this branch (P-027); the early project memory's thin-UI assumption was wrong (149 goldens, full design system).
+- **Build-PR discovery is the second verification gate.** Every PROBABLE finding (P-009/P-011/P-012/P-013/P-015) must be re-confirmed (screenshots or re-fetch) in its build PR's discovery phase before any code changes — the pattern that caught real misreads across the prior 22 PRs.
+- **VERIFIED-COMPLETE is the dominant verdict here, and that is the truthful result.** Mopro is not a Trendyol skeleton awaiting a re-skin; it is a mature, design-systematized, golden-covered, guest-aware app whose remaining parity work is polish and backend-data wiring.
+
+---
+
+*End of Trendyol Parity Audit. No UI changed in this PR (prompt §0/§10). Follow-up parity PRs reference the `P-ID` above; see CONTRIBUTING "Parity audit cadence" and ROADMAP Step 5.*
