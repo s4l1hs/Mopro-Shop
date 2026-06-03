@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:mopro/core/widgets/mopro_logo.dart';
 import 'package:mopro/design/tokens.dart';
@@ -131,6 +132,14 @@ class _WideLayout extends StatelessWidget {
 class _BrandPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    // Built at render time (not a `static const`) so each value prop's copy can
+    // be localised per item with its own literal key; a dynamically-indexed key
+    // would be flagged unresolved by the i18n usage analyzer.
+    final valueProps = <(IconData, String)>[
+      (Icons.local_shipping_outlined, 'auth.layout.value_prop_shipping'.tr()),
+      (Icons.currency_exchange_outlined, 'auth.layout.value_prop_cashback'.tr()),
+      (Icons.verified_user_outlined, 'auth.layout.value_prop_secure'.tr()),
+    ];
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -165,9 +174,9 @@ class _BrandPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 40),
-          const Text(
-            'Alışveriş yap,\ngeri kazan.',
-            style: TextStyle(
+          Text(
+            'auth.layout.headline'.tr(),
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 32,
               fontWeight: FontWeight.w800,
@@ -175,7 +184,7 @@ class _BrandPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 32),
-          ..._valueProps.map(
+          ...valueProps.map(
             (item) => Padding(
               padding: const EdgeInsets.only(bottom: 16),
               child: Row(
@@ -206,10 +215,4 @@ class _BrandPanel extends StatelessWidget {
       ),
     );
   }
-
-  static const _valueProps = [
-    (Icons.local_shipping_outlined, 'Ücretsiz & hızlı teslimat'),
-    (Icons.currency_exchange_outlined, 'Her alışverişte nakit iade'),
-    (Icons.verified_user_outlined, 'Güvenli ödeme altyapısı'),
-  ];
 }

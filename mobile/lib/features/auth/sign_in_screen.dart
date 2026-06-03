@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -48,20 +49,20 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Giriş Yap',
+              'auth.login'.tr(),
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
             const SizedBox(height: 4),
             Text(
-              'Hesabınıza giriş yapın',
+              'auth.sign_in.subtitle'.tr(),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),
             ),
             const SizedBox(height: 32),
-            const AuthFieldLabel('E-posta'),
+            AuthFieldLabel('auth.email_label'.tr()),
             const SizedBox(height: 6),
             TextFormField(
               controller: _emailCtrl,
@@ -70,19 +71,18 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
               autofillHints: const [AutofillHints.email],
               decoration: authInputDecoration(
                 context,
-                hint: 'ornek@email.com',
+                hint: 'auth.email_hint'.tr(),
                 prefixIcon: Icons.email_outlined,
               ),
-              validator: (v) =>
-                  (v == null || !v.contains('@'))
-                      ? 'Geçerli bir e-posta girin'
-                      : null,
+              validator: (v) => (v == null || !v.contains('@'))
+                  ? 'auth.email_invalid'.tr()
+                  : null,
             ),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const AuthFieldLabel('Parola'),
+                AuthFieldLabel('auth.password_label'.tr()),
                 TextButton(
                   onPressed: () => context.go('/auth/forgot-password'),
                   style: TextButton.styleFrom(
@@ -90,9 +90,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  child: const Text(
-                    'Şifremi unuttum',
-                    style: TextStyle(
+                  child: Text(
+                    'auth.sign_in.forgot_password'.tr(),
+                    style: const TextStyle(
                       color: MoproTokens.primaryLight,
                       fontSize: 13,
                     ),
@@ -122,8 +122,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       setState(() => _obscurePassword = !_obscurePassword),
                 ),
               ),
-              validator: (v) =>
-                  (v == null || v.length < 8) ? 'En az 8 karakter girin' : null,
+              validator: (v) => (v == null || v.length < 8)
+                  ? 'auth.sign_in.password_min'.tr()
+                  : null,
             ),
             if (state.error != null) ...[
               const SizedBox(height: 16),
@@ -132,7 +133,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
             const SizedBox(height: 24),
             AuthSubmitButton(
               isLoading: state.isLoading,
-              label: 'Giriş Yap',
+              label: 'auth.login'.tr(),
               onPressed: () => _submit(notifier),
             ),
             const SizedBox(height: 32),
@@ -143,7 +144,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Hesabın yok mu? ',
+                    'auth.sign_in.no_account'.tr(),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.outline,
                     ),
@@ -155,9 +156,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: const Text(
-                      'Kayıt ol',
-                      style: TextStyle(
+                    child: Text(
+                      'auth.sign_in.register_link'.tr(),
+                      style: const TextStyle(
                         color: MoproTokens.primaryLight,
                         fontWeight: FontWeight.w600,
                       ),
@@ -181,12 +182,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   }
 
   String _errorMessage(AppError error) => switch (error) {
-        InvalidCredentialsError() => 'E-posta veya parola hatalı.',
+        InvalidCredentialsError() =>
+          'auth.sign_in.error_invalid_credentials'.tr(),
         EmailNotVerifiedError() =>
-          'E-posta adresiniz doğrulanmamış. Gelen kutunuzu kontrol edin.',
-        RateLimitedError() => 'Çok fazla deneme. Lütfen biraz bekleyin.',
-        NetworkError() =>
-          'Bağlantı hatası. İnternet bağlantınızı kontrol edin.',
-        _ => 'Bir hata oluştu. Lütfen tekrar deneyin.',
+          'auth.sign_in.error_email_not_verified'.tr(),
+        RateLimitedError() => 'auth.sign_in.error_rate_limited'.tr(),
+        NetworkError() => 'auth.network_error'.tr(),
+        _ => 'auth.unknown_error'.tr(),
       };
 }

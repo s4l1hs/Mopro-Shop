@@ -27,7 +27,44 @@
     "name_first": "First Name",
     "name_last": "Last Name",
     "locale": "Language",
-    "complete_profile": "Continue"
+    "complete_profile": "Continue",
+    "email_label": "Email",
+    "email_hint": "example@email.com",
+    "email_invalid": "Enter a valid email",
+    "password_label": "Password",
+    "sign_up": {
+      "title": "Create Account",
+      "subtitle": "Sign up free in a few minutes",
+      "name_first_hint": "Your first name",
+      "name_last_hint": "Your last name",
+      "required": "Required",
+      "password_hint": "At least 8 characters",
+      "password_weak": "Password isn't strong enough",
+      "password_confirm_label": "Confirm Password",
+      "password_confirm_hint": "Re-enter your password",
+      "password_mismatch": "Passwords don't match",
+      "submit": "Sign Up",
+      "have_account": "Already have an account? ",
+      "login_link": "Sign in",
+      "error_email_exists": "This email is already registered. Try signing in.",
+      "error_weak_password": "Password must be at least 8 characters."
+    },
+    "sign_in": {
+      "subtitle": "Sign in to your account",
+      "forgot_password": "Forgot password",
+      "password_min": "Enter at least 8 characters",
+      "no_account": "Don't have an account? ",
+      "register_link": "Sign up",
+      "error_invalid_credentials": "Incorrect email or password.",
+      "error_email_not_verified": "Your email isn't verified. Check your inbox.",
+      "error_rate_limited": "Too many attempts. Please wait a moment."
+    },
+    "layout": {
+      "headline": "Shop and\nearn back.",
+      "value_prop_shipping": "Free & fast delivery",
+      "value_prop_cashback": "Cash back on every purchase",
+      "value_prop_secure": "Secure payment infrastructure"
+    }
   },
   "nav": {
     "home": "Home",
