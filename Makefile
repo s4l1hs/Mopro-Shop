@@ -17,14 +17,14 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
         caddy-validate caddy-reload \
         test-integration-catalog test-integration-outbox test-integration-cart test-integration-order \
-        test-integration-sellerpayout test-e2e integration-e2e integration-cart integration-identity e2e-test-up e2e-test-down \
+        test-integration-sellerpayout test-e2e integration-e2e integration-cart integration-identity integration-payment e2e-test-up e2e-test-down \
         api-gen-models api-gen-core api-gen-fin api-gen-dart api-gen api-lint contract-test \
         docker-build release deploy deploy-staging rollback \
         seed-dry-run seed-staging seed-prod build-seed \
         smoke loadtest grafana-deploy
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order integration-e2e integration-cart integration-identity verify-image-manifest verify-contrast
+verify: fmt vet test lint boundaries property-cashback property-payout property-ledger property-timex property-order integration-e2e integration-cart integration-identity integration-payment verify-image-manifest verify-contrast
 
 # WCAG contrast check for the documented brand colour pairs. Fails if any
 # non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.
@@ -416,6 +416,14 @@ integration-identity: e2e-test-up
 	IDENTITY_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
 	IDENTITY_TEST_REDIS=localhost:6381 \
 	  go test -tags=integration ./internal/identity/... -count=1 -timeout 5m
+
+# payment reconciler integration suite (TESTING_AUDIT F-001). Reuses e2e-test-up's
+# pg-ecom-e2e (its TestMain self-bootstraps order_schema.payments+outbox). -race is on:
+# the suite is small + DB-bound, and the concurrency case exists specifically to be
+# race-checked (addresses TESTING_AUDIT F-006's "reconciler not exercised under -race").
+integration-payment: e2e-test-up
+	ORDER_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	  go test -tags=integration ./internal/payment/... -count=1 -race -timeout 5m
 
 # ── Catalog seed ───────────────────────────────────────────────────────────────
 
