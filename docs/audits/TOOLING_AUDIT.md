@@ -2,10 +2,12 @@
 
 **Audit-only. No tooling built in this PR.** Findings are scoped into follow-up build PRs (§6).
 
-> **BUILD PROGRESS (T3-1 + T3-2 bundle):** ✅ **T-003, T-004, T-010, T-001 RESOLVED** (4 of the
-> NOW set). Two new findings surfaced during the build: **T-014** (2 called Go stdlib vulns,
-> govulncheck) and **T-015** (10 pre-existing missing i18n keys). The i18n dead-key **sweep** and
-> the T-014/T-015 fixes are follow-up PRs. Remaining Step-3 build PRs: T3-3..T3-6 (see §6).
+> **BUILD PROGRESS:**
+> - *PR #63 (T3-1 + T3-2):* ✅ **T-003, T-004, T-010, T-001 RESOLVED**; surfaced T-014 + T-015.
+> - *T3 cleanup PR:* ✅ **T-014, T-015 RESOLVED** + **T3-sweep-i18n** done (163 dead keys removed).
+>   govulncheck is now a required gate; the i18n analyzer reports 0 dead / 0 missing. No new findings.
+> - Remaining Step-3 build PRs: **T3-3** bootstrap, **T3-4** migration/discipline linters,
+>   **T3-5** Riverpod detector (T-002), **T3-6** nightly/cron (see §6).
 
 ## TL;DR
 - **MISSING:** 9 (3 HIGH, 5 MED, 1 LOW)
@@ -381,7 +383,13 @@ deferred i18n analyzer in ~2 small PRs.
 ## New findings (surfaced during the T3-1 + T3-2 build)
 
 ### T-014 — Go stdlib vulnerabilities (govulncheck)
-**Status: MISSING-FIX | Severity: MED | Confidence: CONFIRMED | Priority: NOW**
+**✅ RESOLVED (T3 cleanup) — was MISSING-FIX/MED/NOW.** Bumped go.mod + go.work to **1.25.11** +
+Dockerfile (`golang:1.25.11-alpine`) + centralized the workflow pins (`openapi-ci` 1.22 →
+go-version-file); removed `continue-on-error` → govulncheck is now a **required** gate. **Correction:**
+the "1.26.4" below was a local-1.26.3 artifact; the authoritative CI scan (go 1.25) showed **9 called
+vulns**, all fixed by the same-minor patch **1.25.11** (Go backports security fixes). Verified
+`GOTOOLCHAIN=go1.25.11 govulncheck ./...` → "No vulnerabilities found".
+**Original status: MISSING-FIX | Severity: MED | Confidence: CONFIRMED | Priority: NOW**
 Surfaced by the T-003 scan (`govulncheck ./...`, real exit 3):
 ```
 Vulnerability #1: GO-2026-5039  Standard library  net/textproto@go1.26.3  → fixed in go1.26.4
@@ -394,7 +402,10 @@ a focused PR bumping the `go` directive / CI toolchain to 1.26.4+, then remove `
 from `govulncheck.yml` to make it a required gate. Per §8 this PR surfaces + tracks, does not patch.
 
 ### T-015 — 10 i18n keys referenced in code but missing from the tr-TR master
-**Status: MISSING-FIX | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
+**✅ RESOLVED (T3 cleanup) — was MISSING-FIX/MED/SOON.** Added all 10 to tr-TR (master) + en-US with
+sibling-key translations (no TRANSLATION_NEEDED — every key was unambiguous from call-site context +
+existing siblings); de/ar left partial (future markets). `make i18n-usage` → 0 missing; baseline cleared.
+**Original status: MISSING-FIX | Severity: MED | Confidence: CONFIRMED | Priority: SOON**
 Surfaced by the T-001 analyzer (`check_i18n_usage.dart --manifest`):
 ```
 checkout.cancel_payment_body/_title, checkout.payment_3ds(/_subtitle),

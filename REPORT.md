@@ -4040,3 +4040,16 @@ New findings: **T-014** (Go stdlib vulns, MED/NOW — Go-toolchain bump), **T-01
 
 ### No parity change
 CI/tooling + one shell-script `--strict` flag; zero product (service/app) code touched.
+
+## PR — Step 3 cleanup: T-014 + dead-key sweep + T-015 — `chore/step3-t014-i18n-cleanup`
+
+Closes the dynamic state PR #63's two new gates surfaced, so later Step-3 work starts fully green. One commit per finding.
+
+- **T-014** ✅ — **Go bumped to 1.25.11** (go.mod + go.work + `golang:1.25.11-alpine` + centralized `openapi-ci` 1.22→go-version-file); `continue-on-error` removed → govulncheck is a **required** gate. **Discovery correction:** the finding named "1.26.4" (a local-1.26.3 artifact). The authoritative CI scan (go-version-file → go 1.25) showed **9 called stdlib vulns**, not 2, all fixed on the 1.25 branch by **1.25.11** (Go backports security fixes) — the minimal same-minor patch, not a 1.25→1.26 minor bump. Verified `GOTOOLCHAIN=go1.25.11 govulncheck ./...` → "No vulnerabilities found".
+- **T3-sweep-i18n** ✅ — **163 dead keys removed** (tr-TR 163 / en-US 121 / de-DE 16 / ar-AE 16); baseline cleared; analyzer → 0 dead. No drift (live == baseline at PR time). JSON round-trip verified byte-identical first → deletion-only diff. §4.2.5: 3 "doc-referenced" keys were git-grep regex-dot false positives (prose "wallet balance" etc.), not literal refs.
+- **T-015** ✅ — **10 missing keys added** to tr-TR (master) + en-US with sibling-key translations (`3ds_cancel_title`, `payment_card`, `secure_payment`, `common.no` gave exact siblings) → **no TRANSLATION_NEEDED**, no T-018. de-DE/ar-AE left partial (future markets, consistent with their existing ~320-key gaps). Analyzer → 0 missing.
+
+New findings: **none**. Split-bailout: **not fired** (~30 LOC version-bump + mechanical JSON edits). Post-bundle state: govulncheck **required + clean**; i18n gates (completeness + usage) **green, 0 dead / 0 missing**.
+
+### No parity change
+Go version pins + translation-file content (10 keys added, 163 removed); zero service/app logic touched.
