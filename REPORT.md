@@ -3946,3 +3946,22 @@ Docs-only; zero code/tooling removed (nothing was actually dead).
 
 ### Risk notes
 - The honest outcome is "nothing to remove." Resisting the urge to manufacture edits to match the prompt's assumed scope is the point — the cheap candidates were false positives the original audit already flagged as such, and #55 cleared the one real pattern.
+
+## Testing Audit PR (Step 2) — `chore/testing-audit`
+
+**Audit-only — no code fixed.** Deliverable: `docs/audits/TESTING_AUDIT.md` + `docs/audits/ROADMAP.md` + CONTRIBUTING "Testing audit cadence". Diff is docs-only.
+
+### TL;DR
+0 CONFIRMED HIGH · 7 CONFIRMED MED · 5 CONFIRMED LOW · 3 PROBABLE · 3 UNKNOWN. Post-cleanup the codebase is healthy — **no confirmed correctness/financial/security defect.** The real signal is **test-coverage gaps**: a live wired `payment.Reconciler` + `internal/payment` with 0 tests (F-001); `treasury`/`search`/`media`/`sizefinder` 0 co-located tests (F-002); identity suite not `-race`'d (F-006); 5 skipped REVIVAL_GAP tests (F-011), one hinting at a possible JWT same-second rotation collision (F-012, PROBABLE).
+
+### Verified-not-actionable (with evidence in the audit)
+§3.1 concurrency (go vet clean; `-race` e2e/cart green; pool discipline swept), §3.2 tx-isolation+bounded-retry, §3.3 idempotency, §3.4 user-state-consumer (14 guards, PR #49), §4.2 Flutter dispose (no leaks), §5.1 soft-refs (documented design).
+
+### Path correction
+The Step-2 prompt assumed `services/*-svc/**` + `app/**`; real layout is `cmd/*-svc` + `internal/**` + `mobile/**`. All audit paths use the real layout.
+
+### Not-run-this-pass (honest UNKNOWN, not a clean bill)
+×50 `-race` repro (§6.3), N+1/`EXPLAIN ANALYZE` (§3.5), migration-safety deep dive (§3.8), Flutter rebuild-storm DevTools (§4.3) — flagged for dedicated follow-ups.
+
+### No parity change
+Docs-only audit. Fix PRs follow per TESTING_AUDIT §8, referencing finding IDs.

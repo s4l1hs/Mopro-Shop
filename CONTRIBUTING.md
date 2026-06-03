@@ -610,6 +610,25 @@ Lessons from the first cleanup *execution* (`chore/project-cleanup-confirmed`):
   pathspec). After `git rm x`, don't re-`git add x` in a later grouped `git add`; commit the
   `git rm` separately or `git add -A` the survivors.
 
+## Testing audit cadence
+
+The same audit-first → focused-fix discipline used for cleanup applies to testing,
+correctness, concurrency, and performance. The audit report is `docs/audits/TESTING_AUDIT.md`
+— **it is the source of truth for what's broken/uncovered**. The audit PR fixes nothing;
+fix PRs follow and **must reference the finding ID** (e.g. "closes TESTING_AUDIT F-001").
+
+Rules (carried from the cleanup arc):
+- **Re-verify at PR time.** Every finding carries the exact command + output that reproduced
+  it on the PR branch. Confidence is graded CONFIRMED (reproduced) / PROBABLE (pattern only) /
+  UNKNOWN (flagged for follow-up). Don't promote PROBABLE to CONFIRMED without reproduction.
+- **Enumerate build tags** before any absence-of-caller claim (`integration`, `contract`,
+  `sipay_sandbox`, `tools`) — the #54 `RefreshWorker`/`Sign*` lesson generalizes.
+- **Escape hatch (honest zero):** if a section genuinely has nothing, write it
+  "verified-not-actionable" with the command used — don't manufacture findings to look
+  thorough. PR #56 (net-zero cleanup) and this audit's verified-not-actionable sections
+  (§3.2/§3.4/§4.2/§5.1) are the precedent.
+- Audits supersede prior ones; `docs/audits/ROADMAP.md` tracks step status (audited vs. fixed).
+
 ## Adaptive presenter
 
 One content widget, two presenters chosen by breakpoint. `LoginRequired`
