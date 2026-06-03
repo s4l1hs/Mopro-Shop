@@ -16,7 +16,7 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
 # `make verify` explicitly), so this is a safe, friendlier default.
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap verify soak fmt vet test lint govulncheck boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order \
+.PHONY: help bootstrap verify soak fmt vet test lint govulncheck boundaries migration-check property-cashback property-payout property-ledger integration-wallet property-timex property-order \
         verify-image-manifest update-goldens audit audit-test i18n-check i18n-usage riverpod-check \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
@@ -37,7 +37,7 @@ help: ## Show this help.
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## /{printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment verify-image-manifest verify-contrast ## Full verification gate (run before every push).
+verify: fmt vet test lint boundaries migration-check property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment verify-image-manifest verify-contrast ## Full verification gate (run before every push).
 
 # WCAG contrast check for the documented brand colour pairs. Fails if any
 # non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.
@@ -136,6 +136,12 @@ deadcode: ## Whole-program dead-code scan (on-demand; see comment).
 
 boundaries: ## Enforce module-boundary import rules.
 	./scripts/check-module-boundaries.sh
+
+# Migration-safety gate (TOOLING_AUDIT T3-4): risky destructive DDL (DROP COLUMN/
+# TABLE, SET NOT NULL) in forward *.up.sql migrations, ratcheted vs a baseline.
+# Fast/text — wired into `verify`. See scripts/lint-migrations.sh + docs/internal/lint-discipline.md.
+migration-check: ## Flag risky destructive DDL in forward migrations.
+	@bash scripts/lint-migrations.sh --strict
 
 # ── Test infrastructure: pg-ledger-test:6434 ────────────────────────────────
 #

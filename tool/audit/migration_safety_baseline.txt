@@ -1,0 +1,5 @@
+# migration-safety baseline — scripts/lint-migrations.sh (TOOLING_AUDIT T3-4).
+# Reviewed-safe risky DDL in forward (*.up.sql) migrations. EMPTY: there is none
+# today (the 2 ALTER COLUMN ... DROP NOT NULL in 0063 RELAX constraints — safe —
+# and are not matched). --strict fails on any NEW DROP COLUMN/TABLE/CONSTRAINT or
+# SET NOT NULL in an *.up.sql.
