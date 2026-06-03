@@ -2,6 +2,34 @@
 
 Closes the P-014 split from PR #78. Branch `feat/i18n-hardcoded-sweep` off `main@36363410`.
 
+## ⚠️ Discovery-shift: P-014 is ~3× the audited scope → **phased**
+
+The audit (#77) listed **11** `Text('…')` literals — accurate for that *one sink*. A comprehensive
+re-grep over **all** string sinks (`label:`/`title:`/`content:`/`hint:`/`SnackBar`/error maps/marketing
+data) found **~155 hardcoded TR strings across 27 files** — the audit undercounted P-014 by ~3×. Whole
+screens/areas are essentially unlocalized:
+
+| File | count | | File | count |
+|---|---|---|---|---|
+| `account/security_screen.dart` | 29 | | `auth/mfa_challenge_screen.dart` | 9 |
+| `account/account_screen.dart` | 21 | | `auth/forgot_password_screen.dart` | 7 |
+| `auth/sign_up_screen.dart` | 15 | | `data/hero_slides.dart` | 7 |
+| `payments/sipay_error_map.dart` | 13 | | `checkout/.../checkout_redirect_screen.dart` | 6 |
+| `auth/sign_in_screen.dart` | 12 | | `core/layout/auth_layout.dart` | 4 |
+| `auth/email_verify_screen.dart` | 10 | | ~16 more files | 1–3 each |
+
+A full 155-string / 27-file sweep is ~1500–2000 LOC (call sites + ~155×2 locale entries + EN
+translations + const-cascade handling) — **2–3× the §9 ceiling**, and a *different size class* than the
+audit's "~55." Per §6/§9 split-bailout (and §1.2 "newly-surfaced sites are filed, not force-fixed"):
+
+**This PR = Phase 1: the `t()` helper refactor + app_router title localization** (44 strings — the
+title's named deliverable and a clean, complete unit: the entire app-router title system is localized,
+no half-done files). P-014 is **re-scoped to a phased plan**; remaining phases grouped by area (auth
+screens, account screens, checkout, marketing/hero, sipay error map, misc singletons). P-014 stays
+**IN-PROGRESS** (not closed) until the phases land.
+
+> The sections below were the original (pre-discovery) full-sweep plan; kept for the phase-2+ PRs.
+
 ## The `t()` helper (re-verified)
 
 `mobile/lib/core/router/app_router.dart:86` — `String t(String s) => 'Mopro · $s';` — a **brand-title
@@ -61,6 +89,12 @@ Several literals are inside `const` widgets (e.g. `const SnackBar(content: Text(
 3. app_router titles → `.tr()` + `router_title.*` keys (tr+en) · 4. Text()/auth_layout/search → `.tr()` + scattered keys (tr+en) ·
 5. goldens (expected no-op; confirm via CI) · 6. closure (audit P-014 RESOLVED + REPORT + ROADMAP).
 
-## Outcome
+## Outcome (revised by the discovery-shift above)
 
-P-014 RESOLVED (full sweep). ~44 router_title + ~14 scattered keys; 46 app_router sites + ~16 scattered sites; `t()`→`_withBrand`. 0 TRANSLATION_NEEDED expected (all TR known; EN standard UI terms).
+**Phase 1 SHIPPED:** `t()`→`withBrand` + app_router title localization — **44 `router_title.*` keys**
+(verbatim TR + en), 46 title sites routed through literal `.tr()` (namedArgs for the 4 interpolated;
+`withBrand(name)` for the 4 dynamic pass-throughs). i18n-usage clean (631 declared, 0 dead, 0 missing);
+no golden impact (the `Title` widget is OS-level, not painted). 0 TRANSLATION_NEEDED.
+
+**P-014 NOT closed** — re-scoped to the ~155-string / 27-file true scope above; remaining ~111 strings
+are phased follow-ups (see ROADMAP). The audit's `Text()`-scoped "~55" estimate was a ~3× undercount.

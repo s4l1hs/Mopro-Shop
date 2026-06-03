@@ -16,7 +16,7 @@
 - **VERIFIED-COMPLETE surfaces (12):** Design tokens · Global navigation (bottom nav + web header) · Home composition · Product card · Flash deals · PDP structure · Search/PLP filters+sort · Reviews · Q&A · Orders/Returns/Refund · Notifications · Empty/loading/error · Responsive · Auth-gate. (Listed with evidence in §5.)
 - **Recommended NOW sequence:** **P5-1** (card+PDP fidelity polish: P-005 token-drift + P-006 discount-pill consistency + P-014 hardcoded-string sweep — pure UI, no API dep, no auth, ~300 LOC) → **P5-2** (dark-mode contrast token fix: P-020 — tiny token tweak + contrast-gate flip). Both fully CONFIRMED, zero dependencies. Everything else is SOON/LATER and either backend-data-gated or PROBABLE-pending-confirmation.
 
-**Build status (2026-06-03):** P5-1+P5-2 shipped (`feat/parity-card-pdp-polish`) — **P-005, P-006, P-020 RESOLVED**; **P-014 SPLIT** to `feat/i18n-hardcoded-sweep` (discovery found ~55 strings cross-app, not a card/PDP-scoped sweep). 3 of the 4 NOW findings closed; the parity NOW queue is now empty.
+**Build status (2026-06-03):** P5-1+P5-2 shipped (`feat/parity-card-pdp-polish`) — **P-005, P-006, P-020 RESOLVED**. **P-014 IN-PROGRESS (phased):** `feat/i18n-hardcoded-sweep` shipped **Phase 1** (`t()`→`withBrand` + 44 app_router title keys); a second discovery-shift found P-014's true scope is **~155 strings / 27 files** (audit undercounted ~3×), so the remaining ~111 are phased by area (auth/account/checkout/error-map/marketing). Not closed.
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
@@ -248,7 +248,17 @@ Recommendation: `P5-favorite-collections` (LATER/PARK). The add/remove interacti
 Mopro: `features/auth/` (15 files, 1797 LOC) — login (phone/OTP), OTP screen, profile completion, email verify. Golden `auth/goldens/auth_card`. The dev-OTP-bypass is injected (`identity.WithDevOTPBypass`, A4-3/#76) and **off in production** (panics if on in prod) — so it is correctly hidden from this surface in prod (prompt §3.13). Trendyol login page not fetched → PROBABLE.
 
 ### P-014 — Hardcoded Turkish strings bypass `.tr()` (auth + checkout + account + PDP + favorites)
-**⤿ SPLIT — re-scoped by P5-1 discovery.** True scope is ~55 strings cross-app (the 11 `Text()` literals below + ~40 `core/router/app_router.dart` `t()` tab-titles, where `t()` is a `'Mopro · '` prefixer, not a localiser + auth_layout marketing + the search-title) **plus a `t()` helper refactor** — far beyond a bundled card/PDP-polish PR (§6/§9 split). Deferred to **`feat/i18n-hardcoded-sweep`**. The 11-string list below was a `Text()`-scoped floor (correctly flagged as a floor). Only `product_detail_screen.dart:57` was actually in card/PDP scope.
+**⏳ IN-PROGRESS — phased (Phase 1 done).** **Second discovery-shift (the audit undercounted ~3×):** the
+all-sinks re-grep on `feat/i18n-hardcoded-sweep` found **~155 hardcoded TR strings across 27 files** — not
+the ~55 the `Text()`-scoped audit estimated. Whole screens are unlocalized (security_screen 29, account_screen
+21, sign_up 15, sipay_error_map 13, sign_in 12, email_verify 10, mfa 9, …). A full sweep is ~1500–2000 LOC /
+27 files — a multi-PR effort.
+- **Phase 1 ✅ (`feat/i18n-hardcoded-sweep`):** the `t()` helper refactor (→ `withBrand`) + **app_router title
+  localization** — 44 `router_title.*` keys, the title's named deliverable, a complete self-contained unit.
+- **Phases 2+ (queued, by area):** auth screens (sign_in/sign_up/email_verify/mfa/forgot/auth_layout),
+  account screens (security/account), sipay error map, marketing/hero data, checkout, misc singletons.
+  ~111 strings remain. See `docs/internal/i18n-helper-refactor.md` + ROADMAP.
+The 11-string list below was a `Text()`-scoped floor (correctly flagged as a floor at the time).
 **Status: CONTENT | Severity: LOW | Confidence: CONFIRMED**
 Evidence (grep, this branch — 11 literal Turkish UI strings not routed through `.tr()`):
 - `features/auth/email_verify_screen.dart:64` `'Doğrulama kodu tekrar gönderildi.'`, `:162` `'Kodu tekrar gönder'`
