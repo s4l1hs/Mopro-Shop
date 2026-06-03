@@ -3994,3 +3994,20 @@ New TESTING-HOOKs: none. `make verify` green incl. the new `-race` line.
 
 ### No parity change
 Test-only + one-line jti fix + Makefile gate; no product behaviour change beyond distinct token jti.
+
+## PR — Audit burn-down: F-002 (re-audit) + F-016 + LOW batch — `test/audit-burndown-f002-f016-low`
+
+7-finding bundle (deviation per prompt §1; one commit per finding). **Split-bailout not fired** — Phase 1 collapsed to mostly re-audit (the slice was tiny), so total stayed small.
+
+- **F-002 (re-audit)** ✅ PARTIAL-RESOLVED — read every file (not file-count): `search`/`media`/`sizefinder` are all **12-LOC empty-interface stubs** (like treasury) → not-actionable; `payment.Service` (91 LOC PSP registry/factory) is the only REAL one → **sliced** (discovery doc + 5 unit tests: registry dispatch, sipay registered/not-registered-panic, craftgate/iyzico stubs → ErrProviderNotImplemented, missing-provider log.Fatal via subprocess). No DB → unit-only. The 4 stubs need *implementation*, not tests.
+- **F-016** ⚠️ CORRECTED → **F-017 (NEW, LOW, product)** — PR #59's "shared-integRedis" hypothesis was **refuted** (tests are sequential; no `t.Parallel`). Real cause: `slidingWindowLua` uses the ms timestamp as the zset **member** (`ZADD key now now`), so same-millisecond requests collide/undercount → partial rate-limit bypass. Test was timing-sensitive (isolated-pass/grouped-fail). Fix deferred (security-adjacent); rate-limiter test re-pointed at F-017.
+- **F-003** ⏳ DEFERRED — `RefreshWorker.Run` untested, but the non-Property wallet integration suite isn't gated (`property-ledger` runs only `-run Property`); a valuable fix needs a wallet-integration gate first (own infra PR). (Observation: ungated wallet integration suite.)
+- **F-004** ✅ NOT-ACTIONABLE — legacy `StateNotifier` is a valid pattern, not a defect; Flutter is out of scope here.
+- **F-007** ✅ FIXED — strengthened the idempotency `Key` determinism property (was `Key(x)==Key(x)`/SA4000 → now asserts the `idem:<uid>:<k>` format). SA4000 cleared.
+- **F-008** ✅ NOT-ACTIONABLE — bounded (3) immediate SERIALIZABLE retry is acceptable; backoff is a cross-cutting optimization, not a LOW defect.
+- **F-010** ✅ NOT-ACTIONABLE — the `context.Background()` DLQ uses are deliberate drain-on-shutdown + decoupled durability writes (can't use the cancelled ctx).
+
+New findings: **F-017** (LOW, product, rate-limiter ms-member undercount). TESTING-HOOKs: none. LOW-batch distribution: 1 FIX / 3 NOT-ACTIONABLE / 1 DEFER.
+
+### No parity change
+Test + audit-doc PR; one prior-untested module sliced; no product behaviour change.

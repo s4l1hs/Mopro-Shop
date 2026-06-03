@@ -7,7 +7,7 @@ marked complete only when its fix PRs land — not when the audit lands.
 | Step | Scope | Audit | Status |
 |---|---|---|---|
 | 1 | Cleanup (dead code / docs / tooling) | `CLEANUP_AUDIT.md` | ✅ **complete** — PRs #54 (audit) → #55 (confirmed removals + `unused` gate) → #56 (re-verify; net-zero). Tooling-blocked remainder (i18n / goldens / Riverpod) → Step 3. |
-| 2 | **Testing / correctness / concurrency** | `docs/audits/TESTING_AUDIT.md` | 🟡 **audited; fixes in progress** — MED findings closed: F-001 (#58), F-006/F-011/F-012 (#this), F-002-treasury corrected-to-stub. Open: F-002 search/media/sizefinder + payment.Service; LOW F-003/F-004/F-007/F-008/F-010; new F-016. |
+| 2 | **Testing / correctness / concurrency** | `docs/audits/TESTING_AUDIT.md` | 🟡 **audited; fixes nearly done.** MED: F-001 (#58), F-006/F-011/F-012 (#59), F-002 partial (4 stubs not-actionable + payment.Service sliced). LOW: F-007 fixed; F-004/F-008/F-010 not-actionable; F-003 deferred (needs wallet-integration gate). Corrected: F-016. **Open: F-017** (NEW, rate-limiter ms-member undercount — product fix), F-003 gate, ungated-wallet-integration observation. |
 | 3 | Tooling-blocked audits (i18n key usage, Riverpod inference classes — need usage-aware analyzers) | — | ⏳ not started |
 | 4 | Architecture / modularity audit | — | ⏳ not started |
 | 5 | (reserved) | — | ⏳ not started |
