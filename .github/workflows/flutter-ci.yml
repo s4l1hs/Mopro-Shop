@@ -106,3 +106,19 @@ jobs:
           flutter-version: '3.x'
           channel: stable
       - run: make i18n-usage
+
+  # TOOLING_AUDIT T3-5: Riverpod inferred-type-provider ratchet (zero-dep dart,
+  # root working-dir). Notifier shapes are informational; only inferred drift gates.
+  riverpod-check:
+    name: riverpod inference gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+      - run: make riverpod-check

@@ -17,7 +17,7 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
 .DEFAULT_GOAL := help
 
 .PHONY: help bootstrap verify soak fmt vet test lint govulncheck boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order \
-        verify-image-manifest update-goldens audit audit-test i18n-check i18n-usage \
+        verify-image-manifest update-goldens audit audit-test i18n-check i18n-usage riverpod-check \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
         caddy-validate caddy-reload \
@@ -86,6 +86,12 @@ i18n-check: ## Translation completeness gate (fails on extra keys).
 # tool/audit/i18n_*_baseline.txt. Zero-dep Dart. See docs/internal/i18n-analyzer.md.
 i18n-usage: ## i18n dead-key / missing-key gate (ratchet vs baseline).
 	@dart run tool/audit/check_i18n_usage.dart --check
+
+# Riverpod inferred-type-provider ratchet (TOOLING_AUDIT T3-5). Notifier build()
+# shapes are inventoried (informational); only inferred-type drift is gated.
+# Zero-dep Dart. See docs/internal/riverpod-analyzer.md.
+riverpod-check: ## Riverpod inferred-type-provider gate (ratchet vs baseline).
+	@dart run tool/audit/riverpod_check.dart --check
 
 # One-command local setup for a fresh checkout (TOOLING_AUDIT T3-3): env file,
 # go mod download, git hooks, flutter pub get. Idempotent; detects (never installs)
