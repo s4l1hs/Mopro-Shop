@@ -8,7 +8,7 @@ marked complete only when its fix PRs land — not when the audit lands.
 |---|---|---|---|
 | 1 | Cleanup (dead code / docs / tooling) | `CLEANUP_AUDIT.md` | ✅ **complete** — PRs #54 (audit) → #55 (confirmed removals + `unused` gate) → #56 (re-verify; net-zero). Tooling-blocked remainder (i18n / goldens / Riverpod) → Step 3. |
 | 2 | **Testing / correctness / concurrency** | `docs/audits/TESTING_AUDIT.md` | ✅ **CLOSED** — every finding F-001→F-017 has a terminal outcome. #58 F-001; #59 F-006/F-011/F-012; #60 F-002(partial)/F-007/F-004/F-008/F-010/F-016→F-017; closure PR: wallet-integration gate + F-003 + F-017 (+ F-016 test unskipped). Deferred non-Step-2 passes (UNKNOWN tier): ×50 -race repro, N+1/EXPLAIN, migration-safety, Flutter DevTools rebuild. |
-| 3 | **Tooling** (CI / build / migration / cron / deploy / static-analysis / dev-convenience automation) | `docs/audits/TOOLING_AUDIT.md` | ⏳ **audited** — 9 MISSING (3 HIGH), 2 EXISTS-AWKWARD, 0 REDUNDANT; 2 from-memory MISSINGs corrected to EXISTS-FINE (rollback, golden-diff). Build PRs T3-1…T3-6 pending (see below). |
+| 3 | **Tooling** (CI / build / migration / cron / deploy / static-analysis / dev-convenience automation) | `docs/audits/TOOLING_AUDIT.md` | ✅ **CLOSED** (PRs #62 audit → #63 → cleanup → closure bundle). All NOW/SOON findings resolved: dep-CVE scan, make help, i18n completeness+dead-key, Go bump, bootstrap, Riverpod gate, migration-safety, nightly soak. **Two carve-outs:** T-007 (3 flow-AST discipline checks) → `cmd/lint-discipline` follow-up; T-008 (cron-overlap sim) deferred (needs fin-svc harness). |
 | 4 | Architecture / modularity audit | — | ⏳ not started |
 | 5 | Trendyol parity continuation | — | ⏳ not started |
 
@@ -34,13 +34,18 @@ LATER/PARK unsequenced). Each build PR references its `T-ID`.
    annotations), **T-010** (`check_i18n.sh --strict` wired), **T-001** (zero-dep prefix-aware
    dead-key analyzer + dual baselines + CI gate). Surfaced **T-014** (2 called Go stdlib vulns)
    and **T-015** (10 missing i18n keys).
-2. **T3-3** `feat/dev-bootstrap` (SOON) — closes **T-005** (`make bootstrap`). ~50 LOC.
-3. **T3-4** `feat/migration-and-discipline-linters` (SOON) — closes **T-006** (migration linter),
-   **T-007** (pool-in-tx / soft-delete-consumer / idempotency discipline linter). ~320 LOC.
-4. **T3-5** `feat/riverpod-shape-detector` (SOON) — closes **T-002** (extend `list_providers.dart`
-   to classify the 3 Notifier shapes + flag inference). ~300–500 LOC.
-5. **T3-6** `feat/nightly-and-cron-tooling` (SOON) — closes **T-009** (`nightly.yml` schedule),
-   **T-008** (cron dry-run + overlap sim). ~230 LOC.
+2. ✅ **T3-3** — closed **T-005** (`make bootstrap` + `scripts/bootstrap.sh`, idempotent).
+3. ✅ **T3-4 (partial)** — closed **T-006** (`scripts/lint-migrations.sh` migration-safety, in
+   `make verify`). **T-007 SPLIT:** the 3 flow-AST checks (pool-in-tx / soft-delete-consumer /
+   idempotency) need `go/analysis` → focused **`cmd/lint-discipline`** follow-up (not greps).
+4. ✅ **T3-5** — closed **T-002** (`tool/audit/riverpod_check.dart`: inferred-type ratchet [0 today]
+   + informational shape inventory [all 21 notifiers conform]).
+5. ✅ **T3-6 (partial)** — closed **T-009** (`nightly.yml` + `make soak`, ×50 -race). **T-008
+   DEFERRED:** cron-overlap sim needs a fin-svc test harness to run the crons safely.
+
+**Step 3 closure carve-outs (the only remaining Step-3 work):**
+- **`cmd/lint-discipline`** (T-007) — 3 `go/analysis` analyzers + `analysistest`, ratcheted.
+- **cron-overlap sim** (T-008) — revisit once a fin-svc harness exists.
 
 **Fix follow-ups from the T3-1/T3-2 build:** ✅ **ALL DONE** (`chore/step3-t014-i18n-cleanup`):
 - ✅ **T3-sweep-i18n** — 163 dead keys removed across 4 locales; `i18n_usage_baseline.txt` cleared.

@@ -4053,3 +4053,17 @@ New findings: **none**. Split-bailout: **not fired** (~30 LOC version-bump + mec
 
 ### No parity change
 Go version pins + translation-file content (10 keys added, 163 removed); zero service/app logic touched.
+
+## PR — Step 3 closure mega-bundle: T3-3 + T3-4 + T3-5 + T3-6 — `chore/step3-closure-bundle`
+
+The four remaining Step-3 build items in one PR. Quality-first: tractable phases shipped whole; the structurally-hard pieces split honestly (the prompt's expected "1-split" outcome, §6/§10). `make verify` green; one commit per finding (9 commits).
+
+- **T3-3 bootstrap** ✅ — `make bootstrap` → `scripts/bootstrap.sh`: idempotent, repo-local (no sudo), **detects** (never installs) Go/Flutter/Docker, scaffolds `.env.local`, runs `go mod download` + hooks + `flutter pub get`, lists remaining MANUAL steps. Verified: run 1 all ✅, run 2 idempotent. CONTRIBUTING rewired. (T-005)
+- **T3-4 discipline linters** ✅ **1 of 4 + split.** `scripts/lint-migrations.sh` (migration-safety, T-006) in `make verify`: flags DROP COLUMN/TABLE + SET NOT NULL in `*.up.sql` only (the 95 `*.down.sql` DROPs are legitimate; DROP NOT NULL / DROP CONSTRAINT are relaxing → safe), ratcheted (0 today), canary-proven. **Discovery refuted the prompt's "pool-acquire + soft-deleted are easy" assumption** — those + idempotency-surface need flow-sensitive `go/analysis`, so they're **SPLIT** to a focused `cmd/lint-discipline` PR (T-007) rather than shipped as FP-ridden greps (§2.3/§8).
+- **T3-5 Riverpod detector** ✅ — `tool/audit/riverpod_check.dart` (zero-dep, 8 self-tests): gates inferred-type providers (ratchet; **0 today** — all 95 explicitly typed — so pure drift-protection) and inventories Notifier `build()` shapes **informationally** (all 21 conform: 15 const-return, 4 post-await, 2 microtask). Shape enforcement stays informational — the synchronous-reachability rule needs flow analysis a textual tool can't do (§4.3.4). Canary-proven. (T-002)
+- **T3-6 nightly/cron** ✅ **nightly shipped, cron-sim deferred.** `.github/workflows/nightly.yml` + `make soak` run the Step-2-hardened suites (wallet RefreshWorker / payment reconciler / identity rate-limiter) under `-race -count=50`, opening an issue on failure (closes the Step-2 §6.3 deferred ×50 repro, T-009). **Cron-overlap sim DEFERRED** (T-008): the crons drive the `mopro` CLI against the ledger DB + fin-svc — no safe dev harness to run them (§4.4.1). Canary generalization skipped (only wallet benefits — `NOT-ACTIONABLE-WITHOUT-SECOND-USE-CASE`).
+
+New findings: none. Split-bailout: **fired on T3-4** (3 of 4 checks → `cmd/lint-discipline` follow-up) + **T3-8 cron-sim deferred** — within the §6 "1-2 split acceptable" band. **Step 3 is CLOSED** but for those two carve-outs.
+
+### No parity change
+Dev/CI tooling (bootstrap, 2 analyzers, 1 SQL linter, nightly workflow) + a Makefile soak target; zero service/app logic touched.
