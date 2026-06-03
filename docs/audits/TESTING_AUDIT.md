@@ -71,9 +71,17 @@ internal/media    (5 src, 0 test)
 internal/sizefinder (5 src, 0 test)
 internal/ledger   (5 src, 0 test)   ← invariants covered indirectly, see note
 ```
-`treasury` (float-yield, financial), `search` (Meilisearch), `media` (photo upload — also ops-blocked per project memory), `sizefinder` each have substantial source and no tests.
-**Note on `internal/ledger`:** 0 co-located tests, **but** `make verify`'s `property-ledger` target runs `go test -run Property ./internal/wallet/...` — ledger double-entry invariants ARE property-tested *through wallet*. The shared ledger helper funcs lack *direct* unit tests (LOW), but the invariants are covered. Not a gap for correctness; a gap for helper-branch coverage.
-Recommendation: per-module follow-up PRs (one each), starting with `treasury` (financial).
+**⚠️ RE-AUDIT (real-vs-stub) — `test/audit-burndown-f002-f016-low` (2026-06-03):** the "5 src, 0 test" count was file-presence, not code (the treasury/PR #57 mistake, repeated). Reading every file:
+
+| Module | LOC | Real logic? | Status |
+|---|---|---|---|
+| `internal/treasury` | 12 | no (empty interfaces) | **STUB** (confirmed PR #59) |
+| `internal/search` | 12 | no (`Service interface{}` / `Repository interface{}`) | **STUB** |
+| `internal/media` | 12 | no (empty interfaces) | **STUB** |
+| `internal/sizefinder` | 12 | no (empty interfaces) | **STUB** |
+| `internal/payment` (`service.go`) | 91 | **yes** — PSP provider registry/factory dispatch + craftgate/iyzico stubs | **REAL** |
+
+So **4 of the 5 "modules" are 12-LOC stubs** — nothing to test (closed NOT-ACTIONABLE). The only REAL one is `payment.Service` (provider registry/factory), the smallest real F-002 surface → **sliced this PR** (unit tests, no DB). `internal/ledger` invariants are covered indirectly (`property-ledger` runs `go test -run Property ./internal/wallet/...`); helper-branch coverage is the only residual (LOW). **F-002 net: PARTIAL-RESOLVED — payment.Service sliced; the 4 stubs are not-actionable (they need implementation, not tests).**
 
 ### F-003 — `wallet.RefreshWorker.Run`/`refresh` loop is untested
 **Severity: LOW | Confidence: CONFIRMED**
