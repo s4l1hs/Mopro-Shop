@@ -171,7 +171,9 @@ class ProductCard extends ConsumerWidget {
                     priceStr,
                     style: theme.textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: MoproTokens.primaryLight,
+                      // P-005: theme-aware primary (was hardcoded primaryLight,
+                      // which rendered the light-mode orange on the dark card).
+                      color: cs.primary,
                     ),
                   ),
                   const SizedBox(height: 4),
