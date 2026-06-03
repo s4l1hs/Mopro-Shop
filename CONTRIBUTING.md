@@ -600,7 +600,12 @@ Lessons from the first cleanup *execution* (`chore/project-cleanup-confirmed`):
   (build-tag-agnostic) and run `go vet -tags=integration` on the package.**
 - **`var _ = f` unused-suppression hides deadness.** `reconcile` kept two dead funcs alive
   only via blank assignments; the cleanup removed the funcs AND the suppression. Watch for
-  `var _ =` when assessing whether something is really used.
+  `var _ =` when assessing whether something is really used. The codebase now has **zero**
+  package-scope `var _ = expr` suppressions (`chore/cleanup-cheap-followup` swept and confirmed).
+  If you add one for a legitimate reason (forcing an init-time side effect; a helper used only
+  under a build tag), **add a comment saying why** — an undocumented `var _ =` reads as a
+  dead-code mask and a future cleanup will remove it (and the symbol it points at). Typed
+  interface assertions (`var _ Iface = (*T)(nil)`) are a different, fine idiom — not a mask.
 - **`git add a b c` stages NOTHING if any path is already-deleted** (errors on the missing
   pathspec). After `git rm x`, don't re-`git add x` in a later grouped `git add`; commit the
   `git rm` separately or `git add -A` the survivors.
