@@ -11,7 +11,7 @@ OAPI_CODEGEN_VERSION  := v2.4.1
 OPENAPI_GEN_VERSION   := v7.10.0
 OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSION)
 
-.PHONY: verify fmt vet test lint boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order \
+.PHONY: verify fmt vet test lint govulncheck boundaries property-cashback property-payout property-ledger integration-wallet property-timex property-order \
         verify-image-manifest update-goldens audit audit-test \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
@@ -78,6 +78,12 @@ test:
 
 lint:
 	golangci-lint run
+
+# Dependency-CVE scan of the Go module (TOOLING_AUDIT T-003). Mirrors the
+# .github/workflows/govulncheck.yml gate. Run before bumping deps. NOT in
+# `verify` yet — main has called stdlib vulns tracked as T-014 (Go 1.26.4 bump).
+govulncheck:
+	go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
 # Whole-program dead-code scan (exported-unreachable funcs that golangci's
 # `unused` can't see — it treats exported library symbols as used-externally).

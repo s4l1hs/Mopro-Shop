@@ -1,0 +1,45 @@
+# Dependabot — automated dependency-update PRs (TOOLING_AUDIT T-003).
+# Covers every ecosystem present in the repo: the single root Go module,
+# GitHub Actions workflow pins, and the Flutter (pub) app under mobile/.
+# Minor+patch updates are grouped to keep PR volume low; majors come solo
+# so they get individual review.
+version: 2
+updates:
+  # Backend — single Go module at the repo root (github.com/mopro/platform).
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      go-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(deps)"
+
+  # CI — action version pins in .github/workflows/**.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(ci)"
+
+  # Mobile — Flutter app (pubspec.yaml lives in mobile/).
+  - package-ecosystem: pub
+    directory: "/mobile"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      pub-minor-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "chore(deps)"
