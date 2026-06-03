@@ -454,7 +454,14 @@ adds the Turkish (+ other-locale) strings and clears the baseline. Content work 
 the gate PR (§8).
 
 ### T-016 — fin-svc has no HTTP integration harness or mock-PSP test mode
-**Status: MISSING (product-adjacent) | Severity: MED | Confidence: CONFIRMED | Priority: LATER (Step 4)**
+**⏳ PARTIAL — mock-PSP pattern resolved via ARCHITECTURE_AUDIT A-001; HTTP harness remains.**
+T-016 named two things. The **mock-PSP test-mode** part is **done** (PR A4-1: `payment.Service`
+is injectable + `internal/payment/paymenttest.Fake` exists; the consumer-side-interface + fake
+pattern is now established). The **fin-svc HTTP integration harness** + a `sellerpayout`-side PSP
+fake (needed to actually run the cron-overlap sim, T-008) are **not** covered by A-001 (`payment`
+is core-svc; `sellerpayout` is fin-svc with its own PSP client) — they remain product-adjacent
+Step-4 work. **Honest scope:** A-001 resolved the abstraction-shape gap; the harness is separate.
+**Original status: MISSING (product-adjacent) | Severity: MED | Confidence: CONFIRMED | Priority: LATER (Step 4)**
 Surfaced building the cron-overlap sim (T-008). The crons `curl` a fin-svc internal HTTP endpoint
 (`:8082/internal/v1/...`), so any HTTP-level sim needs `cmd/fin-svc` booted with its DB + router +
 auth, **and** a mock PSP — `internal/payment/` has only real adapters (sipay/craftgate/iyzico;
