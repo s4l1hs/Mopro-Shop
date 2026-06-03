@@ -43,3 +43,15 @@ New namespaces: `auth.sign_up.*`, `auth.sign_in.*`, `auth.layout.*`, `account.se
 ## Plan
 
 Per-phase commit, **keys co-located with each phase's usage** (so each commit is gate-consistent — cleaner than a separate keys commit). Gates after each: `i18n-check` (extras), `i18n-usage` (dead/missing), `flutter analyze`. Goldens regen via CI after push. Split 2b (account) if it balloons (§6/§9 — highest variance). 0 TRANSLATION_NEEDED target.
+
+## ⚠️ Second discovery-shift: diacritic grep undercounts ~2× → 2b split
+
+Reading `sign_up_screen` in full showed **~24** user-facing strings, not the 15 the grep reported: the diacritic-based grep (`[ğşıİçöüĞŞÇÖÜ]`) **misses Turkish strings without special chars** — "Ad", "Soyad", "Parola", "E-posta", "Zorunlu", "Kayıt Ol", "Hesap Oluştur", "Giriş", etc. So **every per-file count (and the ~155 total) is undercounted, roughly 2×** — true P-014 scope is likely ~250–300 strings. (Counting fix for future phases: read the file, or grep UI sinks `Text(`/`label:`/`hint:`/`header:`/`validator`/switch-arms, not just diacritics.)
+
+## Outcome (what shipped)
+
+- **Phase 2c (sipay) ✅** — `sipay_error_map.dart` → `'payment.error.sipay.$code'.tr()` (dynamic prefix); 12 keys; test rewritten (#79 pattern). No goldens.
+- **Phase 2a (auth) ✅** — sign_up + sign_in + auth_layout, **~46 strings** (true count), reuse + new `auth.*`/`auth.sign_up.*`/`auth.sign_in.*`/`auth.layout.*`; `_valueProps` const→build-time. auth goldens (auth_card / login flow) regen via CI.
+- **Phase 2b (account) ⤿ SPLIT** → `feat/i18n-sweep-2b-account`. With the ~2× undercount, `security_screen` (≈40, incl. interpolated `'Kod gönderilemedi: ${…}'`, const dialogs/snackbars, the phone-change flow) + `account_screen` (≈30, theme-label dedup, softGated prompts) is the high-variance half (§9). Splitting keeps quality + review surface sane (§6 "ship 2 phases; 3rd carves out"). Its goldens (`account_security_*`, `account_welcome_*`) change Turkish→keys there, not here.
+
+This PR closes **Phases 2a + 2c** (P-014 Phases 1/2a/2c done). Title reflects that, not 2b. Both i18n-gate false-positives from `'key'.tr()`-in-comments (auth_layout) were caught + rephrased (recurring #79 hazard).

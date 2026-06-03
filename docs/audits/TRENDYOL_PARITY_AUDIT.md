@@ -16,7 +16,7 @@
 - **VERIFIED-COMPLETE surfaces (12):** Design tokens · Global navigation (bottom nav + web header) · Home composition · Product card · Flash deals · PDP structure · Search/PLP filters+sort · Reviews · Q&A · Orders/Returns/Refund · Notifications · Empty/loading/error · Responsive · Auth-gate. (Listed with evidence in §5.)
 - **Recommended NOW sequence:** **P5-1** (card+PDP fidelity polish: P-005 token-drift + P-006 discount-pill consistency + P-014 hardcoded-string sweep — pure UI, no API dep, no auth, ~300 LOC) → **P5-2** (dark-mode contrast token fix: P-020 — tiny token tweak + contrast-gate flip). Both fully CONFIRMED, zero dependencies. Everything else is SOON/LATER and either backend-data-gated or PROBABLE-pending-confirmation.
 
-**Build status (2026-06-03):** P5-1+P5-2 shipped (`feat/parity-card-pdp-polish`) — **P-005, P-006, P-020 RESOLVED**. **P-014 IN-PROGRESS (phased):** `feat/i18n-hardcoded-sweep` shipped **Phase 1** (`t()`→`withBrand` + 44 app_router title keys); a second discovery-shift found P-014's true scope is **~155 strings / 27 files** (audit undercounted ~3×), so the remaining ~111 are phased by area (auth/account/checkout/error-map/marketing). Not closed.
+**Build status (2026-06-03):** P5-1+P5-2 shipped (`feat/parity-card-pdp-polish`) — **P-005, P-006, P-020 RESOLVED**. **P-014 IN-PROGRESS (phased):** Phase 1 (`feat/i18n-hardcoded-sweep`, app_router titles); **Phases 2a+2c** (`feat/i18n-sweep-2abc`, auth + sipay error map). A third discovery-shift: the diacritic grep undercounts ~2×, so **true scope ≈ 250–300 strings** (not 155). Phase 2b (account) split out; 2d/2e/2f queued. Not closed.
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
@@ -253,11 +253,12 @@ all-sinks re-grep on `feat/i18n-hardcoded-sweep` found **~155 hardcoded TR strin
 the ~55 the `Text()`-scoped audit estimated. Whole screens are unlocalized (security_screen 29, account_screen
 21, sign_up 15, sipay_error_map 13, sign_in 12, email_verify 10, mfa 9, …). A full sweep is ~1500–2000 LOC /
 27 files — a multi-PR effort.
-- **Phase 1 ✅ (`feat/i18n-hardcoded-sweep`):** the `t()` helper refactor (→ `withBrand`) + **app_router title
-  localization** — 44 `router_title.*` keys, the title's named deliverable, a complete self-contained unit.
-- **Phases 2+ (queued, by area):** auth screens (sign_in/sign_up/email_verify/mfa/forgot/auth_layout),
-  account screens (security/account), sipay error map, marketing/hero data, checkout, misc singletons.
-  ~111 strings remain. See `docs/internal/i18n-helper-refactor.md` + ROADMAP.
+- **Phase 1 ✅ (`feat/i18n-hardcoded-sweep`):** `t()`→`withBrand` + app_router title localization (44 `router_title.*`).
+- **Phase 2c ✅ (`feat/i18n-sweep-2abc`):** sipay error map → `payment.error.sipay.*` (12 keys, dynamic prefix).
+- **Phase 2a ✅ (`feat/i18n-sweep-2abc`):** auth — sign_up + sign_in + auth_layout (~46 strings; `auth.*`/`auth.sign_up.*`/`auth.sign_in.*`/`auth.layout.*`).
+- **Phase 2b ⤿ SPLIT** → `feat/i18n-sweep-2b-account`: security_screen + account_screen (high-variance; interpolation, const dialogs, theme dedup).
+- **Phases 2d/2e/2f (queued):** email_verify/mfa/forgot + marketing/hero, checkout, misc singletons.
+- **Third discovery-shift:** the diacritic grep undercounts ~2× (misses TR strings w/o special chars — "Ad", "Parola", "Giriş"). **True P-014 scope ≈ 250–300 strings**, not 155. Future phases counted by full-file read, not diacritic grep.
 The 11-string list below was a `Text()`-scoped floor (correctly flagged as a floor at the time).
 **Status: CONTENT | Severity: LOW | Confidence: CONFIRMED**
 Evidence (grep, this branch — 11 literal Turkish UI strings not routed through `.tr()`):

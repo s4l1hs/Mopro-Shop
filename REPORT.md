@@ -4157,3 +4157,19 @@ Closes the P-014 split from #78 — **partially**. A second discovery-shift re-s
 
 ### No visual change
 Browser/tab titles only (OS-level) + i18n keys. No painted UI changed; no goldens; no backend.
+
+## PR #80 — P-014 Phase 2a + 2c: auth + sipay error map (Phase 2b split)
+
+Bundled three P-014 phases; shipped 2a + 2c, split 2b.
+
+- **Phase 2c (sipay) ✅** — `sipay_error_map.dart` (`static const Map`) → `get()` resolves `'payment.error.sipay.$code'.tr()` (interpolated key → usage analyzer derives the prefix; unknown/empty → `unknown`). 12 keys, verbatim TR + actionable EN (§4.3.3). Test rewritten to the #79 pattern (code→key + fallback + key→TR-needle from JSON). No goldens.
+- **Phase 2a (auth) ✅** — sign_up + sign_in + auth_layout, **~46 strings** (true count). Reused `auth.network_error`/`unknown_error`/`login`/`name_first`/`name_last`; added shared `auth.email_*`/`password_label` + `auth.sign_up.*`/`auth.sign_in.*`/`auth.layout.*`. `auth_layout`'s `static const _valueProps` → build-time list with literal `.tr()` (a dynamic `item.$2.tr()` would be flagged unresolved). 0 TRANSLATION_NEEDED.
+- **Phase 2b (account) ⤿ SPLIT** → `feat/i18n-sweep-2b-account`. security_screen + account_screen are the high-variance half (interpolated `'Kod gönderilemedi: ${…}'`, const dialogs/snackbars, the phone-change flow, theme-label dedup) — and bigger than estimated (see below). §6/§9 sanction splitting the highest-variance phase; 2a+2c is already a complete delivery.
+- **Discovery-shift (3rd on P-014): the diacritic grep undercounts ~2×.** Reading `sign_up_screen` showed ~24 strings, not the grep's 15 — Turkish strings without special chars ("Ad", "Parola", "Giriş", "Kayıt Ol") are missed. **True P-014 scope ≈ 250–300 strings**, not 155. Future phases counted by full-file read.
+- **Gates:** `i18n-check` 0 extras; `i18n-usage` 674 declared / 0 dead / 0 missing; `flutter analyze` clean. Caught + rephrased a recurring false-positive (a `'key'.tr()` literal in an auth_layout comment tripping the usage analyzer — same hazard as #79).
+- **Goldens:** auth goldens that render the swept screens (auth_card / login flow) flip Turkish→keys (the harness renders keys — #79); regenerated via the `golden-rebaseline` workflow. account goldens unchanged here (2b split).
+- **No test-assertion breaks** beyond the sipay test (rewritten); `find.text('…TR…')` over the 6 screens = none.
+- **P-014 remaining:** 2b (account), 2d (email_verify/mfa/forgot + marketing/hero), 2e (checkout), 2f (singletons). Title = Phases 2a + 2c, not 2b.
+
+### No visual change beyond text source
+Same rendered Turkish (verbatim) in the app; goldens render keys (harness limitation, filed). No backend.
