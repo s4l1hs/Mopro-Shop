@@ -1,9 +1,12 @@
-# Discipline linters — discovery + design (TOOLING_AUDIT T3-4)
+# Discipline linters — discovery + design (TOOLING_AUDIT T3-4 / T-007)
 
-Catalogue of the four discipline patterns Steps 1–2 enforced by hand, and which
-are tractable to automate now vs. deferred. **This PR ships migration-safety**
-(text-tractable, low-FP); the three flow-sensitive AST checks are split to a
-focused `cmd/lint-discipline` follow-up (see "Split" below).
+Catalogue of the four discipline patterns Steps 1–2 enforced by hand.
+
+> **STATUS:** migration-safety shipped in PR #71 (text). **This PR (`cmd/lint-discipline`)
+> builds 2 of the 3 flow-AST checks — pool-acquire-inside-tx + soft-deleted-user-consumer —
+> on `golang.org/x/tools/go/analysis`, both at 0 findings (required drift-gates in
+> `make verify`).** idempotency-surface remains SPLIT to a focused follow-up (the hardest;
+> SQL-shape analysis, FP-prone — §6 / §4.1.5).
 
 ## The four patterns
 
@@ -19,32 +22,39 @@ window. **Tractable as a text check** with one essential nuance discovery found:
   baseline (ratchet against future drift). Built as `scripts/lint-migrations.sh`
   (text/SQL — `go/analysis` is the wrong tool; it parses Go AST, not `.sql`).
 
-### 2. Pool-acquire-inside-tx — DEFERRED (split)
-`pgxpool.Pool` method called while a `tx` from `pool.BeginTx`/`dbx.InTx` is open
-(PR #42 / #47 — exhausts the pool → deadlock). Detecting it **correctly** needs
-flow analysis: a pool call is fine before `BeginTx` and in post-`Commit`/`Rollback`
-cleanup, only risky *while the tx is live*. That is control/data-flow over
-`go/analysis` (likely SSA), not a textual match — a grep version is FP/FN-ridden.
+### 2. Pool-acquire-inside-tx — ✅ BUILT (`cmd/lint-discipline/pooltx`)
+`*pgxpool.Pool` method (Exec/Query/Acquire/Begin/…) called, within a function,
+AFTER that pool's `Begin`/`BeginTx` opened a tx (PR #42 / #47 — pool exhaustion →
+deadlock). Implementation (position-ordered, same-function — sound for the real
+straight-line bug shape): flag pool calls after the first `Begin` **unless** a
+`Commit`/`Rollback` occurs between (tx already closed) or the call is in a `defer`
+(post-commit cleanup). A goroutine launched after Begin IS flagged (PR #42 did).
+5 analysistest cases incl. the dlq.go pattern (pool use after Rollback = ok — a
+real FP the canary caught + the analyzer now excludes). **0 codebase findings.**
 
-### 3. Soft-deleted-user-consumer — DEFERRED (split)
-A user read that doesn't honour `Status == StatusDeleted` (PR #49). PR #49's design
-puts the guard in the **service** (the repo is a dumb store), so the real check is
-"a service method returning a user applies the guard" — flow-sensitive, and admin/
-audit consumers are legitimate exemptions. Needs `go/analysis`, not grep.
+### 3. Soft-deleted-user-consumer — ✅ BUILT (`cmd/lint-discipline/softdeleteduser`)
+A `*Repository` user read (`Get*`/`Find*` bound to a non-blank var) inside a
+function with no `StatusDeleted` guard (PR #49). Scoped to **Repository** receivers
+on purpose: consuming the **service** (`svc.GetMe`) is safe — the service guards
+internally — so those are NOT flagged (the discovery-caught FP). Discarded users
+(`_, err := …`) and `Create*`/`Mark*` (fresh users) are excluded; `repository.go`,
+`*_test.go`, and `//nolint:soft-deleted-user-consumer` funcs are exempt. 5
+analysistest cases. **0 codebase findings** (service methods all guard post-#49).
 
-### 4. Idempotency-surface — DEFERRED (split)
+### 4. Idempotency-surface — ⏳ STILL SPLIT (next follow-up)
 An `INSERT` into a financial table without `ON CONFLICT` / a preceding
-`SELECT … FOR UPDATE`. Requires SQL-shape analysis of `Exec` call args + tx
-context — the hardest, highest-FP of the four. `go/analysis` + continue-on-error.
+`SELECT … FOR UPDATE`. The hardest, highest-FP of the four (SQL-shape analysis of
+`Exec` args + tx context). Per §4.1.5 it ships continue-on-error / disabled-by-
+default — deferred to its own focused PR rather than rushed into this bundle.
 
-## Why split 2–4 rather than ship grep heuristics
-The arc's rule (PRs #57–#70): an FP-ridden gate that cries wolf is worse than no
-gate — it trains people to ignore it. Checks 2–4 are each a careful `go/analysis`
-`Analyzer` with `analysistest` fixtures (a focused PR, like T-001 was). Shipping
-migration-safety well + cataloguing the rest honestly beats four shallow greps.
-The prompt assumed 2–4 were "easy"; discovery says otherwise (the §2.3 hatch).
+## Why go/analysis (not grep), and 0 findings
+The arc's rule (PRs #57–#71): an FP-ridden gate that cries wolf is worse than no
+gate. Both shipped analyzers had real FPs on first run (pool: dlq.go post-Rollback;
+soft-deleted: handlers consuming the guarding `svc.GetMe`) — each fixed by a precise
+guard, landing at **0 findings**. So no baseline file is needed: the gate is a plain
+required check (`make lint-discipline` in `verify`) that fails on any NEW finding,
+suppressible via `//nolint:soft-deleted-user-consumer` where intentional.
 
-## Follow-up: `cmd/lint-discipline`
-One Go binary, three `*analysis.Analyzer`s (pool-in-tx, soft-deleted-consumer,
-idempotency-surface) + `analysistest` + a baseline; pool/soft-deleted gated,
-idempotency continue-on-error initially (per the PR #63 day-one protocol).
+## Remaining follow-up
+`cmd/lint-discipline/idempotency` — the third `*analysis.Analyzer`, with
+`analysistest` + (likely) continue-on-error until its baseline is triaged.
