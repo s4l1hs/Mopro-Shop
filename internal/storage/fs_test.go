@@ -39,8 +39,8 @@ func TestFSStorage_RoundTrip(t *testing.T) {
 }
 
 func TestNew_DisabledByDefault(t *testing.T) {
-	t.Setenv("STORAGE_ENABLED", "")
-	if _, err := New(context.Background()); err != ErrDisabled {
+	// A-003: New takes injected Config; a zero Config (Enabled:false) → ErrDisabled.
+	if _, err := New(context.Background(), Config{}); err != ErrDisabled {
 		t.Errorf("want ErrDisabled, got %v", err)
 	}
 }

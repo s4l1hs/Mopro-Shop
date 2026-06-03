@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"os"
 
 	"github.com/mopro/platform/pkg/mediaurl"
 )
@@ -26,20 +25,29 @@ type PhotoStorage interface {
 	PublicURL(key string) string
 }
 
-// Enabled reports whether media uploads are turned on (an app bucket exists).
-func Enabled() bool { return os.Getenv("STORAGE_ENABLED") == "true" }
+// Config is the storage configuration (A-003: injected; was os.Getenv in New/newS3Storage).
+// The env-read lives at the binary entry (cmd/core-svc/main.go); tests build Config directly.
+type Config struct {
+	Enabled   bool   // STORAGE_ENABLED == "true"
+	Backend   string // STORAGE_BACKEND ("fs" → filesystem; anything else → S3)
+	FSPath    string // PHOTO_STORAGE_PATH (fs backend)
+	Endpoint  string // STORAGE_ENDPOINT (S3-compatible)
+	Bucket    string // STORAGE_BUCKET
+	Region    string // STORAGE_REGION (default us-east-1 when empty)
+	AccessKey string // STORAGE_ACCESS_KEY
+	SecretKey string // STORAGE_SECRET_KEY
+}
 
-// New builds the configured PhotoStorage. STORAGE_BACKEND selects the impl:
-// "fs" (filesystem, dev/test) or anything else → S3 (default). Returns
-// ErrDisabled when STORAGE_ENABLED != "true".
-func New(ctx context.Context) (PhotoStorage, error) {
-	if !Enabled() {
+// New builds the configured PhotoStorage. cfg.Backend=="fs" → filesystem (dev/test);
+// anything else → S3 (default). Returns ErrDisabled when cfg.Enabled is false.
+func New(ctx context.Context, cfg Config) (PhotoStorage, error) {
+	if !cfg.Enabled {
 		return nil, ErrDisabled
 	}
-	if os.Getenv("STORAGE_BACKEND") == "fs" {
-		return NewFSStorage(os.Getenv("PHOTO_STORAGE_PATH"))
+	if cfg.Backend == "fs" {
+		return NewFSStorage(cfg.FSPath)
 	}
-	return newS3Storage(ctx)
+	return newS3Storage(ctx, cfg)
 }
 
 // publicURL is the shared key→URL resolution (CDN-fronted via CDN_BASE_URL),

@@ -180,7 +180,17 @@ func main() {
 	// provisioned (ADR-0004). When disabled, the upload route 503s and the
 	// consumer surfaces stay dormant.
 	var attachmentsSvc attachments.Service
-	if photoStore, perr := storage.New(initCtx); perr == nil {
+	storageCfg := storage.Config{ // A-003: env read at the binary entry, injected into storage.New
+		Enabled:   os.Getenv("STORAGE_ENABLED") == "true",
+		Backend:   os.Getenv("STORAGE_BACKEND"),
+		FSPath:    os.Getenv("PHOTO_STORAGE_PATH"),
+		Endpoint:  os.Getenv("STORAGE_ENDPOINT"),
+		Bucket:    os.Getenv("STORAGE_BUCKET"),
+		Region:    os.Getenv("STORAGE_REGION"),
+		AccessKey: os.Getenv("STORAGE_ACCESS_KEY"),
+		SecretKey: os.Getenv("STORAGE_SECRET_KEY"),
+	}
+	if photoStore, perr := storage.New(initCtx, storageCfg); perr == nil {
 		attachmentsSvc = attachments.NewService(attachments.NewRepository(pool), photoStore)
 	} else if !errors.Is(perr, storage.ErrDisabled) {
 		slog.Error("media: storage init failed", "err", perr)
@@ -720,7 +730,7 @@ func main() {
 	// ── Media upload (photos) — auth-gated; 503 until STORAGE_ENABLED (ADR-0004) ─
 	mux.Handle("POST /uploads/photos",
 		httpTrace(requireAuth(http.HandlerFunc(
-			handleUploadPhoto(attachmentsSvc, storage.Enabled(), uploadLim),
+			handleUploadPhoto(attachmentsSvc, storageCfg.Enabled, uploadLim),
 		))),
 	)
 
