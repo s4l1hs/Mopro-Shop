@@ -4,6 +4,7 @@ package idempotency_test
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -20,12 +21,16 @@ func gopterParams(minTests int) *gopter.TestParameters {
 	return params
 }
 
-// TestProperty_Key_Deterministic verifies the same inputs always produce the same key.
+// TestProperty_Key_Deterministic verifies Key(userID, k) always equals its documented
+// format `idem:<userID>:<k>`. F-007: the prior assertion was `Key(x) == Key(x)` (SA4000,
+// a near-tautology that passes for any pure fn); comparing against the constructed expected
+// string actually exercises determinism AND pins the format (catches any impl drift).
 func TestProperty_Key_Deterministic(t *testing.T) {
 	properties := gopter.NewProperties(gopterParams(500))
-	properties.Property("Key is deterministic", prop.ForAll(
+	properties.Property("Key matches idem:<userID>:<idemKey>", prop.ForAll(
 		func(userID int64, idemKey string) bool {
-			return idempotency.Key(userID, idemKey) == idempotency.Key(userID, idemKey)
+			want := fmt.Sprintf("idem:%d:%s", userID, idemKey)
+			return idempotency.Key(userID, idemKey) == want
 		},
 		gen.Int64(),
 		gen.AnyString(),
