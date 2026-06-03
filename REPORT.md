@@ -4024,3 +4024,19 @@ New findings: none. TESTING-HOOKs: none. Split-bailout: not fired. **Step 2 is C
 
 ### No parity change
 Test + one rate-limiter Lua fix + CI gate; the only product change is the limiter's unique-member fix.
+
+## PR — Step 3 build #1: tooling CI hygiene + i18n dead-key analyzer — `feat/step3-ci-hygiene-i18n-analyzer`
+
+First Step-3 build PR (bundles T3-1 + T3-2). Closes 4 NOW findings from `TOOLING_AUDIT.md`; one commit per finding.
+
+- **T-003** ✅ — dependency-CVE scanning: `.github/workflows/govulncheck.yml` + `.github/dependabot.yml` (gomod/actions/pub) + `make govulncheck`. The scan found **2 *called* Go stdlib vulns** (GO-2026-5039 net/textproto, GO-2026-5037 crypto/x509; both fixed by Go 1.26.4) → filed **T-014**; workflow is `continue-on-error` until T-014 lands, then required. Per §8 we surface, not patch.
+- **T-004** ✅ — `make help` + `.DEFAULT_GOAL := help` (bare `make` now prints help; confirmed nothing runs bare `make`) + `## ` on 31 dev-facing targets (internal sub-targets omitted so help stays scannable).
+- **T-010** ✅ — `check_i18n.sh --strict` (fails on **extra** keys only — missing keys are by-design for unlaunched TR-only markets, ar/de/en are 37/37/90%) + `make i18n-check` + flutter-ci job. **Canary-proven.**
+- **T-001** ✅ — the long-deferred prefix-aware dead-key analyzer. **Named deviation** from the prompt's AST/`analyzer`-package approach: discovery showed raw string-literal keys (no codegen) + `dart:`-only tooling convention + no root pubspec, and AST resolves nothing extra (dynamic `_key(enum)`/`'$prefix${x}'` keys are unevaluable statically either way). Built `tool/audit/check_i18n_usage.dart` (zero-dep, 13 `--self-test` fixtures, `dart analyze` clean). USED = literal-anywhere ∨ auto-derived interpolation-prefix ∨ allowlist (biased to "used" — safe for a removal gate). Found **163 dead** + **10 missing** → both baselined (ratchet), canary-proven. Discovery doc: `docs/internal/i18n-analyzer.md`.
+
+**T-001 does NOT supersede T-010** — completeness (T-010) vs usage (T-001) are orthogonal; both run (refutes the prompt's "replace check_i18n" premise, consistent with the original audit note).
+
+New findings: **T-014** (Go stdlib vulns, MED/NOW — Go-toolchain bump), **T-015** (10 i18n keys referenced in code but missing from the tr-TR master → raw keys in the TR UI, MED). Both are fix follow-ups (this PR builds gates, not content/toolchain fixes). The dead-key **sweep** (163 keys) is also a follow-up. Split-bailout: not fired (the analyzer came in well under budget — text-based, not AST).
+
+### No parity change
+CI/tooling + one shell-script `--strict` flag; zero product (service/app) code touched.
