@@ -9,6 +9,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -536,4 +537,81 @@ func TestIntegration_AppendOnlyRule(t *testing.T) {
 		t.Errorf("append-only violated: amount_minor changed to %d (expected 100)", storedAmount)
 	}
 	t.Logf("PASS: UPDATE silently swallowed by RULE; entry id=%d amount unchanged=100", entryID)
+}
+
+// TestIntegration_RefreshWorker_RunLoopRefreshesMV exercises the Run ticker LOOP (F-003):
+// with a short interval, Run must refresh the balance MV on its own (not just RefreshOnce),
+// then exit cleanly on context cancel.
+func TestIntegration_RefreshWorker_RunLoopRefreshesMV(t *testing.T) {
+	svc, pool := newTestSvc(t)
+	ctx := context.Background()
+
+	const uniqueUserID = int64(70014)
+	distID, _ := svc.FindAccount(ctx, "equity:cashback_distribution", "TRY_COIN")
+	walletID, _ := svc.OpenOrFindUserWallet(ctx, uniqueUserID, "TRY_COIN")
+
+	const amount = int64(321_00)
+	if _, err := svc.Post(ctx, ledger.PostInput{
+		Type:           "cashback_payment",
+		IdempotencyKey: "integ:e:refresh:runloop:1",
+		Market:         "TR",
+		Currency:       "TRY_COIN",
+		Entries: []ledger.Entry{
+			{AccountID: distID, Direction: ledger.Debit, AmountMinor: amount},
+			{AccountID: walletID, Direction: ledger.Credit, AmountMinor: amount},
+		},
+	}); err != nil {
+		t.Fatalf("Post: %v", err)
+	}
+
+	// Run the LOOP with a fast tick; it should refresh the MV without any explicit RefreshOnce.
+	worker := wallet.NewRefreshWorker(pool, 10*time.Millisecond, slog.Default())
+	rctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() { worker.Run(rctx); close(done) }()
+
+	var mv int64
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		mv, _ = svc.GetBalance(ctx, walletID)
+		if mv == amount {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run did not exit after cancel")
+	}
+	if mv != amount {
+		t.Errorf("MV not refreshed by the Run loop: want %d, got %d", amount, mv)
+	}
+}
+
+// TestIntegration_RefreshWorker_Run_SurvivesRefreshError (F-003): a refresh error must be
+// logged-and-continued, never crash the loop; Run still exits cleanly on cancel. Uses a
+// closed pool so refresh()'s Exec returns an error on every tick.
+func TestIntegration_RefreshWorker_Run_SurvivesRefreshError(t *testing.T) {
+	ctx := context.Background()
+	deadPool, err := pgxpool.New(ctx, testDSNFromEnv())
+	if err != nil {
+		t.Fatalf("pgxpool.New: %v", err)
+	}
+	deadPool.Close() // every refresh Exec now errors ("closed pool")
+
+	worker := wallet.NewRefreshWorker(deadPool, 5*time.Millisecond, slog.Default())
+	rctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() { worker.Run(rctx); close(done) }()
+
+	time.Sleep(40 * time.Millisecond) // several failing ticks — must not panic
+	cancel()
+	select {
+	case <-done:
+		// survived the refresh errors and exited cleanly
+	case <-time.After(2 * time.Second):
+		t.Fatal("Run hung or crashed on repeated refresh errors")
+	}
 }

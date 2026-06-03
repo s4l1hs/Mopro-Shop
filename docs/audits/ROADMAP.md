@@ -7,7 +7,7 @@ marked complete only when its fix PRs land — not when the audit lands.
 | Step | Scope | Audit | Status |
 |---|---|---|---|
 | 1 | Cleanup (dead code / docs / tooling) | `CLEANUP_AUDIT.md` | ✅ **complete** — PRs #54 (audit) → #55 (confirmed removals + `unused` gate) → #56 (re-verify; net-zero). Tooling-blocked remainder (i18n / goldens / Riverpod) → Step 3. |
-| 2 | **Testing / correctness / concurrency** | `docs/audits/TESTING_AUDIT.md` | 🟡 **audited; fixes nearly done.** MED: F-001 (#58), F-006/F-011/F-012 (#59), F-002 partial (4 stubs not-actionable + payment.Service sliced). LOW: F-007 fixed; F-004/F-008/F-010 not-actionable; F-003 deferred (needs wallet-integration gate). Corrected: F-016. **Open: F-017** (NEW, rate-limiter ms-member undercount — product fix), F-003 gate, ungated-wallet-integration observation. |
+| 2 | **Testing / correctness / concurrency** | `docs/audits/TESTING_AUDIT.md` | ✅ **CLOSED** — every finding F-001→F-017 has a terminal outcome. #58 F-001; #59 F-006/F-011/F-012; #60 F-002(partial)/F-007/F-004/F-008/F-010/F-016→F-017; closure PR: wallet-integration gate + F-003 + F-017 (+ F-016 test unskipped). Deferred non-Step-2 passes (UNKNOWN tier): ×50 -race repro, N+1/EXPLAIN, migration-safety, Flutter DevTools rebuild. |
 | 3 | Tooling-blocked audits (i18n key usage, Riverpod inference classes — need usage-aware analyzers) | — | ⏳ not started |
 | 4 | Architecture / modularity audit | — | ⏳ not started |
 | 5 | (reserved) | — | ⏳ not started |

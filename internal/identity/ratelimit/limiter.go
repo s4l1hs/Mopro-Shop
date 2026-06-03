@@ -11,8 +11,10 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -34,13 +36,17 @@ type Limiter interface {
 }
 
 // Lua sliding-window script.
-// KEYS[1] = key, ARGV[1] = window_seconds, ARGV[2] = max_count, ARGV[3] = now_unix_ms
+// KEYS[1] = key, ARGV[1] = window_seconds, ARGV[2] = max_count, ARGV[3] = now_unix_ms,
+// ARGV[4] = unique member (F-017: must be distinct PER REQUEST, else same-millisecond
+// requests collide to one zset element and ZCARD undercounts → limit under-enforced).
+// The score stays now_unix_ms so ZREMRANGEBYSCORE window-trimming is unaffected.
 // Returns 1 if allowed, 0 if rate-limited.
 const slidingWindowLua = `
 local key = KEYS[1]
 local window_ms = tonumber(ARGV[1]) * 1000
 local max = tonumber(ARGV[2])
 local now = tonumber(ARGV[3])
+local member = ARGV[4]
 local cutoff = now - window_ms
 
 redis.call('ZREMRANGEBYSCORE', key, '-inf', cutoff)
@@ -48,7 +54,7 @@ local count = redis.call('ZCARD', key)
 if count >= max then
     return 0
 end
-redis.call('ZADD', key, now, now)
+redis.call('ZADD', key, now, member)
 redis.call('PEXPIRE', key, window_ms)
 return 1
 `
@@ -98,9 +104,12 @@ func (l *RedisLimiter) CheckOTPRequest(ctx context.Context, phoneHash []byte, cl
 }
 
 func (l *RedisLimiter) slidingCheck(ctx context.Context, key string, windowSec, max int64, nowMS int64) error {
+	// F-017: a unique member per request (ms + uuid) so same-millisecond requests occupy
+	// distinct zset slots; the score stays nowMS for window trimming.
+	member := strconv.FormatInt(nowMS, 10) + ":" + uuid.NewString()
 	res, err := l.rdb.Eval(ctx, slidingWindowLua,
 		[]string{key},
-		windowSec, max, nowMS,
+		windowSec, max, nowMS, member,
 	).Int64()
 	if err != nil {
 		return fmt.Errorf("ratelimit: redis eval: %w", err)

@@ -483,17 +483,10 @@ func TestInteg_CreateDevice(t *testing.T) {
 // ── Rate limiter integration tests ───────────────────────────────────────────
 
 func TestInteg_RateLimiter_OTPRequest_PhoneWindow(t *testing.T) {
-	// F-016 was CORRECTED → real cause is F-017 (product, LOW). The PR #59 "shared-integRedis
-	// test-infra" hypothesis was WRONG: tests are sequential (no t.Parallel), so FlushDB can't
-	// race. The real cause is in the sliding-window Lua — `ZADD key now now` uses the
-	// millisecond timestamp as the zset MEMBER, so multiple CheckOTPRequest calls in the same
-	// millisecond collide to one member; ZCARD undercounts and the limit isn't enforced. The
-	// test is timing-sensitive (distinct-ms → pass; same-ms burst → 4th wrongly allowed),
-	// which is exactly the isolated-pass/grouped-fail pattern. This is a real (LOW) limiter
-	// robustness gap (same-ms bursts partially bypass the per-window limit). Fix = unique zset
-	// member per request; deferred to F-017 (security-adjacent product code, own PR). Left
-	// skipped pointing at F-017. Run with IDENTITY_RUN_REVIVAL_GAP=1.
-	skipRevivalGap(t, "RateLimiter_OTPRequest_PhoneWindow: blocked on F-017 (sliding-window Lua uses ms timestamp as zset member → same-ms requests collide/undercount)")
+	// UNSKIPPED: F-017 fixed (the sliding-window Lua now uses a unique member per request
+	// instead of the ms timestamp), so the 3/10min phone window is enforced even when calls
+	// share a millisecond — the timing-sensitivity that made this fail in the full suite is
+	// gone. Burst coverage lives in internal/identity/ratelimit/limiter_burst_test.go.
 	ctx := context.Background()
 	integRedis.FlushDB(ctx)
 	limiter := ratelimit.New(integRedis)
