@@ -78,6 +78,24 @@ make verify
 `make verify` runs: `gofmt`, `go vet`, `go test -race ./...`, `golangci-lint run`,
 `./scripts/check-module-boundaries.sh`, and property tests.
 
+## Tooling audit cadence
+
+Tooling work follows the same **audit-then-build** shape as the testing arc (the read-only
+`TESTING_AUDIT.md` → focused fix PRs #58–#61): a read-only audit lands first, then build PRs
+act on its findings by ID.
+
+- **`docs/audits/TOOLING_AUDIT.md` is the source of truth** for what tooling to build and in what
+  order. Read its §6 "Recommended build sequence" before proposing a new script, workflow, or
+  analyzer — the gap may already be scoped (or may already exist; the audit lists what's
+  EXISTS-FINE so we don't rebuild it).
+- **Build PRs reference the `T-ID`** they close (e.g. `feat/i18n-deadkey-analyzer (closes
+  TOOLING_AUDIT T-001)`), one finding per commit, mirroring the F-ID discipline.
+- **Honest-zero is allowed.** A category with no gap is written up as `VERIFIED-COMPLETE` with the
+  `git grep`/`ls`/`make -n` command that proves it — don't manufacture findings to look thorough
+  (the PR #56 lesson). New gaps discovered while building are added to the audit, not silently fixed.
+- **Re-verify at PR time.** A finding is only as good as its evidence on the current branch; the
+  Step-3 audit caught two from-memory false positives (rollback, golden-diff) by reading the code.
+
 ## Commit conventions
 
 Follow conventional commits: `feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`.
