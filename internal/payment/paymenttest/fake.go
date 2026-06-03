@@ -30,14 +30,14 @@ type Fake struct {
 	TransferErr    error
 
 	// Recording — last request per method (nil pointer / zero = not called).
-	LastInitiate  *payment.InitiatePaymentRequest
-	LastWebhook   []byte
+	LastInitiate   *payment.InitiatePaymentRequest
+	LastWebhook    []byte
 	LastWebhookSig string
-	LastRefund    *payment.RefundRequest
-	LastStatusRef string
-	LastSubMerch  *payment.RegisterSubMerchantRequest
-	LastTransfer  *payment.TransferToSellerRequest
-	Calls         int
+	LastRefund     *payment.RefundRequest
+	LastStatusRef  string
+	LastSubMerch   *payment.RegisterSubMerchantRequest
+	LastTransfer   *payment.TransferToSellerRequest
+	Calls          int
 }
 
 // Compile-time check: Fake satisfies the production payment.Service interface.
