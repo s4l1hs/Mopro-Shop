@@ -97,11 +97,13 @@ func TestRegisterProvider_StoresUnderName(t *testing.T) {
 // Standard re-exec idiom — the child runs the same test with BE_FATAL=1 and must exit non-zero.
 func TestNewService_MissingProvider_FatalExit(t *testing.T) {
 	if os.Getenv("BE_FATAL") == "1" {
-		os.Unsetenv("PSP_PROVIDER")
+		_ = os.Unsetenv("PSP_PROVIDER")
 		NewService(SipayConfig{}, nil) // log.Fatal → os.Exit(1)
 		return                         // unreachable if Fatal fired
 	}
-	cmd := exec.Command(os.Args[0], "-test.run=^TestNewService_MissingProvider_FatalExit$")
+	// #nosec G204 -- standard log.Fatal test idiom: re-exec THIS test binary (os.Args[0])
+	// with a constant -test.run filter; no external/tainted input.
+	cmd := exec.Command(os.Args[0], "-test.run=^TestNewService_MissingProvider_FatalExit$") //nolint:gosec
 	cmd.Env = append(os.Environ(), "BE_FATAL=1")
 	err := cmd.Run()
 	var exitErr *exec.ExitError
