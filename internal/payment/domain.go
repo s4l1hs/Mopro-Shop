@@ -151,4 +151,5 @@ type SipayConfig struct {
 	MerchantID  string // SIPAY_MERCHANT_ID
 	ReturnURL   string // SIPAY_RETURN_URL
 	CancelURL   string // SIPAY_CANCEL_URL
+	Environment string // GO_ENV — "production" triggers the prod-safety guard (A-003: was os.Getenv in validateConfig)
 }

@@ -528,8 +528,9 @@ func containsStr(s, substr string) bool {
 
 // TestD2_ProductionGuard verifies that a sandbox MerchantKey is rejected in production.
 func TestD2_ProductionGuard(t *testing.T) {
-	t.Setenv("GO_ENV", "production")
+	// A-003: the prod-safety guard now reads SipayConfig.Environment (was os.Getenv("GO_ENV")).
 	_, err := sipay.NewAdapter(payment.SipayConfig{
+		Environment: "production",
 		BaseURL:     "https://provisioning.sipay.com.tr",
 		MerchantKey: "test_my_key", // sandbox prefix — should be rejected
 		AppID:       "x",
@@ -537,13 +538,13 @@ func TestD2_ProductionGuard(t *testing.T) {
 		MerchantID:  "z",
 	}, newStubRepo(), nil)
 	if err == nil {
-		t.Error("expected error for sandbox MerchantKey in production GO_ENV, got nil")
+		t.Error("expected error for sandbox MerchantKey in production, got nil")
 	}
 }
 
 func TestD2_ProductionGuard_WrongURL(t *testing.T) {
-	t.Setenv("GO_ENV", "production")
 	_, err := sipay.NewAdapter(payment.SipayConfig{
+		Environment: "production",
 		BaseURL:     "https://sandbox.sipay.dev", // wrong host
 		MerchantKey: "prod_live_key",
 		AppID:       "x",
@@ -551,7 +552,7 @@ func TestD2_ProductionGuard_WrongURL(t *testing.T) {
 		MerchantID:  "z",
 	}, newStubRepo(), nil)
 	if err == nil {
-		t.Error("expected error for non-production BaseURL in production GO_ENV, got nil")
+		t.Error("expected error for non-production BaseURL in production, got nil")
 	}
 }
 

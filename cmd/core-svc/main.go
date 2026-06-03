@@ -198,6 +198,7 @@ func main() {
 		MerchantID:  mustEnv("SIPAY_MERCHANT_ID"),
 		ReturnURL:   os.Getenv("SIPAY_RETURN_URL"),
 		CancelURL:   os.Getenv("SIPAY_CANCEL_URL"),
+		Environment: os.Getenv("GO_ENV"), // A-003: prod-safety guard now reads injected config
 	}
 	paymentSvc, err := payment.NewService(os.Getenv("PSP_PROVIDER"), sipaycfg, paymentRepo)
 	if err != nil {
