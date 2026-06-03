@@ -76,12 +76,32 @@ Declared set = flattened `tr-TR.json` leaf keys (master = source of truth).
 
 ## Output + exit codes
 
-- `--manifest` → JSON: `{declared, used, unused[], missing[], unresolved[]}`.
-- `--check` (CI): exit 1 if `missing != 0`, or if the `unused` set differs from
-  `tool/audit/i18n_usage_baseline.txt`. The only legal way to change the baseline
-  is the follow-up sweep PR (which edits the baseline alongside the JSON removals).
+- `--manifest` → JSON: `{declared, unused[], missing[], unresolved_sites}`.
+- `--check` (CI): **ratchet** — exit 1 on any drift from EITHER baseline:
+  `i18n_usage_baseline.txt` (dead/unused keys) or `i18n_missing_baseline.txt`
+  (missing keys). A "new dead key" or "new missing key" fails; a baseline that
+  lists a key no longer dead/missing also fails (stale). The legal way to change
+  a baseline is the follow-up sweep PR (dead keys) / translation-fix PR (missing).
 - `--self-test` → runs the resolver fixtures; exit 1 on any failure.
 - default (no flag) → human-readable summary.
+
+### Discovery result on the full repo (this PR's baselines)
+
+Running the analyzer on `mobile/lib` against the 740-key master:
+- **163 dead (unused)** keys → frozen in `i18n_usage_baseline.txt`. The follow-up
+  **sweep PR** removes them + clears the baseline.
+- **10 missing** keys → frozen in `i18n_missing_baseline.txt`. These are a **real
+  bug** (code calls e.g. `'checkout.payment_3ds'.tr()` / `'common.yes'.tr()` but
+  the master — the launched TR locale — lacks them, so users see raw key strings).
+  Fixing them is translation content, out of scope for this gate PR (§8) — filed
+  as **TOOLING_AUDIT T-015** for a focused translation-fix PR. Baselining them
+  makes the gate green + ratchets against NEW missing keys.
+- 24 `.tr()` sites have non-literal receivers (variables / `_key(enum)`) — all
+  resolved as used via the literal-anywhere rule; reported as informational.
+
+Originally the doc planned `missing != 0 → hard fail`; discovery on the full repo
+turned up 10 pre-existing missing keys, so missing is **baselined** like unused
+(same ratchet) rather than blocking adoption on a pre-existing bug.
 
 ## Limitations (documented, not bugs)
 
