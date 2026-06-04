@@ -116,6 +116,8 @@ type ProductSummaryRow struct {
 	OriginalPriceMinor *int64   // null when no discount; render strikethrough on UI
 	RatingAvg          *float64 // null when no reviews
 	RatingCount        int
+	FreeShipping       bool // products.free_shipping flag (P-028 column) — P-009 badge
+	FavoritesCount     int  // count of user_favorites rows for this product (P-004)
 }
 
 // ProductFilter holds the optional filter + sort knobs for product listing and
