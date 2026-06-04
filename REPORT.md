@@ -4304,3 +4304,15 @@ Backend foundation for the data-dark card/PDP findings. Discovery `docs/internal
 
 ### Step 5 status (post enrichment)
 P-004 + P-009 **backend-unblocked**; P-008b discount done; **P-030 opened** (lowest_30d / price-history, HIGH compliance). Remaining: P-007 (delivery-ETA), P-029 (bestseller), P-030 (price-history), chi-square flake, + the P-004/P-009 frontend-wiring PR.
+
+## PR — P-004 + P-009 frontend wiring (`feat/wire-card-badges`) — closes PARITY_AUDIT P-004 + P-009 (frontend-wiring)
+
+Renders the ProductSummary fields PR #88 enriched. Discovery `docs/internal/p004-p009-wiring.md`. Card-scoped (both findings are card findings; the PDP uses the un-enriched full `Product` → out of scope).
+
+- **P-004 — RESOLVED.** `ProductCard` shows a `♥{count}` social-proof overlay (bottom-left of the image, distinct from the top-right toggle; server count, no optimistic update). `formatCompactCount` (new `lib/utils/count_format.dart`): `<10` hidden, `10–999` raw, `≥1000` → "1.2K"/M (period + K/M, avoids Turkish compact "B" ambiguity).
+- **P-009 — RESOLVED.** Free-shipping "Ücretsiz Kargo" badge (top-left image overlay, reuses `plp.free_shipping`) when `product.freeShipping`. Discount badge already rendered (`DiscountPill`, #78); flash derivable from `flash_price_minor`. Bestseller stays deferred (→ P-029).
+- Both overlays kept off the text column (can't overflow tight grid cells); translucent-dark + white = AA-safe both themes, **no new design token**. Also updated `productSummaryFromApi` so recommendations/recently-viewed/similar cards populate the fields.
+- **i18n:** 0 new keys (reused `plp.free_shipping`). **Goldens:** 0 flips — card fixtures use `favoritesCount=0`/`freeShipping=false` (overlays hidden). 5 new tests (formatter + card rendering). `flutter analyze` clean; `make verify` green.
+
+### Step 5 status (post P-004/P-009 frontend)
+**P-004 + P-009 ✅ RESOLVED — the pure-UI Trendyol-parity work is complete.** Remaining (all backend/architectural): P-007 (delivery-ETA), P-029 (bestseller sort/badge — catalog-side popularity), P-030 (price-history / lowest_30d — compliance), chi-square flake.
