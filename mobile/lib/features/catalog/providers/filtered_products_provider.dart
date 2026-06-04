@@ -2,15 +2,16 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/api/client.dart';
 import 'package:mopro/core/network/app_error.dart';
+import 'package:mopro/features/catalog/plp/plp_filters.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
 import 'package:mopro/features/catalog/providers/products_by_category_provider.dart';
 import 'package:mopro_api/mopro_api.dart';
 
-/// Family key is the category id as a string (e.g. `'42'`). The active sort is
-/// sourced from `plpFiltersProvider(categoryId)`; changing the sort rebuilds
-/// this provider and refetches from page 1. (Price/brand/rating/shipping live
-/// in the same filter state for the URL + the 5b sidebar but do not yet affect
-/// the fetch — the catalog API only filters by sort today; see REPORT §8.4.)
+/// Family key is the category id as a string (e.g. `'42'`). The full `PlpFilters`
+/// (sort + price + brand + rating + free-shipping + in-stock) is sourced from
+/// `plpFiltersProvider(categoryId)`; any filter/sort change rebuilds this provider
+/// and refetches from page 1, passing every dimension to the P-028 filter-aware
+/// catalog API. `loadMore` paginates with the same captured filter.
 final filteredProductsProvider =
     NotifierProviderFamily<FilteredProductsNotifier, ProductsState, String>(
   FilteredProductsNotifier.new,
@@ -19,12 +20,12 @@ final filteredProductsProvider =
 class FilteredProductsNotifier
     extends FamilyNotifier<ProductsState, String> {
   late int _categoryId;
-  late String _sort;
+  late PlpFilters _filters;
 
   @override
   ProductsState build(String arg) {
     _categoryId = int.parse(arg);
-    _sort = ref.watch(plpFiltersProvider(arg).select((f) => f.sort)).token;
+    _filters = ref.watch(plpFiltersProvider(arg));
     // Defer the fetch: _load mutates `state`, which is illegal during build
     // (the notifier isn't mounted yet). The microtask runs once build returns.
     Future.microtask(() => _load(1, replace: true));
@@ -45,10 +46,17 @@ class FilteredProductsNotifier
     }
     try {
       final api = ref.read(catalogApiProvider);
+      final f = _filters;
       final resp = await api.listProducts(
         categoryId: _categoryId,
         page: page,
-        sort: _sort,
+        sort: f.sort.token,
+        minPrice: f.priceMinMinor,
+        maxPrice: f.priceMaxMinor,
+        brand: f.brands.isEmpty ? null : f.brands,
+        rating: f.ratingMin,
+        freeShipping: f.freeShippingOnly ? true : null,
+        inStock: f.inStock ? true : null,
       );
       final incoming = resp.data?.data ?? [];
       final meta = resp.data?.pagination;
