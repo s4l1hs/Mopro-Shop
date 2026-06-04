@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -304,41 +305,97 @@ func (r *pgxRepository) ListCategories(ctx context.Context, locale string, maxDe
 	return cats, rows.Err()
 }
 
-func (r *pgxRepository) ListProductsByCategory(ctx context.Context, categoryID int64, locale string, offset, limit int) ([]ProductSummaryRow, int, error) {
-	rows, err := r.pool.Query(ctx,
-		`SELECT p.id, p.seller_id, p.category_id, p.brand, p.status,
-		        COALESCE(t.title, '') AS title,
-		        v.price_minor, v.price_currency,
-		        COALESCE(v.image_keys[1], '') AS cover_image_key,
-		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
-		        v.original_price_minor,
-		        p.rating_avg, p.rating_count,
-		        count(*) OVER() AS total_count
-		FROM catalog_schema.products p
-		JOIN catalog_schema.product_translations t
-		     ON t.product_id = p.id AND t.locale = $2
-		JOIN LATERAL (
-		    SELECT price_minor, price_currency, image_keys, original_price_minor
-		    FROM catalog_schema.variants
-		    WHERE product_id = p.id
-		    ORDER BY price_minor ASC
-		    LIMIT 1
-		) v ON TRUE
-		LEFT JOIN ref_schema.commission_rules cr
-		       ON cr.category_id = p.category_id
-		      AND cr.active = TRUE
-		      AND (cr.effective_to IS NULL OR cr.effective_to > now())
-		WHERE p.category_id = $1
-		  AND p.status = 'active'
-		ORDER BY p.id DESC
-		LIMIT $3 OFFSET $4`,
-		categoryID, locale, limit, offset,
-	)
-	if err != nil {
-		return nil, 0, fmt.Errorf("catalog.repo: ListProductsByCategory: %w", err)
-	}
-	defer rows.Close()
+// productSummarySelect is the shared SELECT/FROM/JOIN preamble for the product
+// listing + search summary queries. The lowest-priced variant (LATERAL) supplies
+// the representative price; ref_schema.commission_rules is the allowed
+// cross-schema join (CLAUDE.md §5). $1 is the leading arg (category id or search
+// query); $2 is the locale. Callers append a base WHERE, optional filter clauses
+// (appendProductFilters, from $3), an ORDER BY (orderByClause), and LIMIT/OFFSET.
+const productSummarySelect = `SELECT p.id, p.seller_id, p.category_id, p.brand, p.status,
+	        COALESCE(t.title, '') AS title,
+	        v.price_minor, v.price_currency,
+	        COALESCE(v.image_keys[1], '') AS cover_image_key,
+	        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
+	        v.original_price_minor,
+	        p.rating_avg, p.rating_count,
+	        count(*) OVER() AS total_count
+	FROM catalog_schema.products p
+	JOIN catalog_schema.product_translations t
+	     ON t.product_id = p.id AND t.locale = $2
+	JOIN LATERAL (
+	    SELECT price_minor, price_currency, image_keys, original_price_minor
+	    FROM catalog_schema.variants
+	    WHERE product_id = p.id
+	    ORDER BY price_minor ASC
+	    LIMIT 1
+	) v ON TRUE
+	LEFT JOIN ref_schema.commission_rules cr
+	       ON cr.category_id = p.category_id
+	      AND cr.active = TRUE
+	      AND (cr.effective_to IS NULL OR cr.effective_to > now())`
 
+// appendProductFilters appends the optional filter WHERE clauses for f to sb
+// (which already holds the base SELECT…WHERE), binding values into args. argN is
+// the next free positional placeholder; the returned int is the next free one
+// after. Boolean filters constrain only when explicitly true. Every value is
+// bound — the token-free clauses never interpolate user input.
+func appendProductFilters(sb *strings.Builder, args []any, f ProductFilter, argN int) ([]any, int) {
+	if f.CategoryID != nil {
+		fmt.Fprintf(sb, " AND p.category_id = $%d", argN)
+		args = append(args, *f.CategoryID)
+		argN++
+	}
+	if f.MinPriceMinor != nil {
+		fmt.Fprintf(sb, " AND v.price_minor >= $%d", argN)
+		args = append(args, *f.MinPriceMinor)
+		argN++
+	}
+	if f.MaxPriceMinor != nil {
+		fmt.Fprintf(sb, " AND v.price_minor <= $%d", argN)
+		args = append(args, *f.MaxPriceMinor)
+		argN++
+	}
+	if len(f.Brands) > 0 {
+		fmt.Fprintf(sb, " AND p.brand = ANY($%d)", argN)
+		args = append(args, f.Brands)
+		argN++
+	}
+	if f.MinRating != nil {
+		fmt.Fprintf(sb, " AND p.rating_avg >= $%d", argN)
+		args = append(args, *f.MinRating)
+		argN++
+	}
+	if f.FreeShipping != nil && *f.FreeShipping {
+		sb.WriteString(" AND p.free_shipping = TRUE")
+	}
+	if f.InStock != nil && *f.InStock {
+		sb.WriteString(" AND EXISTS (SELECT 1 FROM catalog_schema.variants vs" +
+			" WHERE vs.product_id = p.id AND vs.stock > 0)")
+	}
+	return args, argN
+}
+
+// orderByClause maps a PlpSort token to a safe ORDER BY. Unknown/unsupported
+// tokens — including bestseller until P-029 — fall back to recommended; it never
+// errors and never interpolates the token. The trailing p.id keeps order stable.
+func orderByClause(sort string) string {
+	switch sort {
+	case "newest":
+		return " ORDER BY p.created_at DESC, p.id DESC"
+	case "price_asc":
+		return " ORDER BY v.price_minor ASC, p.id DESC"
+	case "price_desc":
+		return " ORDER BY v.price_minor DESC, p.id DESC"
+	case "cashback_desc":
+		return " ORDER BY (v.price_minor * COALESCE(cr.commission_pct_bps, 0)) DESC, p.id DESC"
+	default:
+		return " ORDER BY p.id DESC"
+	}
+}
+
+// scanProductSummaries scans rows into a ProductSummaryRow slice plus the
+// windowed total. Shared by the listing + search summary queries.
+func scanProductSummaries(rows pgx.Rows, label string) ([]ProductSummaryRow, int, error) {
 	var results []ProductSummaryRow
 	var total int
 	for rows.Next() {
@@ -349,7 +406,7 @@ func (r *pgxRepository) ListProductsByCategory(ctx context.Context, categoryID i
 			&s.CoverImageKey, &s.CommissionPctBps,
 			&s.OriginalPriceMinor, &s.RatingAvg, &s.RatingCount, &total,
 		); err != nil {
-			return nil, 0, fmt.Errorf("catalog.repo: scan product summary: %w", err)
+			return nil, 0, fmt.Errorf("catalog.repo: scan %s: %w", label, err)
 		}
 		results = append(results, s)
 	}
@@ -359,60 +416,42 @@ func (r *pgxRepository) ListProductsByCategory(ctx context.Context, categoryID i
 	return results, total, rows.Err()
 }
 
-func (r *pgxRepository) SearchProductsSummary(ctx context.Context, query, locale string, offset, limit int) ([]ProductSummaryRow, int, error) {
-	rows, err := r.pool.Query(ctx,
-		`SELECT p.id, p.seller_id, p.category_id, p.brand, p.status,
-		        COALESCE(t.title, '') AS title,
-		        v.price_minor, v.price_currency,
-		        COALESCE(v.image_keys[1], '') AS cover_image_key,
-		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
-		        v.original_price_minor,
-		        p.rating_avg, p.rating_count,
-		        count(*) OVER() AS total_count
-		FROM catalog_schema.products p
-		JOIN catalog_schema.product_translations t
-		     ON t.product_id = p.id AND t.locale = $2
-		JOIN LATERAL (
-		    SELECT price_minor, price_currency, image_keys, original_price_minor
-		    FROM catalog_schema.variants
-		    WHERE product_id = p.id
-		    ORDER BY price_minor ASC
-		    LIMIT 1
-		) v ON TRUE
-		LEFT JOIN ref_schema.commission_rules cr
-		       ON cr.category_id = p.category_id
-		      AND cr.active = TRUE
-		      AND (cr.effective_to IS NULL OR cr.effective_to > now())
-		WHERE p.status = 'active'
-		  AND (t.search_vector @@ plainto_tsquery('simple', $1)
-		       OR t.title ILIKE '%' || $1 || '%')
-		ORDER BY p.id DESC
-		LIMIT $3 OFFSET $4`,
-		query, locale, limit, offset,
-	)
+func (r *pgxRepository) ListProductsByCategory(ctx context.Context, categoryID int64, locale string, filter ProductFilter, offset, limit int) ([]ProductSummaryRow, int, error) {
+	var sb strings.Builder
+	sb.WriteString(productSummarySelect)
+	sb.WriteString(" WHERE p.category_id = $1 AND p.status = 'active'")
+	args := []any{categoryID, locale}
+	args, argN := appendProductFilters(&sb, args, filter, 3)
+	sb.WriteString(orderByClause(filter.Sort))
+	fmt.Fprintf(&sb, " LIMIT $%d OFFSET $%d", argN, argN+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.pool.Query(ctx, sb.String(), args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("catalog.repo: ListProductsByCategory: %w", err)
+	}
+	defer rows.Close()
+	return scanProductSummaries(rows, "product summary")
+}
+
+func (r *pgxRepository) SearchProductsSummary(ctx context.Context, query, locale string, filter ProductFilter, offset, limit int) ([]ProductSummaryRow, int, error) {
+	var sb strings.Builder
+	sb.WriteString(productSummarySelect)
+	sb.WriteString(" WHERE p.status = 'active'" +
+		" AND (t.search_vector @@ plainto_tsquery('simple', $1)" +
+		" OR t.title ILIKE '%' || $1 || '%')")
+	args := []any{query, locale}
+	args, argN := appendProductFilters(&sb, args, filter, 3)
+	sb.WriteString(orderByClause(filter.Sort))
+	fmt.Fprintf(&sb, " LIMIT $%d OFFSET $%d", argN, argN+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.pool.Query(ctx, sb.String(), args...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("catalog.repo: SearchProductsSummary: %w", err)
 	}
 	defer rows.Close()
-
-	var results []ProductSummaryRow
-	var total int
-	for rows.Next() {
-		var s ProductSummaryRow
-		if err := rows.Scan(
-			&s.ID, &s.SellerID, &s.CategoryID, &s.Brand, &s.Status,
-			&s.Title, &s.PriceMinor, &s.PriceCurrency,
-			&s.CoverImageKey, &s.CommissionPctBps,
-			&s.OriginalPriceMinor, &s.RatingAvg, &s.RatingCount, &total,
-		); err != nil {
-			return nil, 0, fmt.Errorf("catalog.repo: scan search summary: %w", err)
-		}
-		results = append(results, s)
-	}
-	if results == nil {
-		results = []ProductSummaryRow{}
-	}
-	return results, total, rows.Err()
+	return scanProductSummaries(rows, "search summary")
 }
 
 func (r *pgxRepository) GetVariantByID(ctx context.Context, variantID int64) (Variant, error) {

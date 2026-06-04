@@ -701,15 +701,10 @@ paths:
     get:
       operationId: ListProducts
       tags: [catalog]
-      summary: List products with optional category filter, pagination, and sort
+      summary: List products with category filter, price/brand/rating/shipping filters, pagination, and sort
       parameters:
         - $ref: '#/components/parameters/TraceId'
-        - name: category_id
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int64
+        - $ref: '#/components/parameters/FilterCategoryId'
         - name: page
           in: query
           required: false
@@ -725,13 +720,13 @@ paths:
             minimum: 1
             maximum: 100
             default: 20
-        - name: sort
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [recommended, newest, price_asc, price_desc, best_selling]
-            default: recommended
+        - $ref: '#/components/parameters/FilterMinPrice'
+        - $ref: '#/components/parameters/FilterMaxPrice'
+        - $ref: '#/components/parameters/FilterBrand'
+        - $ref: '#/components/parameters/FilterRating'
+        - $ref: '#/components/parameters/FilterFreeShipping'
+        - $ref: '#/components/parameters/FilterInStock'
+        - $ref: '#/components/parameters/FilterSort'
       responses:
         '200':
           description: Paginated product list
@@ -904,33 +899,7 @@ paths:
           schema:
             type: string
             minLength: 1
-        - name: category_id
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int64
-        - name: min_price
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int64
-            description: Minimum price in minor units
-        - name: max_price
-          in: query
-          required: false
-          schema:
-            type: integer
-            format: int64
-            description: Maximum price in minor units
-        - name: sort
-          in: query
-          required: false
-          schema:
-            type: string
-            enum: [recommended, newest, price_asc, price_desc, best_selling]
-            default: recommended
+        - $ref: '#/components/parameters/FilterCategoryId'
         - name: page
           in: query
           required: false
@@ -946,6 +915,13 @@ paths:
             minimum: 1
             maximum: 100
             default: 20
+        - $ref: '#/components/parameters/FilterMinPrice'
+        - $ref: '#/components/parameters/FilterMaxPrice'
+        - $ref: '#/components/parameters/FilterBrand'
+        - $ref: '#/components/parameters/FilterRating'
+        - $ref: '#/components/parameters/FilterFreeShipping'
+        - $ref: '#/components/parameters/FilterInStock'
+        - $ref: '#/components/parameters/FilterSort'
       responses:
         '200':
           description: Search results
@@ -1796,6 +1772,83 @@ components:
       schema:
         type: string
         example: "4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e"
+
+    # ── Catalog/search filter + sort params (P-028) ───────────────────────────
+    # Shared by GET /products and GET /search so both endpoints filter+sort
+    # identically. All optional; omitting one applies no constraint on that
+    # dimension. The backend maps an unknown `sort` token to `recommended`
+    # (never errors) — `bestseller` is intentionally absent until P-029.
+    FilterCategoryId:
+      name: category_id
+      in: query
+      required: false
+      description: Scope results to a category (optional on /search).
+      schema:
+        type: integer
+        format: int64
+    FilterMinPrice:
+      name: min_price
+      in: query
+      required: false
+      description: Minimum price in minor units (filters the displayed/lowest variant price).
+      schema:
+        type: integer
+        format: int64
+        minimum: 0
+    FilterMaxPrice:
+      name: max_price
+      in: query
+      required: false
+      description: Maximum price in minor units (filters the displayed/lowest variant price).
+      schema:
+        type: integer
+        format: int64
+        minimum: 0
+    FilterBrand:
+      name: brand
+      in: query
+      required: false
+      description: Repeatable; matches any of the given brands (?brand=Nike&brand=Adidas).
+      schema:
+        type: array
+        items:
+          type: string
+      style: form
+      explode: true
+    FilterRating:
+      name: rating
+      in: query
+      required: false
+      description: Minimum average rating (products with rating_avg >= this).
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 5
+    FilterFreeShipping:
+      name: free_shipping
+      in: query
+      required: false
+      description: When true, only products flagged free-shipping.
+      schema:
+        type: boolean
+    FilterInStock:
+      name: in_stock
+      in: query
+      required: false
+      description: When true, only products with at least one in-stock variant.
+      schema:
+        type: boolean
+    FilterSort:
+      name: sort
+      in: query
+      required: false
+      description: |
+        Sort order. Unknown/unsupported tokens fall back to `recommended`.
+        `bestseller` is not yet supported server-side (P-029).
+      schema:
+        type: string
+        enum: [recommended, newest, price_asc, price_desc, cashback_desc]
+        default: recommended
 
   responses:
     BadRequest:

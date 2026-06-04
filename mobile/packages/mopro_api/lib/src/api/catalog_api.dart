@@ -375,15 +375,21 @@ _responseData = rawData == null ? null : deserialize<ListCategories200Response, 
     );
   }
 
-  /// List products with optional category filter, pagination, and sort
+  /// List products with category filter, price/brand/rating/shipping filters, pagination, and sort
   /// 
   ///
   /// Parameters:
   /// * [xTraceId] - Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
-  /// * [categoryId] 
+  /// * [categoryId] - Scope results to a category (optional on /search).
   /// * [page] 
   /// * [perPage] 
-  /// * [sort] 
+  /// * [minPrice] - Minimum price in minor units (filters the displayed/lowest variant price).
+  /// * [maxPrice] - Maximum price in minor units (filters the displayed/lowest variant price).
+  /// * [brand] - Repeatable; matches any of the given brands (?brand=Nike&brand=Adidas).
+  /// * [rating] - Minimum average rating (products with rating_avg >= this).
+  /// * [freeShipping] - When true, only products flagged free-shipping.
+  /// * [inStock] - When true, only products with at least one in-stock variant.
+  /// * [sort] - Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` is not yet supported server-side (P-029). 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -398,6 +404,12 @@ _responseData = rawData == null ? null : deserialize<ListCategories200Response, 
     int? categoryId,
     int? page = 1,
     int? perPage = 20,
+    int? minPrice,
+    int? maxPrice,
+    List<String>? brand,
+    int? rating,
+    bool? freeShipping,
+    bool? inStock,
     String? sort = 'recommended',
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -430,6 +442,12 @@ _responseData = rawData == null ? null : deserialize<ListCategories200Response, 
       if (categoryId != null) r'category_id': categoryId,
       if (page != null) r'page': page,
       if (perPage != null) r'per_page': perPage,
+      if (minPrice != null) r'min_price': minPrice,
+      if (maxPrice != null) r'max_price': maxPrice,
+      if (brand != null) r'brand': brand,
+      if (rating != null) r'rating': rating,
+      if (freeShipping != null) r'free_shipping': freeShipping,
+      if (inStock != null) r'in_stock': inStock,
       if (sort != null) r'sort': sort,
     };
 

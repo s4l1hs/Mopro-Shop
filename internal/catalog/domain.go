@@ -118,6 +118,22 @@ type ProductSummaryRow struct {
 	RatingCount        int
 }
 
+// ProductFilter holds the optional filter + sort knobs for product listing and
+// search (P-028). The zero value applies no constraints. Nil pointers / empty
+// slices mean "unset"; an unknown Sort token falls back to recommended (see
+// repository.orderByClause). Price filters match the displayed (lowest-variant)
+// price. Brands is an ANY-match. FreeShipping/InStock constrain only when true.
+type ProductFilter struct {
+	CategoryID    *int64   // search-only; PLP passes its dedicated categoryID arg
+	MinPriceMinor *int64   // v.price_minor >= MinPriceMinor
+	MaxPriceMinor *int64   // v.price_minor <= MaxPriceMinor
+	Brands        []string // p.brand = ANY(Brands)
+	MinRating     *int     // p.rating_avg >= MinRating (1..5)
+	FreeShipping  *bool    // true => only free-shipping products
+	InStock       *bool    // true => only products with an in-stock variant
+	Sort          string   // PlpSort token; "" or unknown => recommended
+}
+
 // CategoryCommission holds the currently active commission + KDV rates for a
 // market/category pair, read from ref_schema.commission_rules.
 type CategoryCommission struct {

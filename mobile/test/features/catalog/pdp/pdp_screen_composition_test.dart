@@ -57,6 +57,12 @@ class _FakeCatalogApi extends CatalogApi {
 
   @override
   Future<Response<ListProducts200Response>> listProducts({
+    int? minPrice,
+    int? maxPrice,
+    List<String>? brand,
+    int? rating,
+    bool? freeShipping,
+    bool? inStock,
     String? xTraceId,
     int? categoryId,
     int? page = 1,

@@ -27,8 +27,8 @@ type Service interface {
 	// a root parent is at most `maxDepth` (root=0, direct children=1, …).
 	// Pass 0 for "no limit" — preserves the historical behavior.
 	ListCategories(ctx context.Context, locale string, maxDepth int) ([]CategoryRow, error)
-	ListProductsByCategory(ctx context.Context, categoryID int64, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error)
-	SearchSummary(ctx context.Context, query, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error)
+	ListProductsByCategory(ctx context.Context, categoryID int64, locale, market string, filter ProductFilter, page, perPage int) ([]ProductSummaryRow, int, error)
+	SearchSummary(ctx context.Context, query, locale, market string, filter ProductFilter, page, perPage int) ([]ProductSummaryRow, int, error)
 
 	// ListProductsByIDs fetches product summaries for the given IDs (guest favorites, batch hydration).
 	ListProductsByIDs(ctx context.Context, ids []int64, locale, market string) ([]ProductSummaryRow, error)
@@ -83,8 +83,8 @@ type Repository interface {
 
 	// Discovery queries (Phase 4.4a).
 	ListCategories(ctx context.Context, locale string, maxDepth int) ([]CategoryRow, error)
-	ListProductsByCategory(ctx context.Context, categoryID int64, locale string, offset, limit int) ([]ProductSummaryRow, int, error)
-	SearchProductsSummary(ctx context.Context, query, locale string, offset, limit int) ([]ProductSummaryRow, int, error)
+	ListProductsByCategory(ctx context.Context, categoryID int64, locale string, filter ProductFilter, offset, limit int) ([]ProductSummaryRow, int, error)
+	SearchProductsSummary(ctx context.Context, query, locale string, filter ProductFilter, offset, limit int) ([]ProductSummaryRow, int, error)
 
 	ListProductsByIDs(ctx context.Context, ids []int64, locale string) ([]ProductSummaryRow, error)
 	HomeRails(ctx context.Context) ([]HomeRailRow, error)

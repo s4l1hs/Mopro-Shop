@@ -71,10 +71,10 @@ func (m *multiVariantCatalogMock) GetVariantByID(_ context.Context, id int64) (c
 func (m *multiVariantCatalogMock) ListCategories(_ context.Context, _ string, _ int) ([]catalog.CategoryRow, error) {
 	return nil, nil
 }
-func (m *multiVariantCatalogMock) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+func (m *multiVariantCatalogMock) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
-func (m *multiVariantCatalogMock) SearchSummary(_ context.Context, _, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+func (m *multiVariantCatalogMock) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
 func (m *multiVariantCatalogMock) ListProductsByIDs(_ context.Context, _ []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {

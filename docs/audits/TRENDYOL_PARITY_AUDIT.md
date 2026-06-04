@@ -20,10 +20,11 @@
 i18n hardcoded-string sweep landed across **7 phased PRs** (#79 app_router · #80 auth+sipay · #81 account ·
 #82 verification+marketing · #83 checkout+singletons), ~250+ strings, 0 hardcoded TR left in UI sinks. The
 arc's lessons (full-file reads, key+JSON test pattern, const→build-time, golden-prediction, diacritic-undercount,
-orphaned-widget) are the canonical i18n template. **P-026 closed as `BLOCKED-BY-BACKEND-GAP`** — discovery
-(`docs/internal/p026-filter-wiring.md`) proved the filter frontend is fully built but the catalog/search backend
-applies no filter or sort dimension; frontend wiring is queued behind new finding **P-028 (HIGH, backend)**.
-**Step-5 findings triaged: P-005, P-006, P-020, P-014 resolved + P-026 closed-as-blocked (5 of ~12); P-028 opened.**
+orphaned-widget) are the canonical i18n template. **P-026 closed as `BLOCKED-BY-BACKEND-GAP`**, then **P-028 ✅ RESOLVED**
+(`feat/catalog-filter-api`) — the catalog/search backend now filters (price/brand/rating/free_shipping/in_stock/
+category) + sorts (5 tokens) end-to-end; the `bestseller` sort is carved to **P-029** (cross-schema popularity). **P-026
+is now unblocked** — its frontend-wiring PR can proceed. **Step-5 findings: P-005, P-006, P-020, P-014 resolved ·
+P-026 closed-as-blocked · P-028 resolved-partial (6 of ~12) · P-029 opened.**
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
@@ -126,11 +127,18 @@ Recommendation: `P5-wire-filters` — connect `plp_filters_provider` selections 
 **Resolution (discover-and-bifurcate, branch `feat/wire-plp-filters`):** closed as `BLOCKED-BY-BACKEND-GAP`. Discovery (`docs/internal/p026-filter-wiring.md`) traced every dimension through all six layers (spec → client → provider → handler → service → repo): the frontend is fully built, but `/products` + `/search` apply no filter or sort — even spec-declared params (`sort` on both; `min_price`/`max_price`/`category_id` on `/search`) are dropped at the handler, and `catalog.Service`/repo have no filter args. No dimension can be wired end-to-end without backend work → **no frontend wiring shipped**. Full-stack gap filed as **P-028 (HIGH, backend)**; the frontend-wiring PR is queued behind it (the `PlpFilters` substrate + URL codec are ready — discovery §9).
 
 ### P-028 — Catalog/search API applies no filter or sort dimension (blocks P-026)
-**Status: OPEN | Severity: HIGH | Confidence: CONFIRMED | Type: backend (full-stack)**
+**Status: ✅ RESOLVED (partial — `bestseller` sort carved to P-029) | Severity: HIGH | Confidence: CONFIRMED | Type: backend (full-stack)**
 Evidence (read, `feat/wire-plp-filters` discovery): `cmd/core-svc/catalog_handlers.go:53-121` — `handleListProducts` reads only `category_id`/`page`/`per_page`/`market`; `handleSearch` reads only `q`/`page`/`per_page`/`market`. `internal/catalog/api.go:30-31` — `ListProductsByCategory` / `SearchSummary` carry no `sort` or filter parameter; the repository (`repository.go:307`) likewise. The mobile client is partly ahead of the backend: `search_api.dart:44-85` already sends `min_price`/`max_price`/`category_id`/`sort` and `openapi.yaml:894-948` declares them ("Full-text product search with filters") — but the handler drops them.
 Gap: no price / brand / rating / free-shipping / sort filtering server-side, on either endpoint.
 Severity rationale: HIGH (bumped from P-026's MED) — a multi-dimension, both-endpoint, full-stack feature (spec + handler + service + repo SQL; `free_shipping` needs a new `ProductSummary` field) blocking the core browse loop's refinement. Not a one-line wiring.
 Recommendation: `P-catalog-filter-api` — implement `sort` (`ORDER BY`) + `price`/`brand`/`rating` (`WHERE`) + `free_shipping` (new flag) on both endpoints; reconcile the `PlpSort` token mismatch (`bestseller`≠`best_selling`, `cashback_desc` absent — discovery §8). Then unblock P-026's frontend-wiring PR. Out of Step-5 (UI) scope.
+**Resolution (`feat/catalog-filter-api`):** ✅ RESOLVED (partial). Shared reusable filter params now declared on both `/products` + `/search`; `handleListProducts`/`handleSearch` parse them; `catalog.Service`/`Repository` thread a `ProductFilter`; the repo builds parameterized WHERE (`price`/`brand`/`rating`/`free_shipping`/`in_stock`/`category`) + an `ORDER BY` switch. `rating_avg`/`brand` reuse existing `catalog_schema.products` columns (no cross-schema JOIN); migration 0081 adds `products.free_shipping` (additive DEFAULT FALSE — data population is a follow-up, the P-008b "filter ready, data SOON" pattern). Sort reconciled: spec lists the implemented set `[recommended,newest,price_asc,price_desc,cashback_desc]`; unknown tokens fall back to `recommended` (never errors). 19 integration subtests (filters + sort + search). **`bestseller` sort carved → P-029** (cross-schema popularity). **`cashback_only` excluded** (vacuous — every Mopro product earns cashback). Full evidence: `docs/internal/p028-filter-sort-api.md`. **P-026 is now UNBLOCKED** — its frontend-wiring PR can proceed (hide `bestseller` until P-029).
+
+### P-029 — `bestseller` product sort needs catalog-side popularity (carved from P-028)
+**Status: OPEN | Severity: MED | Confidence: CONFIRMED | Type: backend**
+Evidence: the frontend `PlpSort.bestseller` token has no data source in `catalog_schema`. Popularity lives in `analytics_schema.popular_products` (migration 0080 — per-scope `view_count` ranking), and CLAUDE.md §5 forbids cross-schema JOINs (only `ref_schema` is exempt). P-028's `orderByClause` therefore maps `bestseller` → `recommended` (graceful), and the spec omits the token (stays honest).
+Gap: no `bestseller` ordering server-side.
+Recommendation: denormalize a popularity counter into `catalog_schema.products` (event/outbox sync from the analytics pipeline, or a periodic projection refresh), then add a `bestseller` `ORDER BY` arm + re-add the spec enum value. Until then the frontend should hide/disable the `bestseller` sort option.
 
 ### P-009 — Search-result cards likely lack Trendyol merch badges (Kargo Bedava / campaign / "Çok satan")
 **Status: CONTENT/VISUAL | Severity: MED | Confidence: PROBABLE**

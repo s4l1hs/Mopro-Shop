@@ -137,7 +137,7 @@ Class | Method | HTTP request | Description
 [*CatalogApi*](doc/CatalogApi.md) | [**getCategoryCommission**](doc/CatalogApi.md#getcategorycommission) | **GET** /categories/{id}/commission | Get live commission and KDV rates for a category + market pair
 [*CatalogApi*](doc/CatalogApi.md) | [**getProduct**](doc/CatalogApi.md#getproduct) | **GET** /products/{id} | Get full product detail including variants and cashback preview
 [*CatalogApi*](doc/CatalogApi.md) | [**listCategories**](doc/CatalogApi.md#listcategories) | **GET** /categories | List all 42 product categories (locale-resolved names)
-[*CatalogApi*](doc/CatalogApi.md) | [**listProducts**](doc/CatalogApi.md#listproducts) | **GET** /products | List products with optional category filter, pagination, and sort
+[*CatalogApi*](doc/CatalogApi.md) | [**listProducts**](doc/CatalogApi.md#listproducts) | **GET** /products | List products with category filter, price/brand/rating/shipping filters, pagination, and sort
 [*DiscoveryApi*](doc/DiscoveryApi.md) | [**listBanners**](doc/DiscoveryApi.md#listbanners) | **GET** /banners | Promotional banners for a given placement
 [*DiscoveryApi*](doc/DiscoveryApi.md) | [**listRecommendations**](doc/DiscoveryApi.md#listrecommendations) | **GET** /recommendations | Personalised product recommendations for the authenticated user
 [*HealthApi*](doc/HealthApi.md) | [**healthz**](doc/HealthApi.md#healthz) | **GET** /healthz | Health check (liveness probe)

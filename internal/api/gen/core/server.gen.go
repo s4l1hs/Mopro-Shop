@@ -116,6 +116,15 @@ const (
 	Bearer TokenPairTokenType = "Bearer"
 )
 
+// Defines values for FilterSort.
+const (
+	FilterSortCashbackDesc FilterSort = "cashback_desc"
+	FilterSortNewest       FilterSort = "newest"
+	FilterSortPriceAsc     FilterSort = "price_asc"
+	FilterSortPriceDesc    FilterSort = "price_desc"
+	FilterSortRecommended  FilterSort = "recommended"
+)
+
 // Defines values for RequestOtpJSONBodyPurpose.
 const (
 	RequestOtpJSONBodyPurposeLogin  RequestOtpJSONBodyPurpose = "login"
@@ -157,20 +166,20 @@ const (
 
 // Defines values for ListProductsParamsSort.
 const (
-	ListProductsParamsSortBestSelling ListProductsParamsSort = "best_selling"
-	ListProductsParamsSortNewest      ListProductsParamsSort = "newest"
-	ListProductsParamsSortPriceAsc    ListProductsParamsSort = "price_asc"
-	ListProductsParamsSortPriceDesc   ListProductsParamsSort = "price_desc"
-	ListProductsParamsSortRecommended ListProductsParamsSort = "recommended"
+	ListProductsParamsSortCashbackDesc ListProductsParamsSort = "cashback_desc"
+	ListProductsParamsSortNewest       ListProductsParamsSort = "newest"
+	ListProductsParamsSortPriceAsc     ListProductsParamsSort = "price_asc"
+	ListProductsParamsSortPriceDesc    ListProductsParamsSort = "price_desc"
+	ListProductsParamsSortRecommended  ListProductsParamsSort = "recommended"
 )
 
 // Defines values for SearchParamsSort.
 const (
-	SearchParamsSortBestSelling SearchParamsSort = "best_selling"
-	SearchParamsSortNewest      SearchParamsSort = "newest"
-	SearchParamsSortPriceAsc    SearchParamsSort = "price_asc"
-	SearchParamsSortPriceDesc   SearchParamsSort = "price_desc"
-	SearchParamsSortRecommended SearchParamsSort = "recommended"
+	CashbackDesc SearchParamsSort = "cashback_desc"
+	Newest       SearchParamsSort = "newest"
+	PriceAsc     SearchParamsSort = "price_asc"
+	PriceDesc    SearchParamsSort = "price_desc"
+	Recommended  SearchParamsSort = "recommended"
 )
 
 // Address defines model for Address.
@@ -629,6 +638,30 @@ type Variant struct {
 	Sku        string  `json:"sku"`
 	Stock      int     `json:"stock"`
 }
+
+// FilterBrand defines model for FilterBrand.
+type FilterBrand = []string
+
+// FilterCategoryId defines model for FilterCategoryId.
+type FilterCategoryId = int64
+
+// FilterFreeShipping defines model for FilterFreeShipping.
+type FilterFreeShipping = bool
+
+// FilterInStock defines model for FilterInStock.
+type FilterInStock = bool
+
+// FilterMaxPrice defines model for FilterMaxPrice.
+type FilterMaxPrice = int64
+
+// FilterMinPrice defines model for FilterMinPrice.
+type FilterMinPrice = int64
+
+// FilterRating defines model for FilterRating.
+type FilterRating = int
+
+// FilterSort defines model for FilterSort.
+type FilterSort string
 
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = openapi_types.UUID
@@ -1141,10 +1174,32 @@ type CreateReturnParams struct {
 
 // ListProductsParams defines parameters for ListProducts.
 type ListProductsParams struct {
-	CategoryId *int64                  `form:"category_id,omitempty" json:"category_id,omitempty"`
-	Page       *int                    `form:"page,omitempty" json:"page,omitempty"`
-	PerPage    *int                    `form:"per_page,omitempty" json:"per_page,omitempty"`
-	Sort       *ListProductsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+	// CategoryId Scope results to a category (optional on /search).
+	CategoryId *FilterCategoryId `form:"category_id,omitempty" json:"category_id,omitempty"`
+	Page       *int              `form:"page,omitempty" json:"page,omitempty"`
+	PerPage    *int              `form:"per_page,omitempty" json:"per_page,omitempty"`
+
+	// MinPrice Minimum price in minor units (filters the displayed/lowest variant price).
+	MinPrice *FilterMinPrice `form:"min_price,omitempty" json:"min_price,omitempty"`
+
+	// MaxPrice Maximum price in minor units (filters the displayed/lowest variant price).
+	MaxPrice *FilterMaxPrice `form:"max_price,omitempty" json:"max_price,omitempty"`
+
+	// Brand Repeatable; matches any of the given brands (?brand=Nike&brand=Adidas).
+	Brand *FilterBrand `form:"brand,omitempty" json:"brand,omitempty"`
+
+	// Rating Minimum average rating (products with rating_avg >= this).
+	Rating *FilterRating `form:"rating,omitempty" json:"rating,omitempty"`
+
+	// FreeShipping When true, only products flagged free-shipping.
+	FreeShipping *FilterFreeShipping `form:"free_shipping,omitempty" json:"free_shipping,omitempty"`
+
+	// InStock When true, only products with at least one in-stock variant.
+	InStock *FilterInStock `form:"in_stock,omitempty" json:"in_stock,omitempty"`
+
+	// Sort Sort order. Unknown/unsupported tokens fall back to `recommended`.
+	// `bestseller` is not yet supported server-side (P-029).
+	Sort *ListProductsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
 	// Echoed in error responses as `error.trace_id`.
@@ -1195,13 +1250,34 @@ type ListRecommendationsParams struct {
 
 // SearchParams defines parameters for Search.
 type SearchParams struct {
-	Q          string            `form:"q" json:"q"`
-	CategoryId *int64            `form:"category_id,omitempty" json:"category_id,omitempty"`
-	MinPrice   *int64            `form:"min_price,omitempty" json:"min_price,omitempty"`
-	MaxPrice   *int64            `form:"max_price,omitempty" json:"max_price,omitempty"`
-	Sort       *SearchParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+	Q string `form:"q" json:"q"`
+
+	// CategoryId Scope results to a category (optional on /search).
+	CategoryId *FilterCategoryId `form:"category_id,omitempty" json:"category_id,omitempty"`
 	Page       *int              `form:"page,omitempty" json:"page,omitempty"`
 	PerPage    *int              `form:"per_page,omitempty" json:"per_page,omitempty"`
+
+	// MinPrice Minimum price in minor units (filters the displayed/lowest variant price).
+	MinPrice *FilterMinPrice `form:"min_price,omitempty" json:"min_price,omitempty"`
+
+	// MaxPrice Maximum price in minor units (filters the displayed/lowest variant price).
+	MaxPrice *FilterMaxPrice `form:"max_price,omitempty" json:"max_price,omitempty"`
+
+	// Brand Repeatable; matches any of the given brands (?brand=Nike&brand=Adidas).
+	Brand *FilterBrand `form:"brand,omitempty" json:"brand,omitempty"`
+
+	// Rating Minimum average rating (products with rating_avg >= this).
+	Rating *FilterRating `form:"rating,omitempty" json:"rating,omitempty"`
+
+	// FreeShipping When true, only products flagged free-shipping.
+	FreeShipping *FilterFreeShipping `form:"free_shipping,omitempty" json:"free_shipping,omitempty"`
+
+	// InStock When true, only products with at least one in-stock variant.
+	InStock *FilterInStock `form:"in_stock,omitempty" json:"in_stock,omitempty"`
+
+	// Sort Sort order. Unknown/unsupported tokens fall back to `recommended`.
+	// `bestseller` is not yet supported server-side (P-029).
+	Sort *SearchParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
 	// Echoed in error responses as `error.trace_id`.
@@ -1393,7 +1469,7 @@ type ServerInterface interface {
 	// Submit a return request for delivered order items
 	// (POST /orders/{id}/returns)
 	CreateReturn(w http.ResponseWriter, r *http.Request, id int64, params CreateReturnParams)
-	// List products with optional category filter, pagination, and sort
+	// List products with category filter, price/brand/rating/shipping filters, pagination, and sort
 	// (GET /products)
 	ListProducts(w http.ResponseWriter, r *http.Request, params ListProductsParams)
 	// Create a new product listing (admin / seller onboarding)
@@ -3535,6 +3611,54 @@ func (siw *ServerInterfaceWrapper) ListProducts(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// ------------- Optional query parameter "min_price" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "min_price", r.URL.Query(), &params.MinPrice)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "min_price", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "max_price" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "max_price", r.URL.Query(), &params.MaxPrice)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "max_price", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "brand" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "brand", r.URL.Query(), &params.Brand)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "brand", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "rating" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "rating", r.URL.Query(), &params.Rating)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rating", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "free_shipping" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "free_shipping", r.URL.Query(), &params.FreeShipping)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "free_shipping", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "in_stock" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "in_stock", r.URL.Query(), &params.InStock)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "in_stock", Err: err})
+		return
+	}
+
 	// ------------- Optional query parameter "sort" -------------
 
 	err = runtime.BindQueryParameter("form", true, false, "sort", r.URL.Query(), &params.Sort)
@@ -3782,6 +3906,22 @@ func (siw *ServerInterfaceWrapper) Search(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// ------------- Optional query parameter "page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "page", r.URL.Query(), &params.Page)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "per_page" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "per_page", r.URL.Query(), &params.PerPage)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "per_page", Err: err})
+		return
+	}
+
 	// ------------- Optional query parameter "min_price" -------------
 
 	err = runtime.BindQueryParameter("form", true, false, "min_price", r.URL.Query(), &params.MinPrice)
@@ -3798,27 +3938,43 @@ func (siw *ServerInterfaceWrapper) Search(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// ------------- Optional query parameter "brand" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "brand", r.URL.Query(), &params.Brand)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "brand", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "rating" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "rating", r.URL.Query(), &params.Rating)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "rating", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "free_shipping" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "free_shipping", r.URL.Query(), &params.FreeShipping)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "free_shipping", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "in_stock" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "in_stock", r.URL.Query(), &params.InStock)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "in_stock", Err: err})
+		return
+	}
+
 	// ------------- Optional query parameter "sort" -------------
 
 	err = runtime.BindQueryParameter("form", true, false, "sort", r.URL.Query(), &params.Sort)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "page" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "page", r.URL.Query(), &params.Page)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page", Err: err})
-		return
-	}
-
-	// ------------- Optional query parameter "per_page" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "per_page", r.URL.Query(), &params.PerPage)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "per_page", Err: err})
 		return
 	}
 
@@ -6262,7 +6418,7 @@ type StrictServerInterface interface {
 	// Submit a return request for delivered order items
 	// (POST /orders/{id}/returns)
 	CreateReturn(ctx context.Context, request CreateReturnRequestObject) (CreateReturnResponseObject, error)
-	// List products with optional category filter, pagination, and sort
+	// List products with category filter, price/brand/rating/shipping filters, pagination, and sort
 	// (GET /products)
 	ListProducts(ctx context.Context, request ListProductsRequestObject) (ListProductsResponseObject, error)
 	// Create a new product listing (admin / seller onboarding)

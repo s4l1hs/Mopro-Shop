@@ -53,10 +53,10 @@ func (s *stubCatalogSvc) ListCategories(ctx context.Context, locale string, maxD
 	}
 	return []catalog.CategoryRow{}, nil
 }
-func (s *stubCatalogSvc) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+func (s *stubCatalogSvc) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
-func (s *stubCatalogSvc) SearchSummary(_ context.Context, _, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+func (s *stubCatalogSvc) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
 func (s *stubCatalogSvc) ListProductsByIDs(_ context.Context, ids []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {

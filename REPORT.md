@@ -4236,3 +4236,21 @@ Findings done: P-005, P-006, P-020, P-014 (4 of ~12). Remaining: P-007 (PDP deli
 
 ### Step 5 status (post P-026)
 Triaged: P-005, P-006, P-020, P-014 resolved + **P-026 closed as BLOCKED-BY-BACKEND-GAP** (5 of ~12); **P-028 opened** (HIGH, backend). Remaining: P-007 (PDP delivery-ETA, backend-gated), 6 LOW (P-004/009/011/012/013/015), orphaned HeroCarousel cleanup (#82), chi-square flake (#74), **P-028 (backend filter API)**, and P-026's queued frontend-wiring PR (gated on P-028).
+
+## PR — P-028 backend filter/sort API (closes PARITY_AUDIT P-028, partial; opens P-029) — `feat/catalog-filter-api`
+
+Full-stack backend filter/sort for `/products` + `/search`, unblocking P-026.
+
+- **Filter dimensions wired (6):** `category_id` (search), `min_price`/`max_price` (on the LATERAL lowest-variant price), `brand` (`= ANY`, repeatable), `rating` (`p.rating_avg >=`, existing indexed column), `free_shipping` (new column), `in_stock` (`EXISTS` over variants). All same-schema — no cross-schema JOIN.
+- **Sort tokens (5):** `recommended` (id desc), `newest` (created_at), `price_asc`, `price_desc`, `cashback_desc` (`price × commission_pct_bps`, from the existing ref_schema join). Unknown tokens → `recommended` (never errors).
+- **New column (migration 0081):** `products.free_shipping BOOLEAN NOT NULL DEFAULT FALSE` (additive, reversible). Data population is a follow-up (filter ready, data SOON — P-008b pattern).
+- **PlpSort reconciliation:** spec sort enum set to the implemented set (`best_selling` dropped, `cashback_desc` added); `bestseller` intentionally omitted (handler falls back) — keeps the spec honest.
+- **Carved:** `bestseller` sort → **P-029** (MED, backend) — its only data is `analytics_schema.popular_products`; CLAUDE.md §5 forbids the cross-schema JOIN. **Excluded:** `cashback_only` (vacuous).
+- **Spec + clients:** shared reusable `components/parameters` referenced by both ops; regenerated `internal/api/gen` (oapi-codegen) + `mobile/packages/mopro_api` (openapi-generator); Spectral 0 errors; `api-check-sync` clean.
+- **Architecture:** `ProductFilter` struct threads repo→service→handler→6 mocks (one atomic commit — Go interface coupling); repo uses a shared preamble const + `appendProductFilters` (parameterized, bound values only) + `orderByClause` (token switch, no interpolation).
+- **Integration tests:** 19 subtests (filters + sort + search + over-filtered + no-filter regression) against ephemeral PG16; `setupSchema` updated to mirror the post-migration columns + generated `search_vector`.
+- **P-026 status:** unblocked — its frontend-wiring PR can proceed (hide `bestseller` until P-029).
+- **Out of scope (logged):** brand/price indexes (residual scans acceptable at launch scale); the commission LEFT JOIN can multiply rows if a category ever has >1 active rule (pre-existing; production seeds one).
+
+### Step 5 status (post P-028)
+P-005, P-006, P-020, P-014 resolved · P-026 closed-as-blocked · **P-028 resolved-partial (6 of ~12)** · **P-029 opened** (bestseller sort). Remaining: P-007 (PDP delivery-ETA), 6 LOW, HeroCarousel cleanup (#82), chi-square flake (#74), P-029, and **P-026's frontend-wiring PR (now actionable)**.
