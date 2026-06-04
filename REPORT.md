@@ -4201,7 +4201,7 @@ Closed whole (no split). The prompt's "3 MFA files" fear was wrong — MFA enrol
 - **~34 keys, 0 TRANSLATION_NEEDED.**
 - **Gates:** `i18n-check` 0 extras; `i18n-usage` **765 declared / 0 dead / 0 missing**; `flutter analyze` clean; `make verify` green.
 - **No test breaks:** no test file imports the swept screens/widgets (other than goldens); `find.text` over the swept strings = none.
-- **Goldens:** home hero goldens regen Turkish→keys (hero_carousel renders `heroSlides()`); auth screens not golden-captured → predicted 0 there. Confirmed via the rebaseline run.
+- **Goldens: 0 changed** (rebaseline confirmed). The discovery predicted the home hero goldens would flip — **wrong: `HeroCarousel`/`hero_slides` has no consumer** (home mounts `MoodStoriesStrip`, not the carousel; `grep -r HeroCarousel` minus its own file is empty). It's an **unadopted widget** — localizing it is still correct + gate-clean (the `marketing.hero.*` keys are `.tr()`-used in `heroSlides()`, so i18n-usage sees them; reachability isn't checked), 0 golden/runtime impact, ready for future adoption. Auth screens also not golden-captured. **New finding: orphaned `HeroCarousel`/`hero_slides`** (cleanup candidate — adopt on home, or remove).
 - **P-014:** Phases 1, 2a, 2b, 2c, 2d done (**5 of ~7**). Remaining: 2e (checkout), 2f (singletons incl. web_header).
 
 ### No visual change beyond text source
