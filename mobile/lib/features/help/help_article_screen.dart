@@ -28,7 +28,7 @@ class HelpArticleScreen extends ConsumerWidget {
         error: (_, __) => Center(child: Text('common.error'.tr())),
         data: (a) => SeoHead(
           meta: MetaTagsInput(
-            title: '${a.title} — Mopro Yardım',
+            title: 'help.article_title'.tr(namedArgs: {'title': a.title}),
             description: seoDescription(a.body),
             canonicalUrl: '${ref.watch(webBaseUrlProvider)}/help/article/$slug',
             openGraphExtras: const {'og:type': 'article'},

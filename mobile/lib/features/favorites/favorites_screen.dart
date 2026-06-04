@@ -171,7 +171,7 @@ class _EmptyState extends StatelessWidget {
           FilledButton.icon(
             onPressed: () => context.go('/'),
             icon: const Icon(Icons.shopping_bag_outlined),
-            label: const Text('Keşfet'),
+            label: Text('favorites.explore'.tr()),
           ),
         ],
       ),

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:mopro/design/tokens.dart';
 
@@ -61,7 +62,7 @@ class _HeaderSearchBarState extends State<HeaderSearchBar>
               child: FadeTransition(
                 opacity: _opacity,
                 child: Text(
-                  'Ürün, marka veya kategori ara…',
+                  'search.web_placeholder'.tr(),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),

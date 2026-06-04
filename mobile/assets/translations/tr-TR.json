@@ -119,6 +119,17 @@
     "trust_easy_return": "Kolay İade",
     "trust_perpetual_cashback": "Sürekli Cashback",
     "flash_deals_ended": "Fırsat sona erdi",
+    "search_hint_generic": "Ürün, kategori veya marka ara",
+    "search_hint_phone": "Akıllı telefon ara",
+    "search_hint_clothing": "Giyim ara",
+    "search_hint_shoes": "Spor ayakkabı ara",
+    "rail_recommended": "Sizin için seçtiklerimiz",
+    "rail_bestseller": "Çok satanlar",
+    "rail_newest": "Yeni gelenler",
+    "trending_phone": "Akıllı telefon",
+    "trending_laptop": "Laptop",
+    "trending_clothing": "Giyim",
+    "trending_shoes": "Spor ayakkabı",
     "rails": {
       "recently_viewed": {
         "title": "Son baktıkların"
@@ -173,14 +184,17 @@
     "recent_searches": "Son Aramalar",
     "trending": "Popüler Aramalar",
     "clear_recent": "Temizle",
-    "suggested_categories": "Kategoriler"
+    "suggested_categories": "Kategoriler",
+    "web_placeholder": "Ürün, marka veya kategori ara…"
   },
   "mega_menu": {
     "empty_children": "Bu kategoride alt kategori bulunmuyor.",
     "promo": {
       "cta": "Keşfet",
       "image_unavailable": "Resim yüklenemedi."
-    }
+    },
+    "see_all": "Tümünü gör: {category}",
+    "submenu_hint": "Submenü açmak için Aşağı ok"
   },
   "empty_state": {
     "empty_message": "Henüz içerik yok",
@@ -189,7 +203,8 @@
   },
   "favorites": {
     "empty_title": "Henüz favori yok",
-    "empty_subtitle": "Beğendiğin ürünleri favorilere ekle"
+    "empty_subtitle": "Beğendiğin ürünleri favorilere ekle",
+    "explore": "Keşfet"
   },
   "account": {
     "title": "Hesabım",
@@ -275,7 +290,8 @@
     "related_title": "Benzer Ürünler",
     "remove_from_favorites": "Favorilerden çıkar",
     "decrease_qty": "Adet azalt",
-    "increase_qty": "Adet artır"
+    "increase_qty": "Adet artır",
+    "not_found": "Ürün bulunamadı."
   },
   "reviews": {
     "header": "Yorumlar ({count})",
@@ -358,7 +374,8 @@
     "coupon_code": "Kupon kodu",
     "apply": "Uygula",
     "confirm_cart": "Sepeti Onayla",
-    "summary_helper": "Vergi ve kargo dahil değildir."
+    "summary_helper": "Vergi ve kargo dahil değildir.",
+    "checkout_login_reason": "Siparişi tamamlamak için giriş yap."
   },
   "checkout": {
     "step_address": "Adres",
@@ -395,7 +412,17 @@
     "payment_cashback": "Mopro Coin ile Öde",
     "payment_coming_soon": "Çok yakında",
     "secure_payment_title": "Güvenli Ödeme",
-    "secure_payment_body": "Ödeme bilgileriniz 256-bit SSL ile şifrelenir ve 3D Secure ile korunur."
+    "secure_payment_body": "Ödeme bilgileriniz 256-bit SSL ile şifrelenir ve 3D Secure ile korunur.",
+    "redirect": {
+      "msg_confirming": "Ödemen onaylanıyor…",
+      "msg_waiting_bank": "Bankadan onay bekleniyor…",
+      "msg_almost": "Neredeyse hazır…",
+      "msg_finishing": "İşleminiz tamamlanıyor…",
+      "timeout_title": "Onay biraz gecikiyor",
+      "timeout_body": "Ödemeniz işleniyor olabilir. Siparişlerim sayfasını kontrol edin.",
+      "go_to_orders": "Siparişlerime Git",
+      "continue_shopping": "Alışverişe Devam Et"
+    }
   },
   "order": {
     "history_title": "Siparişlerim",
@@ -705,7 +732,8 @@
     "contact_success_title": "Talebin alındı",
     "contact_ticket_no": "Talep No: #{}",
     "contact_success_sub": "48 saat içinde yanıt vereceğiz.",
-    "contact_title": "Bize Ulaş"
+    "contact_title": "Bize Ulaş",
+    "article_title": "{title} — Mopro Yardım"
   },
   "qa": {
     "header": "Sorular ({count})",
@@ -875,5 +903,9 @@
       "season_title": "Yeni Sezon",
       "season_sub": "En yeni ürünleri keşfedin, cashback kazanmaya başlayın."
     }
+  },
+  "theme": {
+    "toggle_dark": "Koyu tema",
+    "toggle_light": "Açık tema"
   }
 }

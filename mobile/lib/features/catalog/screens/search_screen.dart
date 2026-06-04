@@ -40,7 +40,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final query = _searchController.text.trim();
     SystemChrome.setApplicationSwitcherDescription(
       ApplicationSwitcherDescription(
-        label: query.isEmpty ? 'Mopro · Arama' : 'Mopro · "$query" araması',
+        label: query.isEmpty
+            ? 'Mopro · ${'router_title.search'.tr()}'
+            : 'Mopro · ${'router_title.search_query'.tr(namedArgs: {'q': query})}',
       ),
     );
 

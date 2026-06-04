@@ -16,7 +16,11 @@
 - **VERIFIED-COMPLETE surfaces (12):** Design tokens · Global navigation (bottom nav + web header) · Home composition · Product card · Flash deals · PDP structure · Search/PLP filters+sort · Reviews · Q&A · Orders/Returns/Refund · Notifications · Empty/loading/error · Responsive · Auth-gate. (Listed with evidence in §5.)
 - **Recommended NOW sequence:** **P5-1** (card+PDP fidelity polish: P-005 token-drift + P-006 discount-pill consistency + P-014 hardcoded-string sweep — pure UI, no API dep, no auth, ~300 LOC) → **P5-2** (dark-mode contrast token fix: P-020 — tiny token tweak + contrast-gate flip). Both fully CONFIRMED, zero dependencies. Everything else is SOON/LATER and either backend-data-gated or PROBABLE-pending-confirmation.
 
-**Build status (2026-06-03):** P5-1+P5-2 shipped (`feat/parity-card-pdp-polish`) — **P-005, P-006, P-020 RESOLVED**. **P-014 IN-PROGRESS (phased):** Phase 1 (`feat/i18n-hardcoded-sweep`, app_router titles); **Phases 2a+2c** (`feat/i18n-sweep-2abc`, auth + sipay error map). A third discovery-shift: the diacritic grep undercounts ~2×, so **true scope ≈ 250–300 strings** (not 155). Phase 2b (account) split out; 2d/2e/2f queued. Not closed.
+**Build status (2026-06-04):** **P-005, P-006, P-020 RESOLVED** (P5-1/P5-2). **P-014 ✅ CLOSED** — the full
+i18n hardcoded-string sweep landed across **7 phased PRs** (#79 app_router · #80 auth+sipay · #81 account ·
+#82 verification+marketing · #83 checkout+singletons), ~250+ strings, 0 hardcoded TR left in UI sinks. The
+arc's lessons (full-file reads, key+JSON test pattern, const→build-time, golden-prediction, diacritic-undercount,
+orphaned-widget) are the canonical i18n template. **Step-5 findings done: P-005, P-006, P-020, P-014 (4 of ~12).**
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
@@ -248,7 +252,11 @@ Recommendation: `P5-favorite-collections` (LATER/PARK). The add/remove interacti
 Mopro: `features/auth/` (15 files, 1797 LOC) — login (phone/OTP), OTP screen, profile completion, email verify. Golden `auth/goldens/auth_card`. The dev-OTP-bypass is injected (`identity.WithDevOTPBypass`, A4-3/#76) and **off in production** (panics if on in prod) — so it is correctly hidden from this surface in prod (prompt §3.13). Trendyol login page not fetched → PROBABLE.
 
 ### P-014 — Hardcoded Turkish strings bypass `.tr()` (auth + checkout + account + PDP + favorites)
-**⏳ IN-PROGRESS — phased (Phase 1 done).** **Second discovery-shift (the audit undercounted ~3×):** the
+**✅ RESOLVED — closed across 7 phased PRs (#79→#83).** Every user-facing hardcoded Turkish string in
+`mobile/lib` is now routed through `.tr()` (verified: 0 diacritic-detectable + 0 common ASCII-only TR
+remain in UI sinks; ~250+ strings localized; tr-TR master + en-US, 0 TRANSLATION_NEEDED). Intentional
+inline kept: language self-names (`'Türkçe'`/`'العربية'`), brand (`'Mopro · '`), code/mask placeholders.
+**Second discovery-shift (the audit undercounted ~3×):** the
 all-sinks re-grep on `feat/i18n-hardcoded-sweep` found **~155 hardcoded TR strings across 27 files** — not
 the ~55 the `Text()`-scoped audit estimated. Whole screens are unlocalized (security_screen 29, account_screen
 21, sign_up 15, sipay_error_map 13, sign_in 12, email_verify 10, mfa 9, …). A full sweep is ~1500–2000 LOC /
@@ -258,7 +266,7 @@ the ~55 the `Text()`-scoped audit estimated. Whole screens are unlocalized (secu
 - **Phase 2a ✅ (`feat/i18n-sweep-2abc`):** auth — sign_up + sign_in + auth_layout (~46 strings; `auth.*`/`auth.sign_up.*`/`auth.sign_in.*`/`auth.layout.*`).
 - **Phase 2b ✅ (`feat/i18n-sweep-2b-account`):** account area — security_screen (40 `security.*` keys; 2 namedArgs interpolations; const dialogs/snackbars) + account_screen (17 `account.*`; theme dedup, softGated prompts). Both full-read swept; `account_security` goldens regen Turkish→keys.
 - **Phase 2d ✅ (`feat/i18n-sweep-2d`):** email_verify + mfa_challenge + forgot_password + auth_widgets (strength rules + `veya`) + hero_slides (marketing) — ~34 keys (`auth.*`/`auth.email_verify.*`/`auth.mfa.*`/`auth.forgot.*`/`auth.password_rule.*`/`marketing.hero.*`). RichText prefix/suffix + `const heroSlides`→function. profile_screen was VERIFIED-COMPLETE (locale self-names). **0 golden impact** — `HeroCarousel`/`hero_slides` is an *unadopted* widget (no consumer; home mounts `MoodStoriesStrip`); localized for completeness + future adoption (new cleanup finding filed).
-- **Phases 2e/2f (queued):** 2e checkout; 2f misc singletons (incl. web_header).
+- **Phase 2e + 2f ✅ (`feat/i18n-sweep-2ef`, #83) — CLOSES P-014:** cart/checkout were already mostly localized, so the remainder was small (~32 strings): checkout_redirect (const-list→build-time), cart softgate, web_header (`auth.login` reuse), header_search_bar, theme_toggle, mega_menu (×2), favorites, product_detail, search_screen (`router_title` reuse), help_article, app_router (`account.title` reuse), + home search-hints/rail/trending fallbacks. 8 goldens regen (web_header ×3, home ×3, favorites_empty ×2). web_header_test + mega_menu_keyboard_test → key assertions (#79 pattern).
 - **Third discovery-shift:** the diacritic grep undercounts ~2× (misses TR strings w/o special chars — "Ad", "Parola", "Giriş"). **True P-014 scope ≈ 250–300 strings**, not 155. Future phases counted by full-file read, not diacritic grep.
 The 11-string list below was a `Text()`-scoped floor (correctly flagged as a floor at the time).
 **Status: CONTENT | Severity: LOW | Confidence: CONFIRMED**

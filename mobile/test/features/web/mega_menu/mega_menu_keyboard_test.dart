@@ -266,8 +266,10 @@ void main() {
       // A bar item is a button labeled with its category name…
       final erkek = tester.getSemantics(find.text('Erkek'));
       expect(erkek.label, contains('Erkek'));
-      // …and items with children expose the Arrow-Down hint.
-      expect(erkek.hint, contains('Aşağı ok'));
+      // …and items with children expose the submenu hint. Tests don't load the
+      // bundle, so .tr() returns the key (mega_menu.submenu_hint → "Submenü açmak
+      // için Aşağı ok" in tr-TR.json, which contains the Arrow-Down cue).
+      expect(erkek.hint, contains('mega_menu.submenu_hint'));
       handle.dispose();
     });
 

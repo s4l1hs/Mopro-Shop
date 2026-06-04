@@ -80,7 +80,7 @@ class CartScreen extends ConsumerWidget {
   void _checkout(BuildContext context, WidgetRef ref) => requireAuth(
         context,
         ref,
-        reason: 'Siparişi tamamlamak için giriş yap.',
+        reason: 'cart.checkout_login_reason'.tr(),
         onAuthed: () => context.push('/checkout'),
       );
 

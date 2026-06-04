@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -332,7 +333,7 @@ class _BarItemTrigger extends StatelessWidget {
       child: Semantics(
         button: true,
         label: node.name,
-        hint: hasChildren ? 'Submenü açmak için Aşağı ok' : null,
+        hint: hasChildren ? 'mega_menu.submenu_hint'.tr() : null,
         excludeSemantics: true,
         child: body,
       ),

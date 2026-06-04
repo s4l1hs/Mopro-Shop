@@ -119,6 +119,17 @@
     "trust_easy_return": "Easy Returns",
     "trust_perpetual_cashback": "Perpetual Cashback",
     "flash_deals_ended": "Deal ended",
+    "search_hint_generic": "Search products, categories or brands",
+    "search_hint_phone": "Search smartphones",
+    "search_hint_clothing": "Search clothing",
+    "search_hint_shoes": "Search sneakers",
+    "rail_recommended": "Picked for you",
+    "rail_bestseller": "Best sellers",
+    "rail_newest": "New arrivals",
+    "trending_phone": "Smartphone",
+    "trending_laptop": "Laptop",
+    "trending_clothing": "Clothing",
+    "trending_shoes": "Sneakers",
     "rails": {
       "recently_viewed": {
         "title": "Recently viewed"
@@ -173,14 +184,17 @@
     "recent_searches": "Recent Searches",
     "trending": "Trending",
     "clear_recent": "Clear",
-    "suggested_categories": "Categories"
+    "suggested_categories": "Categories",
+    "web_placeholder": "Search products, brands or categories…"
   },
   "mega_menu": {
     "empty_children": "No subcategories in this section.",
     "promo": {
       "cta": "Discover",
       "image_unavailable": "Image unavailable."
-    }
+    },
+    "see_all": "See all: {category}",
+    "submenu_hint": "Down arrow to open submenu"
   },
   "empty_state": {
     "empty_message": "Nothing here yet",
@@ -189,7 +203,8 @@
   },
   "favorites": {
     "empty_title": "No favourites yet",
-    "empty_subtitle": "Add products you like to your favourites"
+    "empty_subtitle": "Add products you like to your favourites",
+    "explore": "Explore"
   },
   "account": {
     "title": "My Account",
@@ -272,7 +287,8 @@
     "related_title": "Similar Products",
     "remove_from_favorites": "Remove from favorites",
     "decrease_qty": "Decrease quantity",
-    "increase_qty": "Increase quantity"
+    "increase_qty": "Increase quantity",
+    "not_found": "Product not found."
   },
   "reviews": {
     "header": "Reviews ({count})",
@@ -352,7 +368,8 @@
     "coupon_code": "Coupon code",
     "apply": "Apply",
     "confirm_cart": "Confirm Cart",
-    "summary_helper": "Taxes and shipping not included."
+    "summary_helper": "Taxes and shipping not included.",
+    "checkout_login_reason": "Sign in to complete your order."
   },
   "checkout": {
     "select_address": "Select Delivery Address",
@@ -380,7 +397,17 @@
     "payment_cashback": "Pay with Mopro Coin",
     "payment_coming_soon": "Coming soon",
     "secure_payment_title": "Secure Payment",
-    "secure_payment_body": "Your payment details are encrypted with 256-bit SSL and protected by 3D Secure."
+    "secure_payment_body": "Your payment details are encrypted with 256-bit SSL and protected by 3D Secure.",
+    "redirect": {
+      "msg_confirming": "Confirming your payment…",
+      "msg_waiting_bank": "Waiting for bank approval…",
+      "msg_almost": "Almost ready…",
+      "msg_finishing": "Completing your transaction…",
+      "timeout_title": "Approval is taking a moment",
+      "timeout_body": "Your payment may still be processing. Check the My Orders page.",
+      "go_to_orders": "Go to My Orders",
+      "continue_shopping": "Continue Shopping"
+    }
   },
   "order": {
     "history_title": "My Orders",
@@ -669,7 +696,8 @@
     "contact_success_title": "Request received",
     "contact_ticket_no": "Ticket No: #{}",
     "contact_success_sub": "We'll respond within 48 hours.",
-    "contact_title": "Contact Us"
+    "contact_title": "Contact Us",
+    "article_title": "{title} — Mopro Help"
   },
   "qa": {
     "header": "Questions ({count})",
@@ -839,5 +867,9 @@
       "season_title": "New Season",
       "season_sub": "Discover the newest products and start earning cashback."
     }
+  },
+  "theme": {
+    "toggle_dark": "Dark theme",
+    "toggle_light": "Light theme"
   }
 }
