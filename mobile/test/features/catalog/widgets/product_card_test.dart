@@ -10,6 +10,7 @@ import '../../../_support/test_harness.dart';
 ProductSummary _product({
   String? coverUrl,
   int favoritesCount = 0,
+  bool freeShipping = false,
 }) =>
     ProductSummary(
       id: 1,
@@ -22,17 +23,26 @@ ProductSummary _product({
       priceCurrency: 'TRY',
       coverImageUrl: coverUrl,
       favoritesCount: favoritesCount,
+      freeShipping: freeShipping,
       cashbackPreview: CashbackPreview(
         monthlyCoinMinor: 125,
         currency: 'TRY_COIN',
       ),
     );
 
-Widget _card({VoidCallback? onTap, int favoritesCount = 0}) => SizedBox(
+Widget _card({
+  VoidCallback? onTap,
+  int favoritesCount = 0,
+  bool freeShipping = false,
+}) =>
+    SizedBox(
       width: 200,
       height: 320,
       child: ProductCard(
-        product: _product(favoritesCount: favoritesCount),
+        product: _product(
+          favoritesCount: favoritesCount,
+          freeShipping: freeShipping,
+        ),
         onTap: onTap ?? () {},
       ),
     );
@@ -91,6 +101,20 @@ void main() {
       // threshold it's omitted. (Asserting on the count text, not the heart icon,
       // keeps this immune to favoritesProvider state leaking between tests.)
       expect(find.text('5'), findsNothing);
+    });
+  });
+
+  group('ProductCard free-shipping badge (P-009)', () {
+    testWidgets('renders when freeShipping is true', (tester) async {
+      await pumpTrendyolApp(tester, _card(freeShipping: true));
+      // tests don't load the bundle, so .tr() returns the key.
+      expect(find.text('plp.free_shipping'), findsOneWidget);
+      expect(find.byIcon(Icons.local_shipping_outlined), findsOneWidget);
+    });
+
+    testWidgets('hidden when freeShipping is false', (tester) async {
+      await pumpTrendyolApp(tester, _card());
+      expect(find.byIcon(Icons.local_shipping_outlined), findsNothing);
     });
   });
 

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/design/tokens.dart';
@@ -107,6 +108,10 @@ class ProductCard extends ConsumerWidget {
                       child:
                           _FavoritesCountBadge(count: product.favoritesCount ?? 0),
                     ),
+                  // P-009: free-shipping ("Kargo Bedava") badge — top-left image
+                  // overlay (off the text column so it can't overflow tight cells).
+                  if (product.freeShipping ?? false)
+                    const Positioned(top: 6, left: 6, child: _FreeShippingBadge()),
                 ],
               ),
             ),
@@ -217,6 +222,39 @@ class _HeartButton extends StatelessWidget {
           color:
               isFav ? MoproTokens.primaryLight : const Color(0xFF888888),
         ),
+      ),
+    );
+  }
+}
+
+class _FreeShippingBadge extends StatelessWidget {
+  const _FreeShippingBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    // Same translucent-dark overlay style as the favorites badge: white on a
+    // dark scrim is legible over any product image + AA-safe in both themes
+    // (no new design token; a green treatment is a future polish).
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xCC000000),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.local_shipping_outlined, size: 11, color: Colors.white),
+          const SizedBox(width: 3),
+          Text(
+            'plp.free_shipping'.tr(),
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }
