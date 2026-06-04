@@ -25,8 +25,10 @@ orphaned-widget) are the canonical i18n template. **P-026 closed as `BLOCKED-BY-
 category) + sorts (5 tokens) end-to-end; the `bestseller` sort is carved to **P-029** (cross-schema popularity). **P-026
 is now unblocked. **Step-5 findings: P-005, P-006, P-020, P-014, P-028, P-026 resolved · P-015 FIXED (OOS variant
 chips) · P-011 CORRECTED · P-004/P-009/P-012/P-013 NOT-ACTIONABLE (backend-gated / documented-design / PARK) ·
-HeroCarousel REMOVED · P-029 opened (bestseller sort). LOW tail closed (PR `chore/step5-low-batch`); remaining:
-P-007 (delivery-ETA, backend-gated), P-029, chi-square flake. ~12 of ~12 audit items triaged.**
+HeroCarousel REMOVED · P-029 opened. **ProductSummary enriched** (`feat/productsummary-enrich`): `favorites_count`
+(P-004) + `free_shipping` (P-009) now backend-emitted; `discount_pct` already emitted (P-008b discount portion);
+`lowest_30d_price` carved to **P-030** (HIGH, compliance). Remaining: P-007 (delivery-ETA), P-029 (bestseller),
+P-030 (price-history), chi-square flake, + a small frontend-wiring follow-up for the P-004/P-009 card badges.**
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
@@ -103,6 +105,7 @@ Gap: missing social-proof favorites count on the card.
 Severity: LOW (social-proof nicety; not conversion-blocking).
 Recommendation: bundle with `P5-4` (`feat/parity-card-badges`) — render a count when the catalog API exposes one. **Backend dependency:** needs a favorites-count field on the product summary.
 **Outcome (NOT-ACTIONABLE — `chore/step5-low-batch`):** backend-gated — `ProductSummary` (mopro_api) exposes no favorites-count field; the card UI is correct (cf. P-008b data-dark pattern). Needs a catalog `ProductSummary` enrichment (favorites_count) to render. No code change.
+**Outcome 2 (✅ BACKEND-UNBLOCKED — `feat/productsummary-enrich`):** `ProductSummary` now emits `favorites_count` (a same-schema subquery over `catalog_schema.user_favorites` + index migration 0082 — no cross-schema JOIN). Frontend wiring (count by the heart on card/PDP) is a small follow-up.
 
 ---
 
@@ -144,6 +147,11 @@ Evidence: the frontend `PlpSort.bestseller` token has no data source in `catalog
 Gap: no `bestseller` ordering server-side.
 Recommendation: denormalize a popularity counter into `catalog_schema.products` (event/outbox sync from the analytics pipeline, or a periodic projection refresh), then add a `bestseller` `ORDER BY` arm + re-add the spec enum value. Until then the frontend should hide/disable the `bestseller` sort option.
 
+### P-030 — `lowest_30d_price` needs price-history infrastructure (carved from ProductSummary enrichment)
+**Status: OPEN | Severity: HIGH | Confidence: CONFIRMED | Type: backend / compliance**
+Evidence (`feat/productsummary-enrich` discovery): no `price_history` / price-snapshot table exists in `catalog_schema` (or anywhere). `lowest_30d_price` (the "son 30 günün en düşük fiyatı" copy) is a **TR consumer-protection + EU** requirement, not just parity. It needs a `price_history` table + a snapshot mechanism (on-price-change hook OR a periodic snapshot job) + a cron-placement decision (which binary owns the snapshot) — >500 LOC + new infra (out of the enrichment PR's scope + its anti-goals).
+Recommendation: dedicated PR — `catalog_schema.price_history` + snapshot mechanism + a 30-day-min query on `ProductSummary`. Compliance-serious → prioritize over pure-parity items.
+
 ### P-009 — Search-result cards likely lack Trendyol merch badges (Kargo Bedava / campaign / "Çok satan")
 **Status: CONTENT/VISUAL | Severity: MED | Confidence: PROBABLE**
 Evidence: Mopro `ProductCard` (`product_card.dart`, read; see §3.1/P-004) renders heart + brand + title + rating + discount-% + price + cashback, but **no free-shipping ("Kargo Bedava"), campaign-label, or bestseller badge**. Trendyol search cards are known to carry these (general knowledge; **not fetched — 403**).
@@ -151,6 +159,7 @@ Gap: missing merch/trust badges on result cards.
 Severity rationale: badges are part of Trendyol's at-a-glance card recognition; MED because they affect scannability, but PROBABLE because the Trendyol side wasn't fetched.
 Recommendation: confirm during the build PR's discovery (screenshots or re-fetch), then `P5-card-badges`. **Note backend dependency:** free-shipping/campaign flags must come from the catalog API; UI-only until then.
 **Outcome (NOT-ACTIONABLE — `chore/step5-low-batch`):** backend-gated — `ProductSummary` exposes no `free_shipping`/`campaign`/`badge` field. P-028 added the `free_shipping` *column* but not the response field, and it's unpopulated. A badge UI is pointless until the API exposes the flags + has data. (Severity re-confirmed **MED**, not LOW — this batch's prompt mislabeled it.) No code change.
+**Outcome 2 (✅ BACKEND-UNBLOCKED, partial — `feat/productsummary-enrich`):** `ProductSummary` now emits `free_shipping` (the "Kargo Bedava" badge); `discount_pct` + `flash_price_minor` were already emitted (discount + flash badges). So every P-009 badge **except bestseller** (= P-029, cross-schema popularity) is now backend-ready; frontend wiring is a small follow-up. (free_shipping data is unpopulated — the badge renders once sellers flag products.)
 
 ### P-010 — Filters / sort UI is built (parity likely; detail PROBABLE)
 **Status: INTERACTION | Severity: LOW | Confidence: CONFIRMED (Mopro) / PROBABLE (gap)**
@@ -185,6 +194,7 @@ Recommendation: `P5-pdp-delivery-eta` — add a delivery-estimate row. **Backend
 **Status: FUNCTIONAL | Severity: — | Confidence: CONFIRMED**
 Evidence: `pdp_price_block.dart:14-31` — `originalPriceMinor` and `lowestIn30DaysMinor` are nullable "because the catalog API does not expose them yet; when null the corresponding row is simply omitted." Same on `ProductCard` (§3.5). So the **discount + lowest-30d UI exists but never renders** (no data).
 **Verdict:** This is a **backend-data gap, not a UI parity gap** → out of Step-5 scope (prompt §1.2 "Backend changes … out of scope"). Logged so the parity PRs don't re-build existing UI; flag for a catalog-API follow-up.
+**Outcome (split — `feat/productsummary-enrich`):** the **discount** portion is ✅ done — `original_price_minor` (variants, 0065) + a handler-computed `discount_pct` are already emitted on `ProductSummary`; the strikethrough + %-badge render once a product has an `original_price_minor`. The **lowest-30d** portion is carved to **P-030** (HIGH, compliance — no price-history infrastructure exists).
 
 ### P-015 — PDP variant swatches / size-guide fidelity (PROBABLE)
 **Status: VISUAL/INTERACTION | Severity: LOW | Confidence: PROBABLE**
