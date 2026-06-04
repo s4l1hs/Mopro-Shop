@@ -124,8 +124,9 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
    **Update — P-028 ✅ RESOLVED** (`feat/catalog-filter-api`, `docs/internal/p028-filter-sort-api.md`): the backend
    now filters (price/brand/rating/free_shipping/in_stock/category) + sorts (5 tokens) end-to-end; migration 0081
    adds `products.free_shipping`; 19 integration subtests. `bestseller` sort carved → **P-029** (cross-schema
-   popularity, CLAUDE.md §5). **P-026 is now unblocked** — its frontend-wiring PR is the next natural slot (hide
-   `bestseller` until P-029).
+   popularity, CLAUDE.md §5). **P-026 ✅ RESOLVED** (`feat/wire-frontend-filters`) — the filter UI now drives the
+   fetch end-to-end (price/brand/rating/free_shipping/in_stock/sort on PLP + search); `bestseller` hidden +
+   `cashback_only` disabled per P-029/P-028. Filters are functional.
 4. **P5-3** `feat/pdp-delivery-eta` (SOON) — closes **P-007** + lights up the dark **P-008b** UI. **Backend-gated**
    (catalog/shipping API must expose ETA + original price + lowest-30d); UI slot can land NOW, data SOON. Risk MED.
 5. **P5-4** `feat/parity-card-badges` (SOON) — closes **P-009** + confirms **P-010**. **Discovery-first** (Trendyol
@@ -136,7 +137,7 @@ confirm product intent); **P5-7** checkout flow-shape review (P-012, PARK — do
 on taste). Drive-by (Step-1 family, not parity): remove the empty `mobile/lib/features/orders/` directory.
 
 **12 VERIFIED-COMPLETE surfaces** (design tokens, auth-gate/guest-browsing, global nav, home, flash deals, product
-card, PDP structure, search/PLP filters (backend live via P-028; frontend wiring pending P-026), reviews, Q&A, orders/returns, notifications/account/empty-states/responsive)
+card, PDP structure, search/PLP filters (✅ functional — P-028 backend + P-026 frontend), reviews, Q&A, orders/returns, notifications/account/empty-states/responsive)
 — see audit §5. **Do not rebuild these.**
 
 **Step-5 coverage caveat:** Trendyol bot-blocks parametrized pages (403 on `/sr`, PDP, category; login-gated
@@ -146,4 +147,5 @@ phase (#59→#60 pattern).
 
 **Open tail (unchanged, non-blocking):** idempotency-surface analyzer (T-007 split); cron-overlap sim (T-008);
 PR #74 chi-square flake; A-004/A-007 PROBABLE; A-005 PARK; **P-029** (`bestseller` sort — catalog-side popularity,
-carved from P-028). P-026's frontend-wiring PR is now actionable (P-028 unblocked it).
+carved from P-028). P-026 ✅ RESOLVED (frontend wired, `feat/wire-frontend-filters`). Remaining Step-5 tail:
+P-007 (delivery-ETA), 6 LOW, HeroCarousel cleanup, chi-square flake, P-029.

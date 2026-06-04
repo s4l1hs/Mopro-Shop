@@ -23,8 +23,8 @@ arc's lessons (full-file reads, key+JSON test pattern, const→build-time, golde
 orphaned-widget) are the canonical i18n template. **P-026 closed as `BLOCKED-BY-BACKEND-GAP`**, then **P-028 ✅ RESOLVED**
 (`feat/catalog-filter-api`) — the catalog/search backend now filters (price/brand/rating/free_shipping/in_stock/
 category) + sorts (5 tokens) end-to-end; the `bestseller` sort is carved to **P-029** (cross-schema popularity). **P-026
-is now unblocked** — its frontend-wiring PR can proceed. **Step-5 findings: P-005, P-006, P-020, P-014 resolved ·
-P-026 closed-as-blocked · P-028 resolved-partial (6 of ~12) · P-029 opened.**
+is now unblocked. **Step-5 findings: P-005, P-006, P-020, P-014, P-028 resolved · P-026 ✅ RESOLVED (frontend wired
+to P-028 — filters functional end-to-end) · P-029 opened (bestseller sort). 7 of ~12 addressed.**
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
@@ -119,12 +119,13 @@ Mopro: `catalog/screens/search_screen.dart` (253 LOC, read) + `catalog/widgets/s
 CONFIRMED Mopro internals (`search_screen.dart`, read): **empty/pre-query state** (`_EmptySearchBody`, line 154) = removable recent-search chips + clear-all (`search.recent_searches`/`search.clear_recent`) + 8 root-category `ActionChip` suggestions (`search.suggested_categories`) — matches Trendyol's pre-query suggestions. **Pagination = load-more** (`hasMore`/`loadingMore`/`loadMoreError`/`onLoadMore`, line 76-79), not infinite-scroll or paged. Mobile = 2-col `CatalogShell`; tablet/desktop = 280px `FilterPanel` sidebar + query chip + `PlpFilterChips` + 3/5-col grid (line 95-143).
 
 ### P-026 — Search filters are rendered but inert (don't affect the fetch yet)
-**Status: ✅ CLOSED — `BLOCKED-BY-BACKEND-GAP` (discover-and-bifurcate) | Severity: MED | Confidence: CONFIRMED**
+**Status: ✅ RESOLVED — frontend wired to the P-028 backend (`feat/wire-frontend-filters`) | Severity: MED | Confidence: CONFIRMED**
 Evidence: `search_screen.dart:88-91` — "Filters write the plp substrate keyed by the query; **like PLP, they don't yet affect the search fetch** (REPORT §5)." So the filter panel + chips render and persist, but selecting a filter does not re-query.
 Gap: filter UI present but functionally disconnected on search (and PLP).
 Severity: MED — a visible control that doesn't work is worse than an absent one; affects the core browse loop.
 Recommendation: `P5-wire-filters` — connect `plp_filters_provider` selections to the search/PLP fetch. **Backend dependency:** the catalog/search API must accept the filter params. Already a known item (REPORT §5) → not a new surface, a wiring follow-up.
 **Resolution (discover-and-bifurcate, branch `feat/wire-plp-filters`):** closed as `BLOCKED-BY-BACKEND-GAP`. Discovery (`docs/internal/p026-filter-wiring.md`) traced every dimension through all six layers (spec → client → provider → handler → service → repo): the frontend is fully built, but `/products` + `/search` apply no filter or sort — even spec-declared params (`sort` on both; `min_price`/`max_price`/`category_id` on `/search`) are dropped at the handler, and `catalog.Service`/repo have no filter args. No dimension can be wired end-to-end without backend work → **no frontend wiring shipped**. Full-stack gap filed as **P-028 (HIGH, backend)**; the frontend-wiring PR is queued behind it (the `PlpFilters` substrate + URL codec are ready — discovery §9).
+**Resolution 2 (frontend-wiring, `feat/wire-frontend-filters`):** ✅ FULLY RESOLVED. With P-028's filter-aware API live, `filteredProductsProvider` now watches the whole `PlpFilters` and `searchProvider` reads the query-keyed filter — both pass price/brand/rating/free_shipping/in_stock/sort to the API, and the result list rebuilds on every filter/sort change. The already-wired `PlpFilterChips` + clear-all are now live; `CatalogShell`'s empty path is reached when over-filtered. UI calls (discovery §10): `bestseller` **hidden** from the sort selectors (it would duplicate "Recommended"; backend maps it→recommended; enum + key kept for P-029); `cashback_only` **disabled** with an informational hint (vacuous server-side). `in_stock` added to `PlpFilters` + codec + bridge + chip. 4 wiring tests. The original gap ("filters render but are inert") is closed.
 
 ### P-028 — Catalog/search API applies no filter or sort dimension (blocks P-026)
 **Status: ✅ RESOLVED (partial — `bestseller` sort carved to P-029) | Severity: HIGH | Confidence: CONFIRMED | Type: backend (full-stack)**

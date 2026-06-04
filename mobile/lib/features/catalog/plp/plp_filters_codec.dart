@@ -8,7 +8,7 @@ import 'package:mopro/features/catalog/plp/plp_filters.dart';
 ///   dropped, page < 1 → 1. Malformed input never throws.
 ///
 /// Query keys: `sort`, `min`, `max`, `brand` (comma-joined), `rating`,
-/// `shipping` (`free`), `page`.
+/// `shipping` (`free`), `stock` (`in`), `page`.
 class PlpFiltersCodec {
   const PlpFiltersCodec();
 
@@ -20,6 +20,7 @@ class PlpFiltersCodec {
     if (f.brands.isNotEmpty) out['brand'] = f.brands.join(',');
     if (f.ratingMin != null) out['rating'] = '${f.ratingMin}';
     if (f.freeShippingOnly) out['shipping'] = 'free';
+    if (f.inStock) out['stock'] = 'in';
     if (f.page > 1) out['page'] = '${f.page}';
     return out;
   }
@@ -32,6 +33,7 @@ class PlpFiltersCodec {
       brands: _brands(q['brand']),
       ratingMin: _rating(q['rating']),
       freeShippingOnly: q['shipping'] == 'free',
+      inStock: q['stock'] == 'in',
       page: _page(q['page']),
     );
   }

@@ -61,6 +61,9 @@ class PlpFilterChips extends ConsumerWidget {
     if (f.freeShippingOnly) {
       chip('plp.free_shipping'.tr(), (x) => x.copyWith(freeShippingOnly: false));
     }
+    if (f.inStock) {
+      chip('catalog.filter_in_stock'.tr(), (x) => x.copyWith(inStock: false));
+    }
 
     final visible = chips.isNotEmpty;
     return AnimatedSwitcher(

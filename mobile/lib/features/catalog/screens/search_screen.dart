@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/design/responsive/responsive.dart';
+import 'package:mopro/features/catalog/plp/plp_filters.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
 import 'package:mopro/features/catalog/plp/widgets/filter_panel.dart';
 import 'package:mopro/features/catalog/plp/widgets/plp_filter_chips.dart';
@@ -23,7 +24,6 @@ class SearchScreen extends ConsumerStatefulWidget {
 
 class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _searchController = TextEditingController();
-  String _sort = 'recommended';
 
   @override
   void dispose() {
@@ -45,6 +45,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             : 'Mopro · ${'router_title.search_query'.tr(namedArgs: {'q': query})}',
       ),
     );
+
+    // Filters live in plpFiltersProvider keyed by the query; this singleton
+    // search provider doesn't watch them, so refetch when they change (P-026).
+    final plpKey = plpKeyForSearch(query);
+    ref.listen(plpFiltersProvider(plpKey), (prev, next) {
+      if (prev != next) ref.read(searchProvider.notifier).reapplyFilters();
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -68,29 +75,34 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ref.read(searchProvider.notifier).setQuery(q);
               },
             )
-          : _results(context, state, query),
+          : _results(context, state, query, plpKey),
     );
   }
 
-  Widget _shell(SearchState state, {bool wide = false}) => CatalogShell(
+  Widget _shell(SearchState state, String plpKey, {bool wide = false}) =>
+      CatalogShell(
         products: state.results.valueOrNull ?? [],
         isLoading: state.results.isLoading,
         hasMore: state.hasMore,
         loadingMore: state.loadingMore,
         loadMoreError: state.loadMoreError,
         onLoadMore: () => ref.read(searchProvider.notifier).loadMore(),
-        currentSort: _sort,
-        onSort: wide ? null : _showSortSheet,
+        currentSort: ref.watch(plpFiltersProvider(plpKey)).sort.token,
+        onSort: wide ? null : () => _showSortSheet(plpKey),
         gridCrossAxisCount: wide ? (context.isDesktop ? 5 : 3) : 2,
       );
 
-  Widget _results(BuildContext context, SearchState state, String query) {
-    if (context.isMobile) return _shell(state);
+  Widget _results(
+    BuildContext context,
+    SearchState state,
+    String query,
+    String plpKey,
+  ) {
+    if (context.isMobile) return _shell(state, plpKey);
 
     // Tablet/desktop: FilterPanel sidebar (no category tree) + a query chip +
-    // filter chips + the results grid. Filters write the plp substrate keyed by
-    // the query; like PLP, they don't yet affect the search fetch (REPORT §5).
-    final plpKey = plpKeyForSearch(query);
+    // filter chips + the results grid. Filters write plpFiltersProvider keyed by
+    // the query; SearchScreen.build refetches on change (P-026 wiring).
     final sidebarW = context.isDesktop ? 280.0 : 260.0;
     final pad = context.isDesktop ? 32.0 : 24.0;
 
@@ -132,7 +144,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             Expanded(child: PlpFilterChips(plpKey: plpKey)),
                           ],
                         ),
-                        Expanded(child: _shell(state, wide: true)),
+                        Expanded(child: _shell(state, plpKey, wide: true)),
                       ],
                     ),
                   ),
@@ -145,10 +157,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     );
   }
 
-  Future<void> _showSortSheet() async {
-    final selected = await showSortSheet(context, current: _sort);
-    if (selected != null && selected != _sort) {
-      setState(() => _sort = selected);
+  Future<void> _showSortSheet(String plpKey) async {
+    final current = ref.read(plpFiltersProvider(plpKey)).sort.token;
+    final selected = await showSortSheet(context, current: current);
+    if (selected != null && selected != current) {
+      ref
+          .read(plpFiltersProvider(plpKey).notifier)
+          .setSort(PlpSort.fromToken(selected));
     }
   }
 }

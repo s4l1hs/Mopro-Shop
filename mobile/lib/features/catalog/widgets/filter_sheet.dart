@@ -206,9 +206,11 @@ class _FilterSheetState extends State<FilterSheet> {
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text('catalog.filter_cashback_only'.tr()),
-                    value: _opts.cashbackOnly,
-                    onChanged: (v) =>
-                        setState(() => _opts = _opts.copyWith(cashbackOnly: v)),
+                    subtitle: Text('catalog.filter_cashback_hint'.tr()),
+                    value: false,
+                    // Disabled: vacuous server-side — every Mopro product earns
+                    // cashback (P-028 excluded it). The hint conveys that.
+                    onChanged: null,
                   ),
                 ],
               ),

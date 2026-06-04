@@ -129,7 +129,7 @@ void main() {
   testWidgets('checking a brand adds a chip + writes the filter', (tester) async {
     await _pump(tester, const Size(1440, 1000));
     await tester.tap(find.byType(Checkbox).first); // Adidas (alphabetical)
-    await tester.pump();
+    await tester.pumpAndSettle(); // brand change now triggers a refetch (P-026)
 
     final f = _container(tester).read(plpFiltersProvider(plpKeyForCategory(5)));
     expect(f.brands, contains('Adidas'));

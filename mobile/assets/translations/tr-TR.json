@@ -176,6 +176,7 @@
     "filter_free_shipping": "Ücretsiz Kargo",
     "filter_in_stock": "Stokta Var",
     "filter_cashback_only": "Sadece Cashback'li Ürünler",
+    "filter_cashback_hint": "Tüm Mopro ürünleri cashback kazanır",
     "filter_apply": "Uygula",
     "filter_reset": "Sıfırla"
   },
