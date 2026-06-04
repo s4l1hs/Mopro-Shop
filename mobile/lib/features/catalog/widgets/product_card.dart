@@ -5,6 +5,7 @@ import 'package:mopro/design/widgets/discount_pill.dart';
 import 'package:mopro/design/widgets/responsive_network_image.dart';
 import 'package:mopro/features/catalog/widgets/cashback_chip.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
+import 'package:mopro/utils/count_format.dart';
 import 'package:mopro/utils/money.dart';
 import 'package:mopro/widgets/skeleton_box.dart';
 import 'package:mopro_api/mopro_api.dart';
@@ -97,6 +98,15 @@ class ProductCard extends ConsumerWidget {
                       },
                     ),
                   ),
+                  // P-004: favorites social-proof count (the global server count,
+                  // no optimistic update). Bottom-left, distinct from the toggle.
+                  if (formatCompactCount(product.favoritesCount ?? 0).isNotEmpty)
+                    Positioned(
+                      bottom: 6,
+                      left: 6,
+                      child:
+                          _FavoritesCountBadge(count: product.favoritesCount ?? 0),
+                    ),
                 ],
               ),
             ),
@@ -207,6 +217,39 @@ class _HeartButton extends StatelessWidget {
           color:
               isFav ? MoproTokens.primaryLight : const Color(0xFF888888),
         ),
+      ),
+    );
+  }
+}
+
+class _FavoritesCountBadge extends StatelessWidget {
+  const _FavoritesCountBadge({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        // Translucent dark scrim keeps white text legible over any image
+        // (same one-off-overlay style as the heart button's white circle).
+        color: const Color(0xCC000000),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.favorite_rounded, size: 11, color: Colors.white),
+          const SizedBox(width: 3),
+          Text(
+            formatCompactCount(count),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }

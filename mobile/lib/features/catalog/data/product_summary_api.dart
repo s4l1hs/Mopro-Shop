@@ -25,6 +25,7 @@ ProductSummary productSummaryFromApi(Map<String, dynamic> j) {
     discountPct: (j['discount_pct'] as num?)?.toInt(),
     ratingAvg: (j['rating_avg'] as num?)?.toDouble(),
     ratingCount: (j['rating_count'] as num?)?.toInt() ?? 0,
+    favoritesCount: (j['favorites_count'] as num?)?.toInt() ?? 0,
     cashbackPreview: CashbackPreview(
       monthlyCoinMinor: (cb['monthly_amount_minor'] as num?)?.toInt() ?? 0,
       currency: (cb['currency'] as String?) ?? '',
