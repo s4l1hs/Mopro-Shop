@@ -30,6 +30,10 @@ class _FakeSearchApi extends SearchApi {
   @override
   Future<Response<ListProducts200Response>> search({
     required String q,
+    List<String>? brand,
+    int? rating,
+    bool? freeShipping,
+    bool? inStock,
     String? xTraceId,
     int? categoryId,
     int? minPrice,
