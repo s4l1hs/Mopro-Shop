@@ -389,7 +389,7 @@ _responseData = rawData == null ? null : deserialize<ListCategories200Response, 
   /// * [rating] - Minimum average rating (products with rating_avg >= this).
   /// * [freeShipping] - When true, only products flagged free-shipping.
   /// * [inStock] - When true, only products with at least one in-stock variant.
-  /// * [sort] - Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` is not yet supported server-side (P-029). 
+  /// * [sort] - Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` orders by global popularity (P-029); it degrades to `recommended` until the analytics popularity projection has data. 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request

@@ -118,6 +118,7 @@ const (
 
 // Defines values for FilterSort.
 const (
+	FilterSortBestseller   FilterSort = "bestseller"
 	FilterSortCashbackDesc FilterSort = "cashback_desc"
 	FilterSortNewest       FilterSort = "newest"
 	FilterSortPriceAsc     FilterSort = "price_asc"
@@ -166,6 +167,7 @@ const (
 
 // Defines values for ListProductsParamsSort.
 const (
+	ListProductsParamsSortBestseller   ListProductsParamsSort = "bestseller"
 	ListProductsParamsSortCashbackDesc ListProductsParamsSort = "cashback_desc"
 	ListProductsParamsSortNewest       ListProductsParamsSort = "newest"
 	ListProductsParamsSortPriceAsc     ListProductsParamsSort = "price_asc"
@@ -175,6 +177,7 @@ const (
 
 // Defines values for SearchParamsSort.
 const (
+	Bestseller   SearchParamsSort = "bestseller"
 	CashbackDesc SearchParamsSort = "cashback_desc"
 	Newest       SearchParamsSort = "newest"
 	PriceAsc     SearchParamsSort = "price_asc"
@@ -1206,7 +1209,8 @@ type ListProductsParams struct {
 	InStock *FilterInStock `form:"in_stock,omitempty" json:"in_stock,omitempty"`
 
 	// Sort Sort order. Unknown/unsupported tokens fall back to `recommended`.
-	// `bestseller` is not yet supported server-side (P-029).
+	// `bestseller` orders by global popularity (P-029); it degrades to
+	// `recommended` until the analytics popularity projection has data.
 	Sort *ListProductsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
@@ -1284,7 +1288,8 @@ type SearchParams struct {
 	InStock *FilterInStock `form:"in_stock,omitempty" json:"in_stock,omitempty"`
 
 	// Sort Sort order. Unknown/unsupported tokens fall back to `recommended`.
-	// `bestseller` is not yet supported server-side (P-029).
+	// `bestseller` orders by global popularity (P-029); it degrades to
+	// `recommended` until the analytics popularity projection has data.
 	Sort *SearchParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// XTraceId Client-generated trace identifier (UUID or opaque string).

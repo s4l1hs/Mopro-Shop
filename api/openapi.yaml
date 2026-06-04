@@ -1777,7 +1777,7 @@ components:
     # Shared by GET /products and GET /search so both endpoints filter+sort
     # identically. All optional; omitting one applies no constraint on that
     # dimension. The backend maps an unknown `sort` token to `recommended`
-    # (never errors) — `bestseller` is intentionally absent until P-029.
+    # (never errors). `bestseller` orders by global popularity (P-029).
     FilterCategoryId:
       name: category_id
       in: query
@@ -1844,10 +1844,11 @@ components:
       required: false
       description: |
         Sort order. Unknown/unsupported tokens fall back to `recommended`.
-        `bestseller` is not yet supported server-side (P-029).
+        `bestseller` orders by global popularity (P-029); it degrades to
+        `recommended` until the analytics popularity projection has data.
       schema:
         type: string
-        enum: [recommended, newest, price_asc, price_desc, cashback_desc]
+        enum: [recommended, bestseller, newest, price_asc, price_desc, cashback_desc]
         default: recommended
 
   responses:
