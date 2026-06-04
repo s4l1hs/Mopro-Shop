@@ -105,13 +105,15 @@ void main() {
 
     testWidgets('guest variant shows "Giriş Yap" pill', (tester) async {
       await _pump(tester);
-      expect(find.text('Giriş Yap'), findsOneWidget);
+      // web_header renders 'auth.login'.tr(); tests don't load the bundle, so
+      // .tr() returns the key (auth.login → "Giriş Yap" verified in tr-TR.json).
+      expect(find.text('auth.login'), findsOneWidget);
     });
 
     testWidgets('authed variant shows avatar (initial), not login pill',
         (tester) async {
       await _pump(tester, authState: const AuthAuthenticated());
-      expect(find.text('Giriş Yap'), findsNothing);
+      expect(find.text('auth.login'), findsNothing);
       // Avatar shows the 'M' placeholder initial.
       expect(find.text('M'), findsOneWidget);
     });
