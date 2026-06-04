@@ -4222,3 +4222,17 @@ The aspirational 0-split outcome: cart/checkout were already mostly localized (P
 
 ### P-014 closure — Step 5 status
 Findings done: P-005, P-006, P-020, P-014 (4 of ~12). Remaining: P-007 (PDP delivery-ETA, backend-gated), P-026 (inert filters MED), 6 LOW (P-004/009/011/012/013/015), + the orphaned HeroCarousel cleanup (#82) and the chi-square flake (#74). No visual change beyond text source.
+
+## PR — P-026: discover-and-bifurcate (closes PARITY_AUDIT P-026 as BLOCKED-BY-BACKEND-GAP; opens P-028) — `feat/wire-plp-filters`
+
+**Outcome C** (prompt §1.3): the filter frontend is fully built; the backend applies no filter dimension → no frontend wiring is shippable. Discovery-only PR (commits 2–8 skipped).
+
+- **Discovery** (`docs/internal/p026-filter-wiring.md`, 219 LOC): traced sort + price + brand + rating + free-shipping through all six layers (OpenAPI spec → generated client → Riverpod provider → HTTP handler → `catalog.Service` → repository) for both `/products` and `/search`.
+- **Backend reality:** `handleListProducts` reads only `category_id`/`page`/`per_page`/`market`; `handleSearch` only `q`/`page`/`per_page`/`market`. `ListProductsByCategory`/`SearchSummary` (and the repo) carry no sort/filter args. Even spec-declared params are dropped at the handler — `/products` declares `sort` (ignored); `/search` declares `min_price`/`max_price`/`category_id`/`sort` (the generated `SearchApi.search` even sends them; `search_provider` doesn't, and the handler wouldn't read them regardless).
+- **Frontend (already built, untouched):** `PlpFilters` + `PlpFiltersCodec` URL round-trip + desktop `FilterPanel` + mobile `FilterSheet` + `PlpFilterChips` + clear-all + active-count badge. All write state correctly; only the fetch link is missing.
+- **Filters wired: 0.** Filters blocked: 5 (price, brand, rating, free-shipping, sort) → all rolled into new finding **P-028 (HIGH, backend)**.
+- **Secondary observations (logged, not fixed):** mobile/desktop filter-model divergence (`in_stock`/`cashback_only` dropped on the bridge; brand/rating absent on mobile); `PlpSort` token mismatch (`bestseller`≠`best_selling`, `cashback_desc` not in spec); `filtered_products_provider.dart:11-13`'s "only filters by sort today" comment is itself inaccurate — sort is a no-op server-side too.
+- **No code changed → no goldens, no new tests** (Outcome C). `make verify` green (docs-only).
+
+### Step 5 status (post P-026)
+Triaged: P-005, P-006, P-020, P-014 resolved + **P-026 closed as BLOCKED-BY-BACKEND-GAP** (5 of ~12); **P-028 opened** (HIGH, backend). Remaining: P-007 (PDP delivery-ETA, backend-gated), 6 LOW (P-004/009/011/012/013/015), orphaned HeroCarousel cleanup (#82), chi-square flake (#74), **P-028 (backend filter API)**, and P-026's queued frontend-wiring PR (gated on P-028).

@@ -115,9 +115,15 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
    **~250+ strings / ~30 files** (the diacritic grep undercounted ~2× each phase). 0 hardcoded TR left in UI sinks;
    tr-TR (master) + en-US; 0 TRANSLATION_NEEDED. Canonical i18n template: full-file reads, key+JSON test pattern (no
    bundle), const→build-time lists, golden-prediction, orphaned-widget findings.
-3. **P5-3** `feat/pdp-delivery-eta` (SOON) — closes **P-007** + lights up the dark **P-008b** UI. **Backend-gated**
+3. ✅ **P5-wire-filters — discover-and-bifurcate (Outcome C).** `feat/wire-plp-filters` — **P-026 closed as
+   `BLOCKED-BY-BACKEND-GAP`.** Discovery (`docs/internal/p026-filter-wiring.md`) traced every filter dimension
+   through all six layers: the frontend (`PlpFilters` state + URL codec + sidebar panel + mobile sheet + chips) is
+   fully built, but `/products` + `/search` apply **no** filter or sort server-side (even spec-declared params are
+   dropped at the handler). 0 filters wired; full-stack gap filed as **P-028 (HIGH, backend)**. The frontend-wiring
+   PR is queued behind P-028 (substrate ready — discovery §9).
+4. **P5-3** `feat/pdp-delivery-eta` (SOON) — closes **P-007** + lights up the dark **P-008b** UI. **Backend-gated**
    (catalog/shipping API must expose ETA + original price + lowest-30d); UI slot can land NOW, data SOON. Risk MED.
-4. **P5-4** `feat/parity-card-badges` (SOON) — closes **P-009** + confirms **P-010**. **Discovery-first** (Trendyol
+5. **P5-4** `feat/parity-card-badges` (SOON) — closes **P-009** + confirms **P-010**. **Discovery-first** (Trendyol
    `/sr` is 403 — re-confirm with screenshots before building). Backend-gated (free-shipping/campaign flags). Risk MED.
 
 LATER/PARK: **P5-5** cart suggestions + saved-for-later (P-011, LOW); **P5-6** favorite collections (P-013, PARK —
@@ -125,7 +131,7 @@ confirm product intent); **P5-7** checkout flow-shape review (P-012, PARK — do
 on taste). Drive-by (Step-1 family, not parity): remove the empty `mobile/lib/features/orders/` directory.
 
 **12 VERIFIED-COMPLETE surfaces** (design tokens, auth-gate/guest-browsing, global nav, home, flash deals, product
-card, PDP structure, search/PLP filters, reviews, Q&A, orders/returns, notifications/account/empty-states/responsive)
+card, PDP structure, search/PLP filters (UI only — fetch wiring gated on P-028), reviews, Q&A, orders/returns, notifications/account/empty-states/responsive)
 — see audit §5. **Do not rebuild these.**
 
 **Step-5 coverage caveat:** Trendyol bot-blocks parametrized pages (403 on `/sr`, PDP, category; login-gated
@@ -134,4 +140,5 @@ evidence but PROBABLE *Trendyol* comparison — each PROBABLE finding gets re-co
 phase (#59→#60 pattern).
 
 **Open tail (unchanged, non-blocking):** idempotency-surface analyzer (T-007 split); cron-overlap sim (T-008);
-PR #74 chi-square flake; A-004/A-007 PROBABLE; A-005 PARK.
+PR #74 chi-square flake; A-004/A-007 PROBABLE; A-005 PARK; **P-028** (catalog/search filter API — backend; blocks
+P-026's frontend wiring).

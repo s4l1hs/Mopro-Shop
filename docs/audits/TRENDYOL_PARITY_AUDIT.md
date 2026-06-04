@@ -20,7 +20,10 @@
 i18n hardcoded-string sweep landed across **7 phased PRs** (#79 app_router · #80 auth+sipay · #81 account ·
 #82 verification+marketing · #83 checkout+singletons), ~250+ strings, 0 hardcoded TR left in UI sinks. The
 arc's lessons (full-file reads, key+JSON test pattern, const→build-time, golden-prediction, diacritic-undercount,
-orphaned-widget) are the canonical i18n template. **Step-5 findings done: P-005, P-006, P-020, P-014 (4 of ~12).**
+orphaned-widget) are the canonical i18n template. **P-026 closed as `BLOCKED-BY-BACKEND-GAP`** — discovery
+(`docs/internal/p026-filter-wiring.md`) proved the filter frontend is fully built but the catalog/search backend
+applies no filter or sort dimension; frontend wiring is queued behind new finding **P-028 (HIGH, backend)**.
+**Step-5 findings triaged: P-005, P-006, P-020, P-014 resolved + P-026 closed-as-blocked (5 of ~12); P-028 opened.**
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
@@ -115,11 +118,19 @@ Mopro: `catalog/screens/search_screen.dart` (253 LOC, read) + `catalog/widgets/s
 CONFIRMED Mopro internals (`search_screen.dart`, read): **empty/pre-query state** (`_EmptySearchBody`, line 154) = removable recent-search chips + clear-all (`search.recent_searches`/`search.clear_recent`) + 8 root-category `ActionChip` suggestions (`search.suggested_categories`) — matches Trendyol's pre-query suggestions. **Pagination = load-more** (`hasMore`/`loadingMore`/`loadMoreError`/`onLoadMore`, line 76-79), not infinite-scroll or paged. Mobile = 2-col `CatalogShell`; tablet/desktop = 280px `FilterPanel` sidebar + query chip + `PlpFilterChips` + 3/5-col grid (line 95-143).
 
 ### P-026 — Search filters are rendered but inert (don't affect the fetch yet)
-**Status: FUNCTIONAL | Severity: MED | Confidence: CONFIRMED**
+**Status: ✅ CLOSED — `BLOCKED-BY-BACKEND-GAP` (discover-and-bifurcate) | Severity: MED | Confidence: CONFIRMED**
 Evidence: `search_screen.dart:88-91` — "Filters write the plp substrate keyed by the query; **like PLP, they don't yet affect the search fetch** (REPORT §5)." So the filter panel + chips render and persist, but selecting a filter does not re-query.
 Gap: filter UI present but functionally disconnected on search (and PLP).
 Severity: MED — a visible control that doesn't work is worse than an absent one; affects the core browse loop.
 Recommendation: `P5-wire-filters` — connect `plp_filters_provider` selections to the search/PLP fetch. **Backend dependency:** the catalog/search API must accept the filter params. Already a known item (REPORT §5) → not a new surface, a wiring follow-up.
+**Resolution (discover-and-bifurcate, branch `feat/wire-plp-filters`):** closed as `BLOCKED-BY-BACKEND-GAP`. Discovery (`docs/internal/p026-filter-wiring.md`) traced every dimension through all six layers (spec → client → provider → handler → service → repo): the frontend is fully built, but `/products` + `/search` apply no filter or sort — even spec-declared params (`sort` on both; `min_price`/`max_price`/`category_id` on `/search`) are dropped at the handler, and `catalog.Service`/repo have no filter args. No dimension can be wired end-to-end without backend work → **no frontend wiring shipped**. Full-stack gap filed as **P-028 (HIGH, backend)**; the frontend-wiring PR is queued behind it (the `PlpFilters` substrate + URL codec are ready — discovery §9).
+
+### P-028 — Catalog/search API applies no filter or sort dimension (blocks P-026)
+**Status: OPEN | Severity: HIGH | Confidence: CONFIRMED | Type: backend (full-stack)**
+Evidence (read, `feat/wire-plp-filters` discovery): `cmd/core-svc/catalog_handlers.go:53-121` — `handleListProducts` reads only `category_id`/`page`/`per_page`/`market`; `handleSearch` reads only `q`/`page`/`per_page`/`market`. `internal/catalog/api.go:30-31` — `ListProductsByCategory` / `SearchSummary` carry no `sort` or filter parameter; the repository (`repository.go:307`) likewise. The mobile client is partly ahead of the backend: `search_api.dart:44-85` already sends `min_price`/`max_price`/`category_id`/`sort` and `openapi.yaml:894-948` declares them ("Full-text product search with filters") — but the handler drops them.
+Gap: no price / brand / rating / free-shipping / sort filtering server-side, on either endpoint.
+Severity rationale: HIGH (bumped from P-026's MED) — a multi-dimension, both-endpoint, full-stack feature (spec + handler + service + repo SQL; `free_shipping` needs a new `ProductSummary` field) blocking the core browse loop's refinement. Not a one-line wiring.
+Recommendation: `P-catalog-filter-api` — implement `sort` (`ORDER BY`) + `price`/`brand`/`rating` (`WHERE`) + `free_shipping` (new flag) on both endpoints; reconcile the `PlpSort` token mismatch (`bestseller`≠`best_selling`, `cashback_desc` absent — discovery §8). Then unblock P-026's frontend-wiring PR. Out of Step-5 (UI) scope.
 
 ### P-009 — Search-result cards likely lack Trendyol merch badges (Kargo Bedava / campaign / "Çok satan")
 **Status: CONTENT/VISUAL | Severity: MED | Confidence: PROBABLE**
