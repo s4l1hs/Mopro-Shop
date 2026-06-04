@@ -134,6 +134,10 @@ type ProductFilter struct {
 	FreeShipping  *bool    // true => only free-shipping products
 	InStock       *bool    // true => only products with an in-stock variant
 	Sort          string   // PlpSort token; "" or unknown => recommended
+	// PopularIDs, when non-empty (bestseller sort), orders results by these IDs
+	// first via array_position — the global popularity ranking the handler reads
+	// from analytics.Service.PopularProductIDs (P-029). Empty => normal sort.
+	PopularIDs []int64
 }
 
 // CategoryCommission holds the currently active commission + KDV rates for a

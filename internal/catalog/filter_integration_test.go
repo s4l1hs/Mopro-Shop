@@ -256,3 +256,45 @@ func TestIntegration_SearchFilters(t *testing.T) {
 		pfAssertSet(t, search(t, catalog.ProductFilter{CategoryID: pfI64(999999)}))
 	})
 }
+
+// TestIntegration_BestsellerOrder covers P-029: the repo orders by the
+// handler-supplied PopularIDs (array_position, NULLS LAST), composes with
+// filters, and falls back to recommended when PopularIDs is empty.
+func TestIntegration_BestsellerOrder(t *testing.T) {
+	ctx := context.Background()
+	pfSetupCat(t, ctx)
+	repo := catalog.NewRepository(integPool)
+
+	a := pfSeed(t, ctx, "Apple", "BS Alpha", 10000, nil, 0, false, 5)
+	b := pfSeed(t, ctx, "Nokia", "BS Beta", 20000, nil, 0, false, 5)
+	c := pfSeed(t, ctx, "Sony", "BS Gamma", 30000, nil, 0, false, 5)
+
+	list := func(t *testing.T, f catalog.ProductFilter) []int64 {
+		t.Helper()
+		rows, _, err := repo.ListProductsByCategory(ctx, pfCat, "tr-TR", f, 0, 50)
+		if err != nil {
+			t.Fatalf("ListProductsByCategory: %v", err)
+		}
+		return pfIDs(rows)
+	}
+
+	t.Run("orders by PopularIDs; unranked last (NULLS LAST)", func(t *testing.T) {
+		// c, a ranked (that order); b unranked -> last.
+		got := list(t, catalog.ProductFilter{Sort: "bestseller", PopularIDs: []int64{c, a}})
+		pfAssertOrder(t, got, c, a, b)
+	})
+
+	t.Run("empty PopularIDs -> recommended fallback (id desc)", func(t *testing.T) {
+		got := list(t, catalog.ProductFilter{Sort: "bestseller"})
+		pfAssertOrder(t, got, c, b, a)
+	})
+
+	t.Run("composes with filters", func(t *testing.T) {
+		got := list(t, catalog.ProductFilter{
+			Sort:       "bestseller",
+			PopularIDs: []int64{c, a, b},
+			Brands:     []string{"Sony"},
+		})
+		pfAssertOrder(t, got, c)
+	})
+}

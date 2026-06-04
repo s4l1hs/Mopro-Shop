@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 
+	"github.com/mopro/platform/internal/analytics"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/seller"
 	"github.com/mopro/platform/pkg/mediaurl"
@@ -50,8 +52,27 @@ func handleListCategories(svc catalog.Service, defaultLocale string) http.Handle
 	}
 }
 
+// bestsellerPopularCap bounds how many globally-popular product IDs the
+// bestseller sort seeds (caps the array_position cost per row).
+const bestsellerPopularCap = 200
+
+// applyBestsellerOrder fills filter.PopularIDs with the global popularity ranking
+// (from analytics) when sort=bestseller, so the repo orders by it (P-029). On
+// error/empty the filter is left as-is → the repo falls back to recommended.
+func applyBestsellerOrder(ctx context.Context, analyticsSvc analytics.Service, filter *catalog.ProductFilter) {
+	if filter.Sort != "bestseller" {
+		return
+	}
+	ids, err := analyticsSvc.PopularProductIDs(ctx, bestsellerPopularCap)
+	if err != nil {
+		slog.Warn("catalog: bestseller popular IDs unavailable", "err", err)
+		return
+	}
+	filter.PopularIDs = ids
+}
+
 // handleListProducts handles GET /products?category_id=X&page=1&per_page=20
-func handleListProducts(svc catalog.Service, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
+func handleListProducts(analyticsSvc analytics.Service, svc catalog.Service, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		categoryIDStr := q.Get("category_id")
@@ -78,6 +99,7 @@ func handleListProducts(svc catalog.Service, defaultLocale, defaultMarket, cashb
 		}
 
 		filter := parseProductFilter(q, false)
+		applyBestsellerOrder(r.Context(), analyticsSvc, &filter)
 		rows, total, err := svc.ListProductsByCategory(r.Context(), categoryID, locale, market, filter, page, perPage)
 		if err != nil {
 			slog.Error("catalog: ListProductsByCategory", "category_id", categoryID, "err", err)
@@ -90,7 +112,7 @@ func handleListProducts(svc catalog.Service, defaultLocale, defaultMarket, cashb
 }
 
 // handleSearch handles GET /search?q=...&page=1&per_page=20
-func handleSearch(svc catalog.Service, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
+func handleSearch(analyticsSvc analytics.Service, svc catalog.Service, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		query := q.Get("q")
@@ -112,6 +134,7 @@ func handleSearch(svc catalog.Service, defaultLocale, defaultMarket, cashbackCur
 		}
 
 		filter := parseProductFilter(q, true)
+		applyBestsellerOrder(r.Context(), analyticsSvc, &filter)
 		rows, total, err := svc.SearchSummary(r.Context(), query, locale, market, filter, page, perPage)
 		if err != nil {
 			slog.Error("catalog: SearchSummary", "query", query, "err", err)
