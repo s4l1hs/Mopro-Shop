@@ -53,7 +53,10 @@ class SortSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          ..._sortOptions.map(
+          // `bestseller` is hidden until P-029 wires real popularity data — the
+          // backend maps it to `recommended` today, so showing it would duplicate
+          // the Recommended option. The enum + i18n key are kept for P-029.
+          ..._sortOptions.where((o) => o.$1 != 'bestseller').map(
             // TODO(4e): migrate to RadioGroup (Radio API deprecated Flutter 3.32)
             (opt) => RadioListTile<String>(
               title: Text(opt.$2.tr()),

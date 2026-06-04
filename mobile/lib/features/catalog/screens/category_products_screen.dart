@@ -231,7 +231,8 @@ class _CategoryProductsScreenState
       onSelected: (s) =>
           ref.read(plpFiltersProvider(_key).notifier).setSort(s),
       itemBuilder: (_) => [
-        for (final s in PlpSort.values)
+        // `bestseller` hidden until P-029 (backend maps it to recommended today).
+        for (final s in PlpSort.values.where((s) => s != PlpSort.bestseller))
           PopupMenuItem<PlpSort>(
             value: s,
             child: Text('catalog.sort_${s.token}'.tr()),
@@ -266,6 +267,7 @@ class _CategoryProductsScreenState
       minPriceMinor: filters.priceMinMinor,
       maxPriceMinor: filters.priceMaxMinor,
       freeShippingOnly: filters.freeShippingOnly,
+      inStockOnly: filters.inStock,
     );
     final result = await showFilterSheet(context, current: current);
     if (result != null) {
@@ -274,6 +276,7 @@ class _CategoryProductsScreenState
               priceMinMinor: result.minPriceMinor,
               priceMaxMinor: result.maxPriceMinor,
               freeShippingOnly: result.freeShippingOnly,
+              inStock: result.inStockOnly,
               page: 1,
             ),
           );
