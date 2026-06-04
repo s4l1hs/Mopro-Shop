@@ -41,6 +41,7 @@ class PlpFilters {
     this.brands = const [],
     this.ratingMin,
     this.freeShippingOnly = false,
+    this.inStock = false,
     this.page = 1,
   });
 
@@ -50,6 +51,7 @@ class PlpFilters {
   final List<String> brands;
   final int? ratingMin; // 1..5 inclusive when set
   final bool freeShippingOnly;
+  final bool inStock;
   final int page;
 
   PlpFilters copyWith({
@@ -59,6 +61,7 @@ class PlpFilters {
     List<String>? brands,
     Object? ratingMin = _unset,
     bool? freeShippingOnly,
+    bool? inStock,
     int? page,
   }) {
     return PlpFilters(
@@ -70,6 +73,7 @@ class PlpFilters {
       brands: brands ?? this.brands,
       ratingMin: identical(ratingMin, _unset) ? this.ratingMin : ratingMin as int?,
       freeShippingOnly: freeShippingOnly ?? this.freeShippingOnly,
+      inStock: inStock ?? this.inStock,
       page: page ?? this.page,
     );
   }
@@ -82,17 +86,19 @@ class PlpFilters {
       brands.isEmpty &&
       ratingMin == null &&
       !freeShippingOnly &&
+      !inStock &&
       page == 1;
 
-  /// Count of active *filters* (not sort, not page) for the future sidebar's
-  /// chip row: price range counts once, each brand counts, rating once,
-  /// free-shipping once.
+  /// Count of active *filters* (not sort, not page) for the sidebar's chip row:
+  /// price range counts once, each brand counts, rating once, free-shipping once,
+  /// in-stock once.
   int get activeChipCount {
     var n = 0;
     if (priceMinMinor != null || priceMaxMinor != null) n++;
     n += brands.length;
     if (ratingMin != null) n++;
     if (freeShippingOnly) n++;
+    if (inStock) n++;
     return n;
   }
 
@@ -106,6 +112,7 @@ class PlpFilters {
           listEquals(other.brands, brands) &&
           other.ratingMin == ratingMin &&
           other.freeShippingOnly == freeShippingOnly &&
+          other.inStock == inStock &&
           other.page == page);
 
   @override
@@ -116,6 +123,7 @@ class PlpFilters {
         Object.hashAll(brands),
         ratingMin,
         freeShippingOnly,
+        inStock,
         page,
       );
 }
