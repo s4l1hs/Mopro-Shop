@@ -268,10 +268,10 @@ func (alwaysValidCatalog) ListCategories(_ context.Context, _ string, _ int) ([]
 	return nil, nil
 }
 
-func (alwaysValidCatalog) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+func (alwaysValidCatalog) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
 
-func (alwaysValidCatalog) SearchSummary(_ context.Context, _, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+func (alwaysValidCatalog) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }

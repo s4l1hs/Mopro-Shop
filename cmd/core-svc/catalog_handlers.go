@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 
 	"github.com/mopro/platform/internal/catalog"
@@ -76,7 +77,8 @@ func handleListProducts(svc catalog.Service, defaultLocale, defaultMarket, cashb
 			market = defaultMarket
 		}
 
-		rows, total, err := svc.ListProductsByCategory(r.Context(), categoryID, locale, market, page, perPage)
+		filter := parseProductFilter(q, false)
+		rows, total, err := svc.ListProductsByCategory(r.Context(), categoryID, locale, market, filter, page, perPage)
 		if err != nil {
 			slog.Error("catalog: ListProductsByCategory", "category_id", categoryID, "err", err)
 			jsonError(w, "internal error", http.StatusInternalServerError)
@@ -109,7 +111,8 @@ func handleSearch(svc catalog.Service, defaultLocale, defaultMarket, cashbackCur
 			market = defaultMarket
 		}
 
-		rows, total, err := svc.SearchSummary(r.Context(), query, locale, market, page, perPage)
+		filter := parseProductFilter(q, true)
+		rows, total, err := svc.SearchSummary(r.Context(), query, locale, market, filter, page, perPage)
 		if err != nil {
 			slog.Error("catalog: SearchSummary", "query", query, "err", err)
 			jsonError(w, "internal error", http.StatusInternalServerError)
@@ -118,6 +121,42 @@ func handleSearch(svc catalog.Service, defaultLocale, defaultMarket, cashbackCur
 
 		jsonOK(w, http.StatusOK, buildProductListResponse(rows, total, page, perPage, cashbackCurrency))
 	}
+}
+
+// parseProductFilter extracts the optional catalog filter + sort knobs (P-028)
+// from the query string. Invalid/absent values are simply omitted (no error) —
+// the listing degrades to "no constraint on that dimension". When
+// includeCategory is true (search), an optional category_id filter is parsed
+// too (on /products the category is the dedicated required arg). The raw sort
+// token is passed through; the repository maps unknown tokens to recommended.
+func parseProductFilter(q url.Values, includeCategory bool) catalog.ProductFilter {
+	f := catalog.ProductFilter{Sort: q.Get("sort")}
+	if includeCategory {
+		if v, err := strconv.ParseInt(q.Get("category_id"), 10, 64); err == nil && v > 0 {
+			f.CategoryID = &v
+		}
+	}
+	if v, err := strconv.ParseInt(q.Get("min_price"), 10, 64); err == nil && v >= 0 {
+		f.MinPriceMinor = &v
+	}
+	if v, err := strconv.ParseInt(q.Get("max_price"), 10, 64); err == nil && v >= 0 {
+		f.MaxPriceMinor = &v
+	}
+	if brands := q["brand"]; len(brands) > 0 {
+		f.Brands = brands
+	}
+	if v, err := strconv.Atoi(q.Get("rating")); err == nil && v >= 1 && v <= 5 {
+		f.MinRating = &v
+	}
+	if q.Get("free_shipping") == "true" {
+		t := true
+		f.FreeShipping = &t
+	}
+	if q.Get("in_stock") == "true" {
+		t := true
+		f.InStock = &t
+	}
+	return f
 }
 
 // handleGetProductDetail handles GET /products/{id} with cashback_preview.

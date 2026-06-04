@@ -116,7 +116,7 @@ func (s *catalogService) ListCategories(ctx context.Context, locale string, maxD
 	return s.repo.ListCategories(ctx, locale, maxDepth)
 }
 
-func (s *catalogService) ListProductsByCategory(ctx context.Context, categoryID int64, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error) {
+func (s *catalogService) ListProductsByCategory(ctx context.Context, categoryID int64, locale, market string, filter ProductFilter, page, perPage int) ([]ProductSummaryRow, int, error) {
 	if locale == "" {
 		locale = s.defaultLocale
 	}
@@ -127,10 +127,10 @@ func (s *catalogService) ListProductsByCategory(ctx context.Context, categoryID 
 		perPage = 20
 	}
 	offset := (page - 1) * perPage
-	return s.repo.ListProductsByCategory(ctx, categoryID, locale, offset, perPage)
+	return s.repo.ListProductsByCategory(ctx, categoryID, locale, filter, offset, perPage)
 }
 
-func (s *catalogService) SearchSummary(ctx context.Context, query, locale, market string, page, perPage int) ([]ProductSummaryRow, int, error) {
+func (s *catalogService) SearchSummary(ctx context.Context, query, locale, market string, filter ProductFilter, page, perPage int) ([]ProductSummaryRow, int, error) {
 	if locale == "" {
 		locale = s.defaultLocale
 	}
@@ -141,7 +141,7 @@ func (s *catalogService) SearchSummary(ctx context.Context, query, locale, marke
 		perPage = 20
 	}
 	offset := (page - 1) * perPage
-	return s.repo.SearchProductsSummary(ctx, query, locale, offset, perPage)
+	return s.repo.SearchProductsSummary(ctx, query, locale, filter, offset, perPage)
 }
 
 func (s *catalogService) ListAllVariantStocks(ctx context.Context) ([]VariantStock, error) {

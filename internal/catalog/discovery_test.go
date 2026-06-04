@@ -37,7 +37,7 @@ func TestSearchSummary_Turkish_Elbise_ReturnsResults(t *testing.T) {
 	repo := &mockRepo{}
 	svc := catalog.NewService(repo, "TRY", "tr-TR")
 
-	rows, total, err := svc.SearchSummary(context.Background(), "elbise", "tr-TR", "TR", 1, 20)
+	rows, total, err := svc.SearchSummary(context.Background(), "elbise", "tr-TR", "TR", catalog.ProductFilter{}, 1, 20)
 	if err != nil {
 		t.Fatalf("SearchSummary: %v", err)
 	}

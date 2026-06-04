@@ -389,10 +389,10 @@ func (m *catalogMock) GetVariantByID(_ context.Context, _ int64) (catalog.Varian
 func (m *catalogMock) ListCategories(_ context.Context, _ string, _ int) ([]catalog.CategoryRow, error) {
 	return nil, nil
 }
-func (m *catalogMock) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+func (m *catalogMock) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
-func (m *catalogMock) SearchSummary(_ context.Context, _, _, _ string, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+func (m *catalogMock) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
 func (m *catalogMock) ListProductsByIDs(_ context.Context, _ []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {
