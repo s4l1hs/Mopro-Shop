@@ -54,24 +54,24 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
-                const _SectionLabel('Parola'),
+                _SectionLabel('security.section_password'.tr()),
                 _RowCard(
                   icon: Icons.lock_outline_rounded,
-                  title: 'Parolamı Değiştir',
-                  subtitle:
-                      'Güçlü bir parola seç (8+ karakter, büyük/küçük harf, özel karakter)',
+                  title: 'security.change_password_title'.tr(),
+                  subtitle: 'security.change_password_sub'.tr(),
                   onTap: () => _showChangePasswordSheet(context),
                 ),
-                const _SectionLabel('İki Faktörlü Doğrulama (MFA)'),
+                _SectionLabel('security.section_mfa'.tr()),
                 _RowCard(
                   icon: _mfaEnabled
                       ? Icons.verified_user_rounded
                       : Icons.shield_outlined,
-                  title: _mfaEnabled ? 'MFA Aktif' : "MFA'yı Etkinleştir",
+                  title: _mfaEnabled
+                      ? 'security.mfa_active_title'.tr()
+                      : 'security.mfa_enable_title'.tr(),
                   subtitle: _mfaEnabled
-                      ? 'Hesabın SMS doğrulamasıyla korunuyor.'
-                      : 'Giriş yaparken SMS kodu istenir; '
-                          'hesabın daha güvenli olur.',
+                      ? 'security.mfa_active_sub'.tr()
+                      : 'security.mfa_inactive_sub'.tr(),
                   iconColor: _mfaEnabled ? Colors.green : cs.primary,
                   onTap: () => _mfaEnabled
                       ? _showDisableMfa(context)
@@ -106,7 +106,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
       setState(() => _mfaEnabled = true);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('MFA başarıyla etkinleştirildi.')),
+        SnackBar(content: Text('security.mfa_enabled_toast'.tr())),
       );
     }
   }
@@ -115,19 +115,17 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("MFA'yı kapat?"),
-        content: const Text(
-          'İki faktörlü doğrulamayı kapatmak hesabını daha az güvenli yapar.',
-        ),
+        title: Text('security.mfa_disable_title'.tr()),
+        content: Text('security.mfa_disable_body'.tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Vazgeç'),
+            child: Text('security.cancel'.tr()),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Kapat'),
+            child: Text('security.disable'.tr()),
           ),
         ],
       ),
@@ -140,13 +138,19 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
         setState(() => _mfaEnabled = false);
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('MFA kapatıldı.')),
+          SnackBar(content: Text('security.mfa_disabled_toast'.tr())),
         );
       }
     } on DioException catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Hata: ${e.message ?? "bilinmeyen"}')),
+        SnackBar(
+          content: Text(
+            'security.error_generic'.tr(
+              namedArgs: {'msg': e.message ?? 'security.unknown'.tr()},
+            ),
+          ),
+        ),
       );
     }
   }
@@ -193,7 +197,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Parolan güncellendi.')),
+          SnackBar(content: Text('security.password_updated_toast'.tr())),
         );
       }
     } on DioException catch (e) {
@@ -202,11 +206,11 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
           : null;
       setState(() {
         if (code == 'invalid_credentials') {
-          _error = 'Mevcut parolan hatalı.';
+          _error = 'security.current_password_wrong'.tr();
         } else if (code == 'weak_password') {
-          _error = 'Yeni parola güvenlik kurallarını karşılamıyor.';
+          _error = 'security.new_password_invalid'.tr();
         } else {
-          _error = 'Bir hata oluştu. Lütfen tekrar dene.';
+          _error = 'security.generic_error'.tr();
         }
       });
     } finally {
@@ -241,13 +245,13 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Parolamı Değiştir',
+                  'security.change_password_title'.tr(),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                 ),
                 const SizedBox(height: 16),
-                const AuthFieldLabel('Mevcut Parola'),
+                AuthFieldLabel('security.current_password_label'.tr()),
                 const SizedBox(height: 6),
                 TextFormField(
                   controller: _oldCtrl,
@@ -264,10 +268,11 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
                           setState(() => _obscureOld = !_obscureOld),
                     ),
                   ),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Zorunlu' : null,
+                  validator: (v) =>
+                      (v == null || v.isEmpty) ? 'auth.sign_up.required'.tr() : null,
                 ),
                 const SizedBox(height: 12),
-                const AuthFieldLabel('Yeni Parola'),
+                AuthFieldLabel('security.new_password_label'.tr()),
                 const SizedBox(height: 6),
                 TextFormField(
                   controller: _newCtrl,
@@ -275,7 +280,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
                   onChanged: (v) => setState(() => _newValue = v),
                   decoration: authInputDecoration(
                     context,
-                    hint: 'En az 8 karakter',
+                    hint: 'auth.sign_up.password_hint'.tr(),
                     prefixIcon: Icons.lock_outline,
                     suffixIcon: IconButton(
                       icon: Icon(_obscureNew
@@ -288,25 +293,25 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
                   validator: (v) =>
                       PasswordStrengthIndicator.isStrong(v ?? '')
                           ? null
-                          : 'Güçlü parola gerekli',
+                          : 'security.strong_password_required'.tr(),
                 ),
                 if (_newValue.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   PasswordStrengthIndicator(password: _newValue),
                 ],
                 const SizedBox(height: 12),
-                const AuthFieldLabel('Yeni Parola Tekrar'),
+                AuthFieldLabel('security.new_password_confirm_label'.tr()),
                 const SizedBox(height: 6),
                 TextFormField(
                   controller: _confirmCtrl,
                   obscureText: _obscureNew,
                   decoration: authInputDecoration(
                     context,
-                    hint: 'Parolayı tekrar gir',
+                    hint: 'security.password_confirm_hint'.tr(),
                     prefixIcon: Icons.lock_outline,
                   ),
                   validator: (v) =>
-                      v != _newCtrl.text ? 'Parolalar eşleşmiyor' : null,
+                      v != _newCtrl.text ? 'auth.sign_up.password_mismatch'.tr() : null,
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 12),
@@ -315,7 +320,7 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
                 const SizedBox(height: 20),
                 AuthSubmitButton(
                   isLoading: _submitting,
-                  label: 'Parolayı Güncelle',
+                  label: 'security.update_password'.tr(),
                   onPressed: _submit,
                 ),
               ],
@@ -350,8 +355,7 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
   Future<void> _sendCode() async {
     final phone = _phoneCtrl.text.trim();
     if (!RegExp(r'^\+\d{8,15}$').hasMatch(phone)) {
-      setState(() => _error =
-          'Telefon E.164 formatında olmalı (örn. +905551234567).',);
+      setState(() => _error = 'security.phone_format_error'.tr());
       return;
     }
     setState(() {
@@ -363,8 +367,12 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
       await dio.post<void>('/auth/mfa/enroll', data: {'phone': phone});
       setState(() => _codeSent = true);
     } on DioException catch (e) {
-      setState(() => _error =
-          'Kod gönderilemedi: ${e.response?.statusCode ?? "bağlantı hatası"}',);
+      setState(() => _error = 'security.code_send_failed'.tr(
+            namedArgs: {
+              'status': e.response?.statusCode?.toString() ??
+                  'security.connection_error'.tr(),
+            },
+          ),);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -373,7 +381,7 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
   Future<void> _confirm() async {
     final code = _codeCtrl.text.trim();
     if (code.length != 6) {
-      setState(() => _error = 'Kod 6 haneli olmalı.');
+      setState(() => _error = 'security.code_length_error'.tr());
       return;
     }
     setState(() {
@@ -390,11 +398,11 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
       final errCode = body is Map ? body['error']?.toString() : null;
       setState(() {
         if (errCode == 'mfa_invalid' || errCode == 'otp_invalid') {
-          _error = 'Hatalı kod, tekrar dene.';
+          _error = 'security.invalid_code'.tr();
         } else if (errCode == 'mfa_already_enabled') {
-          _error = 'MFA zaten aktif.';
+          _error = 'security.mfa_already_active'.tr();
         } else {
-          _error = 'İşlem başarısız.';
+          _error = 'security.operation_failed'.tr();
         }
       });
     } finally {
@@ -432,7 +440,7 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
                       color: MoproTokens.primaryLight, size: 24,),
                   const SizedBox(width: 8),
                   Text(
-                    "MFA'yı Etkinleştir",
+                    'security.mfa_enable_title'.tr(),
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
@@ -442,15 +450,15 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
               const SizedBox(height: 12),
               Text(
                 _codeSent
-                    ? 'Telefonuna gönderilen 6 haneli kodu gir.'
-                    : 'SMS doğrulaması için telefon numaranı gir.',
+                    ? 'security.enroll_code_prompt'.tr()
+                    : 'security.enroll_phone_prompt'.tr(),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
               ),
               const SizedBox(height: 20),
               if (!_codeSent) ...[
-                const AuthFieldLabel('Telefon (E.164)'),
+                AuthFieldLabel('security.phone_label'.tr()),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _phoneCtrl,
@@ -465,7 +473,7 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
                   ),
                 ),
               ] else ...[
-                const AuthFieldLabel('Doğrulama Kodu'),
+                AuthFieldLabel('security.code_label'.tr()),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _codeCtrl,
@@ -493,14 +501,16 @@ class _EnrollMfaSheetState extends ConsumerState<_EnrollMfaSheet> {
               const SizedBox(height: 20),
               AuthSubmitButton(
                 isLoading: _submitting,
-                label: _codeSent ? 'Onayla' : 'Kod Gönder',
+                label: _codeSent
+                    ? 'security.confirm'.tr()
+                    : 'security.send_code'.tr(),
                 onPressed: _codeSent ? _confirm : _sendCode,
               ),
               if (_codeSent) ...[
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () => setState(() => _codeSent = false),
-                  child: const Text('Telefon numarasını değiştir'),
+                  child: Text('security.change_phone'.tr()),
                 ),
               ],
             ],

@@ -256,8 +256,8 @@ the ~55 the `Text()`-scoped audit estimated. Whole screens are unlocalized (secu
 - **Phase 1 ✅ (`feat/i18n-hardcoded-sweep`):** `t()`→`withBrand` + app_router title localization (44 `router_title.*`).
 - **Phase 2c ✅ (`feat/i18n-sweep-2abc`):** sipay error map → `payment.error.sipay.*` (12 keys, dynamic prefix).
 - **Phase 2a ✅ (`feat/i18n-sweep-2abc`):** auth — sign_up + sign_in + auth_layout (~46 strings; `auth.*`/`auth.sign_up.*`/`auth.sign_in.*`/`auth.layout.*`).
-- **Phase 2b ⤿ SPLIT** → `feat/i18n-sweep-2b-account`: security_screen + account_screen (high-variance; interpolation, const dialogs, theme dedup).
-- **Phases 2d/2e/2f (queued):** email_verify/mfa/forgot + marketing/hero, checkout, misc singletons.
+- **Phase 2b ✅ (`feat/i18n-sweep-2b-account`):** account area — security_screen (40 `security.*` keys; 2 namedArgs interpolations; const dialogs/snackbars) + account_screen (17 `account.*`; theme dedup, softGated prompts). Both full-read swept; `account_security` goldens regen Turkish→keys.
+- **Phases 2d/2e/2f (queued):** email_verify/mfa/forgot + marketing/hero, checkout, misc singletons (incl. web_header).
 - **Third discovery-shift:** the diacritic grep undercounts ~2× (misses TR strings w/o special chars — "Ad", "Parola", "Giriş"). **True P-014 scope ≈ 250–300 strings**, not 155. Future phases counted by full-file read, not diacritic grep.
 The 11-string list below was a `Text()`-scoped floor (correctly flagged as a floor at the time).
 **Status: CONTENT | Severity: LOW | Confidence: CONFIRMED**

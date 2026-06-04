@@ -4173,3 +4173,18 @@ Bundled three P-014 phases; shipped 2a + 2c, split 2b.
 
 ### No visual change beyond text source
 Same rendered Turkish (verbatim) in the app; goldens render keys (harness limitation, filed). No backend.
+
+## PR #81 — P-014 Phase 2b: account (security_screen + account_screen)
+
+Closes Phase 2b whole (both files in one PR — the real diff is ~500 LOC, full rewrites preserve code).
+
+- **security_screen ✅** — full-read sweep, **40 `security.*` keys**. The complex file: const `_SectionLabel`s + const SnackBars + the disable-MFA const `AlertDialog` (const dropped at each `.tr()` site); the change-password sheet; the MFA-enroll flow with **2 interpolated errors → namedArgs** (`error_generic`="Hata: {msg}" + `unknown`; `code_send_failed`="Kod gönderilemedi: {status}" + `connection_error`). Top-level `security.*` group (since `account.security` already exists as a string key — a nested object would collide). Reused `auth.sign_up.required`/`password_hint`/`password_mismatch`. Inline-kept masks (`••••••••`, `+905551234567`, `000000`).
+- **account_screen ✅** — full-read sweep, **17 `account.*` keys**. Simpler (no interpolation/dialogs): section headers, stat labels, theme labels (deduped across `_ThemeTile` + `_GuestMenu`), guest welcome/prompt, softGated prompts. Dropped `const` on the two header `Expanded`/`Column` blocks + guest buttons. Reused `account.title`/`orders`/`wallet`/`addresses`/`menu_help`/`menu_register` + `auth.login`. softGated copy preserved verbatim (gate consistency is VERIFIED-COMPLETE, #77 §4.4).
+- **Counting:** security 29→35 (full read), account 21→~20 incl. ASCII-only TR the diacritic grep missed. **57 keys total, 0 TRANSLATION_NEEDED.**
+- **Gates:** `i18n-check` 0 extras; `i18n-usage` **731 declared / 0 dead / 0 missing**; `flutter analyze` clean; `make verify` green.
+- **No test breaks:** theme_picker, help_widgets, flow_u_account_two_pane, and all 4 a11y tests pass (they assert behavior/semantics, not the swept labels). `find.text('Hesabım')` in help_widgets is the help widget's own string.
+- **Goldens:** `account_security_*` regen Turkish→keys (security_screen is golden-captured; harness renders keys). The account *mobile* body isn't golden-captured (goldens render the wide-pane `AccountWelcomePanel`).
+- **P-014:** Phases 1, 2a, 2b, 2c done (4 of ~7). Remaining: 2d (email_verify/mfa/forgot + marketing/hero), 2e (checkout), 2f (singletons incl. web_header).
+
+### No visual change beyond text source
+Same rendered Turkish (verbatim); account_security goldens render keys (harness limitation, filed). No backend.
