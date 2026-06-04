@@ -4254,3 +4254,19 @@ Full-stack backend filter/sort for `/products` + `/search`, unblocking P-026.
 
 ### Step 5 status (post P-028)
 P-005, P-006, P-020, P-014 resolved · P-026 closed-as-blocked · **P-028 resolved-partial (6 of ~12)** · **P-029 opened** (bestseller sort). Remaining: P-007 (PDP delivery-ETA), 6 LOW, HeroCarousel cleanup (#82), chi-square flake (#74), P-029, and **P-026's frontend-wiring PR (now actionable)**.
+
+## PR — P-026 frontend-wiring (closes PARITY_AUDIT P-026 — filters now functional) — `feat/wire-frontend-filters`
+
+Wires the existing filter UI to the P-028 filter-aware backend — the original P-026 gap ("filters render but are inert") is closed end-to-end.
+
+- **Fetch wiring (the core):** `filteredProductsProvider` watches the whole `PlpFilters` (not just `.sort`) and passes min/max price, brands, rating, free_shipping, in_stock, sort to `listProducts`; `searchProvider._load` reads `plpFiltersProvider(plpKeyForSearch(query))` and passes the same to `search`, with a new `reapplyFilters()` the screen calls (via `ref.listen`) to refetch on change. Result list rebuilds on every filter/sort change.
+- **Already-wired (no-op commits):** `PlpFilterChips` (`onDeleted` + clear-all already write to `plpFiltersProvider`) become live once the providers react; `CatalogShell`'s empty path is reached when over-filtered.
+- **in_stock:** added to `PlpFilters` (+ copyWith/isEmpty/activeChipCount/==/hashCode) + URL codec (`stock=in`) + the mobile FilterSheet bridge + a removable chip (reuses `catalog.filter_in_stock`).
+- **bestseller:** HIDDEN from both sort selectors (discovery override of the prompt's "rename to Recommended" default — that would duplicate the existing Recommended option; backend maps bestseller→recommended today; enum + i18n key kept for P-029; deep-linked URLs still resolve).
+- **cashback_only:** the mobile FilterSheet toggle DISABLED with an informational subtitle (vacuous server-side — every Mopro product earns cashback per P-028). +1 i18n key (`catalog.filter_cashback_hint`, tr-TR master + en-US).
+- **Tests:** 4 provider-level wiring tests (PLP passes all dims / omits unset / refetches on change; search passes dims). 1 existing widget test updated to `pumpAndSettle` (brand tap now refetches). `flutter analyze` clean; i18n gates green (794 declared, 0 dead/0 missing, 0 extras).
+- **Goldens:** predicted **none** — FilterPanel controls unchanged; the in-stock chip renders only when set (no fixture sets it); the sort *button* label is unchanged (only dropdown items filtered); sheets aren't golden-captured. CI `flutter test` is the check; rebaseline only if a flip surfaces.
+- **category_id-as-filter:** no UI control (PLP category is navigation; search hides the tree) — not wired, documented.
+
+### Step 5 status (post P-026)
+P-005, P-006, P-014, P-020, P-028 resolved · **P-026 ✅ RESOLVED (filters functional end-to-end)** · P-029 opened. **7 of ~12 addressed.** Remaining: P-007 (delivery-ETA, backend-gated), 6 LOW (P-004/009/011/012/013/015), HeroCarousel cleanup (#82), chi-square flake (#74), P-029 (bestseller sort).
