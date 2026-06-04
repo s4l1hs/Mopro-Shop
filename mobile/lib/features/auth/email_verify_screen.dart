@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
@@ -60,8 +61,8 @@ class _EmailVerifyScreenState extends ConsumerState<EmailVerifyScreen> {
           .resendVerification(email: widget.email);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Doğrulama kodu tekrar gönderildi.'),
+          SnackBar(
+            content: Text('auth.email_verify.resent_toast'.tr()),
           ),
         );
       }
@@ -92,7 +93,7 @@ class _EmailVerifyScreenState extends ConsumerState<EmailVerifyScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            'E-postanızı Doğrulayın',
+            'auth.email_verify.title'.tr(),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -104,7 +105,7 @@ class _EmailVerifyScreenState extends ConsumerState<EmailVerifyScreen> {
                     color: Theme.of(context).colorScheme.outline,
                   ),
               children: [
-                const TextSpan(text: '8 karakterlik doğrulama kodunu '),
+                TextSpan(text: 'auth.email_verify.code_sent_prefix'.tr()),
                 TextSpan(
                   text: widget.email,
                   style: TextStyle(
@@ -112,12 +113,12 @@ class _EmailVerifyScreenState extends ConsumerState<EmailVerifyScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const TextSpan(text: ' adresine gönderdik.'),
+                TextSpan(text: 'auth.email_verify.code_sent_suffix'.tr()),
               ],
             ),
           ),
           const SizedBox(height: 32),
-          const AuthFieldLabel('Doğrulama Kodu'),
+          AuthFieldLabel('auth.code_label'.tr()),
           const SizedBox(height: 6),
           TextField(
             controller: _codeCtrl,
@@ -151,7 +152,7 @@ class _EmailVerifyScreenState extends ConsumerState<EmailVerifyScreen> {
           const SizedBox(height: 24),
           AuthSubmitButton(
             isLoading: _isLoading,
-            label: 'Doğrula',
+            label: 'auth.verify_action'.tr(),
             onPressed: _verify,
           ),
           const SizedBox(height: 16),
@@ -159,7 +160,7 @@ class _EmailVerifyScreenState extends ConsumerState<EmailVerifyScreen> {
             child: TextButton.icon(
               onPressed: _resend,
               icon: const Icon(Icons.refresh, size: 16),
-              label: const Text('Kodu tekrar gönder'),
+              label: Text('auth.email_verify.resend'.tr()),
             ),
           ),
         ],
@@ -168,9 +169,8 @@ class _EmailVerifyScreenState extends ConsumerState<EmailVerifyScreen> {
   }
 
   String _errorText() => switch (_error) {
-        InvalidCodeError() => 'Hatalı kod. Lütfen tekrar deneyin.',
-        MFAChallengeExpiredError() =>
-          'Kodun süresi doldu. Yeni kod isteyin.',
-        _ => 'Bir hata oluştu.',
+        InvalidCodeError() => 'auth.error_invalid_code'.tr(),
+        MFAChallengeExpiredError() => 'auth.email_verify.error_expired'.tr(),
+        _ => 'auth.error_generic_short'.tr(),
       };
 }

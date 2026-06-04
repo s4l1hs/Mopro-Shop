@@ -4188,3 +4188,21 @@ Closes Phase 2b whole (both files in one PR — the real diff is ~500 LOC, full 
 
 ### No visual change beyond text source
 Same rendered Turkish (verbatim); account_security goldens render keys (harness limitation, filed). No backend.
+
+## PR #82 — P-014 Phase 2d: email_verify + mfa + forgot + marketing/hero
+
+Closed whole (no split). The prompt's "3 MFA files" fear was wrong — MFA enroll/disable already shipped inside security_screen (2b); only the login-time `mfa_challenge` remained.
+
+- **email_verify + mfa_challenge** — both code-entry screens. RichText prefix/suffix keys (email / masked-phone stays a styled span); const SnackBar/TextSpan/Text drops. Shared `auth.{code_label,verify_action,error_invalid_code,error_generic_short}` + `auth.email_verify.*` + `auth.mfa.*` (titles/errors kept distinct from `security.section_mfa` / `auth.rate_limit`).
+- **forgot_password** — request + sent states → `auth.forgot.*`; reused 2a `auth.email_label`/`email_hint`/`email_invalid`.
+- **auth_widgets** — 4 PasswordStrengthIndicator rules → `auth.password_rule.*`; AuthOrDivider `veya` → `auth.or`.
+- **hero_slides (marketing)** — `const heroSlides` list → `heroSlides()` function with literal `.tr()` (a `slide.title.tr()` render-site call would be unresolved); `hero_carousel` updated. 8 `marketing.hero.*` keys.
+- **profile_screen — VERIFIED-COMPLETE**: already fully `.tr()`; the 1 diacritic hit is `'Türkçe'`/`'العربية'` (locale self-names in the picker — correctly inline).
+- **~34 keys, 0 TRANSLATION_NEEDED.**
+- **Gates:** `i18n-check` 0 extras; `i18n-usage` **765 declared / 0 dead / 0 missing**; `flutter analyze` clean; `make verify` green.
+- **No test breaks:** no test file imports the swept screens/widgets (other than goldens); `find.text` over the swept strings = none.
+- **Goldens: 0 changed** (rebaseline confirmed). The discovery predicted the home hero goldens would flip — **wrong: `HeroCarousel`/`hero_slides` has no consumer** (home mounts `MoodStoriesStrip`, not the carousel; `grep -r HeroCarousel` minus its own file is empty). It's an **unadopted widget** — localizing it is still correct + gate-clean (the `marketing.hero.*` keys are `.tr()`-used in `heroSlides()`, so i18n-usage sees them; reachability isn't checked), 0 golden/runtime impact, ready for future adoption. Auth screens also not golden-captured. **New finding: orphaned `HeroCarousel`/`hero_slides`** (cleanup candidate — adopt on home, or remove).
+- **P-014:** Phases 1, 2a, 2b, 2c, 2d done (**5 of ~7**). Remaining: 2e (checkout), 2f (singletons incl. web_header).
+
+### No visual change beyond text source
+Same rendered Turkish (verbatim); home hero goldens render keys (harness limitation, filed). No backend.

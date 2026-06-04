@@ -64,7 +64,41 @@
       "value_prop_shipping": "Free & fast delivery",
       "value_prop_cashback": "Cash back on every purchase",
       "value_prop_secure": "Secure payment infrastructure"
-    }
+    },
+    "code_label": "Verification Code",
+    "verify_action": "Verify",
+    "error_invalid_code": "Incorrect code. Please try again.",
+    "error_generic_short": "Something went wrong.",
+    "email_verify": {
+      "resent_toast": "Verification code resent.",
+      "title": "Verify Your Email",
+      "code_sent_prefix": "We sent the 8-character verification code to ",
+      "code_sent_suffix": ".",
+      "resend": "Resend code",
+      "error_expired": "The code has expired. Request a new one."
+    },
+    "mfa": {
+      "title": "Two-Factor Authentication",
+      "code_sent_prefix": "We sent a 6-digit code to your registered phone (",
+      "code_sent_suffix": ").",
+      "error_expired": "The code has expired. Please sign in again.",
+      "error_rate_limited": "Too many attempts. Please wait."
+    },
+    "forgot": {
+      "title": "Forgot Password",
+      "subtitle": "Enter your email and we'll send a password reset link.",
+      "send_link": "Send Link",
+      "sent_title": "Email Sent",
+      "sent_body": "We've sent a password reset link to your email. Check your inbox.",
+      "back_to_login": "Back to sign in"
+    },
+    "password_rule": {
+      "min_length": "At least 8 characters",
+      "upper": "At least 1 uppercase letter (A-Z)",
+      "lower": "At least 1 lowercase letter (a-z)",
+      "special": "At least 1 special character (@, #, etc.)"
+    },
+    "or": "or"
   },
   "nav": {
     "home": "Home",
@@ -793,5 +827,17 @@
     "confirm": "Confirm",
     "send_code": "Send Code",
     "change_phone": "Change phone number"
+  },
+  "marketing": {
+    "hero": {
+      "cashback_title": "Lifetime Cashback",
+      "cashback_sub": "Earn monthly Mopro Coin on every purchase — forever.",
+      "secure_title": "Secure Shopping",
+      "secure_sub": "Shop with 3D-secure payment and easy returns.",
+      "shipping_title": "Free Shipping",
+      "shipping_sub": "Enjoy free shipping on all your orders.",
+      "season_title": "New Season",
+      "season_sub": "Discover the newest products and start earning cashback."
+    }
   }
 }

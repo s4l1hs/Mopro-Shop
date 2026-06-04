@@ -64,7 +64,41 @@
       "value_prop_shipping": "Ücretsiz & hızlı teslimat",
       "value_prop_cashback": "Her alışverişte nakit iade",
       "value_prop_secure": "Güvenli ödeme altyapısı"
-    }
+    },
+    "code_label": "Doğrulama Kodu",
+    "verify_action": "Doğrula",
+    "error_invalid_code": "Hatalı kod. Lütfen tekrar deneyin.",
+    "error_generic_short": "Bir hata oluştu.",
+    "email_verify": {
+      "resent_toast": "Doğrulama kodu tekrar gönderildi.",
+      "title": "E-postanızı Doğrulayın",
+      "code_sent_prefix": "8 karakterlik doğrulama kodunu ",
+      "code_sent_suffix": " adresine gönderdik.",
+      "resend": "Kodu tekrar gönder",
+      "error_expired": "Kodun süresi doldu. Yeni kod isteyin."
+    },
+    "mfa": {
+      "title": "İki Faktörlü Doğrulama",
+      "code_sent_prefix": "Kayıtlı telefonunuza (",
+      "code_sent_suffix": ") 6 haneli bir kod gönderdik.",
+      "error_expired": "Kodun süresi doldu. Lütfen yeniden giriş yapın.",
+      "error_rate_limited": "Çok fazla deneme. Lütfen bekleyin."
+    },
+    "forgot": {
+      "title": "Şifremi Unuttum",
+      "subtitle": "E-posta adresinizi girin, şifre sıfırlama bağlantısı gönderelim.",
+      "send_link": "Bağlantı Gönder",
+      "sent_title": "E-posta Gönderildi",
+      "sent_body": "Şifre sıfırlama bağlantısını e-posta adresinize gönderdik. Gelen kutunuzu kontrol edin.",
+      "back_to_login": "Giriş sayfasına dön"
+    },
+    "password_rule": {
+      "min_length": "En az 8 karakter",
+      "upper": "En az 1 büyük harf (A-Z)",
+      "lower": "En az 1 küçük harf (a-z)",
+      "special": "En az 1 özel karakter (@, #, vb.)"
+    },
+    "or": "veya"
   },
   "nav": {
     "home": "Ana Sayfa",
@@ -829,5 +863,17 @@
     "confirm": "Onayla",
     "send_code": "Kod Gönder",
     "change_phone": "Telefon numarasını değiştir"
+  },
+  "marketing": {
+    "hero": {
+      "cashback_title": "Süresiz Cashback",
+      "cashback_sub": "Her alışverişten aylık Mopro Coin kazan — sonsuza dek.",
+      "secure_title": "Güvenli Alışveriş",
+      "secure_sub": "3D güvenli ödeme ve kolay iade güvencesiyle alışveriş yapın.",
+      "shipping_title": "Ücretsiz Kargo",
+      "shipping_sub": "Tüm siparişlerinizde ücretsiz kargo fırsatından yararlanın.",
+      "season_title": "Yeni Sezon",
+      "season_sub": "En yeni ürünleri keşfedin, cashback kazanmaya başlayın."
+    }
   }
 }

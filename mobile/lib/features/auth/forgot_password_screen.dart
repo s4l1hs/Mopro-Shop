@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -52,15 +53,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'E-posta Gönderildi',
+              'auth.forgot.sent_title'.tr(),
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
             const SizedBox(height: 8),
             Text(
-              'Şifre sıfırlama bağlantısını e-posta adresinize gönderdik. '
-              'Gelen kutunuzu kontrol edin.',
+              'auth.forgot.sent_body'.tr(),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),
@@ -68,7 +68,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             const SizedBox(height: 32),
             AuthSubmitButton(
               isLoading: false,
-              label: 'Giriş sayfasına dön',
+              label: 'auth.forgot.back_to_login'.tr(),
               onPressed: () => context.go('/auth/login'),
             ),
           ],
@@ -84,21 +84,20 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Şifremi Unuttum',
+              'auth.forgot.title'.tr(),
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
             const SizedBox(height: 4),
             Text(
-              'E-posta adresinizi girin, '
-              'şifre sıfırlama bağlantısı gönderelim.',
+              'auth.forgot.subtitle'.tr(),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),
             ),
             const SizedBox(height: 32),
-            const AuthFieldLabel('E-posta'),
+            AuthFieldLabel('auth.email_label'.tr()),
             const SizedBox(height: 6),
             TextFormField(
               controller: _emailCtrl,
@@ -107,18 +106,18 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
               onFieldSubmitted: (_) => _submit(notifier),
               decoration: authInputDecoration(
                 context,
-                hint: 'ornek@email.com',
+                hint: 'auth.email_hint'.tr(),
                 prefixIcon: Icons.email_outlined,
               ),
               validator: (v) =>
                   (v == null || !v.contains('@'))
-                      ? 'Geçerli bir e-posta girin'
+                      ? 'auth.email_invalid'.tr()
                       : null,
             ),
             const SizedBox(height: 24),
             AuthSubmitButton(
               isLoading: state.isLoading,
-              label: 'Bağlantı Gönder',
+              label: 'auth.forgot.send_link'.tr(),
               onPressed: () => _submit(notifier),
             ),
           ],

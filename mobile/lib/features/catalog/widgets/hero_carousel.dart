@@ -22,7 +22,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted) return;
-      final next = (_current + 1) % heroSlides.length;
+      final next = (_current + 1) % heroSlides().length;
       _controller.animateToPage(
         next,
         duration: const Duration(milliseconds: 400),
@@ -40,15 +40,16 @@ class _HeroCarouselState extends State<HeroCarousel> {
 
   @override
   Widget build(BuildContext context) {
+    final slides = heroSlides();
     return AspectRatio(
       aspectRatio: 16 / 9,
       child: Stack(
         children: [
           PageView.builder(
             controller: _controller,
-            itemCount: heroSlides.length,
+            itemCount: slides.length,
             onPageChanged: (i) => setState(() => _current = i),
-            itemBuilder: (_, i) => _HeroSlideWidget(slide: heroSlides[i]),
+            itemBuilder: (_, i) => _HeroSlideWidget(slide: slides[i]),
           ),
           Positioned(
             bottom: 12,
@@ -57,7 +58,7 @@ class _HeroCarouselState extends State<HeroCarousel> {
             child: Center(
               child: SmoothPageIndicator(
                 controller: _controller,
-                count: heroSlides.length,
+                count: slides.length,
                 effect: const WormEffect(
                   dotWidth: 8,
                   dotHeight: 8,
