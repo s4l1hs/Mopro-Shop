@@ -295,6 +295,11 @@ type productSummaryJSON struct {
 	// price comes from PriceMinor (rendered with strikethrough on the UI).
 	FlashPriceMinor *int64 `json:"flash_price_minor,omitempty"`
 
+	// FreeShipping drives the "Kargo Bedava" badge (P-009); FavoritesCount is
+	// social-proof on the card/PDP (P-004). Always emitted (0/false when absent).
+	FreeShipping   bool `json:"free_shipping"`
+	FavoritesCount int  `json:"favorites_count"`
+
 	CashbackPreview cashbackPreviewJSON `json:"cashback_preview"`
 }
 
@@ -326,6 +331,8 @@ func buildProductSummaryJSON(r catalog.ProductSummaryRow, cashbackCurrency strin
 		DiscountPct:        discountPct,
 		RatingAvg:          r.RatingAvg,
 		RatingCount:        r.RatingCount,
+		FreeShipping:       r.FreeShipping,
+		FavoritesCount:     r.FavoritesCount,
 		CashbackPreview: cashbackPreviewJSON{
 			MonthlyAmountMinor: monthlyMinor,
 			Currency:           cashbackCurrency,

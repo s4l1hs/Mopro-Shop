@@ -183,6 +183,16 @@ CREATE TABLE catalog_schema.review_helpful_votes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (review_id, user_id)
 );
+
+-- user_favorites (migration 0064 + the 0082 product_id index) — backs the
+-- ProductSummary favorites_count subquery.
+CREATE TABLE catalog_schema.user_favorites (
+    user_id    BIGINT      NOT NULL,
+    product_id BIGINT      NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, product_id)
+);
+CREATE INDEX user_fav_product_idx ON catalog_schema.user_favorites(product_id);
 `
 	_, err := pool.Exec(ctx, ddl)
 	return err

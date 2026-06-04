@@ -318,6 +318,9 @@ const productSummarySelect = `SELECT p.id, p.seller_id, p.category_id, p.brand, 
 	        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
 	        v.original_price_minor,
 	        p.rating_avg, p.rating_count,
+	        p.free_shipping,
+	        (SELECT count(*) FROM catalog_schema.user_favorites uf
+	         WHERE uf.product_id = p.id) AS favorites_count,
 	        count(*) OVER() AS total_count
 	FROM catalog_schema.products p
 	JOIN catalog_schema.product_translations t
@@ -404,7 +407,8 @@ func scanProductSummaries(rows pgx.Rows, label string) ([]ProductSummaryRow, int
 			&s.ID, &s.SellerID, &s.CategoryID, &s.Brand, &s.Status,
 			&s.Title, &s.PriceMinor, &s.PriceCurrency,
 			&s.CoverImageKey, &s.CommissionPctBps,
-			&s.OriginalPriceMinor, &s.RatingAvg, &s.RatingCount, &total,
+			&s.OriginalPriceMinor, &s.RatingAvg, &s.RatingCount,
+			&s.FreeShipping, &s.FavoritesCount, &total,
 		); err != nil {
 			return nil, 0, fmt.Errorf("catalog.repo: scan %s: %w", label, err)
 		}
@@ -529,7 +533,12 @@ func (r *pgxRepository) ListProductsByIDs(ctx context.Context, ids []int64, loca
 		        COALESCE(t.title, '') AS title,
 		        v.price_minor, v.price_currency,
 		        COALESCE(v.image_keys[1], '') AS cover_image_key,
-		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps
+		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
+		        v.original_price_minor,
+		        p.rating_avg, p.rating_count,
+		        p.free_shipping,
+		        (SELECT count(*) FROM catalog_schema.user_favorites uf
+		         WHERE uf.product_id = p.id) AS favorites_count
 		FROM catalog_schema.products p
 		JOIN catalog_schema.product_translations t
 		     ON t.product_id = p.id AND t.locale = $2
@@ -560,6 +569,7 @@ func (r *pgxRepository) ListProductsByIDs(ctx context.Context, ids []int64, loca
 			&s.Title, &s.PriceMinor, &s.PriceCurrency,
 			&s.CoverImageKey, &s.CommissionPctBps,
 			&s.OriginalPriceMinor, &s.RatingAvg, &s.RatingCount,
+			&s.FreeShipping, &s.FavoritesCount,
 		); err != nil {
 			return nil, fmt.Errorf("catalog.repo: scan product: %w", err)
 		}

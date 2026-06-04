@@ -4288,3 +4288,19 @@ Per-finding triage (PR #60 protocol) — discovery `docs/internal/p-low-batch-di
 
 ### Step 5 status (post LOW batch)
 Resolved/closed: P-005, P-006, P-014, P-020, P-028, P-026, P-015 · CORRECTED P-011 · NOT-ACTIONABLE P-004/P-009/P-012/P-013 · HeroCarousel REMOVED · P-029 open. **The LOW tail is closed.** Remaining Step-5 work: **P-007** (delivery-ETA, backend-gated), **P-029** (bestseller sort), the **chi-square flake**, and a catalog **`ProductSummary` enrichment** backend PR that would unblock P-004/P-009/P-008b card+PDP data.
+
+## PR — ProductSummary enrichment (`feat/productsummary-enrich`) — enrich ProductSummary (unblocks P-004 + P-009 + P-008b)
+
+Backend foundation for the data-dark card/PDP findings. Discovery `docs/internal/productsummary-enrichment.md`. The codebase evolved since the PR #77 audit, so the actual delta was small.
+
+- **discount_pct — ALREADY DONE.** `buildProductSummaryJSON` already computes + emits it from `original_price_minor` (variants, 0065). P-008b discount portion ✅ (no work needed).
+- **favorites_count — Outcome A.** `user_favorites` is in **catalog_schema** (0064), so a same-schema correlated subquery suffices — **no cross-schema JOIN, no event listener, no eventual-consistency story** (the prompt anticipated Outcome B; discovery made it A). + index migration 0082 (`user_favorites(product_id)`). Unblocks **P-004**.
+- **free_shipping — Outcome A.** passthrough of the 0081 column. Unblocks the **P-009** "Kargo Bedava" badge; the discount + flash badges were already derivable (`discount_pct`, `flash_price_minor`). Bestseller badge = P-029 (out of scope).
+- **lowest_30d_price — Outcome C → P-030 (HIGH, compliance).** No price-history table exists; needs new infra + a cron-placement decision; it's a TR/EU consumer-protection requirement → deserves a dedicated PR.
+- **Latent bug fixed:** `ListProductsByIDs` (guest-favorites hydration) had a SELECT/scan column mismatch (scan read `original_price_minor`/`rating_avg`/`rating_count` the SELECT never produced — runtime scan error, untested). Repaired as a necessary part of enriching it.
+- **Structured badge system: not built** — no campaign system exists; building one is a feature, not enrichment (anti-goal). The actionable badge data is the three signals above.
+- **Spec + clients regenerated** (both defaulted → optional → **no mobile fake-blast-radius**; `flutter analyze` clean). 3 integration subtests (favorites 3/1/0, free_shipping, the ByIDs fix). All 7 gates green.
+- **Frontend follow-up queued:** render favorites_count + free-shipping/discount/flash badges (~100-200 LOC, P-026 wiring shape).
+
+### Step 5 status (post enrichment)
+P-004 + P-009 **backend-unblocked**; P-008b discount done; **P-030 opened** (lowest_30d / price-history, HIGH compliance). Remaining: P-007 (delivery-ETA), P-029 (bestseller), P-030 (price-history), chi-square flake, + the P-004/P-009 frontend-wiring PR.
