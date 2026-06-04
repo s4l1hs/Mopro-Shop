@@ -857,18 +857,6 @@
     "send_code": "Send Code",
     "change_phone": "Change phone number"
   },
-  "marketing": {
-    "hero": {
-      "cashback_title": "Lifetime Cashback",
-      "cashback_sub": "Earn monthly Mopro Coin on every purchase — forever.",
-      "secure_title": "Secure Shopping",
-      "secure_sub": "Shop with 3D-secure payment and easy returns.",
-      "shipping_title": "Free Shipping",
-      "shipping_sub": "Enjoy free shipping on all your orders.",
-      "season_title": "New Season",
-      "season_sub": "Discover the newest products and start earning cashback."
-    }
-  },
   "theme": {
     "toggle_dark": "Dark theme",
     "toggle_light": "Light theme"

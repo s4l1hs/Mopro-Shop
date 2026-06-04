@@ -893,18 +893,6 @@
     "send_code": "Kod Gönder",
     "change_phone": "Telefon numarasını değiştir"
   },
-  "marketing": {
-    "hero": {
-      "cashback_title": "Süresiz Cashback",
-      "cashback_sub": "Her alışverişten aylık Mopro Coin kazan — sonsuza dek.",
-      "secure_title": "Güvenli Alışveriş",
-      "secure_sub": "3D güvenli ödeme ve kolay iade güvencesiyle alışveriş yapın.",
-      "shipping_title": "Ücretsiz Kargo",
-      "shipping_sub": "Tüm siparişlerinizde ücretsiz kargo fırsatından yararlanın.",
-      "season_title": "Yeni Sezon",
-      "season_sub": "En yeni ürünleri keşfedin, cashback kazanmaya başlayın."
-    }
-  },
   "theme": {
     "toggle_dark": "Koyu tema",
     "toggle_light": "Açık tema"
