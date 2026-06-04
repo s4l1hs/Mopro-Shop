@@ -4206,3 +4206,19 @@ Closed whole (no split). The prompt's "3 MFA files" fear was wrong — MFA enrol
 
 ### No visual change beyond text source
 Same rendered Turkish (verbatim); home hero goldens render keys (harness limitation, filed). No backend.
+
+## PR #83 — P-014 Phase 2e + 2f: checkout + singletons — CLOSES P-014
+
+The aspirational 0-split outcome: cart/checkout were already mostly localized (Phase 4.5), so the remainder was small (~32 strings) and **P-014 closes entirely** in one PR.
+
+- **2e checkout:** `checkout_redirect_screen` (const `_loadingMessages` list → build-time localized list + const count for the cycle modulo; timeout title/body; 2 buttons → `checkout.redirect.*`); `cart_screen` softGated reason → `cart.checkout_login_reason`. (The big checkout files — payment/address/review/summary — were already `.tr()`.)
+- **2f singletons (10 files):** web_header 'Giriş Yap' → `auth.login` (reuse); app_router `_titled('Hesabım')` → `account.title` (reuse); search_screen app-switcher → `router_title.search`/`_query` (reuse, brand inline); header_search_bar → `search.web_placeholder`; theme_toggle → `theme.toggle_*`; mega_menu_panel/bar → `mega_menu.see_all`(namedArgs)/`submenu_hint`; favorites → `favorites.explore`; product_detail → `product.not_found`; help_article → `help.article_title`(namedArgs).
+- **home stragglers:** home_screen `_defaultHints` const field → localised getter; home_provider rail + trending fallbacks → `home.rail_*`/`home.trending_*` (drop const; global `.tr()` in providers).
+- **VERIFIED-COMPLETE:** `account_left_rail` `'tr':'Türkçe'` (language self-name).
+- **~32 keys, 0 TRANSLATION_NEEDED.** Gates: `i18n-check` 0 extras; `i18n-usage` **793 declared / 0 dead / 0 missing**; `flutter analyze` clean; `make verify` green.
+- **Goldens: 8 regenerated** (all predicted) — web_header ×3 ('Giriş Yap'→key), home ×3 (search pill→key), favorites_empty ×2 ('Keşfet'→key).
+- **Test fixes (#79 pattern):** `web_header_test` (`find.text('Giriş Yap')` → `auth.login`) + `mega_menu_keyboard_test` (`hint contains 'Aşağı ok'` → `mega_menu.submenu_hint`). The rebaseline run surfaced the mega_menu break (1 failed during `--update-goldens`); fixed + re-ran.
+- **P-014 FULLY CLOSED** across 7 PRs (#79→#83), ~250+ strings, 0 hardcoded TR left in UI sinks.
+
+### P-014 closure — Step 5 status
+Findings done: P-005, P-006, P-020, P-014 (4 of ~12). Remaining: P-007 (PDP delivery-ETA, backend-gated), P-026 (inert filters MED), 6 LOW (P-004/009/011/012/013/015), + the orphaned HeroCarousel cleanup (#82) and the chi-square flake (#74). No visual change beyond text source.
