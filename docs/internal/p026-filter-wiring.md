@@ -217,3 +217,54 @@ refinement, not a one-line wiring.
 5. Goldens: re-baseline active-filter + empty-results surfaces.
 
 This is bounded (~frontend-only) once P-028 makes the API filter-aware.
+
+---
+
+## §10 — Outcome A wiring (frontend-wiring PR, `feat/wire-frontend-filters`)
+
+P-028 (PR #85) shipped the filter-aware backend + regenerated client; this PR wires the
+existing UI to it. Re-verified the current state (post-#85 main):
+
+**Already built/wired (no change needed):**
+- `PlpFilterChips` — each chip's `onDeleted` already writes through `plpFiltersProvider`, and
+  clear-all (`set(const PlpFilters())`) fires at `activeChipCount >= 2`. They were "inert" only
+  because the **fetch providers didn't react** — wiring those (below) makes the chips live.
+  → **commit "indicators" is a no-op.**
+- `FilterPanel` (desktop) writes brand/price/rating/free-shipping to `plpFiltersProvider`.
+- `CatalogShell` already renders an empty path → **commit "empty-state" is a no-op** (verify reached).
+
+**The two fetch wires (the core of this PR):**
+1. `filteredProductsProvider` (PLP): currently `ref.watch(...select((f)=>f.sort))` + passes only
+   `categoryId/page/sort`. → watch the **whole** `PlpFilters`; pass min/max price, brands, rating,
+   free_shipping, in_stock, sort to `api.listProducts`. (Filter mutations already set `page:1`;
+   `loadMore` doesn't touch `PlpFilters.page`, so whole-object watch is safe.)
+2. `searchProvider` (singleton, decoupled, query-keyed filter): `_load` **reads**
+   `plpFiltersProvider(plpKeyForSearch(query))` at fetch time + passes the dims to `api.search`;
+   `search_screen` adds `ref.listen` on that provider → `searchProvider.notifier.reapplyFilters()`
+   to refetch on filter change. (Reading-at-load means a new query naturally gets fresh filters —
+   the key changes with the query.)
+
+**in_stock:** the mobile `FilterSheet` has an `inStock` toggle but `PlpFilters` lacked the field, so
+the bridge (`_showFilterSheet`) dropped it. → add `inStock` to `PlpFilters` (+ copyWith/isEmpty/
+activeChipCount/==/hashCode), the codec (`stock=in`), the bridge mapping, an in-stock chip
+(reusing `catalog.filter_in_stock`), and both providers. (Desktop `FilterPanel` gains no in-stock
+control — no redesign per scope; in_stock is mobile-settable.)
+
+**UI decisions (§2.3), with discovery overriding the prompt's defaults where evidence warrants:**
+- **bestseller → HIDE** (not the prompt's default "rename to Recommended"). `PlpSort` has BOTH
+  `recommended` AND `bestseller`; renaming bestseller's label to "Recommended" would show **two
+  identical "Recommended" options** (both order identically until P-029). Hiding it from the sort
+  selectors (filter `_sortOptions` + `_sortDropdown` at render; keep the enum value + i18n key for
+  P-029) leaves exactly the 5 backend-supported tokens. A deep-linked `sort=bestseller` URL still
+  resolves (→ backend maps to recommended). Honest + no duplicate; reverts cleanly when P-029 lands.
+- **cashback_only → DISABLE + tooltip** (prompt default B). The mobile `FilterSheet` toggle is
+  disabled with an informational hint ("Tüm Mopro ürünleri cashback kazanır") — communicates the
+  brand fact rather than silently dropping the control.
+
+**category_id-as-filter:** no UI control exists (PLP category is navigation; search `FilterPanel`
+hides the category tree). Not wired — documented, not a gap.
+
+**Golden prediction:** the filter UIs are mostly modals/popups (sort sheet, filter sheet) + the
+result grids are unchanged (fakes return the same data), so flips should be minimal. Candidates:
+`filter_sheet` golden (cashback row disabled style) if one exists; sort goldens if they capture the
+sheet. Predict + regen via the ubuntu `golden-rebaseline` workflow (never darwin).
