@@ -135,6 +135,15 @@ const (
 	Debit  WalletTransactionType = "debit"
 )
 
+// Defines values for FilterSort.
+const (
+	FilterSortCashbackDesc FilterSort = "cashback_desc"
+	FilterSortNewest       FilterSort = "newest"
+	FilterSortPriceAsc     FilterSort = "price_asc"
+	FilterSortPriceDesc    FilterSort = "price_desc"
+	FilterSortRecommended  FilterSort = "recommended"
+)
+
 // Defines values for RequestOtpJSONBodyPurpose.
 const (
 	RequestOtpJSONBodyPurposeLogin  RequestOtpJSONBodyPurpose = "login"
@@ -183,20 +192,20 @@ const (
 
 // Defines values for ListProductsParamsSort.
 const (
-	ListProductsParamsSortBestSelling ListProductsParamsSort = "best_selling"
-	ListProductsParamsSortNewest      ListProductsParamsSort = "newest"
-	ListProductsParamsSortPriceAsc    ListProductsParamsSort = "price_asc"
-	ListProductsParamsSortPriceDesc   ListProductsParamsSort = "price_desc"
-	ListProductsParamsSortRecommended ListProductsParamsSort = "recommended"
+	ListProductsParamsSortCashbackDesc ListProductsParamsSort = "cashback_desc"
+	ListProductsParamsSortNewest       ListProductsParamsSort = "newest"
+	ListProductsParamsSortPriceAsc     ListProductsParamsSort = "price_asc"
+	ListProductsParamsSortPriceDesc    ListProductsParamsSort = "price_desc"
+	ListProductsParamsSortRecommended  ListProductsParamsSort = "recommended"
 )
 
 // Defines values for SearchParamsSort.
 const (
-	SearchParamsSortBestSelling SearchParamsSort = "best_selling"
-	SearchParamsSortNewest      SearchParamsSort = "newest"
-	SearchParamsSortPriceAsc    SearchParamsSort = "price_asc"
-	SearchParamsSortPriceDesc   SearchParamsSort = "price_desc"
-	SearchParamsSortRecommended SearchParamsSort = "recommended"
+	CashbackDesc SearchParamsSort = "cashback_desc"
+	Newest       SearchParamsSort = "newest"
+	PriceAsc     SearchParamsSort = "price_asc"
+	PriceDesc    SearchParamsSort = "price_desc"
+	Recommended  SearchParamsSort = "recommended"
 )
 
 // Address defines model for Address.
@@ -732,6 +741,30 @@ type WalletTransactionReferenceType string
 
 // WalletTransactionType defines model for WalletTransaction.Type.
 type WalletTransactionType string
+
+// FilterBrand defines model for FilterBrand.
+type FilterBrand = []string
+
+// FilterCategoryId defines model for FilterCategoryId.
+type FilterCategoryId = int64
+
+// FilterFreeShipping defines model for FilterFreeShipping.
+type FilterFreeShipping = bool
+
+// FilterInStock defines model for FilterInStock.
+type FilterInStock = bool
+
+// FilterMaxPrice defines model for FilterMaxPrice.
+type FilterMaxPrice = int64
+
+// FilterMinPrice defines model for FilterMinPrice.
+type FilterMinPrice = int64
+
+// FilterRating defines model for FilterRating.
+type FilterRating = int
+
+// FilterSort defines model for FilterSort.
+type FilterSort string
 
 // IdempotencyKey defines model for IdempotencyKey.
 type IdempotencyKey = openapi_types.UUID
@@ -1278,10 +1311,32 @@ type CreateReturnParams struct {
 
 // ListProductsParams defines parameters for ListProducts.
 type ListProductsParams struct {
-	CategoryId *int64                  `form:"category_id,omitempty" json:"category_id,omitempty"`
-	Page       *int                    `form:"page,omitempty" json:"page,omitempty"`
-	PerPage    *int                    `form:"per_page,omitempty" json:"per_page,omitempty"`
-	Sort       *ListProductsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+	// CategoryId Scope results to a category (optional on /search).
+	CategoryId *FilterCategoryId `form:"category_id,omitempty" json:"category_id,omitempty"`
+	Page       *int              `form:"page,omitempty" json:"page,omitempty"`
+	PerPage    *int              `form:"per_page,omitempty" json:"per_page,omitempty"`
+
+	// MinPrice Minimum price in minor units (filters the displayed/lowest variant price).
+	MinPrice *FilterMinPrice `form:"min_price,omitempty" json:"min_price,omitempty"`
+
+	// MaxPrice Maximum price in minor units (filters the displayed/lowest variant price).
+	MaxPrice *FilterMaxPrice `form:"max_price,omitempty" json:"max_price,omitempty"`
+
+	// Brand Repeatable; matches any of the given brands (?brand=Nike&brand=Adidas).
+	Brand *FilterBrand `form:"brand,omitempty" json:"brand,omitempty"`
+
+	// Rating Minimum average rating (products with rating_avg >= this).
+	Rating *FilterRating `form:"rating,omitempty" json:"rating,omitempty"`
+
+	// FreeShipping When true, only products flagged free-shipping.
+	FreeShipping *FilterFreeShipping `form:"free_shipping,omitempty" json:"free_shipping,omitempty"`
+
+	// InStock When true, only products with at least one in-stock variant.
+	InStock *FilterInStock `form:"in_stock,omitempty" json:"in_stock,omitempty"`
+
+	// Sort Sort order. Unknown/unsupported tokens fall back to `recommended`.
+	// `bestseller` is not yet supported server-side (P-029).
+	Sort *ListProductsParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
 	// Echoed in error responses as `error.trace_id`.
@@ -1332,13 +1387,34 @@ type ListRecommendationsParams struct {
 
 // SearchParams defines parameters for Search.
 type SearchParams struct {
-	Q          string            `form:"q" json:"q"`
-	CategoryId *int64            `form:"category_id,omitempty" json:"category_id,omitempty"`
-	MinPrice   *int64            `form:"min_price,omitempty" json:"min_price,omitempty"`
-	MaxPrice   *int64            `form:"max_price,omitempty" json:"max_price,omitempty"`
-	Sort       *SearchParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+	Q string `form:"q" json:"q"`
+
+	// CategoryId Scope results to a category (optional on /search).
+	CategoryId *FilterCategoryId `form:"category_id,omitempty" json:"category_id,omitempty"`
 	Page       *int              `form:"page,omitempty" json:"page,omitempty"`
 	PerPage    *int              `form:"per_page,omitempty" json:"per_page,omitempty"`
+
+	// MinPrice Minimum price in minor units (filters the displayed/lowest variant price).
+	MinPrice *FilterMinPrice `form:"min_price,omitempty" json:"min_price,omitempty"`
+
+	// MaxPrice Maximum price in minor units (filters the displayed/lowest variant price).
+	MaxPrice *FilterMaxPrice `form:"max_price,omitempty" json:"max_price,omitempty"`
+
+	// Brand Repeatable; matches any of the given brands (?brand=Nike&brand=Adidas).
+	Brand *FilterBrand `form:"brand,omitempty" json:"brand,omitempty"`
+
+	// Rating Minimum average rating (products with rating_avg >= this).
+	Rating *FilterRating `form:"rating,omitempty" json:"rating,omitempty"`
+
+	// FreeShipping When true, only products flagged free-shipping.
+	FreeShipping *FilterFreeShipping `form:"free_shipping,omitempty" json:"free_shipping,omitempty"`
+
+	// InStock When true, only products with at least one in-stock variant.
+	InStock *FilterInStock `form:"in_stock,omitempty" json:"in_stock,omitempty"`
+
+	// Sort Sort order. Unknown/unsupported tokens fall back to `recommended`.
+	// `bestseller` is not yet supported server-side (P-029).
+	Sort *SearchParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
 	// Echoed in error responses as `error.trace_id`.

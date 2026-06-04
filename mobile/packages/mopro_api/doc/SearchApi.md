@@ -15,7 +15,7 @@ Method | HTTP request | Description
 
 
 # **search**
-> ListProducts200Response search(q, xTraceId, categoryId, minPrice, maxPrice, sort, page, perPage)
+> ListProducts200Response search(q, xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, sort)
 
 Full-text product search with filters
 
@@ -26,15 +26,19 @@ import 'package:mopro_api/api.dart';
 final api = MoproApi().getSearchApi();
 final String q = q_example; // String | 
 final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
-final int categoryId = 789; // int | 
-final int minPrice = 789; // int | 
-final int maxPrice = 789; // int | 
-final String sort = sort_example; // String | 
+final int categoryId = 789; // int | Scope results to a category (optional on /search).
 final int page = 56; // int | 
 final int perPage = 56; // int | 
+final int minPrice = 789; // int | Minimum price in minor units (filters the displayed/lowest variant price).
+final int maxPrice = 789; // int | Maximum price in minor units (filters the displayed/lowest variant price).
+final List<String> brand = ; // List<String> | Repeatable; matches any of the given brands (?brand=Nike&brand=Adidas).
+final int rating = 56; // int | Minimum average rating (products with rating_avg >= this).
+final bool freeShipping = true; // bool | When true, only products flagged free-shipping.
+final bool inStock = true; // bool | When true, only products with at least one in-stock variant.
+final String sort = sort_example; // String | Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` is not yet supported server-side (P-029). 
 
 try {
-    final response = api.search(q, xTraceId, categoryId, minPrice, maxPrice, sort, page, perPage);
+    final response = api.search(q, xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, sort);
     print(response);
 } catch on DioException (e) {
     print('Exception when calling SearchApi->search: $e\n');
@@ -47,12 +51,16 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **q** | **String**|  | 
  **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
- **categoryId** | **int**|  | [optional] 
- **minPrice** | **int**|  | [optional] 
- **maxPrice** | **int**|  | [optional] 
- **sort** | **String**|  | [optional] [default to 'recommended']
+ **categoryId** | **int**| Scope results to a category (optional on /search). | [optional] 
  **page** | **int**|  | [optional] [default to 1]
  **perPage** | **int**|  | [optional] [default to 20]
+ **minPrice** | **int**| Minimum price in minor units (filters the displayed/lowest variant price). | [optional] 
+ **maxPrice** | **int**| Maximum price in minor units (filters the displayed/lowest variant price). | [optional] 
+ **brand** | [**List&lt;String&gt;**](String.md)| Repeatable; matches any of the given brands (?brand=Nike&brand=Adidas). | [optional] 
+ **rating** | **int**| Minimum average rating (products with rating_avg >= this). | [optional] 
+ **freeShipping** | **bool**| When true, only products flagged free-shipping. | [optional] 
+ **inStock** | **bool**| When true, only products with at least one in-stock variant. | [optional] 
+ **sort** | **String**| Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` is not yet supported server-side (P-029).  | [optional] [default to 'recommended']
 
 ### Return type
 

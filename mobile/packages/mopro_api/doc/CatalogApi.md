@@ -13,7 +13,7 @@ Method | HTTP request | Description
 [**getCategoryCommission**](CatalogApi.md#getcategorycommission) | **GET** /categories/{id}/commission | Get live commission and KDV rates for a category + market pair
 [**getProduct**](CatalogApi.md#getproduct) | **GET** /products/{id} | Get full product detail including variants and cashback preview
 [**listCategories**](CatalogApi.md#listcategories) | **GET** /categories | List all 42 product categories (locale-resolved names)
-[**listProducts**](CatalogApi.md#listproducts) | **GET** /products | List products with optional category filter, pagination, and sort
+[**listProducts**](CatalogApi.md#listproducts) | **GET** /products | List products with category filter, price/brand/rating/shipping filters, pagination, and sort
 
 
 # **createProduct**
@@ -197,9 +197,9 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **listProducts**
-> ListProducts200Response listProducts(xTraceId, categoryId, page, perPage, sort)
+> ListProducts200Response listProducts(xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, sort)
 
-List products with optional category filter, pagination, and sort
+List products with category filter, price/brand/rating/shipping filters, pagination, and sort
 
 ### Example
 ```dart
@@ -207,13 +207,19 @@ import 'package:mopro_api/api.dart';
 
 final api = MoproApi().getCatalogApi();
 final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
-final int categoryId = 789; // int | 
+final int categoryId = 789; // int | Scope results to a category (optional on /search).
 final int page = 56; // int | 
 final int perPage = 56; // int | 
-final String sort = sort_example; // String | 
+final int minPrice = 789; // int | Minimum price in minor units (filters the displayed/lowest variant price).
+final int maxPrice = 789; // int | Maximum price in minor units (filters the displayed/lowest variant price).
+final List<String> brand = ; // List<String> | Repeatable; matches any of the given brands (?brand=Nike&brand=Adidas).
+final int rating = 56; // int | Minimum average rating (products with rating_avg >= this).
+final bool freeShipping = true; // bool | When true, only products flagged free-shipping.
+final bool inStock = true; // bool | When true, only products with at least one in-stock variant.
+final String sort = sort_example; // String | Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` is not yet supported server-side (P-029). 
 
 try {
-    final response = api.listProducts(xTraceId, categoryId, page, perPage, sort);
+    final response = api.listProducts(xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, sort);
     print(response);
 } catch on DioException (e) {
     print('Exception when calling CatalogApi->listProducts: $e\n');
@@ -225,10 +231,16 @@ try {
 Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
- **categoryId** | **int**|  | [optional] 
+ **categoryId** | **int**| Scope results to a category (optional on /search). | [optional] 
  **page** | **int**|  | [optional] [default to 1]
  **perPage** | **int**|  | [optional] [default to 20]
- **sort** | **String**|  | [optional] [default to 'recommended']
+ **minPrice** | **int**| Minimum price in minor units (filters the displayed/lowest variant price). | [optional] 
+ **maxPrice** | **int**| Maximum price in minor units (filters the displayed/lowest variant price). | [optional] 
+ **brand** | [**List&lt;String&gt;**](String.md)| Repeatable; matches any of the given brands (?brand=Nike&brand=Adidas). | [optional] 
+ **rating** | **int**| Minimum average rating (products with rating_avg >= this). | [optional] 
+ **freeShipping** | **bool**| When true, only products flagged free-shipping. | [optional] 
+ **inStock** | **bool**| When true, only products with at least one in-stock variant. | [optional] 
+ **sort** | **String**| Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` is not yet supported server-side (P-029).  | [optional] [default to 'recommended']
 
 ### Return type
 
