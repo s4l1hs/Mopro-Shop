@@ -125,6 +125,10 @@ CREATE TABLE catalog_schema.products (
     default_currency TEXT         NOT NULL DEFAULT 'TRY',
     default_locale   TEXT         NOT NULL DEFAULT 'tr-TR',
     status           TEXT         NOT NULL DEFAULT 'draft',
+    -- additive display/filter columns (migrations 0065 + 0081)
+    rating_avg       NUMERIC(2,1),
+    rating_count     INT          NOT NULL DEFAULT 0,
+    free_shipping    BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
@@ -134,19 +138,24 @@ CREATE TABLE catalog_schema.product_translations (
     locale      TEXT   NOT NULL,
     title       TEXT   NOT NULL,
     description TEXT   NOT NULL DEFAULT '',
+    -- generated FTS column (migration 0057) so SearchProductsSummary works
+    search_vector TSVECTOR GENERATED ALWAYS AS (
+        to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(description, ''))
+    ) STORED,
     PRIMARY KEY (product_id, locale)
 );
 
 CREATE TABLE catalog_schema.variants (
-    id             BIGSERIAL PRIMARY KEY,
-    product_id     BIGINT    NOT NULL REFERENCES catalog_schema.products(id),
-    sku            TEXT      NOT NULL,
-    color          TEXT      NOT NULL DEFAULT '',
-    size           TEXT      NOT NULL DEFAULT '',
-    price_minor    BIGINT    NOT NULL,
-    price_currency TEXT      NOT NULL DEFAULT 'TRY',
-    stock          INTEGER   NOT NULL DEFAULT 0,
-    image_keys     TEXT[]    NOT NULL DEFAULT '{}'::text[]
+    id                   BIGSERIAL PRIMARY KEY,
+    product_id           BIGINT    NOT NULL REFERENCES catalog_schema.products(id),
+    sku                  TEXT      NOT NULL,
+    color                TEXT      NOT NULL DEFAULT '',
+    size                 TEXT      NOT NULL DEFAULT '',
+    price_minor          BIGINT    NOT NULL,
+    price_currency       TEXT      NOT NULL DEFAULT 'TRY',
+    stock                INTEGER   NOT NULL DEFAULT 0,
+    original_price_minor BIGINT,
+    image_keys           TEXT[]    NOT NULL DEFAULT '{}'::text[]
 );
 
 CREATE UNIQUE INDEX variants_product_sku_uq ON catalog_schema.variants(product_id, sku);
