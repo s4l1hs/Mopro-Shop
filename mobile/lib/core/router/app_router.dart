@@ -759,7 +759,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/account',
                 builder: (_, __) =>
-                    _titled('Hesabım', const AccountScreen()),
+                    _titled('account.title'.tr(), const AccountScreen()),
               ),
             ],
           ),

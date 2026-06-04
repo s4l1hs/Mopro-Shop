@@ -54,7 +54,7 @@ class ProductDetailScreen extends ConsumerWidget {
         if (appError is NotFoundError) {
           return Scaffold(
             appBar: AppBar(),
-            body: const Center(child: Text('Ürün bulunamadı.')),
+            body: Center(child: Text('product.not_found'.tr())),
           );
         }
         return Scaffold(

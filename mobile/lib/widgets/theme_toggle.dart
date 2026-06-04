@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/design/theme_controller.dart';
@@ -15,7 +16,7 @@ class ThemeToggle extends ConsumerWidget {
 
     return IconButton(
       icon: Icon(isDark ? Icons.dark_mode : Icons.light_mode),
-      tooltip: isDark ? 'Koyu tema' : 'Açık tema',
+      tooltip: isDark ? 'theme.toggle_dark'.tr() : 'theme.toggle_light'.tr(),
       onPressed: () => ref.read(themeControllerProvider.notifier).cycle(),
     );
   }

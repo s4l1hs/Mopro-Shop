@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -219,10 +220,10 @@ class _LoginPill extends StatelessWidget {
         color: MoproTokens.primaryLight,
         borderRadius: BorderRadius.circular(8),
       ),
-      child: const Center(
+      child: Center(
         child: Text(
-          'Giriş Yap',
-          style: TextStyle(
+          'auth.login'.tr(),
+          style: const TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.w600,
             fontSize: 13,

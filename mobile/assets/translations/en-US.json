@@ -173,14 +173,17 @@
     "recent_searches": "Recent Searches",
     "trending": "Trending",
     "clear_recent": "Clear",
-    "suggested_categories": "Categories"
+    "suggested_categories": "Categories",
+    "web_placeholder": "Search products, brands or categories…"
   },
   "mega_menu": {
     "empty_children": "No subcategories in this section.",
     "promo": {
       "cta": "Discover",
       "image_unavailable": "Image unavailable."
-    }
+    },
+    "see_all": "See all: {category}",
+    "submenu_hint": "Down arrow to open submenu"
   },
   "empty_state": {
     "empty_message": "Nothing here yet",
@@ -189,7 +192,8 @@
   },
   "favorites": {
     "empty_title": "No favourites yet",
-    "empty_subtitle": "Add products you like to your favourites"
+    "empty_subtitle": "Add products you like to your favourites",
+    "explore": "Explore"
   },
   "account": {
     "title": "My Account",
@@ -272,7 +276,8 @@
     "related_title": "Similar Products",
     "remove_from_favorites": "Remove from favorites",
     "decrease_qty": "Decrease quantity",
-    "increase_qty": "Increase quantity"
+    "increase_qty": "Increase quantity",
+    "not_found": "Product not found."
   },
   "reviews": {
     "header": "Reviews ({count})",
@@ -680,7 +685,8 @@
     "contact_success_title": "Request received",
     "contact_ticket_no": "Ticket No: #{}",
     "contact_success_sub": "We'll respond within 48 hours.",
-    "contact_title": "Contact Us"
+    "contact_title": "Contact Us",
+    "article_title": "{title} — Mopro Help"
   },
   "qa": {
     "header": "Questions ({count})",
@@ -850,5 +856,9 @@
       "season_title": "New Season",
       "season_sub": "Discover the newest products and start earning cashback."
     }
+  },
+  "theme": {
+    "toggle_dark": "Dark theme",
+    "toggle_light": "Light theme"
   }
 }

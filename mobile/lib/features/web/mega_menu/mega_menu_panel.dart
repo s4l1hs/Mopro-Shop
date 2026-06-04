@@ -145,7 +145,7 @@ class MegaMenuPanel extends StatelessWidget {
           colChildren.add(
             _PanelRow(
               order: order++,
-              label: 'Tümünü gör: ${subcat.name}',
+              label: 'mega_menu.see_all'.tr(namedArgs: {'category': subcat.name}),
               onTap: () => _go(context, subcat.id),
               isSeeAll: true,
             ),

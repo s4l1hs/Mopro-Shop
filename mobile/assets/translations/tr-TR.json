@@ -173,14 +173,17 @@
     "recent_searches": "Son Aramalar",
     "trending": "Popüler Aramalar",
     "clear_recent": "Temizle",
-    "suggested_categories": "Kategoriler"
+    "suggested_categories": "Kategoriler",
+    "web_placeholder": "Ürün, marka veya kategori ara…"
   },
   "mega_menu": {
     "empty_children": "Bu kategoride alt kategori bulunmuyor.",
     "promo": {
       "cta": "Keşfet",
       "image_unavailable": "Resim yüklenemedi."
-    }
+    },
+    "see_all": "Tümünü gör: {category}",
+    "submenu_hint": "Submenü açmak için Aşağı ok"
   },
   "empty_state": {
     "empty_message": "Henüz içerik yok",
@@ -189,7 +192,8 @@
   },
   "favorites": {
     "empty_title": "Henüz favori yok",
-    "empty_subtitle": "Beğendiğin ürünleri favorilere ekle"
+    "empty_subtitle": "Beğendiğin ürünleri favorilere ekle",
+    "explore": "Keşfet"
   },
   "account": {
     "title": "Hesabım",
@@ -275,7 +279,8 @@
     "related_title": "Benzer Ürünler",
     "remove_from_favorites": "Favorilerden çıkar",
     "decrease_qty": "Adet azalt",
-    "increase_qty": "Adet artır"
+    "increase_qty": "Adet artır",
+    "not_found": "Ürün bulunamadı."
   },
   "reviews": {
     "header": "Yorumlar ({count})",
@@ -716,7 +721,8 @@
     "contact_success_title": "Talebin alındı",
     "contact_ticket_no": "Talep No: #{}",
     "contact_success_sub": "48 saat içinde yanıt vereceğiz.",
-    "contact_title": "Bize Ulaş"
+    "contact_title": "Bize Ulaş",
+    "article_title": "{title} — Mopro Yardım"
   },
   "qa": {
     "header": "Sorular ({count})",
@@ -886,5 +892,9 @@
       "season_title": "Yeni Sezon",
       "season_sub": "En yeni ürünleri keşfedin, cashback kazanmaya başlayın."
     }
+  },
+  "theme": {
+    "toggle_dark": "Koyu tema",
+    "toggle_light": "Açık tema"
   }
 }
