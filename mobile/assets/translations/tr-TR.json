@@ -358,7 +358,8 @@
     "coupon_code": "Kupon kodu",
     "apply": "Uygula",
     "confirm_cart": "Sepeti Onayla",
-    "summary_helper": "Vergi ve kargo dahil değildir."
+    "summary_helper": "Vergi ve kargo dahil değildir.",
+    "checkout_login_reason": "Siparişi tamamlamak için giriş yap."
   },
   "checkout": {
     "step_address": "Adres",
@@ -395,7 +396,17 @@
     "payment_cashback": "Mopro Coin ile Öde",
     "payment_coming_soon": "Çok yakında",
     "secure_payment_title": "Güvenli Ödeme",
-    "secure_payment_body": "Ödeme bilgileriniz 256-bit SSL ile şifrelenir ve 3D Secure ile korunur."
+    "secure_payment_body": "Ödeme bilgileriniz 256-bit SSL ile şifrelenir ve 3D Secure ile korunur.",
+    "redirect": {
+      "msg_confirming": "Ödemen onaylanıyor…",
+      "msg_waiting_bank": "Bankadan onay bekleniyor…",
+      "msg_almost": "Neredeyse hazır…",
+      "msg_finishing": "İşleminiz tamamlanıyor…",
+      "timeout_title": "Onay biraz gecikiyor",
+      "timeout_body": "Ödemeniz işleniyor olabilir. Siparişlerim sayfasını kontrol edin.",
+      "go_to_orders": "Siparişlerime Git",
+      "continue_shopping": "Alışverişe Devam Et"
+    }
   },
   "order": {
     "history_title": "Siparişlerim",

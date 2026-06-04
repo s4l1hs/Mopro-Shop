@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,12 +12,9 @@ const _pollIntervalMs = 1500;
 const _timeoutMs = 30000;
 const _msgCycleMs = 3000;
 
-const _loadingMessages = [
-  'Ödemen onaylanıyor…',
-  'Bankadan onay bekleniyor…',
-  'Neredeyse hazır…',
-  'İşleminiz tamamlanıyor…',
-];
+// Localised at render (build) so the cycling copy uses literal `.tr()`; the count
+// is constant across locales for the cycle modulo.
+const _loadingMessageCount = 4;
 
 const _terminalStatuses = {'captured', 'failed', 'cancelled', 'refunded'};
 
@@ -53,7 +51,7 @@ class _CheckoutRedirectScreenState
     );
     _cycleTimer = Timer.periodic(
       const Duration(milliseconds: _msgCycleMs),
-      (_) => setState(() => _msgIndex = (_msgIndex + 1) % _loadingMessages.length),
+      (_) => setState(() => _msgIndex = (_msgIndex + 1) % _loadingMessageCount),
     );
   }
 
@@ -108,6 +106,12 @@ class _CheckoutRedirectScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final loadingMessages = [
+      'checkout.redirect.msg_confirming'.tr(),
+      'checkout.redirect.msg_waiting_bank'.tr(),
+      'checkout.redirect.msg_almost'.tr(),
+      'checkout.redirect.msg_finishing'.tr(),
+    ];
 
     if (_timedOut) {
       return Scaffold(
@@ -120,13 +124,13 @@ class _CheckoutRedirectScreenState
                 Icon(Icons.hourglass_bottom_outlined, size: 64, color: cs.tertiary),
                 const SizedBox(height: 24),
                 Text(
-                  'Onay biraz gecikiyor',
+                  'checkout.redirect.timeout_title'.tr(),
                   style: theme.textTheme.headlineSmall,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Ödemeniz işleniyor olabilir. Siparişlerim sayfasını kontrol edin.',
+                  'checkout.redirect.timeout_body'.tr(),
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
@@ -138,12 +142,12 @@ class _CheckoutRedirectScreenState
                   style: FilledButton.styleFrom(
                     minimumSize: const Size.fromHeight(52),
                   ),
-                  child: const Text('Siparişlerime Git'),
+                  child: Text('checkout.redirect.go_to_orders'.tr()),
                 ),
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: () => context.go('/'),
-                  child: const Text('Alışverişe Devam Et'),
+                  child: Text('checkout.redirect.continue_shopping'.tr()),
                 ),
               ],
             ),
@@ -163,7 +167,7 @@ class _CheckoutRedirectScreenState
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 400),
                 child: Text(
-                  _loadingMessages[_msgIndex],
+                  loadingMessages[_msgIndex],
                   key: ValueKey(_msgIndex),
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: cs.onSurfaceVariant,

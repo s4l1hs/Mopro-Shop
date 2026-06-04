@@ -352,7 +352,8 @@
     "coupon_code": "Coupon code",
     "apply": "Apply",
     "confirm_cart": "Confirm Cart",
-    "summary_helper": "Taxes and shipping not included."
+    "summary_helper": "Taxes and shipping not included.",
+    "checkout_login_reason": "Sign in to complete your order."
   },
   "checkout": {
     "select_address": "Select Delivery Address",
@@ -380,7 +381,17 @@
     "payment_cashback": "Pay with Mopro Coin",
     "payment_coming_soon": "Coming soon",
     "secure_payment_title": "Secure Payment",
-    "secure_payment_body": "Your payment details are encrypted with 256-bit SSL and protected by 3D Secure."
+    "secure_payment_body": "Your payment details are encrypted with 256-bit SSL and protected by 3D Secure.",
+    "redirect": {
+      "msg_confirming": "Confirming your payment…",
+      "msg_waiting_bank": "Waiting for bank approval…",
+      "msg_almost": "Almost ready…",
+      "msg_finishing": "Completing your transaction…",
+      "timeout_title": "Approval is taking a moment",
+      "timeout_body": "Your payment may still be processing. Check the My Orders page.",
+      "go_to_orders": "Go to My Orders",
+      "continue_shopping": "Continue Shopping"
+    }
   },
   "order": {
     "history_title": "My Orders",
