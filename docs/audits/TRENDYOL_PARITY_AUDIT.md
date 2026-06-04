@@ -25,10 +25,11 @@ orphaned-widget) are the canonical i18n template. **P-026 closed as `BLOCKED-BY-
 category) + sorts (5 tokens) end-to-end; the `bestseller` sort is carved to **P-029** (cross-schema popularity). **P-026
 is now unblocked. **Step-5 findings: P-005, P-006, P-020, P-014, P-028, P-026 resolved · P-015 FIXED (OOS variant
 chips) · P-011 CORRECTED · P-004/P-009/P-012/P-013 NOT-ACTIONABLE (backend-gated / documented-design / PARK) ·
-HeroCarousel REMOVED · P-029 opened. **ProductSummary enriched** (`feat/productsummary-enrich`): `favorites_count`
-(P-004) + `free_shipping` (P-009) now backend-emitted; `discount_pct` already emitted (P-008b discount portion);
-`lowest_30d_price` carved to **P-030** (HIGH, compliance). Remaining: P-007 (delivery-ETA), P-029 (bestseller),
-P-030 (price-history), chi-square flake, + a small frontend-wiring follow-up for the P-004/P-009 card badges.**
+HeroCarousel REMOVED · P-029 opened. ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + P-009
+✅ RESOLVED** (`feat/wire-card-badges`): the card now renders the favorites-count overlay + free-shipping/discount
+badges end-to-end. `discount_pct` emitted; `lowest_30d_price` → **P-030** (HIGH, compliance). **The pure-UI parity
+work is done.** Remaining (all backend/architectural): P-007 (delivery-ETA), P-029 (bestseller), P-030
+(price-history), chi-square flake.**
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
@@ -106,6 +107,7 @@ Severity: LOW (social-proof nicety; not conversion-blocking).
 Recommendation: bundle with `P5-4` (`feat/parity-card-badges`) — render a count when the catalog API exposes one. **Backend dependency:** needs a favorites-count field on the product summary.
 **Outcome (NOT-ACTIONABLE — `chore/step5-low-batch`):** backend-gated — `ProductSummary` (mopro_api) exposes no favorites-count field; the card UI is correct (cf. P-008b data-dark pattern). Needs a catalog `ProductSummary` enrichment (favorites_count) to render. No code change.
 **Outcome 2 (✅ BACKEND-UNBLOCKED — `feat/productsummary-enrich`):** `ProductSummary` now emits `favorites_count` (a same-schema subquery over `catalog_schema.user_favorites` + index migration 0082 — no cross-schema JOIN). Frontend wiring (count by the heart on card/PDP) is a small follow-up.
+**✅ RESOLVED (frontend — `feat/wire-card-badges`):** the product card renders a `♥{count}` social-proof overlay (`formatCompactCount`: <10 hidden, 10–999 raw, ≥1000 "1.2K"), populated on every card surface (list/search/rails/flash/favorites — the custom `productSummaryFromApi` mapper updated too). The finding is **card-scoped** (per its title); the PDP uses the un-enriched full `Product` and is out of scope (a backend follow-up, not part of P-004).
 
 ---
 
@@ -160,6 +162,7 @@ Severity rationale: badges are part of Trendyol's at-a-glance card recognition; 
 Recommendation: confirm during the build PR's discovery (screenshots or re-fetch), then `P5-card-badges`. **Note backend dependency:** free-shipping/campaign flags must come from the catalog API; UI-only until then.
 **Outcome (NOT-ACTIONABLE — `chore/step5-low-batch`):** backend-gated — `ProductSummary` exposes no `free_shipping`/`campaign`/`badge` field. P-028 added the `free_shipping` *column* but not the response field, and it's unpopulated. A badge UI is pointless until the API exposes the flags + has data. (Severity re-confirmed **MED**, not LOW — this batch's prompt mislabeled it.) No code change.
 **Outcome 2 (✅ BACKEND-UNBLOCKED, partial — `feat/productsummary-enrich`):** `ProductSummary` now emits `free_shipping` (the "Kargo Bedava" badge); `discount_pct` + `flash_price_minor` were already emitted (discount + flash badges). So every P-009 badge **except bestseller** (= P-029, cross-schema popularity) is now backend-ready; frontend wiring is a small follow-up. (free_shipping data is unpopulated — the badge renders once sellers flag products.)
+**✅ RESOLVED (frontend — `feat/wire-card-badges`):** the card renders a "Ücretsiz Kargo" badge (top-left image overlay) when `product.freeShipping`; the discount-% badge (`DiscountPill`, #78) already renders. So the **free-shipping + discount** card badges are live; **bestseller** remains the only deferred badge (→ P-029). (free_shipping data is seller-populated — the badge shows once products are flagged.)
 
 ### P-010 — Filters / sort UI is built (parity likely; detail PROBABLE)
 **Status: INTERACTION | Severity: LOW | Confidence: CONFIRMED (Mopro) / PROBABLE (gap)**

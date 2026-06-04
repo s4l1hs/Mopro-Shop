@@ -129,10 +129,10 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
    `cashback_only` disabled per P-029/P-028. Filters are functional.
 4. **P5-3** `feat/pdp-delivery-eta` (SOON) — closes **P-007** + lights up the dark **P-008b** UI. **Backend-gated**
    (catalog/shipping API must expose ETA + original price + lowest-30d); UI slot can land NOW, data SOON. Risk MED.
-5. **P5-4** `feat/parity-card-badges` — ✅ **BACKEND DONE** (`feat/productsummary-enrich`): `ProductSummary` now
-   emits `favorites_count` (P-004) + `free_shipping` (P-009); `discount_pct` already emitted; `flash_price_minor`
-   already present. So P-004 + P-009 (minus bestseller=P-029) + the P-008b discount portion are backend-ready.
-   **Next: a small frontend-wiring PR** renders the favorites count + free-shipping/discount/flash badges. Risk LOW.
+5. **P5-4** `feat/parity-card-badges` — ✅ **P-004 + P-009 RESOLVED** (backend `feat/productsummary-enrich`;
+   frontend `feat/wire-card-badges`). The card renders the favorites-count overlay (`formatCompactCount`) +
+   free-shipping/discount badges end-to-end. Bestseller badge stays deferred (→ P-029). The PDP count/badge
+   is out of scope (card-scoped findings; PDP uses the un-enriched full `Product`).
 
 ✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
 CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);
@@ -154,8 +154,8 @@ phase (#59→#60 pattern).
 PR #74 chi-square flake; A-004/A-007 PROBABLE; A-005 PARK; **P-029** (`bestseller` sort — catalog-side popularity,
 carved from P-028). P-026 ✅ RESOLVED (frontend wired, `feat/wire-frontend-filters`). **LOW tail + HeroCarousel
 closed** (`chore/step5-low-batch`: P-015 FIX, P-011 CORRECTED, P-004/009/012/013 NOT-ACTIONABLE, HeroCarousel
-REMOVED). **ProductSummary enriched** (`feat/productsummary-enrich`): `favorites_count` (P-004) + `free_shipping`
-(P-009) backend-emitted; `discount_pct` already emitted (P-008b discount portion); also fixed a latent
-`ListProductsByIDs` SELECT/scan mismatch. Remaining Step-5 tail: P-007 (delivery-ETA), P-029 (bestseller),
-**P-030** (price-history / lowest_30d — HIGH, compliance), chi-square flake, + a small frontend-wiring PR for the
-P-004/P-009 card badges.
+REMOVED). ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + P-009 ✅ RESOLVED**
+(`feat/wire-card-badges`: favorites-count overlay + free-shipping/discount card badges, end-to-end).
+**The pure-UI Trendyol-parity work is complete.** Remaining Step-5 tail (all backend/architectural): P-007
+(delivery-ETA), P-029 (bestseller — catalog-side popularity), **P-030** (price-history / lowest_30d — HIGH
+compliance), chi-square flake.
