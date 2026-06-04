@@ -2409,6 +2409,18 @@ components:
             Flash-deal price in minor units; set only for products served by the
             /home/flash-deals rail. When present, render this as the price and
             price_minor as the strikethrough original.
+        free_shipping:
+          type: boolean
+          default: false
+          description: |
+            When true, render the "Kargo Bedava" (free-shipping) badge (P-009).
+            Sourced from the products.free_shipping flag.
+        favorites_count:
+          type: integer
+          default: 0
+          description: |
+            Number of users who favorited this product — social proof by the
+            heart on the card / PDP (P-004). Zero when none.
         cashback_preview:
           $ref: '#/components/schemas/CashbackPreview'
 

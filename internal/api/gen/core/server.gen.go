@@ -470,11 +470,19 @@ type ProductSummary struct {
 	// Render as red %-badge next to the strikethrough.
 	DiscountPct *int `json:"discount_pct"`
 
+	// FavoritesCount Number of users who favorited this product — social proof by the
+	// heart on the card / PDP (P-004). Zero when none.
+	FavoritesCount *int `json:"favorites_count,omitempty"`
+
 	// FlashPriceMinor Flash-deal price in minor units; set only for products served by the
 	// /home/flash-deals rail. When present, render this as the price and
 	// price_minor as the strikethrough original.
 	FlashPriceMinor *int64 `json:"flash_price_minor"`
-	Id              int64  `json:"id"`
+
+	// FreeShipping When true, render the "Kargo Bedava" (free-shipping) badge (P-009).
+	// Sourced from the products.free_shipping flag.
+	FreeShipping *bool `json:"free_shipping,omitempty"`
+	Id           int64 `json:"id"`
 
 	// OriginalPriceMinor MSRP in minor units. When set and greater than price_minor, render
 	// with strikethrough; backend also emits discount_pct.

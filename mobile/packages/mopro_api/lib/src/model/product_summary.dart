@@ -47,6 +47,10 @@ class ProductSummary {
 
      this.flashPriceMinor,
 
+     this.freeShipping = false,
+
+     this.favoritesCount = 0,
+
     required  this.cashbackPreview,
   });
 
@@ -226,6 +230,32 @@ class ProductSummary {
 
 
 
+      /// When true, render the \"Kargo Bedava\" (free-shipping) badge (P-009). Sourced from the products.free_shipping flag. 
+  @JsonKey(
+    defaultValue: false,
+    name: r'free_shipping',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final bool? freeShipping;
+
+
+
+      /// Number of users who favorited this product — social proof by the heart on the card / PDP (P-004). Zero when none. 
+  @JsonKey(
+    defaultValue: 0,
+    name: r'favorites_count',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final int? favoritesCount;
+
+
+
   @JsonKey(
     
     name: r'cashback_preview',
@@ -256,6 +286,8 @@ class ProductSummary {
       other.ratingAvg == ratingAvg &&
       other.ratingCount == ratingCount &&
       other.flashPriceMinor == flashPriceMinor &&
+      other.freeShipping == freeShipping &&
+      other.favoritesCount == favoritesCount &&
       other.cashbackPreview == cashbackPreview;
 
     @override
@@ -274,6 +306,8 @@ class ProductSummary {
         ratingAvg.hashCode +
         ratingCount.hashCode +
         flashPriceMinor.hashCode +
+        freeShipping.hashCode +
+        favoritesCount.hashCode +
         cashbackPreview.hashCode;
 
   factory ProductSummary.fromJson(Map<String, dynamic> json) => _$ProductSummaryFromJson(json);
