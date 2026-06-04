@@ -113,10 +113,11 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
    (diacritic grep undercounts ~2×) **≈ 250–300 strings / 27 files**. **Done:** Phase 1 (`feat/i18n-hardcoded-sweep`,
    app_router titles, 44 keys); Phase 2a (auth: sign_up/sign_in/auth_layout, ~46) + Phase 2c (sipay error map, 12) in
    `feat/i18n-sweep-2abc`; **Phase 2b** (account: security_screen 40 keys + account_screen 17) in
-   `feat/i18n-sweep-2b-account` (account_security goldens regen). **Queued:** 2d email_verify/mfa/forgot +
-   marketing/hero; 2e checkout; 2f singletons (incl. web_header). Each phase: literal `'key'.tr()`, keys → tr-TR
-   (master) + en-US; goldens regen where screens render swept strings (harness renders keys, so currently-hardcoded
-   screens' goldens flip Turkish→keys). **4 of ~7 phases done; ~110+ strings localized so far.**
+   `feat/i18n-sweep-2b-account`; **Phase 2d** (email_verify + mfa_challenge + forgot_password + auth_widgets +
+   hero_slides marketing, ~34 keys) in `feat/i18n-sweep-2d` (home hero goldens regen). **Queued:** 2e checkout;
+   2f singletons (incl. web_header). Each phase: literal `'key'.tr()`, keys → tr-TR (master) + en-US; goldens
+   regen where screens render swept strings (harness renders keys → currently-hardcoded screens flip Turkish→keys).
+   **5 of ~7 phases done; ~145+ strings localized so far.**
 3. **P5-3** `feat/pdp-delivery-eta` (SOON) — closes **P-007** + lights up the dark **P-008b** UI. **Backend-gated**
    (catalog/shipping API must expose ETA + original price + lowest-30d); UI slot can land NOW, data SOON. Risk MED.
 4. **P5-4** `feat/parity-card-badges` (SOON) — closes **P-009** + confirms **P-010**. **Discovery-first** (Trendyol

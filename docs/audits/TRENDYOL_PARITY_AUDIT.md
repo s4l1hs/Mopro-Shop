@@ -257,7 +257,8 @@ the ~55 the `Text()`-scoped audit estimated. Whole screens are unlocalized (secu
 - **Phase 2c ✅ (`feat/i18n-sweep-2abc`):** sipay error map → `payment.error.sipay.*` (12 keys, dynamic prefix).
 - **Phase 2a ✅ (`feat/i18n-sweep-2abc`):** auth — sign_up + sign_in + auth_layout (~46 strings; `auth.*`/`auth.sign_up.*`/`auth.sign_in.*`/`auth.layout.*`).
 - **Phase 2b ✅ (`feat/i18n-sweep-2b-account`):** account area — security_screen (40 `security.*` keys; 2 namedArgs interpolations; const dialogs/snackbars) + account_screen (17 `account.*`; theme dedup, softGated prompts). Both full-read swept; `account_security` goldens regen Turkish→keys.
-- **Phases 2d/2e/2f (queued):** email_verify/mfa/forgot + marketing/hero, checkout, misc singletons (incl. web_header).
+- **Phase 2d ✅ (`feat/i18n-sweep-2d`):** email_verify + mfa_challenge + forgot_password + auth_widgets (strength rules + `veya`) + hero_slides (marketing) — ~34 keys (`auth.*`/`auth.email_verify.*`/`auth.mfa.*`/`auth.forgot.*`/`auth.password_rule.*`/`marketing.hero.*`). RichText prefix/suffix + `const heroSlides`→function. profile_screen was VERIFIED-COMPLETE (locale self-names). Home hero goldens regen.
+- **Phases 2e/2f (queued):** 2e checkout; 2f misc singletons (incl. web_header).
 - **Third discovery-shift:** the diacritic grep undercounts ~2× (misses TR strings w/o special chars — "Ad", "Parola", "Giriş"). **True P-014 scope ≈ 250–300 strings**, not 155. Future phases counted by full-file read, not diacritic grep.
 The 11-string list below was a `Text()`-scoped floor (correctly flagged as a floor at the time).
 **Status: CONTENT | Severity: LOW | Confidence: CONFIRMED**
