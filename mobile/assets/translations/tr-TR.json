@@ -119,6 +119,17 @@
     "trust_easy_return": "Kolay İade",
     "trust_perpetual_cashback": "Sürekli Cashback",
     "flash_deals_ended": "Fırsat sona erdi",
+    "search_hint_generic": "Ürün, kategori veya marka ara",
+    "search_hint_phone": "Akıllı telefon ara",
+    "search_hint_clothing": "Giyim ara",
+    "search_hint_shoes": "Spor ayakkabı ara",
+    "rail_recommended": "Sizin için seçtiklerimiz",
+    "rail_bestseller": "Çok satanlar",
+    "rail_newest": "Yeni gelenler",
+    "trending_phone": "Akıllı telefon",
+    "trending_laptop": "Laptop",
+    "trending_clothing": "Giyim",
+    "trending_shoes": "Spor ayakkabı",
     "rails": {
       "recently_viewed": {
         "title": "Son baktıkların"

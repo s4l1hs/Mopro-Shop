@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/di/providers.dart';
 
@@ -71,10 +72,10 @@ final homeRailsProvider =
       }).toList();
     } on DioException catch (_) {
       // Fallback to default order if endpoint fails.
-      const fallback = [
-        HomeRail(key: 'recommended', title: 'Sizin için seçtiklerimiz'),
-        HomeRail(key: 'bestseller', title: 'Çok satanlar'),
-        HomeRail(key: 'newest', title: 'Yeni gelenler'),
+      final fallback = [
+        HomeRail(key: 'recommended', title: 'home.rail_recommended'.tr()),
+        HomeRail(key: 'bestseller', title: 'home.rail_bestseller'.tr()),
+        HomeRail(key: 'newest', title: 'home.rail_newest'.tr()),
       ];
       return fallback;
     }
@@ -114,7 +115,12 @@ final trendingSearchesProvider = FutureProvider.autoDispose<List<String>>(
       final data = (resp.data?['data'] as List<dynamic>?) ?? [];
       return data.cast<String>();
     } on DioException catch (_) {
-      return const ['Akıllı telefon', 'Laptop', 'Giyim', 'Spor ayakkabı'];
+      return [
+        'home.trending_phone'.tr(),
+        'home.trending_laptop'.tr(),
+        'home.trending_clothing'.tr(),
+        'home.trending_shoes'.tr(),
+      ];
     }
   },
 );

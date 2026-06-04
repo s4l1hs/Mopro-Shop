@@ -119,6 +119,17 @@
     "trust_easy_return": "Easy Returns",
     "trust_perpetual_cashback": "Perpetual Cashback",
     "flash_deals_ended": "Deal ended",
+    "search_hint_generic": "Search products, categories or brands",
+    "search_hint_phone": "Search smartphones",
+    "search_hint_clothing": "Search clothing",
+    "search_hint_shoes": "Search sneakers",
+    "rail_recommended": "Picked for you",
+    "rail_bestseller": "Best sellers",
+    "rail_newest": "New arrivals",
+    "trending_phone": "Smartphone",
+    "trending_laptop": "Laptop",
+    "trending_clothing": "Clothing",
+    "trending_shoes": "Sneakers",
     "rails": {
       "recently_viewed": {
         "title": "Recently viewed"

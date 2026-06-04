@@ -240,12 +240,13 @@ class _AnimatedSearchPill extends ConsumerStatefulWidget {
 class _AnimatedSearchPillState extends ConsumerState<_AnimatedSearchPill> {
   int _index = 0;
   Timer? _timer;
-  final List<String> _defaultHints = const [
-    'Ürün, kategori veya marka ara',
-    'Akıllı telefon ara',
-    'Giyim ara',
-    'Spor ayakkabı ara',
-  ];
+  // Localised getter (not a const field) so each hint uses a literal `.tr()`.
+  List<String> get _defaultHints => [
+        'home.search_hint_generic'.tr(),
+        'home.search_hint_phone'.tr(),
+        'home.search_hint_clothing'.tr(),
+        'home.search_hint_shoes'.tr(),
+      ];
 
   @override
   void initState() {
