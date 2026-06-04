@@ -7,6 +7,7 @@ import 'package:mopro_api/mopro_api.dart';
 /// so this renders one [FilterChip] per variant with a "color / size" label
 /// (falling back to the SKU). Extracted from the PDP buy-box so mobile and
 /// desktop share one selector. Renders nothing for a single-variant product.
+/// Out-of-stock variants (`stock == 0`) render struck-through + disabled (P-015).
 class PdpVariantSelector extends StatelessWidget {
   const PdpVariantSelector({
     required this.variants,
@@ -40,10 +41,18 @@ class PdpVariantSelector extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: variants.map((v) {
+            final inStock = v.stock > 0;
             return FilterChip(
-              label: Text(variantLabel(v)),
+              label: Text(
+                variantLabel(v),
+                style: inStock
+                    ? null
+                    : const TextStyle(decoration: TextDecoration.lineThrough),
+              ),
               selected: selected?.id == v.id,
-              onSelected: (_) => onChanged(v),
+              // Out-of-stock variants render struck-through + disabled so they
+              // can't be selected into the buy box (P-015 parity treatment).
+              onSelected: inStock ? (_) => onChanged(v) : null,
             );
           }).toList(),
         ),

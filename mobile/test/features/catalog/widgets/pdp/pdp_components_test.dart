@@ -77,6 +77,37 @@ void main() {
       await tester.tap(find.text('Mavi'));
       expect(tapped?.id, 2);
     });
+
+    testWidgets('out-of-stock variant is disabled + struck-through (P-015)',
+        (tester) async {
+      Variant? tapped;
+      await _pump(
+        tester,
+        PdpVariantSelector(
+          variants: [
+            _v(1, color: 'Kırmızı', stock: 5),
+            _v(2, color: 'Mavi', stock: 0),
+          ],
+          selected: _v(1, color: 'Kırmızı', stock: 5),
+          onChanged: (v) => tapped = v,
+        ),
+      );
+      final oosChip = tester.widget<FilterChip>(
+        find.ancestor(of: find.text('Mavi'), matching: find.byType(FilterChip)),
+      );
+      expect(oosChip.onSelected, isNull); // disabled — can't select OOS
+      await tester.tap(find.text('Mavi'), warnIfMissed: false);
+      expect(tapped, isNull);
+      final inStockChip = tester.widget<FilterChip>(
+        find.ancestor(
+          of: find.text('Kırmızı'),
+          matching: find.byType(FilterChip),
+        ),
+      );
+      expect(inStockChip.onSelected, isNotNull);
+      final oosLabel = tester.widget<Text>(find.text('Mavi'));
+      expect(oosLabel.style?.decoration, TextDecoration.lineThrough);
+    });
   });
 
   group('PdpSellerCard', () {
