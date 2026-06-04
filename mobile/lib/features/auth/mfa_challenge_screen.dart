@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/layout/auth_layout.dart';
@@ -55,7 +56,7 @@ class _MFAChallengeScreenState extends ConsumerState<MFAChallengeScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            'İki Faktörlü Doğrulama',
+            'auth.mfa.title'.tr(),
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -67,7 +68,7 @@ class _MFAChallengeScreenState extends ConsumerState<MFAChallengeScreen> {
                     color: Theme.of(context).colorScheme.outline,
                   ),
               children: [
-                const TextSpan(text: 'Kayıtlı telefonunuza ('),
+                TextSpan(text: 'auth.mfa.code_sent_prefix'.tr()),
                 TextSpan(
                   text: widget.maskedPhone,
                   style: TextStyle(
@@ -75,12 +76,12 @@ class _MFAChallengeScreenState extends ConsumerState<MFAChallengeScreen> {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const TextSpan(text: ') 6 haneli bir kod gönderdik.'),
+                TextSpan(text: 'auth.mfa.code_sent_suffix'.tr()),
               ],
             ),
           ),
           const SizedBox(height: 32),
-          const AuthFieldLabel('Doğrulama Kodu'),
+          AuthFieldLabel('auth.code_label'.tr()),
           const SizedBox(height: 6),
           TextField(
             controller: _codeCtrl,
@@ -118,7 +119,7 @@ class _MFAChallengeScreenState extends ConsumerState<MFAChallengeScreen> {
           const SizedBox(height: 24),
           AuthSubmitButton(
             isLoading: state.isLoading,
-            label: 'Doğrula',
+            label: 'auth.verify_action'.tr(),
             onPressed: () => notifier.verify(
               mfaToken: widget.mfaToken,
               code: _codeCtrl.text.trim(),
@@ -130,10 +131,9 @@ class _MFAChallengeScreenState extends ConsumerState<MFAChallengeScreen> {
   }
 
   String _errorMessage(AppError error) => switch (error) {
-        InvalidCodeError() => 'Hatalı kod. Lütfen tekrar deneyin.',
-        MFAChallengeExpiredError() =>
-          'Kodun süresi doldu. Lütfen yeniden giriş yapın.',
-        RateLimitedError() => 'Çok fazla deneme. Lütfen bekleyin.',
-        _ => 'Bir hata oluştu.',
+        InvalidCodeError() => 'auth.error_invalid_code'.tr(),
+        MFAChallengeExpiredError() => 'auth.mfa.error_expired'.tr(),
+        RateLimitedError() => 'auth.mfa.error_rate_limited'.tr(),
+        _ => 'auth.error_generic_short'.tr(),
       };
 }

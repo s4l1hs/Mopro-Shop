@@ -64,6 +64,25 @@
       "value_prop_shipping": "Ücretsiz & hızlı teslimat",
       "value_prop_cashback": "Her alışverişte nakit iade",
       "value_prop_secure": "Güvenli ödeme altyapısı"
+    },
+    "code_label": "Doğrulama Kodu",
+    "verify_action": "Doğrula",
+    "error_invalid_code": "Hatalı kod. Lütfen tekrar deneyin.",
+    "error_generic_short": "Bir hata oluştu.",
+    "email_verify": {
+      "resent_toast": "Doğrulama kodu tekrar gönderildi.",
+      "title": "E-postanızı Doğrulayın",
+      "code_sent_prefix": "8 karakterlik doğrulama kodunu ",
+      "code_sent_suffix": " adresine gönderdik.",
+      "resend": "Kodu tekrar gönder",
+      "error_expired": "Kodun süresi doldu. Yeni kod isteyin."
+    },
+    "mfa": {
+      "title": "İki Faktörlü Doğrulama",
+      "code_sent_prefix": "Kayıtlı telefonunuza (",
+      "code_sent_suffix": ") 6 haneli bir kod gönderdik.",
+      "error_expired": "Kodun süresi doldu. Lütfen yeniden giriş yapın.",
+      "error_rate_limited": "Çok fazla deneme. Lütfen bekleyin."
     }
   },
   "nav": {
