@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:mopro/design/tokens.dart';
 
@@ -138,13 +139,13 @@ class PasswordStrengthIndicator extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _Rule(met: has8, label: 'En az 8 karakter'),
+        _Rule(met: has8, label: 'auth.password_rule.min_length'.tr()),
         const SizedBox(height: 4),
-        _Rule(met: hasUpper, label: 'En az 1 büyük harf (A-Z)'),
+        _Rule(met: hasUpper, label: 'auth.password_rule.upper'.tr()),
         const SizedBox(height: 4),
-        _Rule(met: hasLower, label: 'En az 1 küçük harf (a-z)'),
+        _Rule(met: hasLower, label: 'auth.password_rule.lower'.tr()),
         const SizedBox(height: 4),
-        _Rule(met: hasSpecial, label: 'En az 1 özel karakter (@, #, vb.)'),
+        _Rule(met: hasSpecial, label: 'auth.password_rule.special'.tr()),
       ],
     );
   }
@@ -202,7 +203,7 @@ class AuthOrDivider extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            'veya',
+            'auth.or'.tr(),
             style: TextStyle(
               color: Theme.of(context).colorScheme.outline,
             ),
