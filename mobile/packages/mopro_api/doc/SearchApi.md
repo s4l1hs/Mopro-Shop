@@ -35,7 +35,7 @@ final List<String> brand = ; // List<String> | Repeatable; matches any of the gi
 final int rating = 56; // int | Minimum average rating (products with rating_avg >= this).
 final bool freeShipping = true; // bool | When true, only products flagged free-shipping.
 final bool inStock = true; // bool | When true, only products with at least one in-stock variant.
-final String sort = sort_example; // String | Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` is not yet supported server-side (P-029). 
+final String sort = sort_example; // String | Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` orders by global popularity (P-029); it degrades to `recommended` until the analytics popularity projection has data. 
 
 try {
     final response = api.search(q, xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, sort);
@@ -60,7 +60,7 @@ Name | Type | Description  | Notes
  **rating** | **int**| Minimum average rating (products with rating_avg >= this). | [optional] 
  **freeShipping** | **bool**| When true, only products flagged free-shipping. | [optional] 
  **inStock** | **bool**| When true, only products with at least one in-stock variant. | [optional] 
- **sort** | **String**| Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` is not yet supported server-side (P-029).  | [optional] [default to 'recommended']
+ **sort** | **String**| Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` orders by global popularity (P-029); it degrades to `recommended` until the analytics popularity projection has data.  | [optional] [default to 'recommended']
 
 ### Return type
 

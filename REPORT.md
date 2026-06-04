@@ -4316,3 +4316,16 @@ Renders the ProductSummary fields PR #88 enriched. Discovery `docs/internal/p004
 
 ### Step 5 status (post P-004/P-009 frontend)
 **P-004 + P-009 ✅ RESOLVED — the pure-UI Trendyol-parity work is complete.** Remaining (all backend/architectural): P-007 (delivery-ETA), P-029 (bestseller sort/badge — catalog-side popularity), P-030 (price-history / lowest_30d — compliance), chi-square flake.
+
+## PR — P-029 bestseller sort (`feat/bestseller-sort`) — closes PARITY_AUDIT P-029 (bestseller sort) via in-process global popularity
+
+Makes the `bestseller` sort order by real popularity instead of falling back to `recommended`. Discovery `docs/internal/p029-bestseller-architecture.md`. **The prompt's framing was wrong for this codebase** and discovery corrected it.
+
+- **P-029 — RESOLVED (Pattern B, in-process read).** The prompt assumed a service boundary needing either Pattern A (denormalize a popularity counter into `catalog_schema.products` via outbox/projection sync) or Pattern C (HTTP). Discovery found **analytics is an in-process `core-svc` module** and `analytics.Service.PopularProductIDs(ctx, limit)` is **already wired** into sibling handlers. So the cross-schema constraint (CLAUDE.md §5) never bites: the catalog **handler** reads the global popularity ranking and passes the ordered IDs to the repo via `ProductFilter.PopularIDs`; the repo orders by `array_position($N::bigint[], p.id) NULLS LAST, p.id DESC` — popular-first, all rows retained (no empty PLPs). Two in-process reads combined in Go — **no cross-schema JOIN, no schema change, no sync infra.** Pattern A would have been the wrong trade for an in-process dependency.
+- **Graceful fallback:** when `PopularProductIDs` returns empty (or errors — logged at Warn), `appendOrderBy` leaves `PopularIDs` empty and falls through to `orderByClause(filter.Sort)` → `recommended`. Bounded fetch (`bestsellerPopularCap = 200`).
+- **Spec:** `FilterSort` enum re-adds `bestseller` (P-028 had omitted it to stay honest); `make api-gen` regenerated `internal/api/gen` + `mobile/packages/mopro_api`.
+- **Scope honesty — global only.** `popular_products` only populates the `'global'` scope (`RebuildPopular` computes global; `category:{id}` scopes are schema-supported but unbuilt). So a category PLP's bestseller sorts by global popularity (a reasonable proxy). Category-specific popularity carved → **P-031** (MED, analytics). The bestseller frontend sort option stays hidden pending a small un-hide follow-up.
+- **Tests:** `TestIntegration_BestsellerOrder` (3 subtests: `array_position` ordering w/ NULLS LAST, empty-PopularIDs→recommended fallback, composes-with-filters). Catalog integration green; `go build`/`go vet` clean (no handler-test blast radius); `flutter analyze` clean after regen; `make verify` green.
+
+### Step 5 status (post P-029)
+**P-029 ✅ RESOLVED.** Remaining (all backend/architectural): P-007 (delivery-ETA), P-030 (price-history / lowest_30d — HIGH compliance), P-031 (category-scoped bestseller popularity, carved from P-029), chi-square flake. Frontend follow-up: un-hide the bestseller sort option now that the backend orders by it.

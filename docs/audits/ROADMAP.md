@@ -123,8 +123,9 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
    PR is queued behind P-028 (substrate ready — discovery §9).
    **Update — P-028 ✅ RESOLVED** (`feat/catalog-filter-api`, `docs/internal/p028-filter-sort-api.md`): the backend
    now filters (price/brand/rating/free_shipping/in_stock/category) + sorts (5 tokens) end-to-end; migration 0081
-   adds `products.free_shipping`; 19 integration subtests. `bestseller` sort carved → **P-029** (cross-schema
-   popularity, CLAUDE.md §5). **P-026 ✅ RESOLVED** (`feat/wire-frontend-filters`) — the filter UI now drives the
+   adds `products.free_shipping`; 19 integration subtests. `bestseller` sort carved → **P-029 ✅ RESOLVED**
+   (`feat/bestseller-sort`, Pattern B — analytics is in-process so the constraint never bit; category-scope → P-031).
+   **P-026 ✅ RESOLVED** (`feat/wire-frontend-filters`) — the filter UI now drives the
    fetch end-to-end (price/brand/rating/free_shipping/in_stock/sort on PLP + search); `bestseller` hidden +
    `cashback_only` disabled per P-029/P-028. Filters are functional.
 4. **P5-3** `feat/pdp-delivery-eta` (SOON) — closes **P-007** + lights up the dark **P-008b** UI. **Backend-gated**
@@ -133,6 +134,14 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
    frontend `feat/wire-card-badges`). The card renders the favorites-count overlay (`formatCompactCount`) +
    free-shipping/discount badges end-to-end. Bestseller badge stays deferred (→ P-029). The PDP count/badge
    is out of scope (card-scoped findings; PDP uses the un-enriched full `Product`).
+6. **P5-5** `feat/bestseller-sort` — ✅ **P-029 RESOLVED** (`docs/internal/p029-bestseller-architecture.md`,
+   Pattern B). The prompt assumed a service boundary needing denormalize-via-outbox (Pattern A) or HTTP; discovery
+   found analytics is an **in-process** core-svc module with `PopularProductIDs` already wired, so the catalog
+   handler reads the global popularity ranking + passes ordered IDs to the repo (`ProductFilter.PopularIDs`),
+   which orders by `array_position(...) NULLS LAST` — **no cross-schema JOIN, no schema change, no sync infra**.
+   Spec re-adds `bestseller`; empty popularity → recommended. Global scope only → category-scope carved → **P-031**
+   (MED, analytics: populate `category:{id}` scopes + a scoped `PopularProductIDs`). Frontend un-hide is a small
+   follow-up.
 
 ✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
 CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);
@@ -151,11 +160,13 @@ evidence but PROBABLE *Trendyol* comparison — each PROBABLE finding gets re-co
 phase (#59→#60 pattern).
 
 **Open tail (unchanged, non-blocking):** idempotency-surface analyzer (T-007 split); cron-overlap sim (T-008);
-PR #74 chi-square flake; A-004/A-007 PROBABLE; A-005 PARK; **P-029** (`bestseller` sort — catalog-side popularity,
-carved from P-028). P-026 ✅ RESOLVED (frontend wired, `feat/wire-frontend-filters`). **LOW tail + HeroCarousel
+PR #74 chi-square flake; A-004/A-007 PROBABLE; A-005 PARK. **P-029 ✅ RESOLVED** (`feat/bestseller-sort`,
+Pattern B — analytics is in-process, so the catalog handler reads `PopularProductIDs` + orders via
+`array_position`; no cross-schema JOIN, no schema change, no sync infra; global scope, category-scope carved →
+**P-031**). P-026 ✅ RESOLVED (frontend wired, `feat/wire-frontend-filters`). **LOW tail + HeroCarousel
 closed** (`chore/step5-low-batch`: P-015 FIX, P-011 CORRECTED, P-004/009/012/013 NOT-ACTIONABLE, HeroCarousel
 REMOVED). ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + P-009 ✅ RESOLVED**
 (`feat/wire-card-badges`: favorites-count overlay + free-shipping/discount card badges, end-to-end).
 **The pure-UI Trendyol-parity work is complete.** Remaining Step-5 tail (all backend/architectural): P-007
-(delivery-ETA), P-029 (bestseller — catalog-side popularity), **P-030** (price-history / lowest_30d — HIGH
-compliance), chi-square flake.
+(delivery-ETA), **P-030** (price-history / lowest_30d — HIGH compliance), P-031 (category-scoped bestseller),
+chi-square flake.

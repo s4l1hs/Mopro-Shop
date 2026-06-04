@@ -396,6 +396,21 @@ func orderByClause(sort string) string {
 	}
 }
 
+// appendOrderBy writes the ORDER BY clause. Bestseller (filter.PopularIDs set —
+// the global popularity ranking the handler reads from analytics) orders by
+// array_position: ALL rows, the popular ones first in rank order, the rest after
+// (NULLS LAST) — no row is excluded, so PLPs never go empty. Otherwise the static
+// token switch. Returns updated args + the next free placeholder.
+func appendOrderBy(sb *strings.Builder, args []any, filter ProductFilter, argN int) ([]any, int) {
+	if len(filter.PopularIDs) > 0 {
+		fmt.Fprintf(sb, " ORDER BY array_position($%d::bigint[], p.id) NULLS LAST, p.id DESC", argN)
+		args = append(args, filter.PopularIDs)
+		return args, argN + 1
+	}
+	sb.WriteString(orderByClause(filter.Sort))
+	return args, argN
+}
+
 // scanProductSummaries scans rows into a ProductSummaryRow slice plus the
 // windowed total. Shared by the listing + search summary queries.
 func scanProductSummaries(rows pgx.Rows, label string) ([]ProductSummaryRow, int, error) {
@@ -426,7 +441,7 @@ func (r *pgxRepository) ListProductsByCategory(ctx context.Context, categoryID i
 	sb.WriteString(" WHERE p.category_id = $1 AND p.status = 'active'")
 	args := []any{categoryID, locale}
 	args, argN := appendProductFilters(&sb, args, filter, 3)
-	sb.WriteString(orderByClause(filter.Sort))
+	args, argN = appendOrderBy(&sb, args, filter, argN)
 	fmt.Fprintf(&sb, " LIMIT $%d OFFSET $%d", argN, argN+1)
 	args = append(args, limit, offset)
 
@@ -446,7 +461,7 @@ func (r *pgxRepository) SearchProductsSummary(ctx context.Context, query, locale
 		" OR t.title ILIKE '%' || $1 || '%')")
 	args := []any{query, locale}
 	args, argN := appendProductFilters(&sb, args, filter, 3)
-	sb.WriteString(orderByClause(filter.Sort))
+	args, argN = appendOrderBy(&sb, args, filter, argN)
 	fmt.Fprintf(&sb, " LIMIT $%d OFFSET $%d", argN, argN+1)
 	args = append(args, limit, offset)
 
