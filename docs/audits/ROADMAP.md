@@ -129,12 +129,17 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
    `cashback_only` disabled per P-029/P-028. Filters are functional.
 4. **P5-3** `feat/pdp-delivery-eta` (SOON) — closes **P-007** + lights up the dark **P-008b** UI. **Backend-gated**
    (catalog/shipping API must expose ETA + original price + lowest-30d); UI slot can land NOW, data SOON. Risk MED.
-5. **P5-4** `feat/parity-card-badges` (SOON) — closes **P-009** + confirms **P-010**. **Discovery-first** (Trendyol
-   `/sr` is 403 — re-confirm with screenshots before building). Backend-gated (free-shipping/campaign flags). Risk MED.
+5. **P5-4** `feat/parity-card-badges` — **P-009 triaged NOT-ACTIONABLE** (`chore/step5-low-batch`): backend-gated —
+   `ProductSummary` exposes no free-shipping/campaign/favorites-count fields. Awaits a catalog `ProductSummary`
+   enrichment PR (would unblock P-004 + P-009 + the dark P-008b discount/lowest-30d data together); the UI badges
+   land after. Risk MED.
 
-LATER/PARK: **P5-5** cart suggestions + saved-for-later (P-011, LOW); **P5-6** favorite collections (P-013, PARK —
-confirm product intent); **P5-7** checkout flow-shape review (P-012, PARK — don't restructure a working 3-DS stepper
-on taste). Drive-by (Step-1 family, not parity): remove the empty `mobile/lib/features/orders/` directory.
+✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
+CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);
+P-004 + P-009 NOT-ACTIONABLE (backend-gated — `ProductSummary` enrichment needed); P-012 + P-013 NOT-ACTIONABLE
+(documented stepper design / PARK collections); **HeroCarousel REMOVED** (orphaned). Still PARK *if product wants*:
+cart cross-sell + saved-for-later (P-011 b/c); favorite collections (P-013). Drive-by (Step-1 family, not parity):
+the empty `mobile/lib/features/orders/` directory remains (out of this batch's scope).
 
 **12 VERIFIED-COMPLETE surfaces** (design tokens, auth-gate/guest-browsing, global nav, home, flash deals, product
 card, PDP structure, search/PLP filters (✅ functional — P-028 backend + P-026 frontend), reviews, Q&A, orders/returns, notifications/account/empty-states/responsive)
@@ -147,5 +152,7 @@ phase (#59→#60 pattern).
 
 **Open tail (unchanged, non-blocking):** idempotency-surface analyzer (T-007 split); cron-overlap sim (T-008);
 PR #74 chi-square flake; A-004/A-007 PROBABLE; A-005 PARK; **P-029** (`bestseller` sort — catalog-side popularity,
-carved from P-028). P-026 ✅ RESOLVED (frontend wired, `feat/wire-frontend-filters`). Remaining Step-5 tail:
-P-007 (delivery-ETA), 6 LOW, HeroCarousel cleanup, chi-square flake, P-029.
+carved from P-028). P-026 ✅ RESOLVED (frontend wired, `feat/wire-frontend-filters`). **LOW tail + HeroCarousel
+closed** (`chore/step5-low-batch`: P-015 FIX, P-011 CORRECTED, P-004/009/012/013 NOT-ACTIONABLE, HeroCarousel
+REMOVED). Remaining Step-5 tail: P-007 (delivery-ETA, backend-gated), P-029 (bestseller sort), chi-square flake —
+plus a catalog `ProductSummary` enrichment backend PR that would unblock P-004/P-009/P-008b card+PDP data.

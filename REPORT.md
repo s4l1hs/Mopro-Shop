@@ -4270,3 +4270,21 @@ Wires the existing filter UI to the P-028 filter-aware backend — the original 
 
 ### Step 5 status (post P-026)
 P-005, P-006, P-014, P-020, P-028 resolved · **P-026 ✅ RESOLVED (filters functional end-to-end)** · P-029 opened. **7 of ~12 addressed.** Remaining: P-007 (delivery-ETA, backend-gated), 6 LOW (P-004/009/011/012/013/015), HeroCarousel cleanup (#82), chi-square flake (#74), P-029 (bestseller sort).
+
+## PR — Step 5 LOW batch + HeroCarousel (`chore/step5-low-batch`)
+
+Per-finding triage (PR #60 protocol) — discovery `docs/internal/p-low-batch-discovery.md`. Re-verified each at PR time.
+
+- **P-004**: NOT-ACTIONABLE — favorites-count is backend-gated (`ProductSummary` has no count field); card UI is correct. No code.
+- **P-009**: NOT-ACTIONABLE — merch badges backend-gated (no `free_shipping`/`campaign` in the response; P-028 added the column, not the response field, and it's unpopulated). Re-confirmed **MED** (the batch prompt mislabeled LOW). No code.
+- **P-011**: CORRECTED — the audit's "no promo field" is wrong; the active cart totals widget (`OrderSummaryCard`, `cart_screen.dart:120`) **has** a coupon input (inert placeholder). The audit cited the orphaned `cart_totals_summary.dart`. Cross-sell/saved-for-later remain PARK.
+- **P-012**: NOT-ACTIONABLE — the multi-screen `checkout_stepper.dart` is a coherent, 3-DS-justified design; don't restructure on taste. No code.
+- **P-013**: NOT-ACTIONABLE — flat favorites; collections are PARK product-intent. No code.
+- **P-015**: ✅ FIX (~12 LOC) — `PdpVariantSelector` let you select out-of-stock variants; now stock==0 chips render struck-through + disabled (`Variant.stock`). 1 widget test. No golden impact (PDP fixtures hardcode stock:10).
+- **HeroCarousel**: REMOVE — re-verified zero consumers; deleted `hero_carousel.dart` (120) + `hero_slides.dart` (52) + the `marketing.hero.*` block (8 keys, tr+en; de/ar lacked it). i18n 786/0/0.
+- **Distribution: 1 FIX / 1 CORRECTED / 4 NOT-ACTIONABLE / 0 ESCALATE / 0 DEFER + HeroCarousel REMOVE** — the "heavy-NOT-ACTIONABLE" arc outcome (the cleanup/tests/architecture work raised the floor; the LOW tail is backend-gated / documented-design / PARK).
+- **Secondary (logged, not actioned):** the audit's §3.2 home-mount narrative corrected (`MoodStoriesStrip` → `_BannerCarousel`, no hero carousel); `cart_totals_summary.dart` + empty `features/orders/` flagged as orphans for a future cleanup sweep.
+- **No new findings escalated.** `flutter analyze` clean; i18n gates green; goldens unaffected.
+
+### Step 5 status (post LOW batch)
+Resolved/closed: P-005, P-006, P-014, P-020, P-028, P-026, P-015 · CORRECTED P-011 · NOT-ACTIONABLE P-004/P-009/P-012/P-013 · HeroCarousel REMOVED · P-029 open. **The LOW tail is closed.** Remaining Step-5 work: **P-007** (delivery-ETA, backend-gated), **P-029** (bestseller sort), the **chi-square flake**, and a catalog **`ProductSummary` enrichment** backend PR that would unblock P-004/P-009/P-008b card+PDP data.

@@ -23,8 +23,10 @@ arc's lessons (full-file reads, key+JSON test pattern, const→build-time, golde
 orphaned-widget) are the canonical i18n template. **P-026 closed as `BLOCKED-BY-BACKEND-GAP`**, then **P-028 ✅ RESOLVED**
 (`feat/catalog-filter-api`) — the catalog/search backend now filters (price/brand/rating/free_shipping/in_stock/
 category) + sorts (5 tokens) end-to-end; the `bestseller` sort is carved to **P-029** (cross-schema popularity). **P-026
-is now unblocked. **Step-5 findings: P-005, P-006, P-020, P-014, P-028 resolved · P-026 ✅ RESOLVED (frontend wired
-to P-028 — filters functional end-to-end) · P-029 opened (bestseller sort). 7 of ~12 addressed.**
+is now unblocked. **Step-5 findings: P-005, P-006, P-020, P-014, P-028, P-026 resolved · P-015 FIXED (OOS variant
+chips) · P-011 CORRECTED · P-004/P-009/P-012/P-013 NOT-ACTIONABLE (backend-gated / documented-design / PARK) ·
+HeroCarousel REMOVED · P-029 opened (bestseller sort). LOW tail closed (PR `chore/step5-low-batch`); remaining:
+P-007 (delivery-ETA, backend-gated), P-029, chi-square flake. ~12 of ~12 audit items triaged.**
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
@@ -79,7 +81,7 @@ Per the Step-5 prompt §2, adapted for visual work. Evidence types, in descendin
 
 ## §3.1 Home / Landing findings
 
-Mopro home (`mobile/lib/features/catalog/screens/home_screen.dart:75-132`) mounts, in order: hero carousel → `MoodStoriesStrip` → `FlashDealsRail` → `HomeCategoryGrid` → `TrustBar` → dynamic backend-driven `ProductRail`s (popular/bestseller equivalents, keyed `r.key`) → `_RecommendationsSliver` (personalized) → `_RecentlyViewedSliver` → `_EditorsPicksSection` → `HomeFooter`. Goldens: `home_mobile_375.png`, `home_tablet_768.png`, `home_desktop_1440.png`.
+Mopro home (`mobile/lib/features/catalog/screens/home_screen.dart:75-132`) mounts, in order: `MoodStoriesStrip` → `_BannerCarousel` → `FlashDealsRail` → `HomeCategoryGrid` → `TrustBar` → dynamic backend-driven `ProductRail`s (popular/bestseller equivalents, keyed `r.key`) → `_RecommendationsSliver` (personalized) → `_RecentlyViewedSliver` → `_EditorsPicksSection` → `HomeFooter`. Goldens: `home_mobile_375.png`, `home_tablet_768.png`, `home_desktop_1440.png`.
 
 Trendyol home (fetched 2026-06-03) shows: header (logo/search/account/cart + top links "Bugün Fiyatı Düşenler / Yemek / Ayrıcalıkları Keşfet") → campaign quick-links strip → **Popüler Ürünler** (grid, cards carry rating + price + favorites-count) → **Flaş Ürünler** (countdown "00:00:00") → **Çok Satan Ürünler** → **discount-tier nav (5/10/30/50%)** → category-discount promos → "Bunlar da İlginizi Çekebilir" search-category chips → extensive footer.
 
@@ -100,6 +102,7 @@ Evidence: Mopro `ProductCard` (`product_card.dart:88-98`, read) has a favorite *
 Gap: missing social-proof favorites count on the card.
 Severity: LOW (social-proof nicety; not conversion-blocking).
 Recommendation: bundle with `P5-4` (`feat/parity-card-badges`) — render a count when the catalog API exposes one. **Backend dependency:** needs a favorites-count field on the product summary.
+**Outcome (NOT-ACTIONABLE — `chore/step5-low-batch`):** backend-gated — `ProductSummary` (mopro_api) exposes no favorites-count field; the card UI is correct (cf. P-008b data-dark pattern). Needs a catalog `ProductSummary` enrichment (favorites_count) to render. No code change.
 
 ---
 
@@ -147,6 +150,7 @@ Evidence: Mopro `ProductCard` (`product_card.dart`, read; see §3.1/P-004) rende
 Gap: missing merch/trust badges on result cards.
 Severity rationale: badges are part of Trendyol's at-a-glance card recognition; MED because they affect scannability, but PROBABLE because the Trendyol side wasn't fetched.
 Recommendation: confirm during the build PR's discovery (screenshots or re-fetch), then `P5-card-badges`. **Note backend dependency:** free-shipping/campaign flags must come from the catalog API; UI-only until then.
+**Outcome (NOT-ACTIONABLE — `chore/step5-low-batch`):** backend-gated — `ProductSummary` exposes no `free_shipping`/`campaign`/`badge` field. P-028 added the `free_shipping` *column* but not the response field, and it's unpopulated. A badge UI is pointless until the API exposes the flags + has data. (Severity re-confirmed **MED**, not LOW — this batch's prompt mislabeled it.) No code change.
 
 ### P-010 — Filters / sort UI is built (parity likely; detail PROBABLE)
 **Status: INTERACTION | Severity: LOW | Confidence: CONFIRMED (Mopro) / PROBABLE (gap)**
@@ -185,6 +189,7 @@ Evidence: `pdp_price_block.dart:14-31` — `originalPriceMinor` and `lowestIn30D
 ### P-015 — PDP variant swatches / size-guide fidelity (PROBABLE)
 **Status: VISUAL/INTERACTION | Severity: LOW | Confidence: PROBABLE**
 Evidence: Mopro PDP has variant selection (in `product_detail_screen.dart`); swatch styling vs Trendyol (color chips, size-guide link, out-of-stock treatment) unverified (PDP 403). → confirm in discovery; no NOW action.
+**Outcome (✅ FIXED — `chore/step5-low-batch`):** the **out-of-stock treatment** was a confirmable Mopro-side bug — `PdpVariantSelector` let you select stock==0 variants into the buy box. Fixed: OOS chips render struck-through + disabled (`Variant.stock`; +1 widget test; no golden impact — fixtures are all in-stock). The broader swatch/size-guide-link fidelity stays PROBABLE (Trendyol 403) — not actioned.
 
 ---
 
@@ -219,6 +224,7 @@ Gap: (a) no promo/coupon entry, (b) no cart cross-sell, (c) no save-for-later.
 Severity: LOW. **Divergence caveat:** promo/coupon absence may be intentional — Mopro's discount mechanic is **perpetual cashback**, not coupons (the `_CashbackSummaryBox` occupies the slot a coupon field would). Confirm product intent before treating (a) as a gap; (b)/(c) are additive.
 Recommendation: `P5-cart-suggestions` (LATER) — reuse `ProductListRail` for (b); (a)/(c) only if product wants coupons/save-for-later. Confirm Trendyol side first.
 **Positive:** guest cart is preserved (`guest_cart_provider.dart`) — browse + add without auth; gate only at checkout (§4.4). Matches the original ask exactly.
+**Outcome (CORRECTED — `chore/step5-low-batch`):** claim (a) "no promo-code field" is **wrong on this branch**. The active cart totals widget is `OrderSummaryCard` (`cart_screen.dart:120`), which **has** a coupon input (`order_summary_card.dart:97-109`, an inert placeholder — "coupon backend not wired"). The audit cited `cart_totals_summary.dart`, an **orphaned** widget the cart no longer mounts. (b) cross-sell + (c) saved-for-later remain absent (PARK/additive — unchanged). The promo *mechanic* is still arguably an intentional cashback divergence; the point is the field exists.
 
 ---
 
@@ -234,6 +240,7 @@ Evidence: Mopro uses a multi-screen linear stepper (address → payment → revi
 Gap: flow-shape difference (stepper vs single-page). 
 Severity: LOW — both are valid e-commerce patterns; Mopro's stepper is coherent and the 3-DS/SAQ-A constraints (sipay) justify screen separation. PROBABLE.
 Recommendation: do **not** restructure without confirming Trendyol's current pattern + a UX rationale; PARK unless discovery shows a real friction gap. The auth gate at checkout entry (`cart_screen.dart:80 → requireAuth`) is the original ask's transition point and is correctly an adaptive prompt (§4.4), not a hard page-redirect — good.
+**Outcome (NOT-ACTIONABLE — `chore/step5-low-batch`):** documented design. `checkout/widgets/checkout_stepper.dart` renders a coherent multi-screen stepper; the 3-DS/SAQ-A (sipay) constraints justify screen separation. Restructuring a working stepper on taste (against a 403'd reference) is unwarranted. No code change.
 
 ---
 
@@ -264,6 +271,7 @@ Evidence: `features/favorites/` is **2 files, 220 LOC** (`favorites_screen.dart`
 Gap: no favorite-list organization (folders/collections/sharing).
 Severity: LOW. **Possibly PARK** — collections may be outside Mopro's near-term product scope (a niche-marketplace decision); confirm product intent before building.
 Recommendation: `P5-favorite-collections` (LATER/PARK). The add/remove interaction itself is at parity — heart top-right on cards (`product_card.dart:88-98`), guest-local + server-sync-on-auth.
+**Outcome (NOT-ACTIONABLE — `chore/step5-low-batch`):** PARK — collections/folders are a product-intent decision outside the near-term scope; the flat list + add/remove are at parity. No code change.
 
 ---
 
@@ -285,7 +293,7 @@ the ~55 the `Text()`-scoped audit estimated. Whole screens are unlocalized (secu
 - **Phase 2c ✅ (`feat/i18n-sweep-2abc`):** sipay error map → `payment.error.sipay.*` (12 keys, dynamic prefix).
 - **Phase 2a ✅ (`feat/i18n-sweep-2abc`):** auth — sign_up + sign_in + auth_layout (~46 strings; `auth.*`/`auth.sign_up.*`/`auth.sign_in.*`/`auth.layout.*`).
 - **Phase 2b ✅ (`feat/i18n-sweep-2b-account`):** account area — security_screen (40 `security.*` keys; 2 namedArgs interpolations; const dialogs/snackbars) + account_screen (17 `account.*`; theme dedup, softGated prompts). Both full-read swept; `account_security` goldens regen Turkish→keys.
-- **Phase 2d ✅ (`feat/i18n-sweep-2d`):** email_verify + mfa_challenge + forgot_password + auth_widgets (strength rules + `veya`) + hero_slides (marketing) — ~34 keys (`auth.*`/`auth.email_verify.*`/`auth.mfa.*`/`auth.forgot.*`/`auth.password_rule.*`/`marketing.hero.*`). RichText prefix/suffix + `const heroSlides`→function. profile_screen was VERIFIED-COMPLETE (locale self-names). **0 golden impact** — `HeroCarousel`/`hero_slides` is an *unadopted* widget (no consumer; home mounts `MoodStoriesStrip`); localized for completeness + future adoption (new cleanup finding filed).
+- **Phase 2d ✅ (`feat/i18n-sweep-2d`):** email_verify + mfa_challenge + forgot_password + auth_widgets (strength rules + `veya`) + hero_slides (marketing) — ~34 keys (`auth.*`/`auth.email_verify.*`/`auth.mfa.*`/`auth.forgot.*`/`auth.password_rule.*`/`marketing.hero.*`). RichText prefix/suffix + `const heroSlides`→function. profile_screen was VERIFIED-COMPLETE (locale self-names). **0 golden impact** — `HeroCarousel`/`hero_slides` is an *unadopted* widget (no consumer; home mounts `MoodStoriesStrip`); localized for completeness + future adoption (new cleanup finding filed). **[✅ REMOVED — `chore/step5-low-batch`: re-verified zero consumers (home mounts `MoodStoriesStrip` → `_BannerCarousel`); deleted `hero_carousel.dart` + `hero_slides.dart` + the `marketing.hero.*` keys.]**
 - **Phase 2e + 2f ✅ (`feat/i18n-sweep-2ef`, #83) — CLOSES P-014:** cart/checkout were already mostly localized, so the remainder was small (~32 strings): checkout_redirect (const-list→build-time), cart softgate, web_header (`auth.login` reuse), header_search_bar, theme_toggle, mega_menu (×2), favorites, product_detail, search_screen (`router_title` reuse), help_article, app_router (`account.title` reuse), + home search-hints/rail/trending fallbacks. 8 goldens regen (web_header ×3, home ×3, favorites_empty ×2). web_header_test + mega_menu_keyboard_test → key assertions (#79 pattern).
 - **Third discovery-shift:** the diacritic grep undercounts ~2× (misses TR strings w/o special chars — "Ad", "Parola", "Giriş"). **True P-014 scope ≈ 250–300 strings**, not 155. Future phases counted by full-file read, not diacritic grep.
 The 11-string list below was a `Text()`-scoped floor (correctly flagged as a floor at the time).
