@@ -3539,7 +3539,6 @@ Connection-acquisition fix; no capability change.
 - Routing `GetAccountCurrencies`/`GetSystemState` onto the SERIALIZABLE tx adds their (point/singleton) reads to its conflict scope — negligible extra 40001 on rarely-mutated rows; the existing retry loop absorbs it.
 
 
-<<<<<<< chore/make-verify-imagemagick-install
 ## ImageMagick Install PR — `chore/make-verify-imagemagick-install`
 
 Closes the last `make-verify` red (PR #42 finding): `verify-image-manifest` failed in CI.
@@ -3565,7 +3564,7 @@ PR #42 Backlog "Install ImageMagick 7 in make-verify.yml" → ✅ (plus the cros
 
 ### No parity change
 Operational/CI PR.
-=======
+
 ## GetSystemState Tx-Routing PR — `fix/cashback-getsystemstate-tx`
 
 Completes the PR #42 cashback deadlock fix, which shipped with **only the
@@ -3592,7 +3591,7 @@ Validated: `TestCronProperty_ConcurrentIdempotency` passes `-race -count=10`
 passed" report was true of the working tree but not of the committed/pushed code.
 Caught this turn when the uncommitted changes surfaced. No business-logic change;
 no schema/API contract change.
->>>>>>> main
+
 ## Financial Domain Pool Discipline PR — `fix/financial-domain-pool-discipline`
 
 Architectural follow-up closing PR #42's deferred Backlog (wallet replay-path + sellerpayout idempotency lookups + a non-fragile pool-acquisition regression test).
@@ -4344,3 +4343,17 @@ The smallest PR in the Step-5 arc. PR #90 made the backend honor `sort=bestselle
 
 ### Step 5 status (post P-029 un-hide)
 **P-029 fully closed end-to-end.** Remaining Step-5 tail (all backend/architectural): P-007 (delivery-ETA), P-030 (price-history / lowest_30d — HIGH compliance), P-031 (category-scoped bestseller popularity), chi-square flake.
+
+## PR — P-030 price-history compliance foundation (`feat/price-history`) — closes PARITY_AUDIT P-030 (price-history compliance foundation)
+
+Backend foundation for the TR 6502 / EU Omnibus (2019/2161) "lowest price in 30 days" rule. Discovery `docs/internal/p030-price-history-architecture.md` — **the prompt's premise was wrong for this codebase** and discovery corrected it.
+
+- **Mechanism: B (DB trigger), not the prompt's default A.** Discovery found: (1) the prompt's paths (`services/core-svc/...`) don't exist — it's `internal/catalog/`; (2) **price lives on `variants`** (`price_minor` + `original_price_minor`), not `products`; (3) **there is no price-update path** — the only write is `InsertVariant` (create); variant prices are immutable post-creation and "discount" is a *static* `original_price_minor` MSRP; (4) the Go `InsertVariant` doesn't even set `original_price_minor` — the rich pricing data comes from **SQL seeds**. Application-level instrumentation (Mechanism A) would miss seeds and original-price entirely, so it was rejected for an `AFTER INSERT OR UPDATE OF price_minor, original_price_minor` **trigger** on `catalog_schema.variants` (`variants_price_history_trg`) — captures seed, app, import, and any future update path uniformly. `IS DISTINCT FROM` dedupes no-op updates.
+- **Schema:** migration `0083` — `variant_price_history` (per-variant grain, `product_id` denormalized) + `(product_id, effective_at DESC)` index + the trigger + a backfill (one baseline row per existing variant). Additive + reversible; passes `scripts/lint-migrations.sh --strict`.
+- **Read:** `ProductSummary.lowest_30d_price_minor` = inline `MIN(price_minor) WHERE product_id = p.id AND effective_at >= now()-30d` correlated subquery on `productSummarySelect` + `ListProductsByIDs` — N+1-safe, mirrors `favorites_count` (no batch method). Plumbed through `ProductSummaryRow` + `productSummaryJSON`; spec adds the nullable `int64`; both clients regenerated (+ build_runner serializer).
+- **Honest compliance posture — foundation, NOT sign-off.** Today `lowest_30d == current price` for every product (no price-update lifecycle → **P-032**), so the frontend's "30 günün en düşük fiyatı" line (shown only when `lowest_30d < price`) correctly stays suppressed everywhere. The existing static `original_price_minor` strikethrough remains **unsubstantiated by history** — this PR makes that gap *measurable*, not resolved. No compliance claim without legal review (per prompt §4/§9). Convention 8 added to `docs/internal/financial-core.md`.
+- **Tests:** `internal/catalog/price_history_integration_test.go` — trigger writes a `create` row on insert; `update` row only on a real change (no-op deduped); `lowest_30d` reflects the historical low not the current price; rows older than 30 days are excluded. Trigger mirrored into the test `setupSchema`. `make test-integration-catalog` green under `-race`; `go build`/`go vet` clean; migration-safety strict clean.
+- **Follow-ups filed:** **P-032** (price-update lifecycle — variants immutable; history can't yet diverge) + a frontend display PR (render the lowest-30d line; drive discount assertions from `lowest_30d`).
+
+### Step 5 status (post P-030 backend)
+**P-030 backend ✅ RESOLVED (Mechanism B).** Remaining Step-5 tail: P-007 (delivery-ETA), P-031 (category-scoped bestseller), **P-032** (price-update lifecycle), P-030-frontend (display), chi-square flake.
