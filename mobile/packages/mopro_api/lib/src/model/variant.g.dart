@@ -33,6 +33,10 @@ Variant _$VariantFromJson(Map<String, dynamic> json) => $checkedCreate(
         'image_urls',
         (v) => (v as List<dynamic>).map((e) => e as String).toList(),
       ),
+      lowest30dPriceMinor: $checkedConvert(
+        'lowest_30d_price_minor',
+        (v) => (v as num?)?.toInt(),
+      ),
     );
     return val;
   },
@@ -40,6 +44,7 @@ Variant _$VariantFromJson(Map<String, dynamic> json) => $checkedCreate(
     'priceMinor': 'price_minor',
     'priceCurrency': 'price_currency',
     'imageUrls': 'image_urls',
+    'lowest30dPriceMinor': 'lowest_30d_price_minor',
   },
 );
 
@@ -52,4 +57,5 @@ Map<String, dynamic> _$VariantToJson(Variant instance) => <String, dynamic>{
   'price_currency': instance.priceCurrency,
   'stock': instance.stock,
   'image_urls': instance.imageUrls,
+  'lowest_30d_price_minor': ?instance.lowest30dPriceMinor,
 };

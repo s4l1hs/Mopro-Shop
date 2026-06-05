@@ -4372,3 +4372,17 @@ Consumes PR #92's `ProductSummary.lowest_30d_price_minor` to render the TR/EU co
 
 ### Step 5 status (post P-030 card display)
 **P-030 cards end-to-end ✅; PDP display deferred (backend-gated).** Remaining Step-5 tail: P-007 (delivery-ETA), P-031 (category-scoped bestseller), **P-032** (price-update lifecycle), **P-030-PDP** (backend-gated display), chi-square flake.
+
+## PR — P-032 price-update lifecycle + P-030-PDP (`feat/price-update-lifecycle`) — closes PARITY_AUDIT P-032 + P-030-PDP (price-update lifecycle + PDP display)
+
+Adds the variant price-**update** path so #92's trigger accrues history, and wires the PDP lowest-30d line. Discovery `docs/internal/p032-price-update-lifecycle.md`.
+
+- **P-032 — RESOLVED (Outcome B, seller-scoped not admin).** Discovery: the established write-auth model is the **seller role** (`RequireSellerRole` → `seller_id` in ctx), the correct owner of a price change. `PUT /seller/variants/{id}/price` (`requireAuth + requireSellerRole`, `requireIdempotencyKey` per §4.4) → `catalog.UpdateVariantPrice`: a **single `UPDATE`** with **ownership enforced in SQL** (`WHERE id=$v AND product_id IN (seller's products)` → 0 rows ⇒ `ErrVariantNotFound`/404, no cross-seller leak), validating `price > 0` / `original >= price`. The #92 `variants_price_history_trg` records history automatically — no manual `variant_price_history` writes. Order/ledger-safe: price snapshots at order time, so updates affect future orders only. (No new migration; no new auth role.)
+- **P-030-PDP — RESOLVED (Outcome A, per-variant).** Discovery corrected the prompt's "`Product.lowest_30d`": the PDP shows a **specific selected variant**, so a product-level MIN would mis-display. Added **per-variant** `lowest_30d` to `loadVariants` + `Variant` + the spec `Variant` schema (rides the existing embedded-Variant serialization + the generated client); `PdpPriceBlock` renders the pre-built slot when `lowest_30d < price`. **P-030 is now end-to-end** (cards #93 + PDP + the lifecycle that lets prices move).
+- **Go interface-fake blast radius:** the new `Service`/`Repository` methods needed stubs in 4 Go fakes (cart/order/core-svc/catalog) — the Go analog of the Dart fake lesson.
+- **Display nuance (documented):** the PDP buy-box still lacks a strikethrough (the `Variant` model has no `original_price`), so the PDP gates on `lowest_30d < price` vs the card's `hasDiscount && lowest_30d < price`. Both dormant today (lowest == price). Small follow-up: add `original_price` to the variant for PDP discount parity.
+- **Tests:** 4 lifecycle/PDP integration subtests (owner update + trigger history; non-owner 404 + unchanged; invalid price; per-variant lowest_30d via GetByID), `-race`; 3 PdpPriceBlock widget tests. `make test-integration-catalog` green; `go build`/`go vet ./... ` clean; `flutter analyze` clean.
+- **Not a compliance sign-off** — whether `original_price` is substantiated by history remains a legal/policy call. Convention 8 in `financial-core.md` extended with the price-update discipline.
+
+### Step 5 status (post P-032 + P-030-PDP)
+**P-030 end-to-end ✅ · P-032 ✅.** Remaining Step-5 tail: P-007 (delivery-ETA), P-031 (category-scoped bestseller), chi-square flake. (Minor: PDP strikethrough for full card parity.)

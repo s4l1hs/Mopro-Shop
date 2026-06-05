@@ -42,6 +42,10 @@ func (m *mockCatalogSvc) CreateProduct(_ context.Context, _ catalog.CreateProduc
 func (m *mockCatalogSvc) AddVariant(_ context.Context, _ int64, _ catalog.AddVariantRequest) (catalog.Variant, error) {
 	return catalog.Variant{}, nil
 }
+
+func (m *mockCatalogSvc) UpdateVariantPrice(_ context.Context, _ int64, _ catalog.UpdateVariantPriceRequest) error {
+	return nil
+}
 func (m *mockCatalogSvc) UpdateTranslation(_ context.Context, _ int64, _, _, _ string) error {
 	return nil
 }

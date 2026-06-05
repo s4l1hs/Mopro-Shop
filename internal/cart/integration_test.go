@@ -50,6 +50,10 @@ func (alwaysValidCatalog) CreateProduct(_ context.Context, _ catalog.CreateProdu
 func (alwaysValidCatalog) AddVariant(_ context.Context, _ int64, _ catalog.AddVariantRequest) (catalog.Variant, error) {
 	return catalog.Variant{}, nil
 }
+
+func (alwaysValidCatalog) UpdateVariantPrice(_ context.Context, _ int64, _ catalog.UpdateVariantPriceRequest) error {
+	return nil
+}
 func (alwaysValidCatalog) UpdateTranslation(_ context.Context, _ int64, _, _, _ string) error {
 	return nil
 }

@@ -62,7 +62,11 @@ class PdpPriceBlock extends StatelessWidget {
             color: cs.primary,
           ),
         ),
-        if (lowestIn30DaysMinor != null) ...[
+        // P-030: show the lowest-30-day price only when the current price is NOT
+        // the 30-day low (lowest < price) — the consumer-protection signal. Today
+        // lowest == price for every variant (no price-update lifecycle yet), so it
+        // stays dark until a seller changes a price (P-032).
+        if (lowestIn30DaysMinor != null && lowestIn30DaysMinor! < priceMinor) ...[
           const SizedBox(height: 4),
           Text(
             'product.lowest_30d'.tr(

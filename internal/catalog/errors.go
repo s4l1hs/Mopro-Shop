@@ -26,4 +26,12 @@ var (
 	// treat it as "toggle off" rather than an error. Mirrors the cashback layer's
 	// sentinel-error convention. Do NOT error-log this.
 	ErrAlreadyVoted = errors.New("catalog: helpful vote already exists for this review/user")
+
+	// ErrInvalidPrice is returned by UpdateVariantPrice when price_minor <= 0, or
+	// original_price_minor is set but <= 0 or below price_minor (P-032).
+	ErrInvalidPrice = errors.New("catalog: invalid price (price must be > 0; original must be >= price)")
+
+	// ErrVariantNotFound is returned by UpdateVariantPrice when the variant does
+	// not exist OR is not owned by the requesting seller (no existence leak).
+	ErrVariantNotFound = errors.New("catalog: variant not found")
 )

@@ -90,6 +90,27 @@ func (s *catalogService) UpdateTranslation(ctx context.Context, productID int64,
 	})
 }
 
+// UpdateVariantPrice validates the new price and applies it to a variant the
+// seller owns (P-032). Ownership + the not-found/not-owned mapping happen in the
+// repository (updated=false). The #92 trigger records history automatically.
+func (s *catalogService) UpdateVariantPrice(ctx context.Context, sellerID int64, in UpdateVariantPriceRequest) error {
+	if in.PriceMinor <= 0 {
+		return ErrInvalidPrice
+	}
+	if in.OriginalPriceMinor != nil &&
+		(*in.OriginalPriceMinor <= 0 || *in.OriginalPriceMinor < in.PriceMinor) {
+		return ErrInvalidPrice
+	}
+	updated, err := s.repo.UpdateVariantPrice(ctx, sellerID, in.VariantID, in.PriceMinor, in.OriginalPriceMinor)
+	if err != nil {
+		return err
+	}
+	if !updated {
+		return ErrVariantNotFound
+	}
+	return nil
+}
+
 func (s *catalogService) GetByID(ctx context.Context, id int64) (Product, []Variant, []ProductTranslation, error) {
 	return s.repo.GetByID(ctx, id)
 }

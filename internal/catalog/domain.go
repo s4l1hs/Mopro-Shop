@@ -66,6 +66,11 @@ type Variant struct {
 	PriceCurrency string   `json:"price_currency"`
 	Stock         int      `json:"stock"`
 	ImageKeys     []string `json:"image_keys"`
+	// Lowest30dPriceMinor is MIN(price) for THIS variant over the last 30 days
+	// (P-030, per-variant so the PDP — which shows a specific variant — is correct,
+	// unlike the product-level value on ProductSummary). Nil when no in-window
+	// history; equals PriceMinor until prices change (see p030/p032 docs).
+	Lowest30dPriceMinor *int64 `json:"lowest_30d_price_minor,omitempty"`
 }
 
 // ProductTranslation holds locale-specific title and description.
@@ -172,6 +177,15 @@ type AddVariantRequest struct {
 	PriceCurrency string   `json:"price_currency"` // left empty to fall back to service defaultCurrency
 	Stock         int      `json:"stock"`
 	ImageKeys     []string `json:"image_keys"`
+}
+
+// UpdateVariantPriceRequest is the body for the seller price-update endpoint
+// (P-032). VariantID comes from the URL path (json:"-"), not the body. Omitting
+// original_price_minor clears any strikethrough (PUT replaces the price state).
+type UpdateVariantPriceRequest struct {
+	VariantID          int64  `json:"-"`
+	PriceMinor         int64  `json:"price_minor"`
+	OriginalPriceMinor *int64 `json:"original_price_minor,omitempty"`
 }
 
 // HomeRailRow is a named product rail for server-driven home composition.

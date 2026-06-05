@@ -126,11 +126,20 @@ correlated subquery on the product summary (no batch method; mirrors `favorites_
 **Gating:** integration tests (`internal/catalog/price_history_integration_test.go`) + migration-safety
 (`scripts/lint-migrations.sh`). Triggers are intentionally outside `lint-discipline` (it observes Go,
 not DDL); the convention is documented here instead.
-**Limits:** today `lowest_30d == current price` for every product (prices are immutable
-post-creation — the price-update lifecycle is **P-032**), and the static `variants.original_price_minor`
-strikethrough is **not** substantiated by history (frontend display + legal review pending). This is the
-technical foundation, **not** a compliance sign-off.
-**Precedent:** P-030 (`feat/price-history`, migration 0083); `docs/internal/p030-price-history-architecture.md`.
+**Price-update path (P-032):** a variant price changes via a **single `UPDATE` on
+`catalog_schema.variants`** — never a direct write to `variant_price_history` (the trigger owns history;
+writing it directly would desync it from the live price). The seller endpoint
+(`PUT /seller/variants/{id}/price`) is `requireAuth + requireSellerRole`-gated, **enforces ownership in
+SQL** (`WHERE id=$v AND product_id IN (seller's products)` → 0 rows ⇒ 404, no cross-seller leak),
+requires an Idempotency-Key (§4.4; the `PUT` is naturally idempotent + the trigger's `IS DISTINCT FROM`
+dedupes), and validates `price > 0` / `original >= price`. Order/ledger safe: price feeds payout +
+cashback **at order time via snapshot**, so an update only affects future orders.
+**Limits:** prices are now mutable, but until a seller actually changes one, `lowest_30d == current` so
+the compliance line stays dormant. Whether `original_price_minor` is *substantiated* by history (the
+deeper Omnibus question) is still a legal/policy call — this is the technical foundation, **not** a
+compliance sign-off.
+**Precedent:** P-030 (`feat/price-history`, migration 0083); P-032 (`feat/price-update-lifecycle`);
+`docs/internal/p030-price-history-architecture.md`, `docs/internal/p032-price-update-lifecycle.md`.
 
 ## Gating summary
 

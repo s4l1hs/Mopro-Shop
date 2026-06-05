@@ -33,6 +33,8 @@ class Variant {
     required  this.stock,
 
     required  this.imageUrls,
+
+     this.lowest30dPriceMinor,
   });
 
   @JsonKey(
@@ -134,6 +136,19 @@ class Variant {
 
 
 
+      /// Lowest price (minor units) applied to THIS variant in the last 30 days (TR 6502 / EU Omnibus, P-030). Per-variant so the PDP — which shows a specific selected variant — is accurate. Omitted when no in-window history; equals price_minor until the price changes (P-032). 
+  @JsonKey(
+    
+    name: r'lowest_30d_price_minor',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final int? lowest30dPriceMinor;
+
+
+
 
 
     @override
@@ -145,7 +160,8 @@ class Variant {
       other.priceMinor == priceMinor &&
       other.priceCurrency == priceCurrency &&
       other.stock == stock &&
-      other.imageUrls == imageUrls;
+      other.imageUrls == imageUrls &&
+      other.lowest30dPriceMinor == lowest30dPriceMinor;
 
     @override
     int get hashCode =>
@@ -156,7 +172,8 @@ class Variant {
         priceMinor.hashCode +
         priceCurrency.hashCode +
         stock.hashCode +
-        imageUrls.hashCode;
+        imageUrls.hashCode +
+        lowest30dPriceMinor.hashCode;
 
   factory Variant.fromJson(Map<String, dynamic> json) => _$VariantFromJson(json);
 

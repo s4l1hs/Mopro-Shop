@@ -15,6 +15,10 @@ import (
 type Service interface {
 	CreateProduct(ctx context.Context, in CreateProductRequest) (Product, error)
 	AddVariant(ctx context.Context, productID int64, in AddVariantRequest) (Variant, error)
+	// UpdateVariantPrice updates the price of a variant the seller owns (P-032).
+	// Returns ErrVariantNotFound when the variant is missing or not owned, and
+	// ErrInvalidPrice on a bad price. The #92 trigger records history.
+	UpdateVariantPrice(ctx context.Context, sellerID int64, in UpdateVariantPriceRequest) error
 	UpdateTranslation(ctx context.Context, productID int64, locale, title, description string) error
 	GetByID(ctx context.Context, id int64) (Product, []Variant, []ProductTranslation, error)
 	Search(ctx context.Context, query, locale, market string) ([]Product, error)
@@ -74,6 +78,9 @@ type Service interface {
 type Repository interface {
 	InsertProduct(ctx context.Context, p Product) (Product, error)
 	InsertVariant(ctx context.Context, v Variant) (Variant, error)
+	// UpdateVariantPrice sets a variant's price (+ optional strikethrough original)
+	// when it belongs to sellerID; returns whether a row was updated (P-032).
+	UpdateVariantPrice(ctx context.Context, sellerID, variantID, priceMinor int64, originalPriceMinor *int64) (bool, error)
 	UpsertTranslation(ctx context.Context, t ProductTranslation) error
 	GetByID(ctx context.Context, id int64) (Product, []Variant, []ProductTranslation, error)
 	SearchProducts(ctx context.Context, query, locale, market string) ([]Product, error)

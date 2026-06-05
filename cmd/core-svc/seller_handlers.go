@@ -232,6 +232,44 @@ func handleSellerApproveReturn(reader catalog.SellerStorefrontReader, returnSvc 
 	}
 }
 
+// handleUpdateVariantPrice: PUT /seller/variants/{id}/price — a seller updates the
+// price (+ optional strikethrough original) of a variant they own (P-032). The #92
+// variants_price_history_trg records the change in variant_price_history. Ownership
+// is enforced in the repository (ErrVariantNotFound => 404, no existence leak).
+func handleUpdateVariantPrice(svc catalog.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !requireIdempotencyKey(w, r) {
+			return
+		}
+		sellerID := middleware.SellerIDFromCtx(r.Context())
+		variantID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil {
+			jsonError(w, "invalid variant id", http.StatusBadRequest)
+			return
+		}
+		var req catalog.UpdateVariantPriceRequest
+		if err := decodeJSON(w, r, &req); err != nil {
+			return
+		}
+		req.VariantID = variantID
+		switch err := svc.UpdateVariantPrice(r.Context(), sellerID, req); {
+		case err == nil:
+			jsonOK(w, http.StatusOK, map[string]any{
+				"variant_id":           variantID,
+				"price_minor":          req.PriceMinor,
+				"original_price_minor": req.OriginalPriceMinor,
+			})
+		case errors.Is(err, catalog.ErrInvalidPrice):
+			jsonError(w, "invalid price (price must be > 0; original >= price)", http.StatusUnprocessableEntity)
+		case errors.Is(err, catalog.ErrVariantNotFound):
+			jsonError(w, "variant not found", http.StatusNotFound) // do not leak other sellers' variants
+		default:
+			slog.Error("seller: UpdateVariantPrice", "variant_id", variantID, "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+		}
+	}
+}
+
 // handleSellerRejectReturn: POST /seller/returns/{id}/reject.
 func handleSellerRejectReturn(reader catalog.SellerStorefrontReader, returnSvc order.ReturnService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

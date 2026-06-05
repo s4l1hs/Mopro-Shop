@@ -162,6 +162,14 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
    until P-032. Rail mapper carries the field. **PDP deferred (backend-blocked):** `PdpPriceBlock` has the slot but
    the PDP uses the full `Product` (GetByID), which lacks `lowest_30d`; wiring needs a backend change → folded with
    P-032. 0 golden flips (the line never renders on default fixtures). Cards end-to-end; PDP awaits backend.
+10. **P5-9** `feat/price-update-lifecycle` — ✅ **P-032 + P-030-PDP** (`docs/internal/p032-price-update-lifecycle.md`).
+    **P-032:** discovery corrected "admin" → **seller-scoped** (the existing `RequireSellerRole` model owns price
+    changes); `PUT /seller/variants/{id}/price` (auth + seller-role + idempotency §4.4) → `UpdateVariantPrice`, a
+    single `UPDATE` with **ownership enforced in SQL** (0 rows ⇒ 404), validating `price>0`/`original>=price`; the
+    #92 trigger logs history automatically. **P-030-PDP:** added **per-variant** `lowest_30d` (product-level MIN
+    would mis-display a multi-variant PDP) to `loadVariants`/`Variant`/spec; `PdpPriceBlock` renders the slot when
+    `lowest_30d < price`. **P-030 is now end-to-end** (cards + PDP + lifecycle). Minor follow-up: PDP strikethrough
+    (`original_price` on the variant) for full card parity. Not a compliance sign-off (legal review pending).
 
 ✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
 CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);
@@ -189,6 +197,6 @@ closed** (`chore/step5-low-batch`: P-015 FIX, P-011 CORRECTED, P-004/009/012/013
 REMOVED). ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + P-009 ✅ RESOLVED**
 (`feat/wire-card-badges`: favorites-count overlay + free-shipping/discount card badges, end-to-end).
 **The pure-UI Trendyol-parity work is complete.** Remaining Step-5 tail (all backend/architectural): P-007
-(delivery-ETA), **P-030 backend + card display ✅ done** (`feat/price-history`, `feat/lowest-30d-display`) —
-**P-030-PDP** (backend-gated) + **P-032** (price-update lifecycle) remain; P-031 (category-scoped bestseller);
-chi-square flake.
+(delivery-ETA), P-031 (category-scoped bestseller), chi-square flake. **P-030 end-to-end ✅** (cards + PDP +
+the P-032 price-update lifecycle, `feat/price-update-lifecycle`); **P-032 ✅**. Minor follow-up: PDP strikethrough
+(`original_price` on the variant) for full card parity.
