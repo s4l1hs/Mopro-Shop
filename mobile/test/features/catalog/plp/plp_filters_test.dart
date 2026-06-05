@@ -45,6 +45,7 @@ void main() {
 
     test('PlpSort.fromToken falls back to recommended on unknown', () {
       expect(PlpSort.fromToken('price_asc'), PlpSort.priceAsc);
+      expect(PlpSort.fromToken('bestseller'), PlpSort.bestseller); // P-029
       expect(PlpSort.fromToken('💩'), PlpSort.recommended);
       expect(PlpSort.fromToken(null), PlpSort.recommended);
     });
@@ -114,6 +115,13 @@ void main() {
 
     test('ignores unknown params', () {
       expect(codec.decode({'wat': '1', 'sort': 'newest'}).sort, PlpSort.newest);
+    });
+
+    test('round-trips bestseller (P-029 un-hide)', () {
+      const f = PlpFilters(sort: PlpSort.bestseller);
+      expect(codec.encode(f), {'sort': 'bestseller'});
+      expect(codec.decode(codec.encode(f)).sort, PlpSort.bestseller);
+      expect(codec.decode({'sort': 'bestseller'}).sort, PlpSort.bestseller);
     });
   });
 }

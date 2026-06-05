@@ -140,8 +140,13 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
    handler reads the global popularity ranking + passes ordered IDs to the repo (`ProductFilter.PopularIDs`),
    which orders by `array_position(...) NULLS LAST` — **no cross-schema JOIN, no schema change, no sync infra**.
    Spec re-adds `bestseller`; empty popularity → recommended. Global scope only → category-scope carved → **P-031**
-   (MED, analytics: populate `category:{id}` scopes + a scoped `PopularProductIDs`). Frontend un-hide is a small
-   follow-up.
+   (MED, analytics: populate `category:{id}` scopes + a scoped `PopularProductIDs`).
+7. **P5-6** `feat/bestseller-unhide` — ✅ **P-029 frontend un-hide** (`docs/internal/p029-frontend-unhide.md`).
+   Removed the two `.where(... != bestseller)` filters PR #86 added (mobile `SortSheet` + desktop `PopupMenuButton`);
+   bestseller now renders in every sort selector and `sort=bestseller` flows to the backend as a raw string (no
+   dependency on #90's client regen). i18n already correct + matches the home rail (`"Çok satanlar"`, kept); URL
+   codec already round-trips; **zero golden flips** (the option only lives in the tapped overlay). **P-029 closed
+   end-to-end.**
 
 ✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
 CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);
@@ -160,10 +165,11 @@ evidence but PROBABLE *Trendyol* comparison — each PROBABLE finding gets re-co
 phase (#59→#60 pattern).
 
 **Open tail (unchanged, non-blocking):** idempotency-surface analyzer (T-007 split); cron-overlap sim (T-008);
-PR #74 chi-square flake; A-004/A-007 PROBABLE; A-005 PARK. **P-029 ✅ RESOLVED** (`feat/bestseller-sort`,
-Pattern B — analytics is in-process, so the catalog handler reads `PopularProductIDs` + orders via
-`array_position`; no cross-schema JOIN, no schema change, no sync infra; global scope, category-scope carved →
-**P-031**). P-026 ✅ RESOLVED (frontend wired, `feat/wire-frontend-filters`). **LOW tail + HeroCarousel
+PR #74 chi-square flake; A-004/A-007 PROBABLE; A-005 PARK. **P-029 ✅ RESOLVED end-to-end** (backend
+`feat/bestseller-sort`, Pattern B — analytics is in-process, so the catalog handler reads `PopularProductIDs` +
+orders via `array_position`; no cross-schema JOIN, no schema change, no sync infra; global scope, category-scope
+carved → **P-031**; frontend un-hide `feat/bestseller-unhide`). P-026 ✅ RESOLVED (frontend wired,
+`feat/wire-frontend-filters`). **LOW tail + HeroCarousel
 closed** (`chore/step5-low-batch`: P-015 FIX, P-011 CORRECTED, P-004/009/012/013 NOT-ACTIONABLE, HeroCarousel
 REMOVED). ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + P-009 ✅ RESOLVED**
 (`feat/wire-card-badges`: favorites-count overlay + free-shipping/discount card badges, end-to-end).

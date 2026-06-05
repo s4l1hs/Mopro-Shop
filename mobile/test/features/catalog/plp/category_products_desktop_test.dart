@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mopro/api/client.dart';
 import 'package:mopro/design/theme.dart';
 import 'package:mopro/design/theme_controller.dart';
+import 'package:mopro/features/catalog/plp/plp_filters.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
 import 'package:mopro/features/catalog/plp/widgets/filter_panel.dart';
 import 'package:mopro/features/catalog/plp/widgets/plp_filter_chips.dart';
@@ -149,5 +150,23 @@ void main() {
 
     final f = _container(tester).read(plpFiltersProvider(plpKeyForCategory(5)));
     expect(f.isEmpty, isTrue);
+  });
+
+  testWidgets('sort dropdown shows + selects bestseller (P-029 un-hide)',
+      (tester) async {
+    await _pump(tester, const Size(1440, 1000));
+
+    // Closed dropdown: only the current (recommended) label is in the tree.
+    expect(find.text('catalog.sort_bestseller'), findsNothing);
+
+    await tester.tap(find.byType(PopupMenuButton<PlpSort>));
+    await tester.pumpAndSettle();
+    // Open: the full enum renders, including the previously-hidden bestseller.
+    expect(find.text('catalog.sort_bestseller'), findsOneWidget);
+
+    await tester.tap(find.text('catalog.sort_bestseller'));
+    await tester.pumpAndSettle();
+    final f = _container(tester).read(plpFiltersProvider(plpKeyForCategory(5)));
+    expect(f.sort, PlpSort.bestseller);
   });
 }
