@@ -2422,6 +2422,17 @@ components:
           description: |
             Number of users who favorited this product — social proof by the
             heart on the card / PDP (P-004). Zero when none.
+        lowest_30d_price_minor:
+          type: integer
+          format: int64
+          nullable: true
+          description: |
+            Lowest price (minor units) applied in the last 30 days, for compliant
+            display of price reductions (TR 6502 / EU Omnibus 2019/2161, P-030).
+            Omitted when no in-window price history. The frontend shows the
+            "30 günün en düşük fiyatı" line only when this is below price_minor —
+            today it equals price_minor for every product (prices are immutable
+            post-creation, so history has not yet diverged from the baseline).
         cashback_preview:
           $ref: '#/components/schemas/CashbackPreview'
 

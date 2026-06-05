@@ -147,6 +147,15 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
    dependency on #90's client regen). i18n already correct + matches the home rail (`"Çok satanlar"`, kept); URL
    codec already round-trips; **zero golden flips** (the option only lives in the tapped overlay). **P-029 closed
    end-to-end.**
+8. **P5-7** `feat/price-history` — ✅ **P-030 BACKEND-RESOLVED** (`docs/internal/p030-price-history-architecture.md`,
+   Mechanism B). Discovery corrected the design: price lives on **variants** (not products), there is **no
+   price-update path** (variants immutable post-creation), and the dominant write is **SQL seeds** — so
+   application-level tracking (Mechanism A) was rejected for an `AFTER INSERT OR UPDATE` **trigger** on `variants`
+   feeding `variant_price_history` (backfilled on migration 0083). `ProductSummary.lowest_30d_price_minor` is an
+   inline 30-day-`MIN` correlated subquery (mirrors `favorites_count`); spec + clients regen; convention 8 added to
+   `financial-core.md`. **Foundation only — not a compliance sign-off:** `lowest_30d == current` for every product
+   (no price-update lifecycle → **P-032**); the static `original_price_minor` strikethrough stays unsubstantiated
+   (frontend display + legal review pending).
 
 ✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
 CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);
@@ -174,5 +183,5 @@ closed** (`chore/step5-low-batch`: P-015 FIX, P-011 CORRECTED, P-004/009/012/013
 REMOVED). ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + P-009 ✅ RESOLVED**
 (`feat/wire-card-badges`: favorites-count overlay + free-shipping/discount card badges, end-to-end).
 **The pure-UI Trendyol-parity work is complete.** Remaining Step-5 tail (all backend/architectural): P-007
-(delivery-ETA), **P-030** (price-history / lowest_30d — HIGH compliance), P-031 (category-scoped bestseller),
-chi-square flake.
+(delivery-ETA), **P-030 backend ✅ done** (`feat/price-history`) — frontend display + **P-032** (price-update
+lifecycle) remain; P-031 (category-scoped bestseller); chi-square flake.

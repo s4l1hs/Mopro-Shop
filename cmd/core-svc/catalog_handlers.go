@@ -323,6 +323,12 @@ type productSummaryJSON struct {
 	FreeShipping   bool `json:"free_shipping"`
 	FavoritesCount int  `json:"favorites_count"`
 
+	// Lowest30dPriceMinor is the lowest price in the last 30 days (P-030, TR 6502 /
+	// EU Omnibus). The frontend shows "30 günün en düşük fiyatı" only when it is
+	// below PriceMinor — today it equals PriceMinor for every product (prices are
+	// immutable post-creation). Omitted when null.
+	Lowest30dPriceMinor *int64 `json:"lowest_30d_price_minor,omitempty"`
+
 	CashbackPreview cashbackPreviewJSON `json:"cashback_preview"`
 }
 
@@ -340,22 +346,23 @@ func buildProductSummaryJSON(r catalog.ProductSummaryRow, cashbackCurrency strin
 		}
 	}
 	return productSummaryJSON{
-		ID:                 r.ID,
-		SellerID:           r.SellerID,
-		CategoryID:         r.CategoryID,
-		Brand:              r.Brand,
-		Status:             r.Status,
-		Title:              r.Title,
-		PriceMinor:         r.PriceMinor,
-		PriceCurrency:      r.PriceCurrency,
-		CoverImageURL:      mediaurl.CDNUrl(r.CoverImageKey),
-		CommissionPctBps:   r.CommissionPctBps,
-		OriginalPriceMinor: r.OriginalPriceMinor,
-		DiscountPct:        discountPct,
-		RatingAvg:          r.RatingAvg,
-		RatingCount:        r.RatingCount,
-		FreeShipping:       r.FreeShipping,
-		FavoritesCount:     r.FavoritesCount,
+		ID:                  r.ID,
+		SellerID:            r.SellerID,
+		CategoryID:          r.CategoryID,
+		Brand:               r.Brand,
+		Status:              r.Status,
+		Title:               r.Title,
+		PriceMinor:          r.PriceMinor,
+		PriceCurrency:       r.PriceCurrency,
+		CoverImageURL:       mediaurl.CDNUrl(r.CoverImageKey),
+		CommissionPctBps:    r.CommissionPctBps,
+		OriginalPriceMinor:  r.OriginalPriceMinor,
+		DiscountPct:         discountPct,
+		RatingAvg:           r.RatingAvg,
+		RatingCount:         r.RatingCount,
+		FreeShipping:        r.FreeShipping,
+		FavoritesCount:      r.FavoritesCount,
+		Lowest30dPriceMinor: r.Lowest30dPriceMinor,
 		CashbackPreview: cashbackPreviewJSON{
 			MonthlyAmountMinor: monthlyMinor,
 			Currency:           cashbackCurrency,

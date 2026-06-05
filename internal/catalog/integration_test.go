@@ -193,6 +193,40 @@ CREATE TABLE catalog_schema.user_favorites (
     PRIMARY KEY (user_id, product_id)
 );
 CREATE INDEX user_fav_product_idx ON catalog_schema.user_favorites(product_id);
+
+-- variant_price_history + Mechanism B trigger (mirrors migration 0083) — backs the
+-- ProductSummary lowest_30d_price_minor subquery (P-030).
+CREATE TABLE catalog_schema.variant_price_history (
+    id                   BIGSERIAL   PRIMARY KEY,
+    variant_id           BIGINT      NOT NULL,
+    product_id           BIGINT      NOT NULL,
+    price_minor          BIGINT      NOT NULL CHECK (price_minor >= 0),
+    original_price_minor BIGINT,
+    currency             TEXT        NOT NULL DEFAULT 'TRY',
+    source               TEXT        NOT NULL DEFAULT 'trigger',
+    effective_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX vph_product_effective_idx
+    ON catalog_schema.variant_price_history(product_id, effective_at DESC);
+
+CREATE OR REPLACE FUNCTION catalog_schema.track_variant_price() RETURNS trigger AS $$
+BEGIN
+    IF (TG_OP = 'INSERT')
+       OR (NEW.price_minor          IS DISTINCT FROM OLD.price_minor)
+       OR (NEW.original_price_minor IS DISTINCT FROM OLD.original_price_minor) THEN
+        INSERT INTO catalog_schema.variant_price_history
+            (variant_id, product_id, price_minor, original_price_minor, currency, source)
+        VALUES (NEW.id, NEW.product_id, NEW.price_minor, NEW.original_price_minor, NEW.price_currency,
+                CASE WHEN TG_OP = 'INSERT' THEN 'create' ELSE 'update' END);
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER variants_price_history_trg
+    AFTER INSERT OR UPDATE OF price_minor, original_price_minor
+    ON catalog_schema.variants
+    FOR EACH ROW EXECUTE FUNCTION catalog_schema.track_variant_price();
 `
 	_, err := pool.Exec(ctx, ddl)
 	return err

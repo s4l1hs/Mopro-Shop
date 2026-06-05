@@ -29,8 +29,11 @@ HeroCarousel REMOVED · P-029 opened. ProductSummary enriched (`feat/productsumm
 ✅ RESOLVED** (`feat/wire-card-badges`): the card now renders the favorites-count overlay + free-shipping/discount
 badges end-to-end. `discount_pct` emitted; `lowest_30d_price` → **P-030** (HIGH, compliance). **P-029 bestseller
 ✅ RESOLVED end-to-end** (backend `feat/bestseller-sort`, Pattern B in-process global scope; frontend un-hide
-`feat/bestseller-unhide`; category-scope → **P-031**). **The pure-UI parity work is done.** Remaining (all backend/architectural): P-007 (delivery-ETA), P-030 (price-history),
-P-031 (category bestseller), chi-square flake.**
+`feat/bestseller-unhide`; category-scope → **P-031**). **P-030 price-history ✅ BACKEND-RESOLVED**
+(`feat/price-history`, Mechanism B trigger + `variant_price_history` + `lowest_30d_price_minor`; price-update
+lifecycle → **P-032**; frontend display pending). **The pure-UI parity work is done.** Remaining (all
+backend/architectural): P-007 (delivery-ETA), P-031 (category bestseller), P-032 (price-update lifecycle),
+P-030-frontend (display), chi-square flake.**
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
@@ -158,9 +161,15 @@ Evidence: `analytics.Repository.RebuildPopular` (`api.go:98`) computes only the 
 Recommendation: extend `RebuildPopular` to populate `category:{id}` scopes + add a scoped `PopularProductIDs(scope, limit)`; the catalog handler then passes the category scope so category-PLP bestseller is category-specific. Out of P-029's scope (analytics computation change).
 
 ### P-030 — `lowest_30d_price` needs price-history infrastructure (carved from ProductSummary enrichment)
-**Status: OPEN | Severity: HIGH | Confidence: CONFIRMED | Type: backend / compliance**
+**Status: ✅ BACKEND-RESOLVED (Mechanism B — DB trigger) | Severity: HIGH | Confidence: CONFIRMED | Type: backend / compliance**
 Evidence (`feat/productsummary-enrich` discovery): no `price_history` / price-snapshot table exists in `catalog_schema` (or anywhere). `lowest_30d_price` (the "son 30 günün en düşük fiyatı" copy) is a **TR consumer-protection + EU** requirement, not just parity. It needs a `price_history` table + a snapshot mechanism (on-price-change hook OR a periodic snapshot job) + a cron-placement decision (which binary owns the snapshot) — >500 LOC + new infra (out of the enrichment PR's scope + its anti-goals).
 Recommendation: dedicated PR — `catalog_schema.price_history` + snapshot mechanism + a 30-day-min query on `ProductSummary`. Compliance-serious → prioritize over pure-parity items.
+**Resolution (`feat/price-history`, migration 0083):** discovery corrected the design — **price lives on `variants`** (not `products`), there is **no price-update path** (variants are immutable post-creation), and the dominant write is **SQL seeds**. So application-level tracking (Mechanism A) was rejected for **Mechanism B**: an `AFTER INSERT OR UPDATE` trigger on `catalog_schema.variants` feeds `variant_price_history` (backfilled on migration), and `ProductSummary.lowest_30d_price_minor` reads `MIN(price_minor) WHERE effective_at >= now()-30d` as an inline correlated subquery (mirrors `favorites_count`). Spec + clients regenerated. **Backend foundation only — NOT a compliance sign-off:** today `lowest_30d == current price` for every product (no price-update lifecycle yet → **P-032**), and the static `original_price_minor` strikethrough is still unsubstantiated by history (frontend display + legal review pending). Evidence: `docs/internal/p030-price-history-architecture.md`; convention 8 in `docs/internal/financial-core.md`. **Frontend follow-up** renders the "30 günün en düşük fiyatı" line (only when `lowest_30d < price`).
+
+### P-032 — no price-update lifecycle (variants immutable; history can't yet diverge) (carved from P-030)
+**Status: OPEN | Severity: MED | Confidence: CONFIRMED | Type: backend / compliance**
+Evidence: catalog has no variant price-**update** path — the only write is `InsertVariant` (create); `original_price_minor` is set only by SQL seeds. So `variant_price_history` (P-030) only ever holds the create/backfill baseline, and `lowest_30d == current price` for every product. The Omnibus 30-day rule becomes meaningful only once prices actually move over time **and** the strikethrough display is driven by tracked history rather than the static `original_price_minor` MSRP.
+Recommendation: introduce a variant price-update path (seller/admin) — the trigger already captures it — and a policy + frontend decision to drive discount display from `lowest_30d_price` (assert a reduction only when `lowest_30d < price`). Legal review of the interpretation.
 
 ### P-009 — Search-result cards likely lack Trendyol merch badges (Kargo Bedava / campaign / "Çok satan")
 **Status: CONTENT/VISUAL | Severity: MED | Confidence: PROBABLE**

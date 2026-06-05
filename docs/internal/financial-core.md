@@ -113,6 +113,25 @@ Financial adapters with a production-startup invariant (e.g. sipay refusing a sa
 not buried in the adapter. The env-read lives once at the binary entry. **Precedent:** A-003 / A4-3
 (sipay `SipayConfig.Environment`, shipping `inProduction`, identity `WithDevOTPBypass`).
 
+### 8. Price-history tracking (TR/EU lowest-30-day)
+**Why:** TR 6502 + EU Omnibus (2019/2161) require that an announced price reduction show the
+lowest price applied in the 30 days before the reduction — compliant display needs a temporal
+record of every price a product was offered at.
+**Rule:** every variant price-set is recorded in `catalog_schema.variant_price_history`. Tracking is
+a **database trigger** (`variants_price_history_trg`, "Mechanism B") — not application code — because
+the dominant write path is SQL seeds and the Go `InsertVariant` does not even set
+`original_price_minor`; a trigger captures seed, app, import, and any future update path uniformly.
+`lowest_30d_price_minor` is read as an inline `MIN(price_minor) … WHERE effective_at >= now()-30d`
+correlated subquery on the product summary (no batch method; mirrors `favorites_count`).
+**Gating:** integration tests (`internal/catalog/price_history_integration_test.go`) + migration-safety
+(`scripts/lint-migrations.sh`). Triggers are intentionally outside `lint-discipline` (it observes Go,
+not DDL); the convention is documented here instead.
+**Limits:** today `lowest_30d == current price` for every product (prices are immutable
+post-creation — the price-update lifecycle is **P-032**), and the static `variants.original_price_minor`
+strikethrough is **not** substantiated by history (frontend display + legal review pending). This is the
+technical foundation, **not** a compliance sign-off.
+**Precedent:** P-030 (`feat/price-history`, migration 0083); `docs/internal/p030-price-history-architecture.md`.
+
 ## Gating summary
 
 | Convention | Perpetual gate | Manual review |
@@ -124,6 +143,7 @@ not buried in the adapter. The env-read lives once at the binary entry. **Preced
 | 5. Outbox | integration tests | yes |
 | 6. Rate-limiter zset member | integration tests | yes |
 | 7. Soft refs | boundary script (imports only) | yes |
+| 8. Price-history tracking | integration tests + migration-safety | yes |
 
 ## Review checklist (PRs touching financial-domain code)
 
@@ -134,6 +154,7 @@ not buried in the adapter. The env-read lives once at the binary entry. **Preced
 - [ ] State change that emits an event writes the event to `outbox` in the same tx.
 - [ ] Any new rate-limiter uses unique zset members (`<ts>:<unique>`).
 - [ ] Cross-service refs use the soft-ref convention (BIGINT, no FK, deref via Service).
+- [ ] Any path that sets a variant price is covered by the price-history trigger (or documents why not).
 
 ## Related
 - `CLAUDE.md` §4 (financial invariants) + §5 (DB/soft-ref rules) — the constitution.

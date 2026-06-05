@@ -53,6 +53,18 @@ ProductSummary _$ProductSummaryFromJson(
         'flash_price_minor',
         (v) => (v as num?)?.toInt(),
       ),
+      freeShipping: $checkedConvert(
+        'free_shipping',
+        (v) => v as bool? ?? false,
+      ),
+      favoritesCount: $checkedConvert(
+        'favorites_count',
+        (v) => (v as num?)?.toInt() ?? 0,
+      ),
+      lowest30dPriceMinor: $checkedConvert(
+        'lowest_30d_price_minor',
+        (v) => (v as num?)?.toInt(),
+      ),
       cashbackPreview: $checkedConvert(
         'cashback_preview',
         (v) => CashbackPreview.fromJson(v as Map<String, dynamic>),
@@ -71,6 +83,9 @@ ProductSummary _$ProductSummaryFromJson(
     'ratingAvg': 'rating_avg',
     'ratingCount': 'rating_count',
     'flashPriceMinor': 'flash_price_minor',
+    'freeShipping': 'free_shipping',
+    'favoritesCount': 'favorites_count',
+    'lowest30dPriceMinor': 'lowest_30d_price_minor',
     'cashbackPreview': 'cashback_preview',
   },
 );
@@ -91,6 +106,9 @@ Map<String, dynamic> _$ProductSummaryToJson(ProductSummary instance) =>
       'rating_avg': ?instance.ratingAvg,
       'rating_count': ?instance.ratingCount,
       'flash_price_minor': ?instance.flashPriceMinor,
+      'free_shipping': ?instance.freeShipping,
+      'favorites_count': ?instance.favoritesCount,
+      'lowest_30d_price_minor': ?instance.lowest30dPriceMinor,
       'cashback_preview': instance.cashbackPreview.toJson(),
     };
 

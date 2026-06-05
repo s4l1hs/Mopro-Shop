@@ -118,6 +118,11 @@ type ProductSummaryRow struct {
 	RatingCount        int
 	FreeShipping       bool // products.free_shipping flag (P-028 column) — P-009 badge
 	FavoritesCount     int  // count of user_favorites rows for this product (P-004)
+	// Lowest30dPriceMinor is MIN(variant price) over the product's price history
+	// in the last 30 days (P-030, TR 6502 / EU Omnibus). Nil when no history rows
+	// in window. Today it equals PriceMinor for every product (prices are immutable
+	// post-creation — see docs/internal/p030-price-history-architecture.md).
+	Lowest30dPriceMinor *int64
 }
 
 // ProductFilter holds the optional filter + sort knobs for product listing and

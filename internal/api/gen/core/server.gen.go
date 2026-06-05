@@ -487,6 +487,14 @@ type ProductSummary struct {
 	FreeShipping *bool `json:"free_shipping,omitempty"`
 	Id           int64 `json:"id"`
 
+	// Lowest30dPriceMinor Lowest price (minor units) applied in the last 30 days, for compliant
+	// display of price reductions (TR 6502 / EU Omnibus 2019/2161, P-030).
+	// Omitted when no in-window price history. The frontend shows the
+	// "30 günün en düşük fiyatı" line only when this is below price_minor —
+	// today it equals price_minor for every product (prices are immutable
+	// post-creation, so history has not yet diverged from the baseline).
+	Lowest30dPriceMinor *int64 `json:"lowest_30d_price_minor"`
+
 	// OriginalPriceMinor MSRP in minor units. When set and greater than price_minor, render
 	// with strikethrough; backend also emits discount_pct.
 	OriginalPriceMinor *int64 `json:"original_price_minor"`
