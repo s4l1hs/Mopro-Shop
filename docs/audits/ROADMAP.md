@@ -156,6 +156,12 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
    `financial-core.md`. **Foundation only — not a compliance sign-off:** `lowest_30d == current` for every product
    (no price-update lifecycle → **P-032**); the static `original_price_minor` strikethrough stays unsubstantiated
    (frontend display + legal review pending).
+9. **P5-8** `feat/lowest-30d-display` — ✅ **P-030 card display** (`docs/internal/p030-frontend-display.md`). The
+   product card renders "Son 30 günün en düşük fiyatı: X" (reused existing `product.lowest_30d` key, no new key)
+   when a reduction is announced and `lowest_30d < price`; suppressed otherwise → stays dark on all current data
+   until P-032. Rail mapper carries the field. **PDP deferred (backend-blocked):** `PdpPriceBlock` has the slot but
+   the PDP uses the full `Product` (GetByID), which lacks `lowest_30d`; wiring needs a backend change → folded with
+   P-032. 0 golden flips (the line never renders on default fixtures). Cards end-to-end; PDP awaits backend.
 
 ✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
 CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);
@@ -183,5 +189,6 @@ closed** (`chore/step5-low-batch`: P-015 FIX, P-011 CORRECTED, P-004/009/012/013
 REMOVED). ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + P-009 ✅ RESOLVED**
 (`feat/wire-card-badges`: favorites-count overlay + free-shipping/discount card badges, end-to-end).
 **The pure-UI Trendyol-parity work is complete.** Remaining Step-5 tail (all backend/architectural): P-007
-(delivery-ETA), **P-030 backend ✅ done** (`feat/price-history`) — frontend display + **P-032** (price-update
-lifecycle) remain; P-031 (category-scoped bestseller); chi-square flake.
+(delivery-ETA), **P-030 backend + card display ✅ done** (`feat/price-history`, `feat/lowest-30d-display`) —
+**P-030-PDP** (backend-gated) + **P-032** (price-update lifecycle) remain; P-031 (category-scoped bestseller);
+chi-square flake.
