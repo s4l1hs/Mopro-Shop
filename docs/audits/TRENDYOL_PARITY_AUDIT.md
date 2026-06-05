@@ -33,9 +33,10 @@ badges end-to-end. `discount_pct` emitted; `lowest_30d_price` → **P-030** (HIG
 (backend `feat/price-history` Mechanism B trigger; card display `feat/lowest-30d-display`; PDP per-variant
 display + **P-032 ✅ price-update lifecycle** `feat/price-update-lifecycle` — seller-scoped
 `PUT /seller/variants/{id}/price`). **P-031 ⏸️ DEFERRED** (category bestseller — blocked by the
-`product_view` event-category gap → **P-033**; global proxy retained). **The pure-UI parity work is
-done.** Remaining (all backend/architectural): P-007 (delivery-ETA), P-033 (event categoryId, unblocks
-P-031), chi-square flake.**
+`product_view` event-category gap → **P-033**; global proxy retained). **P-007 ⏸️ DEFERRED** (PDP
+delivery-ETA — blocked by missing shipping-ETA infra → **P-034**). **The pure-UI parity work is
+done.** Remaining (all backend/architectural, infra-gated): **P-033** (event categoryId → P-031),
+**P-034** (shipping-ETA infra → P-007), chi-square flake.**
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
@@ -215,11 +216,17 @@ Evidence: `pdp/pdp_sticky_cta.dart:11-65` — mobile sticky bottom CTA: selected
 **Verdict:** VERIFIED-COMPLETE for sticky positioning + buy-box structure. The prompt's illustrative "P-007 — buy box lacks sticky positioning" is **factually wrong on this branch** (documented per §2.5).
 
 ### P-007 — PDP buy box lacks a delivery-estimate
-**Status: STRUCTURAL | Severity: MED | Confidence: CONFIRMED (Mopro) / PROBABLE (Trendyol)**
+**Status: ⏸️ DEFERRED (blocked by shipping-ETA infra → P-034) | Severity: MED | Confidence: CONFIRMED (Mopro) / PROBABLE (Trendyol)**
 Evidence: `pdp_sticky_cta.dart` (read) + `pdp_price_block.dart` (read) render price + CTA + discount + lowest-30d, but **no delivery-date / "Yarın kargoda" estimate**. Trendyol prominently shows an estimated-delivery line in/near the buy box (general knowledge; PDP not fetched — the homepage meta did advertise "same-day delivery"). 
 Gap: no delivery-ETA affordance on PDP.
 Severity rationale: delivery ETA is conversion-relevant and a recognizable Trendyol element; MED. PROBABLE on the Trendyol side (not fetched).
 Recommendation: `P5-pdp-delivery-eta` — add a delivery-estimate row. **Backend dependency:** ETA must come from shipping/catalog API; this is partly out of UI scope (the slot can land with a placeholder, data SOON).
+**Discovery (`feat/delivery-eta`, Outcome C):** no pre-purchase ETA infrastructure exists. `internal/shipping/` is a carrier-adapter layer for *real* shipments; `CalculateRate.EstimatedDays` is a **live carrier call** needing a full `ShipmentInput` (origin/dest/package) — checkout-time, not PDP. The foundational inputs are absent: **no seller dispatch origin** (no warehouse/city on the seller model — onboarding territory) and **no zone/transit-days model**; only the user destination exists (`identity.Address` city/district; guests have none), and there's no PDP delivery slot. A hardcoded static line is rejected (§9 SLA-promise + misleading, worse than nothing). **Decision: discovery-only — PDP unchanged.** Filed **P-034**. Evidence: `docs/internal/p007-delivery-eta.md`.
+
+### P-034 — no pre-purchase shipping-ETA infrastructure (blocks PDP delivery-ETA) (carved from P-007)
+**Status: OPEN | Severity: MED | Confidence: CONFIRMED | Type: backend (shipping + seller)**
+Evidence: a cheap delivery estimate = `transit_days(originZone, destZone)`, but there is **no seller dispatch origin** (absent on the seller model / `0078_sellers`) and **no zone/transit-days lookup** anywhere; `CalculateRate` is a live per-call carrier API needing a full `ShipmentInput`, unfit for PDP. User destination (`identity.Address` city/district) exists; guests don't. No PDP delivery slot.
+Recommendation: (1) seller dispatch origin (city/zone) + onboarding capture; (2) a seeded `shipping_zones`/transit-days lookup (origin×dest → business-days); (3) a cheap `shipping.EstimateETA` (no carrier call; guest → conservative labelled range); (4) surface on `Product`/`Variant` + a `PdpDeliveryInfo` widget + i18n. Unblocks **P-007** (and a checkout delivery estimate, where `CalculateRate` fits).
 
 ### P-008b — PDP discount + lowest-30d UI present but data-dark (backend, OUT OF SCOPE)
 **Status: FUNCTIONAL | Severity: — | Confidence: CONFIRMED**

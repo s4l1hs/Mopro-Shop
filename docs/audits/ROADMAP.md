@@ -176,6 +176,13 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
     **§5-forbidden cross-schema JOIN** to `catalog_schema.products` (or out-of-scope event enrichment). The codebase
     already documents the deferral. **Discovery-only:** global proxy retained; filed **P-033** (carry `categoryId` on
     `product_view`) as the enabler — once it lands P-031 is a small same-schema follow-up.
+12. **P5-11** `feat/delivery-eta` — ⏸️ **P-007 DEFERRED (Outcome C)** (`docs/internal/p007-delivery-eta.md`). No
+    pre-purchase ETA infra exists: `internal/shipping/` is a carrier-adapter layer for *real* shipments and
+    `CalculateRate.EstimatedDays` is a **live carrier call** needing a full `ShipmentInput` (origin/dest/package) —
+    checkout-time, not PDP. The foundations are absent — **no seller dispatch origin** (onboarding territory) and **no
+    zone/transit-days model**; only the user destination (`Address` city) exists, guests don't; no PDP delivery slot. A
+    static line is rejected (§9 SLA-promise + misleading). **Discovery-only:** PDP unchanged; filed **P-034**
+    (shipping-ETA infra: seller origin + zone matrix + cheap `EstimateETA` + PDP widget) — unblocks P-007.
 
 ✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
 CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);
@@ -202,7 +209,8 @@ carved → **P-031**; frontend un-hide `feat/bestseller-unhide`). P-026 ✅ RESO
 closed** (`chore/step5-low-batch`: P-015 FIX, P-011 CORRECTED, P-004/009/012/013 NOT-ACTIONABLE, HeroCarousel
 REMOVED). ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + P-009 ✅ RESOLVED**
 (`feat/wire-card-badges`: favorites-count overlay + free-shipping/discount card badges, end-to-end).
-**The pure-UI Trendyol-parity work is complete.** Remaining Step-5 tail (all backend/architectural): P-007
-(delivery-ETA), **P-033** (carry `categoryId` on `product_view`, unblocks the deferred P-031), chi-square flake.
-**P-030 end-to-end ✅ · P-032 ✅** (`feat/price-update-lifecycle`); **P-031 ⏸️ deferred → P-033**. Minor
-follow-up: PDP strikethrough (`original_price` on the variant) for full card parity.
+**The pure-UI Trendyol-parity work is complete.** All per-finding parity work is now resolved or
+infra-deferred. Remaining Step-5 tail (all infra-gated / non-parity): **P-033** (carry `categoryId` on
+`product_view` → unblocks deferred **P-031**), **P-034** (shipping-ETA infra → unblocks deferred **P-007**),
+chi-square flake, + the minor PDP-strikethrough follow-up. **P-030 end-to-end ✅ · P-032 ✅ · P-029 ✅**;
+P-031 ⏸️→P-033; P-007 ⏸️→P-034.

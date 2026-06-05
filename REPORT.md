@@ -4398,3 +4398,16 @@ Discovery-only. Discovery `docs/internal/p031-category-popularity.md`.
 
 ### Step 5 status (post P-031 deferral)
 Remaining Step-5 tail: P-007 (delivery-ETA), **P-033** (event `categoryId` → unblocks P-031), chi-square flake. (Minor: PDP strikethrough.)
+
+## PR — P-007 PDP delivery-ETA (`feat/delivery-eta`) — closes PARITY_AUDIT P-007 (PDP delivery-ETA) as DEFERRED (Outcome C); opens P-034
+
+Discovery-only. Discovery `docs/internal/p007-delivery-eta.md`.
+
+- **Outcome C (blocked by shipping-ETA infra).** `internal/shipping/` is a mature **carrier-adapter** layer for *real outbound shipments* (CreateLabel/Track/webhooks/poll). Its `CalculateRate → RateResult.EstimatedDays` exists but is a **live carrier call** requiring a full `ShipmentInput` (origin/dest/package) — a **checkout-time** operation, infeasible per PDP load and unavailable to guests.
+- **The two foundations for a cheap PDP ETA are absent:** (1) **no seller dispatch origin** — no warehouse/city on the seller model or `0078_sellers` (adding it is seller-onboarding territory); (2) **no zone/transit-days model** anywhere (`ref_schema.business_calendars` counts business days, it is not a transit model). The user **destination** exists (`identity.Address` city/district/postal "for logistics routing") but guests have none, and there is **no PDP delivery slot** to wire (unlike P-030's pre-built `PdpPriceBlock` slot).
+- **A hardcoded static "1-3 iş günü" line is rejected:** an unbacked delivery promise (§9 anti-goal "do not promise SLAs"), no per-product/destination variation, misleading — worse than the current honest blank.
+- **Decision:** no code change; the PDP shows no ETA (current state). Filed **P-034** (shipping-ETA infrastructure: seller dispatch origin + a seeded zone/transit-days lookup + a cheap `shipping.EstimateETA` that makes no carrier call + a `PdpDeliveryInfo` widget + guest-fallback policy). `CalculateRate.EstimatedDays` can later feed a *checkout* estimate (where a real `ShipmentInput` exists) — a separate post-address surface.
+- Docs-only — no migration/schema/code/tests. `make verify` green locally.
+
+### Step 5 status (post P-007 deferral)
+**All per-finding parity work is resolved or infra-deferred.** Remaining tail (infra-gated / non-parity): **P-033** (event `categoryId` → P-031), **P-034** (shipping-ETA infra → P-007), chi-square flake, + minor PDP-strikethrough.
