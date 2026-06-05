@@ -51,6 +51,8 @@ class ProductSummary {
 
      this.favoritesCount = 0,
 
+     this.lowest30dPriceMinor,
+
     required  this.cashbackPreview,
   });
 
@@ -256,6 +258,19 @@ class ProductSummary {
 
 
 
+      /// Lowest price (minor units) applied in the last 30 days, for compliant display of price reductions (TR 6502 / EU Omnibus 2019/2161, P-030). Omitted when no in-window price history. The frontend shows the \"30 günün en düşük fiyatı\" line only when this is below price_minor — today it equals price_minor for every product (prices are immutable post-creation, so history has not yet diverged from the baseline). 
+  @JsonKey(
+    
+    name: r'lowest_30d_price_minor',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final int? lowest30dPriceMinor;
+
+
+
   @JsonKey(
     
     name: r'cashback_preview',
@@ -288,6 +303,7 @@ class ProductSummary {
       other.flashPriceMinor == flashPriceMinor &&
       other.freeShipping == freeShipping &&
       other.favoritesCount == favoritesCount &&
+      other.lowest30dPriceMinor == lowest30dPriceMinor &&
       other.cashbackPreview == cashbackPreview;
 
     @override
@@ -308,6 +324,7 @@ class ProductSummary {
         flashPriceMinor.hashCode +
         freeShipping.hashCode +
         favoritesCount.hashCode +
+        lowest30dPriceMinor.hashCode +
         cashbackPreview.hashCode;
 
   factory ProductSummary.fromJson(Map<String, dynamic> json) => _$ProductSummaryFromJson(json);
