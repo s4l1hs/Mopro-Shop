@@ -231,8 +231,8 @@ class _CategoryProductsScreenState
       onSelected: (s) =>
           ref.read(plpFiltersProvider(_key).notifier).setSort(s),
       itemBuilder: (_) => [
-        // `bestseller` hidden until P-029 (backend maps it to recommended today).
-        for (final s in PlpSort.values.where((s) => s != PlpSort.bestseller))
+        // All sorts render — `bestseller` is backed by real popularity (P-029).
+        for (final s in PlpSort.values)
           PopupMenuItem<PlpSort>(
             value: s,
             child: Text('catalog.sort_${s.token}'.tr()),
