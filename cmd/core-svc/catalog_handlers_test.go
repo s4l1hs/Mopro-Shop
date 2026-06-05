@@ -29,6 +29,10 @@ func (s *stubCatalogSvc) CreateProduct(_ context.Context, _ catalog.CreateProduc
 func (s *stubCatalogSvc) AddVariant(_ context.Context, _ int64, _ catalog.AddVariantRequest) (catalog.Variant, error) {
 	return catalog.Variant{}, nil
 }
+
+func (s *stubCatalogSvc) UpdateVariantPrice(_ context.Context, _ int64, _ catalog.UpdateVariantPriceRequest) error {
+	return nil
+}
 func (s *stubCatalogSvc) UpdateTranslation(_ context.Context, _ int64, _, _, _ string) error {
 	return nil
 }

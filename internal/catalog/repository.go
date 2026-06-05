@@ -75,6 +75,25 @@ func (r *pgxRepository) InsertVariant(ctx context.Context, v Variant) (Variant, 
 	return v, nil
 }
 
+// UpdateVariantPrice sets a variant's price (and optional strikethrough original)
+// when it belongs to sellerID, returning whether a row was updated (false =>
+// missing or not owned). Ownership is enforced in SQL so there is no fetch race
+// and no cross-seller existence leak. The variants_price_history_trg trigger
+// (migration 0083) records the change automatically — do NOT write history here.
+func (r *pgxRepository) UpdateVariantPrice(ctx context.Context, sellerID, variantID, priceMinor int64, originalPriceMinor *int64) (bool, error) {
+	tag, err := r.pool.Exec(ctx,
+		`UPDATE catalog_schema.variants
+		    SET price_minor = $3, original_price_minor = $4
+		  WHERE id = $2
+		    AND product_id IN (SELECT id FROM catalog_schema.products WHERE seller_id = $1)`,
+		sellerID, variantID, priceMinor, originalPriceMinor,
+	)
+	if err != nil {
+		return false, fmt.Errorf("catalog.repo: UpdateVariantPrice: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 func (r *pgxRepository) UpsertTranslation(ctx context.Context, t ProductTranslation) error {
 	_, err := r.pool.Exec(ctx,
 		`INSERT INTO catalog_schema.product_translations

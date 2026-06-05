@@ -37,6 +37,10 @@ func (m *mockRepo) InsertVariant(ctx context.Context, v catalog.Variant) (catalo
 	return v, nil
 }
 
+func (m *mockRepo) UpdateVariantPrice(_ context.Context, _, _, _ int64, _ *int64) (bool, error) {
+	return true, nil
+}
+
 func (m *mockRepo) UpsertTranslation(ctx context.Context, t catalog.ProductTranslation) error {
 	if m.upsertTranslationFn != nil {
 		return m.upsertTranslationFn(ctx, t)

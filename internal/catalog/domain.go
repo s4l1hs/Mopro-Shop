@@ -174,6 +174,15 @@ type AddVariantRequest struct {
 	ImageKeys     []string `json:"image_keys"`
 }
 
+// UpdateVariantPriceRequest is the body for the seller price-update endpoint
+// (P-032). VariantID comes from the URL path (json:"-"), not the body. Omitting
+// original_price_minor clears any strikethrough (PUT replaces the price state).
+type UpdateVariantPriceRequest struct {
+	VariantID          int64  `json:"-"`
+	PriceMinor         int64  `json:"price_minor"`
+	OriginalPriceMinor *int64 `json:"original_price_minor,omitempty"`
+}
+
 // HomeRailRow is a named product rail for server-driven home composition.
 type HomeRailRow struct {
 	RailKey   string
