@@ -4329,3 +4329,18 @@ Makes the `bestseller` sort order by real popularity instead of falling back to 
 
 ### Step 5 status (post P-029)
 **P-029 ✅ RESOLVED.** Remaining (all backend/architectural): P-007 (delivery-ETA), P-030 (price-history / lowest_30d — HIGH compliance), P-031 (category-scoped bestseller popularity, carved from P-029), chi-square flake. Frontend follow-up: un-hide the bestseller sort option now that the backend orders by it.
+
+## PR — P-029 frontend un-hide (`feat/bestseller-unhide`) — closes PARITY_AUDIT P-029 (frontend un-hide); bestseller now functional end-to-end
+
+The smallest PR in the Step-5 arc. PR #90 made the backend honor `sort=bestseller`; PR #86 had hidden the option pending it. Discovery `docs/internal/p029-frontend-unhide.md`.
+
+- **Un-hide — the exact mechanism.** PR #86 hid the option via a `.where(... != bestseller)` filter in **two** selectors: the mobile `SortSheet` (`sort_sheet.dart:59` — covers category PLP + search, both route through `showSortSheet`) and the desktop `PopupMenuButton<PlpSort>` (`category_products_screen.dart:235`, `_sortDropdown`). Both filters removed; the option now renders in every selector.
+- **No PR #90 dependency.** Sort is sent to the generated client as a **raw string** (`api.listProducts(sort: f.sort.token)`; the client param is `String? sort`), so `sort=bestseller` flows regardless of the client's `FilterSort` enum. This PR is stacked on #90 only to avoid docs-file conflicts (GitHub retargets to main on #90 merge).
+- **i18n — Outcome: no change (keys already correct).** The prompt assumed TR="En Çok Satan"/EN="Bestseller". Discovery: the keys exist as TR=`"Çok satanlar"`/EN=`"Best sellers"` — idiomatic, not placeholders, and **identical to the home bestseller rail** (`home.rail_bestseller`). Changing the sort label alone would desync the rail; aligning both to Trendyol's exact "En çok satanlar" is a separate wording call (out of scope). Kept verbatim. The key was never dead even while hidden (statically referenced in `catalog_shell.dart:146`).
+- **URL codec.** Already round-trips `?sort=bestseller` (`encode` writes `f.sort.token`; `decode` uses `PlpSort.fromToken`). Guarded by a new unit case.
+- **Goldens — zero flips.** The prompt predicted "2 goldens regenerate"; falsified. The desktop option lives only in the tapped `PopupMenuButton` overlay, and `plp_goldens_test.dart` captures the *closed* sidebar; the mobile `SortSheet` has no golden. No regen.
+- **Tests:** codec round-trip + `fromToken('bestseller')` (`plp_filters_test`); mobile `SortSheet` renders all 6 options with an enabled bestseller tile carrying its token (`sort_sheet_test`, new); desktop popup shows + selects bestseller → `f.sort = PlpSort.bestseller` (`category_products_desktop_test`). 19 tests green in the affected files; `flutter analyze` clean.
+- **P-029 status:** ✅ end-to-end RESOLVED (backend #90 + frontend this PR). All 7 perpetual gates green; `make verify` green.
+
+### Step 5 status (post P-029 un-hide)
+**P-029 fully closed end-to-end.** Remaining Step-5 tail (all backend/architectural): P-007 (delivery-ETA), P-030 (price-history / lowest_30d — HIGH compliance), P-031 (category-scoped bestseller popularity), chi-square flake.
