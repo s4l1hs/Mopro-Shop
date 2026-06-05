@@ -725,6 +725,10 @@ func main() {
 	mux.Handle("POST /seller/returns/{id}/reject",
 		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleSellerRejectReturn(storefrontReader, returnSvc))))),
 	)
+	// P-032: a seller updates the price of a variant they own; #92 trigger logs history.
+	mux.Handle("PUT /seller/variants/{id}/price",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleUpdateVariantPrice(catalogSvc))))),
+	)
 	mux.Handle("GET /seller/questions",
 		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleSellerQuestions(storefrontReader, ugcSvc))))),
 	)
