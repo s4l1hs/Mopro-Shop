@@ -11,6 +11,7 @@ ProductSummary _product({
   String? coverUrl,
   int favoritesCount = 0,
   bool freeShipping = false,
+  int? lowest30dPriceMinor,
 }) =>
     ProductSummary(
       id: 1,
@@ -24,6 +25,7 @@ ProductSummary _product({
       coverImageUrl: coverUrl,
       favoritesCount: favoritesCount,
       freeShipping: freeShipping,
+      lowest30dPriceMinor: lowest30dPriceMinor,
       cashbackPreview: CashbackPreview(
         monthlyCoinMinor: 125,
         currency: 'TRY_COIN',
@@ -34,16 +36,23 @@ Widget _card({
   VoidCallback? onTap,
   int favoritesCount = 0,
   bool freeShipping = false,
+  int? originalPriceMinor,
+  int? discountPct,
+  int? lowest30dPriceMinor,
+  double height = 320,
 }) =>
     SizedBox(
       width: 200,
-      height: 320,
+      height: height,
       child: ProductCard(
         product: _product(
           favoritesCount: favoritesCount,
           freeShipping: freeShipping,
+          lowest30dPriceMinor: lowest30dPriceMinor,
         ),
         onTap: onTap ?? () {},
+        originalPriceMinor: originalPriceMinor,
+        discountPct: discountPct,
       ),
     );
 
@@ -115,6 +124,46 @@ void main() {
     testWidgets('hidden when freeShipping is false', (tester) async {
       await pumpTrendyolApp(tester, _card());
       expect(find.byIcon(Icons.local_shipping_outlined), findsNothing);
+    });
+  });
+
+  group('ProductCard lowest-30d price (P-030)', () {
+    // .tr() returns the key in tests (bundle not loaded); assert on the key.
+    testWidgets('hidden without a discount even if lowest_30d is set',
+        (tester) async {
+      await pumpTrendyolApp(
+        tester,
+        _card(lowest30dPriceMinor: 19999, height: 460),
+      );
+      expect(find.textContaining('product.lowest_30d'), findsNothing);
+    });
+
+    testWidgets('hidden when lowest_30d equals the current price',
+        (tester) async {
+      await pumpTrendyolApp(
+        tester,
+        _card(
+          originalPriceMinor: 39999,
+          discountPct: 25,
+          lowest30dPriceMinor: 29999, // == priceMinor → no real 30-day low
+          height: 460,
+        ),
+      );
+      expect(find.textContaining('product.lowest_30d'), findsNothing);
+    });
+
+    testWidgets('renders when discounted and lowest_30d is below price',
+        (tester) async {
+      await pumpTrendyolApp(
+        tester,
+        _card(
+          originalPriceMinor: 39999,
+          discountPct: 25,
+          lowest30dPriceMinor: 24999, // < priceMinor (29999)
+          height: 460,
+        ),
+      );
+      expect(find.textContaining('product.lowest_30d'), findsOneWidget);
     });
   });
 
