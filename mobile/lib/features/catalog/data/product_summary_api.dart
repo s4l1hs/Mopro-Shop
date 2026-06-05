@@ -27,6 +27,7 @@ ProductSummary productSummaryFromApi(Map<String, dynamic> j) {
     ratingCount: (j['rating_count'] as num?)?.toInt() ?? 0,
     favoritesCount: (j['favorites_count'] as num?)?.toInt() ?? 0,
     freeShipping: (j['free_shipping'] as bool?) ?? false,
+    lowest30dPriceMinor: (j['lowest_30d_price_minor'] as num?)?.toInt(),
     cashbackPreview: CashbackPreview(
       monthlyCoinMinor: (cb['monthly_amount_minor'] as num?)?.toInt() ?? 0,
       currency: (cb['currency'] as String?) ?? '',
