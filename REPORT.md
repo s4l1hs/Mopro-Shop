@@ -4357,3 +4357,18 @@ Backend foundation for the TR 6502 / EU Omnibus (2019/2161) "lowest price in 30 
 
 ### Step 5 status (post P-030 backend)
 **P-030 backend ✅ RESOLVED (Mechanism B).** Remaining Step-5 tail: P-007 (delivery-ETA), P-031 (category-scoped bestseller), **P-032** (price-update lifecycle), P-030-frontend (display), chi-square flake.
+
+## PR — P-030 frontend display (`feat/lowest-30d-display`) — closes PARITY_AUDIT P-030-frontend (lowest 30-day price display)
+
+Consumes PR #92's `ProductSummary.lowest_30d_price_minor` to render the TR/EU compliance line on cards. Discovery `docs/internal/p030-frontend-display.md`. **Stacked on `feat/price-history`** (#92) — hard dependency on the generated field (retargets to main on #92 merge).
+
+- **Discovery reshaped scope (3 corrections).** (1) The i18n key **already exists** — `product.lowest_30d` (TR "Son 30 günün en düşük fiyatı: {price}" / EN "Lowest price in 30 days: {price}") — reused, **no new key**. (2) The PDP renderer **already exists** — `PdpPriceBlock` has a `lowestIn30DaysMinor` slot + the line (a pre-built dark slot from #88). (3) **PDP is backend-blocked** — the PDP screen uses the full `Product` from `GetByID`, which does not carry `lowest_30d` (only `ProductSummary` does); wiring it needs a backend change → **deferred** (folded with P-032). So this PR is **card-only** + the rail mapper.
+- **Card** (`product_card.dart`): renders the line below the price when the card announces a reduction (`hasDiscount`) AND `lowest_30d < effectivePrice`; suppressed on flash cards and when `lowest_30d == price`. `labelSmall`/`onSurfaceVariant` (AA-safe documented pair, **no new token**), single-line ellipsis (the #89 card-overflow lesson).
+- **Rail mapper** (`product_summary_api.dart`): `productSummaryFromApi` carries `lowest_30d_price_minor` (recently-viewed / recommendations / similar). List/search cards get it via the generated `fromJson` automatically.
+- **Honest posture (from #92):** today `lowest_30d == current` for every product (no price-update lifecycle → P-032), so the line **renders nowhere on current data** — dormant-but-correct wiring that activates automatically once prices move. Not a compliance sign-off.
+- **Goldens — 0 flips** (confirmed): the card goldens use the default no-discount fixture, so the line never renders → content unchanged. (Local golden runs fail only on the macOS-vs-Linux platform guard; CI/Linux passes.)
+- **Tests:** card (line hidden w/o discount; hidden when `lowest_30d == price`; visible when `lowest_30d < price`) + mapper (maps when present, null when absent). `flutter analyze` clean.
+- **Follow-ups:** **P-030-PDP** (wire the PDP slot once `GetByID` exposes `lowest_30d` — backend), **P-032** (price-update lifecycle).
+
+### Step 5 status (post P-030 card display)
+**P-030 cards end-to-end ✅; PDP display deferred (backend-gated).** Remaining Step-5 tail: P-007 (delivery-ETA), P-031 (category-scoped bestseller), **P-032** (price-update lifecycle), **P-030-PDP** (backend-gated display), chi-square flake.

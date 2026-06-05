@@ -65,6 +65,18 @@ class ProductCard extends ConsumerWidget {
         effectiveOriginal > effectivePrice &&
         (effectiveDiscountPct ?? 0) > 0;
     final hasRating = ratingCount > 0 && ratingAvg != null;
+    // P-030: "lowest price in 30 days" compliance line (TR 6502 / EU Omnibus).
+    // Shown only when a reduction is announced (hasDiscount) AND the current
+    // price is not the 30-day low. lowest_30d <= price always, so `<` means it
+    // was cheaper earlier in the window. Suppressed on flash cards (the override
+    // price is not the regular-price history). Today lowest_30d == price for
+    // every product (no price-update lifecycle yet → P-032), so this stays dark
+    // until prices move.
+    final low30d = product.lowest30dPriceMinor;
+    final showLowest30d = priceOverride == null &&
+        hasDiscount &&
+        low30d != null &&
+        low30d < effectivePrice;
 
     return GestureDetector(
       onTap: onTap,
@@ -177,6 +189,19 @@ class ProductCard extends ConsumerWidget {
                       color: cs.primary,
                     ),
                   ),
+                  if (showLowest30d) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'product.lowest_30d'.tr(
+                        namedArgs: {'price': MoneyUtils.formatMinor(low30d)},
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   CashbackChip(
                     monthlyCoinMinor:
