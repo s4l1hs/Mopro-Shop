@@ -48,6 +48,29 @@ void main() {
       // (10000-7500)/10000 = 25%
       expect(find.text('%25'), findsOneWidget);
     });
+
+    // P-030 lowest-30d line. .tr() returns the key in tests (bundle not loaded).
+    testWidgets('hides the lowest-30d line when null', (tester) async {
+      await _pump(tester, const PdpPriceBlock(priceMinor: 12900));
+      expect(find.textContaining('product.lowest_30d'), findsNothing);
+    });
+
+    testWidgets('hides the lowest-30d line when it equals the price',
+        (tester) async {
+      await _pump(
+        tester,
+        const PdpPriceBlock(priceMinor: 12900, lowestIn30DaysMinor: 12900),
+      );
+      expect(find.textContaining('product.lowest_30d'), findsNothing);
+    });
+
+    testWidgets('shows the lowest-30d line when below the price', (tester) async {
+      await _pump(
+        tester,
+        const PdpPriceBlock(priceMinor: 12900, lowestIn30DaysMinor: 9900),
+      );
+      expect(find.textContaining('product.lowest_30d'), findsOneWidget);
+    });
   });
 
   group('PdpVariantSelector', () {

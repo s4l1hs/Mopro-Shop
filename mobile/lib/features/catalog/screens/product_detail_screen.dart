@@ -453,7 +453,10 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
         ],
         const SizedBox(height: 12),
         if (v != null) ...[
-          PdpPriceBlock(priceMinor: v.priceMinor),
+          PdpPriceBlock(
+            priceMinor: v.priceMinor,
+            lowestIn30DaysMinor: v.lowest30dPriceMinor,
+          ),
           const SizedBox(height: 6),
           _StockPill(stock: v.stock),
         ],
@@ -583,7 +586,10 @@ class _BuyBox extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (selectedVariant != null) ...[
-            PdpPriceBlock(priceMinor: selectedVariant!.priceMinor),
+            PdpPriceBlock(
+              priceMinor: selectedVariant!.priceMinor,
+              lowestIn30DaysMinor: selectedVariant!.lowest30dPriceMinor,
+            ),
             const SizedBox(height: 6),
             _StockPill(stock: selectedVariant!.stock),
           ],
