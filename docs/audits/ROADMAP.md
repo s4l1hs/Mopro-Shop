@@ -170,6 +170,12 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
     would mis-display a multi-variant PDP) to `loadVariants`/`Variant`/spec; `PdpPriceBlock` renders the slot when
     `lowest_30d < price`. **P-030 is now end-to-end** (cards + PDP + lifecycle). Minor follow-up: PDP strikethrough
     (`original_price` on the variant) for full card parity. Not a compliance sign-off (legal review pending).
+11. **P5-10** `feat/category-popularity` — ⏸️ **P-031 DEFERRED (Outcome C)** (`docs/internal/p031-category-popularity.md`).
+    The `popular_products` schema is already category-ready (no migration), but `product_view` events carry only
+    `productId` — no `categoryId`, no category column in `analytics_schema` — so true per-category aggregation needs a
+    **§5-forbidden cross-schema JOIN** to `catalog_schema.products` (or out-of-scope event enrichment). The codebase
+    already documents the deferral. **Discovery-only:** global proxy retained; filed **P-033** (carry `categoryId` on
+    `product_view`) as the enabler — once it lands P-031 is a small same-schema follow-up.
 
 ✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
 CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);
@@ -197,6 +203,6 @@ closed** (`chore/step5-low-batch`: P-015 FIX, P-011 CORRECTED, P-004/009/012/013
 REMOVED). ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + P-009 ✅ RESOLVED**
 (`feat/wire-card-badges`: favorites-count overlay + free-shipping/discount card badges, end-to-end).
 **The pure-UI Trendyol-parity work is complete.** Remaining Step-5 tail (all backend/architectural): P-007
-(delivery-ETA), P-031 (category-scoped bestseller), chi-square flake. **P-030 end-to-end ✅** (cards + PDP +
-the P-032 price-update lifecycle, `feat/price-update-lifecycle`); **P-032 ✅**. Minor follow-up: PDP strikethrough
-(`original_price` on the variant) for full card parity.
+(delivery-ETA), **P-033** (carry `categoryId` on `product_view`, unblocks the deferred P-031), chi-square flake.
+**P-030 end-to-end ✅ · P-032 ✅** (`feat/price-update-lifecycle`); **P-031 ⏸️ deferred → P-033**. Minor
+follow-up: PDP strikethrough (`original_price` on the variant) for full card parity.
