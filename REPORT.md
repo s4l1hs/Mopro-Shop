@@ -4386,3 +4386,15 @@ Adds the variant price-**update** path so #92's trigger accrues history, and wir
 
 ### Step 5 status (post P-032 + P-030-PDP)
 **P-030 end-to-end ✅ · P-032 ✅.** Remaining Step-5 tail: P-007 (delivery-ETA), P-031 (category-scoped bestseller), chi-square flake. (Minor: PDP strikethrough for full card parity.)
+
+## PR — P-031 category-scoped popularity (`feat/category-popularity`) — closes PARITY_AUDIT P-031 (category-scoped popularity) as DEFERRED (Outcome C); opens P-033
+
+Discovery-only. Discovery `docs/internal/p031-category-popularity.md`.
+
+- **Outcome C (deferred) — the §5 wall.** `analytics_schema.popular_products` is already category-ready (`scope` supports `'category:{id}'`, indexed — **no migration needed**), but `RebuildPopular` only builds `'global'` because the source can't supply a category: `product_view` events carry **only `productId`** (`requiredPayloadFields[EventProductView] = {"productId"}`), and there is no `category_id` column or product→category projection anywhere in `analytics_schema`. True per-category aggregation (`GROUP BY category, product`) would need a **cross-schema JOIN to `catalog_schema.products` — forbidden by CLAUDE.md §5** — or event enrichment (frontend emit / ingest coupling — out of scope). The codebase already documents the deferral (repository.go: "…once categoryId is carried on the product_view payload (Backlog)").
+- **Alternatives rejected:** cross-schema JOIN (§5); ingest-time catalog lookup (architectural, hot-path coupling, history still needs the JOIN); session-correlation heuristic (imperfect + diverges from the documented design); bucket-globally-popular-by-category (degraded — misses a category's local leaders).
+- **Decision:** no code change; `bestseller` on a category PLP keeps using **global** popularity (PR #90's reasonable proxy; only a niche-category leader that isn't globally popular mis-ranks). Filed **P-033** (carry `categoryId` on the `product_view` payload) as the enabler — once it lands, P-031 is a small same-schema `GROUP BY` + a scoped `PopularProductIDs`, no §5 issue.
+- No migration / schema / tests (no behavior change). `make verify` unaffected (docs-only).
+
+### Step 5 status (post P-031 deferral)
+Remaining Step-5 tail: P-007 (delivery-ETA), **P-033** (event `categoryId` → unblocks P-031), chi-square flake. (Minor: PDP strikethrough.)
