@@ -66,6 +66,11 @@ type Variant struct {
 	PriceCurrency string   `json:"price_currency"`
 	Stock         int      `json:"stock"`
 	ImageKeys     []string `json:"image_keys"`
+	// Lowest30dPriceMinor is MIN(price) for THIS variant over the last 30 days
+	// (P-030, per-variant so the PDP — which shows a specific variant — is correct,
+	// unlike the product-level value on ProductSummary). Nil when no in-window
+	// history; equals PriceMinor until prices change (see p030/p032 docs).
+	Lowest30dPriceMinor *int64 `json:"lowest_30d_price_minor,omitempty"`
 }
 
 // ProductTranslation holds locale-specific title and description.
