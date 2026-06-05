@@ -724,8 +724,14 @@ type Variant struct {
 	Id    int64   `json:"id"`
 
 	// ImageUrls CDN-resolved full URLs. Never raw storage keys.
-	ImageUrls     []string `json:"image_urls"`
-	PriceCurrency string   `json:"price_currency"`
+	ImageUrls []string `json:"image_urls"`
+
+	// Lowest30dPriceMinor Lowest price (minor units) applied to THIS variant in the last 30 days
+	// (TR 6502 / EU Omnibus, P-030). Per-variant so the PDP — which shows a
+	// specific selected variant — is accurate. Omitted when no in-window
+	// history; equals price_minor until the price changes (P-032).
+	Lowest30dPriceMinor *int64 `json:"lowest_30d_price_minor"`
+	PriceCurrency       string `json:"price_currency"`
 
 	// PriceMinor Price in minor units (kuruş)
 	PriceMinor int64   `json:"price_minor"`
