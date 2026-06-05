@@ -321,6 +321,9 @@ const productSummarySelect = `SELECT p.id, p.seller_id, p.category_id, p.brand, 
 	        p.free_shipping,
 	        (SELECT count(*) FROM catalog_schema.user_favorites uf
 	         WHERE uf.product_id = p.id) AS favorites_count,
+	        (SELECT min(vph.price_minor) FROM catalog_schema.variant_price_history vph
+	         WHERE vph.product_id = p.id
+	           AND vph.effective_at >= now() - INTERVAL '30 days') AS lowest_30d_price_minor,
 	        count(*) OVER() AS total_count
 	FROM catalog_schema.products p
 	JOIN catalog_schema.product_translations t
@@ -423,7 +426,7 @@ func scanProductSummaries(rows pgx.Rows, label string) ([]ProductSummaryRow, int
 			&s.Title, &s.PriceMinor, &s.PriceCurrency,
 			&s.CoverImageKey, &s.CommissionPctBps,
 			&s.OriginalPriceMinor, &s.RatingAvg, &s.RatingCount,
-			&s.FreeShipping, &s.FavoritesCount, &total,
+			&s.FreeShipping, &s.FavoritesCount, &s.Lowest30dPriceMinor, &total,
 		); err != nil {
 			return nil, 0, fmt.Errorf("catalog.repo: scan %s: %w", label, err)
 		}
@@ -553,7 +556,10 @@ func (r *pgxRepository) ListProductsByIDs(ctx context.Context, ids []int64, loca
 		        p.rating_avg, p.rating_count,
 		        p.free_shipping,
 		        (SELECT count(*) FROM catalog_schema.user_favorites uf
-		         WHERE uf.product_id = p.id) AS favorites_count
+		         WHERE uf.product_id = p.id) AS favorites_count,
+		        (SELECT min(vph.price_minor) FROM catalog_schema.variant_price_history vph
+		         WHERE vph.product_id = p.id
+		           AND vph.effective_at >= now() - INTERVAL '30 days') AS lowest_30d_price_minor
 		FROM catalog_schema.products p
 		JOIN catalog_schema.product_translations t
 		     ON t.product_id = p.id AND t.locale = $2
@@ -584,7 +590,7 @@ func (r *pgxRepository) ListProductsByIDs(ctx context.Context, ids []int64, loca
 			&s.Title, &s.PriceMinor, &s.PriceCurrency,
 			&s.CoverImageKey, &s.CommissionPctBps,
 			&s.OriginalPriceMinor, &s.RatingAvg, &s.RatingCount,
-			&s.FreeShipping, &s.FavoritesCount,
+			&s.FreeShipping, &s.FavoritesCount, &s.Lowest30dPriceMinor,
 		); err != nil {
 			return nil, fmt.Errorf("catalog.repo: scan product: %w", err)
 		}
