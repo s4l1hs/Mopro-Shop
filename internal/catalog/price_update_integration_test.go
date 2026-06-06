@@ -118,4 +118,41 @@ func TestIntegration_UpdateVariantPrice(t *testing.T) {
 			t.Errorf("variant lowest_30d: got %v, want 30000 (pre-raise low)", found.Lowest30dPriceMinor)
 		}
 	})
+
+	t.Run("GetByID variants carry original_price_minor (PDP strikethrough source)", func(t *testing.T) {
+		get := func(productID, variantID int64) *catalog.Variant {
+			_, variants, _, err := svc.GetByID(ctx, productID)
+			if err != nil {
+				t.Fatalf("GetByID(%d): %v", productID, err)
+			}
+			for i := range variants {
+				if variants[i].ID == variantID {
+					return &variants[i]
+				}
+			}
+			t.Fatalf("variant %d not returned by GetByID", variantID)
+			return nil
+		}
+
+		// Marked-down variant: original_price set above the live price → the PDP
+		// strikethrough source flows through loadVariants.
+		disc := pfSeed(t, ctx, "Vestel", "PU Strike", 60000, nil, 0, false, 5)
+		dvid := pfVariantID(t, ctx, disc)
+		orig := int64(60000)
+		if err := svc.UpdateVariantPrice(ctx, owner, catalog.UpdateVariantPriceRequest{
+			VariantID: dvid, PriceMinor: 45000, OriginalPriceMinor: &orig,
+		}); err != nil {
+			t.Fatalf("update: %v", err)
+		}
+		if d := get(disc, dvid); d.OriginalPriceMinor == nil || *d.OriginalPriceMinor != 60000 {
+			t.Errorf("discounted variant original_price: got %v, want 60000", d.OriginalPriceMinor)
+		}
+
+		// Never-discounted variant: original_price_minor stays nil (omitempty).
+		plain := pfSeed(t, ctx, "Vestel", "PU Plain", 30000, nil, 0, false, 5)
+		pvid := pfVariantID(t, ctx, plain)
+		if pl := get(plain, pvid); pl.OriginalPriceMinor != nil {
+			t.Errorf("never-discounted variant original_price: got %d, want nil", *pl.OriginalPriceMinor)
+		}
+	})
 }

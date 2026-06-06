@@ -64,12 +64,29 @@ void main() {
       expect(find.textContaining('product.lowest_30d'), findsNothing);
     });
 
-    testWidgets('shows the lowest-30d line when below the price', (tester) async {
+    testWidgets('shows the lowest-30d line when discounted and below the price',
+        (tester) async {
+      await _pump(
+        tester,
+        const PdpPriceBlock(
+          priceMinor: 12900,
+          originalPriceMinor: 15000,
+          lowestIn30DaysMinor: 9900,
+        ),
+      );
+      expect(find.textContaining('product.lowest_30d'), findsOneWidget);
+    });
+
+    // PDP-strikethrough gate alignment: the lowest-30d line is suppressed when
+    // there is no strikethrough above it, even if lowest < price — matching the
+    // card's `hasDiscount && lowest_30d < price` gate.
+    testWidgets('hides the lowest-30d line when below price but no discount',
+        (tester) async {
       await _pump(
         tester,
         const PdpPriceBlock(priceMinor: 12900, lowestIn30DaysMinor: 9900),
       );
-      expect(find.textContaining('product.lowest_30d'), findsOneWidget);
+      expect(find.textContaining('product.lowest_30d'), findsNothing);
     });
   });
 
