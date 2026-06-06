@@ -57,14 +57,32 @@ func handleListCategories(svc catalog.Service, defaultLocale string) http.Handle
 // bestseller sort seeds (caps the array_position cost per row).
 const bestsellerPopularCap = 200
 
-// applyBestsellerOrder fills filter.PopularIDs with the global popularity ranking
-// (from analytics) when sort=bestseller, so the repo orders by it (P-029). On
-// error/empty the filter is left as-is → the repo falls back to recommended.
-func applyBestsellerOrder(ctx context.Context, analyticsSvc analytics.Service, filter *catalog.ProductFilter) {
+// applyBestsellerOrder fills filter.PopularIDs with a popularity ranking (from
+// analytics) when sort=bestseller, so the repo orders by it (P-029). With a
+// category filter it uses per-category popularity (P-031), falling back to the
+// global proxy on empty; with no category it uses global. On error/empty the
+// filter is left as-is → the repo falls back to recommended.
+// categoryID scopes the popularity ranking (the category PLP's category, or the
+// search category filter); nil = global. It is passed explicitly because the
+// category-PLP handler keeps it out of ProductFilter (the base query already
+// scopes by category).
+func applyBestsellerOrder(ctx context.Context, analyticsSvc analytics.Service, categoryID *int64, filter *catalog.ProductFilter) {
 	if filter.Sort != "bestseller" {
 		return
 	}
-	ids, err := analyticsSvc.PopularProductIDs(ctx, bestsellerPopularCap)
+	var ids []int64
+	var err error
+	if categoryID != nil {
+		// Per-category popularity (P-031). Most categories have no per-category
+		// data until product_view events carrying categoryId (P-033) accrue, so
+		// fall back to the global proxy on empty — never regress to recommended.
+		ids, err = analyticsSvc.PopularProductIDsInCategory(ctx, *categoryID, bestsellerPopularCap)
+		if err == nil && len(ids) == 0 {
+			ids, err = analyticsSvc.PopularProductIDs(ctx, bestsellerPopularCap)
+		}
+	} else {
+		ids, err = analyticsSvc.PopularProductIDs(ctx, bestsellerPopularCap)
+	}
 	if err != nil {
 		slog.Warn("catalog: bestseller popular IDs unavailable", "err", err)
 		return
@@ -100,7 +118,7 @@ func handleListProducts(analyticsSvc analytics.Service, svc catalog.Service, def
 		}
 
 		filter := parseProductFilter(q, false)
-		applyBestsellerOrder(r.Context(), analyticsSvc, &filter)
+		applyBestsellerOrder(r.Context(), analyticsSvc, &categoryID, &filter)
 		rows, total, err := svc.ListProductsByCategory(r.Context(), categoryID, locale, market, filter, page, perPage)
 		if err != nil {
 			slog.Error("catalog: ListProductsByCategory", "category_id", categoryID, "err", err)
@@ -135,7 +153,7 @@ func handleSearch(analyticsSvc analytics.Service, svc catalog.Service, defaultLo
 		}
 
 		filter := parseProductFilter(q, true)
-		applyBestsellerOrder(r.Context(), analyticsSvc, &filter)
+		applyBestsellerOrder(r.Context(), analyticsSvc, filter.CategoryID, &filter)
 		rows, total, err := svc.SearchSummary(r.Context(), query, locale, market, filter, page, perPage)
 		if err != nil {
 			slog.Error("catalog: SearchSummary", "query", query, "err", err)
