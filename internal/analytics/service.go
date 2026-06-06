@@ -164,6 +164,10 @@ func (s *service) PopularProductIDs(ctx context.Context, limit int) ([]int64, er
 	return s.repo.PopularGlobalIDs(ctx, clampLimit(limit))
 }
 
+func (s *service) PopularProductIDsInCategory(ctx context.Context, categoryID int64, limit int) ([]int64, error) {
+	return s.repo.PopularCategoryIDs(ctx, categoryID, clampLimit(limit))
+}
+
 func (s *service) HomeRecommendationIDs(ctx context.Context, userID int64, limit int) ([]int64, error) {
 	seeds, err := s.repo.ListRecentlyViewed(ctx, userID, homeSeedLimit)
 	if err != nil {

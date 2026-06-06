@@ -50,6 +50,10 @@ type Service interface {
 	// fallback + home rail for non-personalized users). Product enrichment is
 	// the caller's job — no cross-schema JOIN.
 	PopularProductIDs(ctx context.Context, limit int) ([]int64, error)
+	// PopularProductIDsInCategory returns the most-viewed product IDs within one
+	// category (P-031, per-category bestseller). Empty until per-category events
+	// accrue — callers fall back to PopularProductIDs (the global proxy).
+	PopularProductIDsInCategory(ctx context.Context, categoryID int64, limit int) ([]int64, error)
 
 	// HomeRecommendationIDs returns personalized product IDs for an authed,
 	// consented user: co-views aggregated over the user's recently-viewed seeds,
