@@ -52,7 +52,7 @@ const (
 // requiredPayloadFields lists the field each event type must carry (presence,
 // not value — §3.3). Types absent from the map have no required fields.
 var requiredPayloadFields = map[string][]string{
-	EventPageView:        {"path"},
+	EventPageView: {"path"},
 	// product_view also accepts an OPTIONAL categoryId (additive, P-033) — not
 	// required (old/offline/web clients omit it) — which enables P-031's
 	// per-category popularity via a same-schema GROUP BY in RebuildPopular.
