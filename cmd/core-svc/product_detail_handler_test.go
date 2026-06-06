@@ -9,7 +9,20 @@ import (
 
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/seller"
+	"github.com/mopro/platform/internal/shipping"
 )
+
+// stubETASvc is a minimal deliveryEstimator for the product-detail handler test.
+type stubETASvc struct {
+	fn func(market, originCity string, destCity *string) (shipping.ETAResult, error)
+}
+
+func (s *stubETASvc) EstimateETA(_ context.Context, market, originCity string, destCity *string) (shipping.ETAResult, error) {
+	if s.fn != nil {
+		return s.fn(market, originCity, destCity)
+	}
+	return shipping.ETAResult{}, nil
+}
 
 // stubSellerSvc is a minimal seller.Service for the product-detail handler test.
 type stubSellerSvc struct {
@@ -51,6 +64,12 @@ type productDetailBody struct {
 		SellerName string  `json:"seller_name"`
 		SellerSlug *string `json:"seller_slug"`
 	} `json:"product"`
+	DeliveryEta *struct {
+		MinDays      int     `json:"min_days"`
+		MaxDays      int     `json:"max_days"`
+		Confident    bool    `json:"confident"`
+		DispatchCity *string `json:"dispatch_city"`
+	} `json:"delivery_eta"`
 }
 
 func TestProductDetail_ResolvesSellerSlugAndName(t *testing.T) {
@@ -69,7 +88,7 @@ func TestProductDetail_ResolvesSellerSlugAndName(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	handleGetProductDetail(catalogSvc, sellerSvc, "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
@@ -100,7 +119,7 @@ func TestProductDetail_UnresolvedSellerYieldsNullSlug(t *testing.T) {
 	sellerSvc := &stubSellerSvc{} // GetByID → ErrSellerNotFound
 
 	rec := httptest.NewRecorder()
-	handleGetProductDetail(catalogSvc, sellerSvc, "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
@@ -114,5 +133,82 @@ func TestProductDetail_UnresolvedSellerYieldsNullSlug(t *testing.T) {
 	}
 	if body.Product.SellerName != "" {
 		t.Errorf("seller_name: want empty got %q", body.Product.SellerName)
+	}
+}
+
+// TestProductDetail_IncludesDeliveryEta asserts the PDP surfaces the P-034
+// estimate, passes the seller's dispatch origin + the dest_city query param, and
+// echoes the dispatch city back for the "X'dan gönderilir" line.
+func TestProductDetail_IncludesDeliveryEta(t *testing.T) {
+	catalogSvc := &stubCatalogSvc{
+		getByIDFn: func(id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error) {
+			return catalog.Product{ID: id, SellerID: 1, CategoryID: 30, Status: "active"}, nil, nil, nil
+		},
+	}
+	dispatch := "istanbul"
+	sellerSvc := &stubSellerSvc{
+		getByIDFn: func(id int64) (seller.Seller, error) {
+			return seller.Seller{ID: 1, Slug: "acme-store", DisplayName: "Acme Store", DispatchCity: &dispatch}, nil
+		},
+	}
+	etaSvc := &stubETASvc{
+		fn: func(market, originCity string, destCity *string) (shipping.ETAResult, error) {
+			if originCity != "istanbul" {
+				t.Errorf("origin city: want istanbul got %q", originCity)
+			}
+			if destCity == nil || *destCity != "ankara" {
+				t.Errorf("dest city: want ankara got %v", destCity)
+			}
+			return shipping.ETAResult{MinDays: 2, MaxDays: 3, Confident: true}, nil
+		},
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/products/7?dest_city=ankara", nil)
+	req.SetPathValue("id", "7")
+	handleGetProductDetail(catalogSvc, sellerSvc, etaSvc, "TR", "TRY_COIN")(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
+	}
+	var body productDetailBody
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v (%s)", err, rec.Body.String())
+	}
+	if body.DeliveryEta == nil {
+		t.Fatalf("delivery_eta missing: %s", rec.Body.String())
+	}
+	if body.DeliveryEta.MinDays != 2 || body.DeliveryEta.MaxDays != 3 || !body.DeliveryEta.Confident {
+		t.Errorf("delivery_eta wrong: %+v", *body.DeliveryEta)
+	}
+	if body.DeliveryEta.DispatchCity == nil || *body.DeliveryEta.DispatchCity != "istanbul" {
+		t.Errorf("dispatch_city: want istanbul got %v", body.DeliveryEta.DispatchCity)
+	}
+}
+
+// TestProductDetail_OmitsDeliveryEtaWhenNoData asserts the line is omitted (null)
+// when the estimator has nothing to offer.
+func TestProductDetail_OmitsDeliveryEtaWhenNoData(t *testing.T) {
+	catalogSvc := &stubCatalogSvc{
+		getByIDFn: func(id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error) {
+			return catalog.Product{ID: id, SellerID: 1, CategoryID: 30, Status: "active"}, nil, nil, nil
+		},
+	}
+	sellerSvc := &stubSellerSvc{
+		getByIDFn: func(id int64) (seller.Seller, error) {
+			return seller.Seller{ID: 1, Slug: "acme-store", DisplayName: "Acme Store"}, nil
+		},
+	}
+	etaSvc := &stubETASvc{} // returns ETAResult{} → MaxDays 0
+
+	rec := httptest.NewRecorder()
+	handleGetProductDetail(catalogSvc, sellerSvc, etaSvc, "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+
+	var body productDetailBody
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v (%s)", err, rec.Body.String())
+	}
+	if body.DeliveryEta != nil {
+		t.Errorf("delivery_eta: want null got %+v", *body.DeliveryEta)
 	}
 }

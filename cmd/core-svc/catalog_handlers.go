@@ -11,6 +11,7 @@ import (
 	"github.com/mopro/platform/internal/analytics"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/seller"
+	"github.com/mopro/platform/internal/shipping"
 	"github.com/mopro/platform/pkg/mediaurl"
 )
 
@@ -184,7 +185,14 @@ func parseProductFilter(q url.Values, includeCategory bool) catalog.ProductFilte
 
 // handleGetProductDetail handles GET /products/{id} with cashback_preview.
 // Replaces the original stub in main.go (wired separately).
-func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, defaultMarket, cashbackCurrency string) http.HandlerFunc {
+// deliveryEstimator is the narrow read-only slice of shipping.Service the PDP
+// needs for the pre-purchase delivery estimate (P-034). Kept local so the catalog
+// handler depends only on EstimateETA, not the full carrier surface.
+type deliveryEstimator interface {
+	EstimateETA(ctx context.Context, market, originCity string, destCity *string) (shipping.ETAResult, error)
+}
+
+func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSvc deliveryEstimator, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
@@ -251,12 +259,40 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, defau
 			SellerSlug *string `json:"seller_slug"`
 		}
 		out := productOut{Product: p}
+		var originCity string
 		if s, sErr := sellerSvc.GetByID(r.Context(), p.SellerID); sErr == nil {
 			out.SellerName = s.DisplayName
 			slug := s.Slug
 			out.SellerSlug = &slug
+			if s.DispatchCity != nil {
+				originCity = *s.DispatchCity
+			}
 		} else if !errors.Is(sErr, seller.ErrSellerNotFound) {
 			slog.Error("catalog: resolve seller for product", "seller_id", p.SellerID, "err", sErr)
+		}
+
+		// Pre-purchase delivery estimate (P-034). dest_city is optional — the
+		// client passes the user's selected delivery city when known; absent (a
+		// guest) yields the conservative national fallback. A failure here never
+		// fails the PDP: we log and omit the line.
+		var deliveryETA *deliveryEtaJSON
+		if etaSvc != nil {
+			var destCity *string
+			if dc := r.URL.Query().Get("dest_city"); dc != "" {
+				destCity = &dc
+			}
+			if eta, etaErr := etaSvc.EstimateETA(r.Context(), market, originCity, destCity); etaErr != nil {
+				slog.Error("catalog: estimate delivery eta", "product_id", id, "err", etaErr)
+			} else if eta.MaxDays > 0 {
+				deliveryETA = &deliveryEtaJSON{
+					MinDays:   eta.MinDays,
+					MaxDays:   eta.MaxDays,
+					Confident: eta.Confident,
+				}
+				if originCity != "" {
+					deliveryETA.DispatchCity = &originCity
+				}
+			}
 		}
 
 		jsonOK(w, http.StatusOK, map[string]any{
@@ -264,6 +300,7 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, defau
 			"variants":         variantsOut,
 			"translations":     translations,
 			"cashback_preview": cashbackPreview,
+			"delivery_eta":     deliveryETA,
 		})
 	}
 }
@@ -283,6 +320,17 @@ type cashbackPreviewJSON struct {
 	Currency           string `json:"currency"`
 	ReferenceRateBps   int    `json:"reference_rate_bps"`
 	CommissionPctBps   int    `json:"commission_pct_bps"`
+}
+
+// deliveryEtaJSON is the pre-purchase delivery estimate shown on the PDP (P-034).
+// Confident=false marks a fallback (national) range that the UI hedges as
+// "tahmini" — never an SLA promise. DispatchCity backs an optional "X'dan
+// gönderilir" line. Null in the response when no estimate is available.
+type deliveryEtaJSON struct {
+	MinDays      int     `json:"min_days"`
+	MaxDays      int     `json:"max_days"`
+	Confident    bool    `json:"confident"`
+	DispatchCity *string `json:"dispatch_city,omitempty"`
 }
 
 type paginationMeta struct {
