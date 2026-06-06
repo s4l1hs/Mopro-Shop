@@ -471,25 +471,23 @@ integration-cart: e2e-test-up
 	CART_TEST_REDIS=localhost:6381 \
 	  go test -tags=integration ./internal/cart/... -count=1 -race -timeout 5m
 
-# NOTE: no -race here (unlike the other suites). identity's TestProperty_OTPCodeDistribution
-# runs 600 bcrypt-backed RequestOTP calls; -race makes that sequential distribution test
-# ~10x slower (≈6.4min local / 10-15min+ on the 2-vCPU CI runner) for zero concurrency-
-# detection value, risking the 20min CI job budget. Backlog: a targeted -race run of the
-# identity concurrency tests (token rotation / family revoke) excluding the distribution test.
+# NOTE: no -race here (unlike the other suites) — kept off the main path for speed
+# (bcrypt-heavy RequestOTP flows). The -race coverage of the identity concurrency tests
+# (token rotation / family revoke / rate-limiter / step-up) runs in integration-identity-race.
 integration-identity: e2e-test-up
 	IDENTITY_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
 	IDENTITY_TEST_REDIS=localhost:6381 \
 	  go test -tags=integration ./internal/identity/... -count=1 -timeout 5m
 
 # integration-identity-race (TESTING_AUDIT F-006): the targeted -race run the no-race
-# integration-identity comment promised. `-skip OTPCodeDistribution` excludes the one
-# pathological test (600 sequential bcrypt calls — ~10x slower under -race for zero
-# concurrency value); everything else (refresh-token rotation, family-revoke, OTP
-# rate-limiter, step-up) runs under the detector in ~26s. Clean as of this commit.
+# integration-identity comment promised — the whole identity integration suite
+# (refresh-token rotation, family-revoke, OTP rate-limiter, step-up) under the detector.
+# (The old `-skip OTPCodeDistribution` is gone: that slow chi-square test was replaced by
+# a deterministic format test — closes flake TestProperty_OTPCodeDistribution.)
 integration-identity-race: e2e-test-up
 	IDENTITY_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
 	IDENTITY_TEST_REDIS=localhost:6381 \
-	  go test -tags=integration -race -skip 'OTPCodeDistribution' ./internal/identity/... -count=1 -timeout 8m
+	  go test -tags=integration -race ./internal/identity/... -count=1 -timeout 8m
 
 # payment reconciler integration suite (TESTING_AUDIT F-001). Reuses e2e-test-up's
 # pg-ecom-e2e (its TestMain self-bootstraps order_schema.payments+outbox). -race is on:
@@ -510,7 +508,7 @@ soak: pg-ledger-test-up e2e-test-up ## Stress concurrency suites (-race -count=$
 	  go test -tags=integration -race ./internal/payment/... -count=$(SOAK_COUNT) -timeout 45m
 	IDENTITY_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
 	IDENTITY_TEST_REDIS=localhost:6381 \
-	  go test -tags=integration -race -skip 'OTPCodeDistribution' ./internal/identity/... -count=$(SOAK_COUNT) -timeout 60m
+	  go test -tags=integration -race ./internal/identity/... -count=$(SOAK_COUNT) -timeout 60m
 
 # ── Catalog seed ───────────────────────────────────────────────────────────────
 

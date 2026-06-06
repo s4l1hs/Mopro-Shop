@@ -4452,3 +4452,15 @@ Completes the chain **P-029** (global bestseller) → **P-033** (`product_view` 
 
 ### Step 5 status (post P-031) — 🎉 COMPLETE
 **Every Trendyol parity-audit finding is RESOLVED end-to-end.** Remaining is post-audit polish/infra only (not parity gaps): chi-square flake (#74), PDP-strikethrough (minor), wiring analytics-integration + delivery-ETA live-PG tests into `make verify`, PDP-goldens Linux regen.
+
+## PR — Chi-square flake fix (`fix/otp-distribution-flake`) — closes flake TestProperty_OTPCodeDistribution
+
+Discovery `docs/internal/chi-square-flake-fix.md`. **Outcome: delete the statistical test, replace with a deterministic format test.**
+
+- **Root cause.** `generateOTPCode` uses `crypto/rand.Int(reader, big.NewInt(1_000_000))` — uniform **by construction** (rejection sampling, no modulo bias). So the chi-square goodness-of-fit was testing **crypto/rand's uniformity**, not Mopro's code, and false-fails at its alpha rate *by definition*. Discovery found **two** copies: a whitebox `!integration` one (`codegen_test.go`, p=0.05, n=100k) that runs in `make test` and flaked ~5%, and a slow integration one (`property_test.go`, p=0.001, 600 bcrypt `RequestOTP` calls) that was already `-skip`-excluded from the `-race` targets for speed.
+- **Fix.** Extracted `formatOTP(int64) string` (the package-owned bound + `%06d` zero-padding). Replaced the whitebox chi-square with **`TestOTPCode_Format`** — deterministic `formatOTP` boundary cases (incl. the zero-padding a random sample could miss — the real regression risk) + a live `generateOTPCode` format/range smoke that holds for every draw (never flakes). **Deleted** the redundant integration chi-square (its flow is covered by other `RequestOTP` tests); dropped its now-unused `ratelimit` import + orphaned `multiCaptureSMS` helper.
+- **Make verify.** Dropped the dead `-skip 'OTPCodeDistribution'` from `integration-identity-race` + `soak` (the test it skipped is gone). Net win: `integration-identity-race` now runs the **whole** identity suite under `-race` (closes the F-006 "identity concurrency never runs under -race" gap, since the slow test that forced the exclusion is gone).
+- **Verification.** `TestOTPCode_Format` passes `-count=10` (deterministic); `go vet ./...` + `-tags=integration` clean; no `OTPCodeDistribution` test/skip remains (only "closes flake" trail comments). No production behavior change (formatOTP is a pure extraction).
+
+### Post-audit tail (updated)
+Remaining (all non-parity polish/infra): PDP-strikethrough (minor `Variant.original_price`), wiring analytics-integration + delivery-ETA live-PG tests into `make verify`, PDP-goldens Linux regen. **The chi-square flake is closed.**

@@ -239,6 +239,7 @@ integration-identity: ... go test -tags=integration ./internal/identity/... -cou
 ```
 `integration-cart` and `integration-e2e` run with `-race`; `integration-identity` does not (documented reason, PR #48: `OTPCodeDistribution`'s 600 bcrypt calls are too slow under `-race` on the 2-vCPU CI runner). Consequence: identity concurrency (refresh-token rotation, family-revoke theft detection, OTP rate-limiter) **never executes under the race detector** anywhere — no nightly `-race` job exists either.
 Recommendation: a targeted `-race` run of identity's concurrency tests *excluding* the bcrypt distribution test (own target or nightly workflow).
+**✅ RESOLVED — `make integration-identity-race` (F-006) + the chi-square removal (`fix/otp-distribution-flake`).** The targeted `-race` target now runs the **whole** identity integration suite under the detector (no exclusion): the slow `OTPCodeDistribution` chi-square test was a statistical test of `crypto/rand.Int`'s uniformity (not Mopro's logic) — it false-failed at its alpha rate by definition and was the only `-race`-excluded test — so it was replaced by a deterministic `TestOTPCode_Format` (whitebox) and its redundant integration copy deleted. `make soak` also dropped the `-skip`. (closes flake `TestProperty_OTPCodeDistribution`.)
 
 ### F-007 — near-tautological determinism property test
 **Severity: LOW | Confidence: CONFIRMED | ✅ RESOLVED-BY `test/audit-burndown-f002-f016-low` (2026-06-03)**
@@ -351,7 +352,7 @@ Query profiling needs a seeded DB + access patterns; not done this pass. Flag fo
 
 ## §8 Recommended follow-up PR sequence (each <500 LOC, by severity)
 1. **`test/payment-reconciler-coverage`** (F-001) — unit tests for `payment.Service` + `Reconciler` (fake adapter). *Highest value: live financial worker.*
-2. **`test/identity-race-target`** (F-006) — add a `-race` identity target excluding `OTPCodeDistribution`; wire as nightly or its own PR job.
+2. ✅ **`test/identity-race-target`** (F-006) — DONE: `make integration-identity-race` + nightly `make soak`. The `OTPCodeDistribution` exclusion is gone (`fix/otp-distribution-flake` replaced that chi-square with a deterministic format test), so the target now runs the whole identity suite under `-race`.
 3. **`test/revival-gap-reconcile`** (F-011 + F-012) — reconcile the 5 skips; determine if F-012 is a real jti/entropy bug (if so, split into a fix PR).
 4. **`test/module-coverage-treasury`** then `search` / `media` / `sizefinder` (F-002) — one module per PR; treasury first (financial).
 5. **`test/wallet-refresh-loop` + `chore/idempotency-determinism-test`** (F-003, F-007) — small.

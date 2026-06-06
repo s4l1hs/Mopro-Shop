@@ -458,13 +458,24 @@ func generateVerificationCode() (string, error) {
 	return string(b), nil
 }
 
-// generateOTPCode returns a cryptographically-random 6-digit code (used for SMS OTP).
+// generateOTPCode returns a cryptographically-random 6-digit code (used for SMS
+// OTP). rand.Int is uniform over [0, 1_000_000) by construction (rejection
+// sampling — no modulo bias), so the *uniformity* of codes is crypto/rand's
+// guarantee, not ours; what this package owns is the bound + zero-padded format
+// (see formatOTP), which TestOTPCode_Format pins deterministically.
 func generateOTPCode() (string, error) {
 	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%06d", n.Int64()), nil
+	return formatOTP(n.Int64()), nil
+}
+
+// formatOTP renders a draw in [0, 1_000_000) as a zero-padded 6-digit string
+// (e.g. 7 → "000007"). Split out so the format is deterministically testable
+// without statistics.
+func formatOTP(n int64) string {
+	return fmt.Sprintf("%06d", n)
 }
 
 // hashToken returns hex(SHA-256(raw)) for DB storage and lookup.

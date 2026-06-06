@@ -13,7 +13,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"strconv"
 	"testing"
 	"time"
 
@@ -23,71 +22,8 @@ import (
 
 	"github.com/mopro/platform/internal/identity"
 	identityjwt "github.com/mopro/platform/internal/identity/jwt"
-	"github.com/mopro/platform/internal/identity/ratelimit"
 	pkgcrypto "github.com/mopro/platform/pkg/crypto"
 )
-
-// TestProperty_OTPCodeDistribution verifies that the 6-digit OTP generator produces
-// uniformly distributed codes (chi-square goodness-of-fit, p > 0.05).
-func TestProperty_OTPCodeDistribution(t *testing.T) {
-	const n = 600 // run 600 OTP requests — enough for chi-square validity (expected ≥5 per cell)
-	ctx := context.Background()
-
-	integRedis.FlushDB(ctx)
-	repo := newIntegRepo(t)
-	limiter := ratelimit.New(integRedis)
-	signer := newIntegSigner(t)
-	sms := &multiCaptureSMS{}
-
-	svc := identity.NewService(repo, sms, capturedEmail{}, limiter, signer, "TR", "tr-TR", nil, nil)
-
-	// Use unique phone numbers per call to avoid rate-limit hits.
-	for i := 0; i < n; i++ {
-		phone := fmt.Sprintf("+9090%07d", i)
-		if err := svc.RequestOTP(ctx, phone, identity.OTPPurposeLogin, ""); err != nil {
-			t.Fatalf("RequestOTP[%d]: %v", i, err)
-		}
-	}
-
-	if len(sms.codes) != n {
-		t.Fatalf("expected %d OTP codes, got %d", n, len(sms.codes))
-	}
-
-	// Verify each code is exactly 6 decimal digits.
-	for i, code := range sms.codes {
-		if len(code) != 6 {
-			t.Errorf("code[%d] = %q: expected 6 digits, got %d", i, code, len(code))
-		}
-		if _, err := strconv.Atoi(code); err != nil {
-			t.Errorf("code[%d] = %q: not a numeric string: %v", i, code, err)
-		}
-	}
-
-	// Chi-square uniformity test over the full 6-digit range [000000, 999999].
-	// Count occurrences of each leading digit (10 cells, expected = n/10).
-	observed := make([]float64, 10)
-	for _, code := range sms.codes {
-		digit := int(code[0] - '0')
-		observed[digit]++
-	}
-	expected := float64(n) / 10
-	chi2 := 0.0
-	for _, o := range observed {
-		diff := o - expected
-		chi2 += diff * diff / expected
-	}
-	// Chi-square critical value for df=9. Use p=0.001 (27.877), not p=0.05
-	// (16.919): this test runs in the make-verify gate on every PR, and a p=0.05
-	// threshold false-fails ~5% of runs on a perfectly-uniform crypto/rand source
-	// (normal statistical variance — an observed chi2=21.933 tripped it in CI
-	// while passing locally). p=0.001 cuts false-fails to ~0.1% while still
-	// catching a genuinely non-uniform generator (a real security regression).
-	const chi2Critical = 27.877
-	if chi2 > chi2Critical {
-		t.Errorf("chi-square test failed: chi2=%.3f > critical=%.3f (observed: %v)", chi2, chi2Critical, observed)
-	}
-	t.Logf("OTP distribution chi2=%.3f (critical=%.3f, n=%d) — PASS", chi2, chi2Critical, n)
-}
 
 // TestProperty_JWTSigner_RoundTrip verifies that for any userID in [1, 2^31-1]
 // and any market code, issuing and then verifying an access token recovers the
@@ -252,16 +188,4 @@ func TestProperty_RefreshTokenRotationChain(t *testing.T) {
 	)
 
 	properties.TestingRun(t)
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-// multiCaptureSMS records all codes sent across multiple Send calls.
-type multiCaptureSMS struct {
-	codes []string
-}
-
-func (m *multiCaptureSMS) Send(_ context.Context, _, code string) error {
-	m.codes = append(m.codes, code)
-	return nil
 }
