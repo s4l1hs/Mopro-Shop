@@ -38,9 +38,13 @@ display + **P-032 ✅ price-update lifecycle** `feat/price-update-lifecycle` —
 **P-007 ✅ RESOLVED** (PDP delivery-ETA shipped end-to-end). **P-034 ✅ SUPERSEDED** — its shipping-ETA
 infra (seller `dispatch_city`, seeded `ref_schema` zone/transit lookup, cheap `shipping.EstimateETA`,
 `PdpDeliveryInfo` widget) was built directly in the P-007 PR rather than as a separate carve.
-**🎉 ALL PARITY FINDINGS CLOSED END-TO-END.** Remaining is post-audit polish/infra only (not parity gaps):
-chi-square flake (#74), PDP-strikethrough (minor), analytics-integration + delivery-ETA live-PG tests in
-`make verify`, PDP-goldens Linux regen.**
+**🎉 ALL PARITY FINDINGS CLOSED END-TO-END.** The **filed post-audit tail is now at zero**:
+chi-square flake (#74) ✅ (`fix/otp-distribution-flake`); PDP-strikethrough ✅ (`feat/pdp-strikethrough`);
+**analytics-integration + delivery-ETA live-PG tests in `make verify` ✅ RESOLVED-BY `chore/wire-post-audit-integration-tests`**
+(`integration-analytics` + a new `integration-shipping` LookupTransit/0085-seed suite). Remaining is
+**operational/infra only** (not code, not parity): a PDP-goldens Linux regen (no golden CI job) and the
+broader integration-CI-coverage carve newly filed as **TESTING_AUDIT F-018** (10 other unwired suites →
+`chore/revive-unwired-integration-suites`). See `docs/internal/integration-tests-wiring.md`.**
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 

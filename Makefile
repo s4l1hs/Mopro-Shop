@@ -37,7 +37,7 @@ help: ## Show this help.
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## /{printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment test-integration-catalog verify-image-manifest verify-contrast ## Full verification gate (run before every push).
+verify: fmt vet test lint boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment integration-analytics integration-shipping test-integration-catalog verify-image-manifest verify-contrast ## Full verification gate (run before every push).
 
 # WCAG contrast check for the documented brand colour pairs. Fails if any
 # non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.
@@ -496,6 +496,24 @@ integration-identity-race: e2e-test-up
 integration-payment: e2e-test-up
 	ORDER_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
 	  go test -tags=integration ./internal/payment/... -count=1 -race -timeout 5m
+
+# analytics integration suite (post-audit wiring; was on no CI job — see
+# docs/internal/integration-tests-wiring.md). Reuses e2e-test-up's pg-ecom-e2e:
+# its TestMain self-bootstraps analytics_schema on empty postgres-ecom (no migrations,
+# no new container). Covers ingest/consent/identify/recently-viewed/prune/erase/
+# recommendations + the #100 per-category popularity (TestIntegration_PopularPerCategory).
+integration-analytics: e2e-test-up
+	ANALYTICS_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	  go test -tags=integration ./internal/analytics/... -count=1 -race -timeout 5m
+
+# shipping ref_schema integration suite (P-034 live-PG, post-audit wiring; was on
+# no CI job — see docs/internal/integration-tests-wiring.md). Reuses e2e-test-up's
+# pg-ecom-e2e; the suite applies migrations/ecom/0085_shipping_zones.up.sql itself
+# (verifying the seed). Non-recursive (./internal/shipping/ not /...) so the carrier
+# adapter sub-packages — already unit-tested by `go test ./...` — aren't pulled in.
+integration-shipping: e2e-test-up
+	SHIPPING_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	  go test -tags=integration ./internal/shipping/ -count=1 -race -timeout 5m
 
 # Nightly soak (TOOLING_AUDIT T3-6): the concurrency-sensitive suites Step 2
 # flagged for repeated -race stress (§6.3) — wallet RefreshWorker/reconcile (F-003),
