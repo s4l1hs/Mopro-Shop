@@ -211,11 +211,12 @@ _responseData = rawData == null ? null : deserialize<CategoryCommission, Categor
   }
 
   /// Get full product detail including variants and cashback preview
-  /// Server resolves &#x60;title&#x60; and &#x60;description&#x60; from &#x60;Accept-Language&#x60; header. &#x60;cashback_preview.monthly_coin_minor&#x60; is computed handler-layer: &#x60;round(variant.price_minor × commission_pct_bps/10000 × 5000/10000 / 12)&#x60;. Uses the lowest-priced active variant for the preview amount. &#x60;seller_name&#x60; is joined from the seller module (in-process, core-svc only). &#x60;image_urls&#x60; are CDN-resolved (not raw storage keys). 
+  /// Server resolves &#x60;title&#x60; and &#x60;description&#x60; from &#x60;Accept-Language&#x60; header. &#x60;cashback_preview.monthly_coin_minor&#x60; is computed handler-layer: &#x60;round(variant.price_minor × commission_pct_bps/10000 × 5000/10000 / 12)&#x60;. Uses the lowest-priced active variant for the preview amount. &#x60;seller_name&#x60; is joined from the seller module (in-process, core-svc only). &#x60;image_urls&#x60; are CDN-resolved (not raw storage keys). &#x60;delivery_eta&#x60; is a cheap, table-driven pre-purchase delivery estimate (P-034) from the seller&#39;s dispatch origin to the optional &#x60;dest_city&#x60;; it makes NO carrier call. Omitted (null) when no estimate is available. 
   ///
   /// Parameters:
   /// * [id] 
   /// * [xTraceId] - Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+  /// * [destCity] - Destination city for the delivery estimate (P-034). The client passes the user's selected delivery city when known; absent (a guest) yields the conservative national fallback (delivery_eta.confident = false). Case/diacritic-insensitive (folded to an ASCII key server-side). 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -228,6 +229,7 @@ _responseData = rawData == null ? null : deserialize<CategoryCommission, Categor
   Future<Response<Product>> getProduct({ 
     required int id,
     String? xTraceId,
+    String? destCity,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -255,9 +257,14 @@ _responseData = rawData == null ? null : deserialize<CategoryCommission, Categor
       validateStatus: validateStatus,
     );
 
+    final _queryParameters = <String, dynamic>{
+      if (destCity != null) r'dest_city': destCity,
+    };
+
     final _response = await _dio.request<Object>(
       _path,
       options: _options,
+      queryParameters: _queryParameters,
       cancelToken: cancelToken,
       onSendProgress: onSendProgress,
       onReceiveProgress: onReceiveProgress,

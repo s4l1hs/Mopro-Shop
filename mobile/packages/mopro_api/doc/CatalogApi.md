@@ -107,11 +107,11 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **getProduct**
-> Product getProduct(id, xTraceId)
+> Product getProduct(id, xTraceId, destCity)
 
 Get full product detail including variants and cashback preview
 
-Server resolves `title` and `description` from `Accept-Language` header. `cashback_preview.monthly_coin_minor` is computed handler-layer: `round(variant.price_minor × commission_pct_bps/10000 × 5000/10000 / 12)`. Uses the lowest-priced active variant for the preview amount. `seller_name` is joined from the seller module (in-process, core-svc only). `image_urls` are CDN-resolved (not raw storage keys). 
+Server resolves `title` and `description` from `Accept-Language` header. `cashback_preview.monthly_coin_minor` is computed handler-layer: `round(variant.price_minor × commission_pct_bps/10000 × 5000/10000 / 12)`. Uses the lowest-priced active variant for the preview amount. `seller_name` is joined from the seller module (in-process, core-svc only). `image_urls` are CDN-resolved (not raw storage keys). `delivery_eta` is a cheap, table-driven pre-purchase delivery estimate (P-034) from the seller's dispatch origin to the optional `dest_city`; it makes NO carrier call. Omitted (null) when no estimate is available. 
 
 ### Example
 ```dart
@@ -120,9 +120,10 @@ import 'package:mopro_api/api.dart';
 final api = MoproApi().getCatalogApi();
 final int id = 789; // int | 
 final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+final String destCity = destCity_example; // String | Destination city for the delivery estimate (P-034). The client passes the user's selected delivery city when known; absent (a guest) yields the conservative national fallback (delivery_eta.confident = false). Case/diacritic-insensitive (folded to an ASCII key server-side). 
 
 try {
-    final response = api.getProduct(id, xTraceId);
+    final response = api.getProduct(id, xTraceId, destCity);
     print(response);
 } catch on DioException (e) {
     print('Exception when calling CatalogApi->getProduct: $e\n');
@@ -135,6 +136,7 @@ Name | Type | Description  | Notes
 ------------- | ------------- | ------------- | -------------
  **id** | **int**|  | 
  **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+ **destCity** | **String**| Destination city for the delivery estimate (P-034). The client passes the user's selected delivery city when known; absent (a guest) yields the conservative national fallback (delivery_eta.confident = false). Case/diacritic-insensitive (folded to an ASCII key server-side).  | [optional] 
 
 ### Return type
 

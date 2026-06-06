@@ -39,6 +39,7 @@ class _FakeCatalogApiOk extends CatalogApi {
   @override
   Future<Response<Product>> getProduct({
     required int id,
+    String? destCity,
     String? xTraceId,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -60,6 +61,7 @@ class _FakeCatalogApiNotFound extends CatalogApi {
   @override
   Future<Response<Product>> getProduct({
     required int id,
+    String? destCity,
     String? xTraceId,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,

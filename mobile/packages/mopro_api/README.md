@@ -186,6 +186,7 @@ Class | Method | HTTP request | Description
  - [CreateProductRequest](doc/CreateProductRequest.md)
  - [CursorPaginationMeta](doc/CursorPaginationMeta.md)
  - [DeleteMeRequest](doc/DeleteMeRequest.md)
+ - [DeliveryEta](doc/DeliveryEta.md)
  - [Device](doc/Device.md)
  - [ErrorEnvelope](doc/ErrorEnvelope.md)
  - [ErrorEnvelopeError](doc/ErrorEnvelopeError.md)

@@ -4,6 +4,7 @@
 
 // ignore_for_file: unused_element
 import 'package:mopro_api/src/model/variant.dart';
+import 'package:mopro_api/src/model/delivery_eta.dart';
 import 'package:mopro_api/src/model/cashback_preview.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -41,6 +42,8 @@ class Product {
     required  this.variants,
 
     required  this.cashbackPreview,
+
+     this.deliveryEta,
 
     required  this.createdAt,
   });
@@ -180,6 +183,19 @@ class Product {
 
 
 
+      /// Pre-purchase delivery estimate (P-034). Null when no estimate is available. Not a delivery SLA — `confident=false` ranges are fallback estimates the UI hedges as \"tahmini\". 
+  @JsonKey(
+    
+    name: r'delivery_eta',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final DeliveryEta? deliveryEta;
+
+
+
   @JsonKey(
     
     name: r'created_at',
@@ -207,6 +223,7 @@ class Product {
       other.description == description &&
       other.variants == variants &&
       other.cashbackPreview == cashbackPreview &&
+      other.deliveryEta == deliveryEta &&
       other.createdAt == createdAt;
 
     @override
@@ -222,6 +239,7 @@ class Product {
         description.hashCode +
         variants.hashCode +
         cashbackPreview.hashCode +
+        deliveryEta.hashCode +
         createdAt.hashCode;
 
   factory Product.fromJson(Map<String, dynamic> json) => _$ProductFromJson(json);

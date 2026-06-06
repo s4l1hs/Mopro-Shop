@@ -344,6 +344,27 @@ type CheckoutResponse struct {
 // CheckoutResponseStatus defines model for CheckoutResponse.Status.
 type CheckoutResponseStatus string
 
+// DeliveryEta Cheap, table-driven pre-purchase delivery estimate in transit business
+// days (P-034). Computed from the seller dispatch origin + optional
+// destination via a static ref_schema lookup — NO carrier call. An estimate,
+// never a committed SLA.
+type DeliveryEta struct {
+	// Confident true when derived from a concrete origin×destination transit row;
+	// false when it is the conservative national fallback (unknown origin
+	// or destination, e.g. a guest with no address).
+	Confident bool `json:"confident"`
+
+	// DispatchCity Normalized key of the seller's dispatch city, for an optional
+	// "{city}'dan gönderilir" line. Omitted when the origin is unknown.
+	DispatchCity *string `json:"dispatch_city"`
+
+	// MaxDays Upper bound of the transit business-day estimate.
+	MaxDays int `json:"max_days"`
+
+	// MinDays Lower bound of the transit business-day estimate.
+	MinDays int `json:"min_days"`
+}
+
 // Device defines model for Device.
 type Device struct {
 	CreatedAt   time.Time `json:"created_at"`
@@ -434,6 +455,11 @@ type Product struct {
 	CashbackPreview CashbackPreview `json:"cashback_preview"`
 	CategoryId      int64           `json:"category_id"`
 	CreatedAt       time.Time       `json:"created_at"`
+
+	// DeliveryEta Pre-purchase delivery estimate (P-034). Null when no estimate is
+	// available. Not a delivery SLA — `confident=false` ranges are
+	// fallback estimates the UI hedges as "tahmini".
+	DeliveryEta *DeliveryEta `json:"delivery_eta"`
 
 	// Description Locale-resolved. Falls back to tr-TR if requested locale unavailable.
 	Description string `json:"description"`
@@ -1260,6 +1286,12 @@ type CreateProductParams struct {
 
 // GetProductParams defines parameters for GetProduct.
 type GetProductParams struct {
+	// DestCity Destination city for the delivery estimate (P-034). The client passes
+	// the user's selected delivery city when known; absent (a guest) yields
+	// the conservative national fallback (delivery_eta.confident = false).
+	// Case/diacritic-insensitive (folded to an ASCII key server-side).
+	DestCity *string `form:"dest_city,omitempty" json:"dest_city,omitempty"`
+
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
 	// Echoed in error responses as `error.trace_id`.
 	// Falls back to a server-generated UUID if absent.
@@ -3817,6 +3849,14 @@ func (siw *ServerInterfaceWrapper) GetProduct(w http.ResponseWriter, r *http.Req
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params GetProductParams
+
+	// ------------- Optional query parameter "dest_city" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "dest_city", r.URL.Query(), &params.DestCity)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dest_city", Err: err})
+		return
+	}
 
 	headers := r.Header
 
