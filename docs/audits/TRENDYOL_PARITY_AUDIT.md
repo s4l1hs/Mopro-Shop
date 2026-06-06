@@ -32,13 +32,15 @@ badges end-to-end. `discount_pct` emitted; `lowest_30d_price` → **P-030** (HIG
 `feat/bestseller-unhide`; category-scope → **P-031**). **P-030 price-history ✅ RESOLVED end-to-end**
 (backend `feat/price-history` Mechanism B trigger; card display `feat/lowest-30d-display`; PDP per-variant
 display + **P-032 ✅ price-update lifecycle** `feat/price-update-lifecycle` — seller-scoped
-`PUT /seller/variants/{id}/price`). **P-033 ✅ RESOLVED** (`product_view` now carries `categoryId`,
-additive) → **P-031 🔓 UNBLOCKED** (category bestseller — a small same-schema aggregation follow-up;
-global proxy covers historical). **P-007 ✅ RESOLVED** (PDP delivery-ETA shipped end-to-end). **P-034 ✅
-SUPERSEDED** — its shipping-ETA infra (seller `dispatch_city`, seeded `ref_schema` zone/transit lookup,
-cheap `shipping.EstimateETA`, `PdpDeliveryInfo` widget) was built directly in the P-007 PR rather than as a
-separate carve. **The pure-UI parity work is done.** Remaining: **P-031** (category-popularity aggregation
-follow-up, now unblocked), chi-square flake, PDP-strikethrough.**
+`PUT /seller/variants/{id}/price`). **P-033 ✅ RESOLVED** (`product_view` carries `categoryId`) →
+**P-031 ✅ RESOLVED end-to-end** (`feat/category-aggregation`: per-category `RebuildPopular` pass +
+`PopularProductIDsInCategory` + handler routing with global fallback — completing P-029→P-033→P-031).
+**P-007 ✅ RESOLVED** (PDP delivery-ETA shipped end-to-end). **P-034 ✅ SUPERSEDED** — its shipping-ETA
+infra (seller `dispatch_city`, seeded `ref_schema` zone/transit lookup, cheap `shipping.EstimateETA`,
+`PdpDeliveryInfo` widget) was built directly in the P-007 PR rather than as a separate carve.
+**🎉 ALL PARITY FINDINGS CLOSED END-TO-END.** Remaining is post-audit polish/infra only (not parity gaps):
+chi-square flake (#74), PDP-strikethrough (minor), analytics-integration + delivery-ETA live-PG tests in
+`make verify`, PDP-goldens Linux regen.**
 
 **Honest headline:** *the visual/interaction language is already Trendyol-shaped.* The original ask ("make UI look like Trendyol; preserve guest browsing; gate only personal actions") is **substantially met** — guest browsing + the auth gate are a model implementation (§4.4). Remaining parity work is **fidelity polish + backend-data wiring**, not surface-building. This is the §12 "concentrated / coverage-constrained" outcome, not the "8 HIGH" outcome.
 
@@ -161,8 +163,8 @@ Recommendation: denormalize a popularity counter into `catalog_schema.products` 
 **Frontend un-hide (`feat/bestseller-unhide`):** removed the two `.where(... != bestseller)` filters PR #86 had added (mobile `SortSheet` + desktop `PopupMenuButton`); the option now renders in every selector and `sort=bestseller` flows to the backend (sent as a raw string — no dependency on the client regen). i18n keys already existed and match the home bestseller rail (`"Çok satanlar"`/`"Best sellers"` — kept, not the prompt's assumed "En Çok Satan"); URL codec already round-trips. Zero golden flips (the option only renders in the tapped overlay; goldens capture the closed sidebar). Evidence: `docs/internal/p029-frontend-unhide.md`. **P-029 is now closed end-to-end.**
 
 ### P-031 — category-scoped bestseller popularity (carved from P-029)
-**Status: 🔓 UNBLOCKED (P-033 landed; aggregation follow-up queued) | Severity: MED | Confidence: CONFIRMED | Type: analytics + backend**
-**Unblocked by P-033 (`feat/event-categoryid`):** `product_view` now carries `categoryId`, so the original §5 blocker is gone. P-031 becomes a small **same-schema** follow-up: extend `RebuildPopular` to also INSERT `'category:'||(payload->>'categoryId')` rows via `GROUP BY (payload->>'categoryId'), (payload->>'productId')`, add a scope param to `PopularProductIDs`, and pass the category in the handler when bestseller+category are both active. (Per-category data accrues only from new events — global proxy still covers historical.)
+**Status: ✅ RESOLVED end-to-end (Outcome A, all components) | Severity: MED | Confidence: CONFIRMED | Type: analytics + backend**
+**Resolution (`feat/category-aggregation`):** completes the chain **P-029** (global bestseller) → **P-033** (`product_view` carries `categoryId`) → **P-031** (per-category aggregation + scoped read + routing). `RebuildPopular` runs a second same-tx pass — top-`limit`-per-category (`ROW_NUMBER` window) writing `scope='category:<id>'` from the categoryId on `product_view` payloads (pure same-schema `GROUP BY`, **no catalog JOIN**, §5 honored). `Repository.PopularCategoryIDs` + `Service.PopularProductIDsInCategory` (additive sibling — global signature untouched). `applyBestsellerOrder` routes by the category (passed explicitly, since the category-PLP keeps it out of `ProductFilter`): category-scope → **global fallback on empty** (most categories until events accrue — never regress to recommended) → recommended. No migration (scope column existed), no frontend (#86), no event change (#99). Integration test (per-category ranking + cross-category isolation + global) validated on PG; handler routing unit-tested. Evidence: `docs/internal/p031-category-aggregation.md`.
 Evidence: `analytics.Repository.RebuildPopular` (`api.go:98`) computes only the `'global'` scope; `popular_products` supports `'category:{id}'` scopes by schema but they're unbuilt, and `PopularProductIDs` is global-only. So P-029's bestseller sorts a category PLP by **global** popularity (a reasonable proxy), not category-specific popularity.
 Recommendation: extend `RebuildPopular` to populate `category:{id}` scopes + add a scoped `PopularProductIDs(scope, limit)`; the catalog handler then passes the category scope so category-PLP bestseller is category-specific. Out of P-029's scope (analytics computation change).
 **Discovery (`feat/category-popularity`, Outcome C):** the schema is already category-ready (no migration needed), but the aggregation source — `product_view` events in `analytics_schema.analytics_events` — carries **only `productId`**, no `categoryId`, and there is no category column / product→category projection anywhere in `analytics_schema`. True per-category aggregation (`GROUP BY category, product`) would therefore need a **cross-schema JOIN to `catalog_schema.products` (CLAUDE.md §5 — forbidden)** or event enrichment (frontend/ingest — out of scope). The codebase already documents this deferral ("…once categoryId is carried on the product_view payload (Backlog)"). **Decision: discovery-only — the global proxy is retained** (a niche-category leader that isn't globally popular is the only mis-rank). The enabler is filed as **P-033**; once it lands, P-031 is a small same-schema follow-up. Evidence: `docs/internal/p031-category-popularity.md`.

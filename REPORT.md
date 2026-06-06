@@ -4439,3 +4439,16 @@ Discovery `docs/internal/p033-event-categoryid.md`. **Outcome A (additive).**
 
 ### Step 5 status (post P-033)
 **Every per-finding parity item is RESOLVED.** Remaining (all follow-ups / non-parity): **P-031** aggregation (now unblocked), chi-square flake, PDP-strikethrough, PDP-goldens Linux regen, live-PG `LookupTransit`/`0085` test.
+
+## PR — P-031 per-category bestseller aggregation (`feat/category-aggregation`) — closes PARITY_AUDIT P-031 (per-category bestseller end-to-end)
+
+Completes the chain **P-029** (global bestseller) → **P-033** (`product_view` carries `categoryId`) → **P-031** (per-category aggregation + scoped read + handler routing). **Outcome A, all components.** Discovery `docs/internal/p031-category-aggregation.md`. Stacked on #99.
+
+- **RebuildPopular** — a second pass in the same tx (after the unchanged global pass; one `TRUNCATE`): **top-`limit` products PER category** via a `ROW_NUMBER() OVER (PARTITION BY category ORDER BY count DESC)` window, writing `scope='category:<id>'` from the categoryId on `product_view` payloads. **Pure same-schema `GROUP BY` — no catalog JOIN (§5).** Events without categoryId are excluded (still in the global pass). Same time window, same score, same `limit`.
+- **`Repository.PopularCategoryIDs`** (mirrors `PopularGlobalIDs` for `scope='category:<id>'`) + **`Service.PopularProductIDsInCategory`** — an **additive sibling** so the global method's 3 callers (bestseller + 2 recs-fallback) stay untouched. Go fakes (`fakeRepo`, `fakeRecsSvc`) gained stubs.
+- **Handler** — `applyBestsellerOrder` takes the category **explicitly** (`categoryID *int64`), because the category-PLP handler keeps it out of `ProductFilter` (the base query already scopes by category); search passes `filter.CategoryID`. Routing: category-scope → **global fallback on empty** → recommended. **The global fallback is required, not optional:** until per-category events accrue (most categories, post-#99-rollout) a category PLP must keep the global proxy — without it, P-031 would *regress* empty-category bestseller from "global proxy" to "recommended."
+- **No migration** (scope column existed), **no frontend** (#86 already un-hid the sort), **no event change** (#99).
+- **Tests:** per-category integration (ranking + cross-category isolation + empty + global) validated on a real PG under `-race`; handler routing unit test (4 paths). `go build`/`go vet ./...` clean; `flutter analyze` unaffected. **Note:** analytics integration tests aren't in `make verify` (pre-existing tooling gap — like catalog before #44); filed alongside the existing live-PG follow-up.
+
+### Step 5 status (post P-031) — 🎉 COMPLETE
+**Every Trendyol parity-audit finding is RESOLVED end-to-end.** Remaining is post-audit polish/infra only (not parity gaps): chi-square flake (#74), PDP-strikethrough (minor), wiring analytics-integration + delivery-ETA live-PG tests into `make verify`, PDP-goldens Linux regen.
