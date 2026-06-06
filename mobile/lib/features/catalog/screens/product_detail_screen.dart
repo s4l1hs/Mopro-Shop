@@ -105,7 +105,12 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(analyticsServiceProvider).track(
-            AnalyticsEvent('product_view', {'productId': widget.product.id}),
+            // categoryId is additive (P-033) — enables per-category popularity
+            // (P-031). The loaded product always carries its category here.
+            AnalyticsEvent('product_view', {
+              'productId': widget.product.id,
+              'categoryId': widget.product.categoryId,
+            }),
           );
     });
     _tabController = TabController(length: 4, vsync: this);
