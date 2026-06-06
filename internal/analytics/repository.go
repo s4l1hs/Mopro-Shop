@@ -233,11 +233,11 @@ func (r *pgxRepository) RebuildRecentlyViewed(ctx context.Context, since time.Ti
 }
 
 // RebuildPopular truncates popular_products and recomputes the 'global' scope
-// from product_view counts since `since`. Per-category scope is deliberately
-// not populated here: product→category mapping lives in catalog_schema, which
-// the jobs-svc refresh cannot read (no cross-schema JOIN, CLAUDE.md §5). The
-// `scope` column is retained for a future category tier once categoryId is
-// carried on the product_view payload (Backlog).
+// from product_view counts since `since`, for two scopes: 'global' (all
+// product_view events) and 'category:<id>' (per-category, P-031). The category
+// tier reads categoryId carried on the product_view payload (P-033) — a pure
+// same-schema aggregation, NOT a cross-schema JOIN to catalog_schema (CLAUDE.md
+// §5). Both passes run in one tx after a single TRUNCATE (replace semantics).
 func (r *pgxRepository) RebuildPopular(ctx context.Context, since time.Time, limit int) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -257,6 +257,33 @@ func (r *pgxRepository) RebuildPopular(ctx context.Context, since time.Time, lim
 		  GROUP BY (payload->>'productId')::numeric::bigint
 		  ORDER BY COUNT(*) DESC
 		  LIMIT $2`,
+		since, limit,
+	); err != nil {
+		return err
+	}
+	// Per-category pass (P-031): top-`limit` products PER category, keyed on the
+	// categoryId carried on product_view payloads (P-033). Events without
+	// categoryId are excluded here (still counted in the global pass above).
+	if _, err = tx.Exec(ctx,
+		`INSERT INTO analytics_schema.popular_products (scope, product_id, view_count)
+		 SELECT 'category:' || cat::text, pid, cnt
+		   FROM (
+		     SELECT (payload->>'categoryId')::numeric::bigint AS cat,
+		            (payload->>'productId')::numeric::bigint  AS pid,
+		            COUNT(*) AS cnt,
+		            ROW_NUMBER() OVER (
+		              PARTITION BY (payload->>'categoryId')::numeric::bigint
+		              ORDER BY COUNT(*) DESC, (payload->>'productId')::numeric::bigint
+		            ) AS rn
+		       FROM analytics_schema.analytics_events
+		      WHERE event_type = 'product_view'
+		        AND server_ts >= $1
+		        AND payload ? 'productId'
+		        AND payload ? 'categoryId'
+		      GROUP BY (payload->>'categoryId')::numeric::bigint,
+		               (payload->>'productId')::numeric::bigint
+		   ) ranked
+		  WHERE rn <= $2`,
 		since, limit,
 	); err != nil {
 		return err
@@ -314,6 +341,24 @@ func (r *pgxRepository) PopularGlobalIDs(ctx context.Context, limit int) ([]int6
 		  ORDER BY view_count DESC, product_id
 		  LIMIT $1`,
 		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanIDs(rows)
+}
+
+// PopularCategoryIDs returns the top products by view_count within one category
+// (scope 'category:<id>', populated by RebuildPopular's per-category pass, P-031).
+// Empty until per-category events accrue — the handler falls back to global.
+func (r *pgxRepository) PopularCategoryIDs(ctx context.Context, categoryID int64, limit int) ([]int64, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT product_id FROM analytics_schema.popular_products
+		  WHERE scope = $1
+		  ORDER BY view_count DESC, product_id
+		  LIMIT $2`,
+		fmt.Sprintf("category:%d", categoryID), limit,
 	)
 	if err != nil {
 		return nil, err
