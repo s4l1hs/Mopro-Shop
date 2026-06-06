@@ -27,6 +27,10 @@ type Seller struct {
 	LogoImageURL    *string           `json:"logo_image_url,omitempty"`
 	BannerImageURL  *string           `json:"banner_image_url,omitempty"`
 	ContactEmail    *string           `json:"contact_email,omitempty"`
-	Status          string            `json:"status"`
-	CreatedAt       time.Time         `json:"created_at"`
+	// DispatchCity is the normalized city key the seller ships from (P-034), the
+	// origin input to shipping.EstimateETA for the PDP delivery estimate. nil =
+	// no declared origin → estimator uses the conservative national fallback.
+	DispatchCity *string   `json:"dispatch_city,omitempty"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
 }
