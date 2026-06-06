@@ -681,7 +681,13 @@ type Variant struct {
 	// specific selected variant — is accurate. Omitted when no in-window
 	// history; equals price_minor until the price changes (P-032).
 	Lowest30dPriceMinor *int64 `json:"lowest_30d_price_minor"`
-	PriceCurrency       string `json:"price_currency"`
+
+	// OriginalPriceMinor Original/list (MSRP) price in minor units. When set and greater than
+	// price_minor the variant is discounted — render a strikethrough on
+	// original_price_minor in the PDP buy-box (PDP-strikethrough). Omitted
+	// when the variant was never marked down.
+	OriginalPriceMinor *int64 `json:"original_price_minor"`
+	PriceCurrency      string `json:"price_currency"`
 
 	// PriceMinor Price in minor units (kuruş)
 	PriceMinor int64   `json:"price_minor"`
