@@ -50,6 +50,10 @@ type Service interface {
 	// fallback + home rail for non-personalized users). Product enrichment is
 	// the caller's job — no cross-schema JOIN.
 	PopularProductIDs(ctx context.Context, limit int) ([]int64, error)
+	// PopularProductIDsInCategory returns the most-viewed product IDs within one
+	// category (P-031, per-category bestseller). Empty until per-category events
+	// accrue — callers fall back to PopularProductIDs (the global proxy).
+	PopularProductIDsInCategory(ctx context.Context, categoryID int64, limit int) ([]int64, error)
 
 	// HomeRecommendationIDs returns personalized product IDs for an authed,
 	// consented user: co-views aggregated over the user's recently-viewed seeds,
@@ -105,6 +109,9 @@ type Repository interface {
 
 	// PopularGlobalIDs returns the top global product IDs by view_count.
 	PopularGlobalIDs(ctx context.Context, limit int) ([]int64, error)
+	// PopularCategoryIDs returns the top product IDs by view_count within one
+	// category (scope 'category:<id>', P-031).
+	PopularCategoryIDs(ctx context.Context, categoryID int64, limit int) ([]int64, error)
 	// CoViewIDs returns the top co-viewed partners of a single product.
 	CoViewIDs(ctx context.Context, productID int64, limit int) ([]int64, error)
 	// CoViewIDsForSeeds aggregates co-views across multiple seed products

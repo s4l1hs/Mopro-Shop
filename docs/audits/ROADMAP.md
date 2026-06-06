@@ -204,6 +204,14 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
     value-validation; old/offline clients + web (which emits no `product_view`) justify keeping it optional
     forever. Backend doc + contract test pin the additive behaviour; a focused capturing-`AnalyticsService`
     test asserts the emit. **P-031** is now a small same-schema `GROUP BY (categoryId, productId)` follow-up.
+15. **P5-14** `feat/category-aggregation` — ✅ **P-031 RESOLVED end-to-end** (`docs/internal/p031-category-aggregation.md`).
+    Completes the chain P-029→P-033→P-031. `RebuildPopular` gains a same-tx top-`limit`-per-category pass
+    (`ROW_NUMBER` window, `scope='category:<id>'`) from the categoryId on `product_view` payloads — pure
+    same-schema `GROUP BY`, no catalog JOIN (§5). `Repository.PopularCategoryIDs` + `Service.PopularProductIDsInCategory`
+    (additive sibling). `applyBestsellerOrder` routes by the category (passed explicitly — the category PLP keeps it
+    out of `ProductFilter`): category-scope → **global fallback on empty** (never regress to recommended). No migration/
+    frontend/event change. Per-category integration test validated on PG (`make verify` doesn't run analytics
+    integration — pre-existing tooling gap); handler routing unit-tested. **Per-category bestseller is live end-to-end.**
 
 ✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
 CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);
@@ -230,9 +238,9 @@ carved → **P-031**; frontend un-hide `feat/bestseller-unhide`). P-026 ✅ RESO
 closed** (`chore/step5-low-batch`: P-015 FIX, P-011 CORRECTED, P-004/009/012/013 NOT-ACTIONABLE, HeroCarousel
 REMOVED). ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + P-009 ✅ RESOLVED**
 (`feat/wire-card-badges`: favorites-count overlay + free-shipping/discount card badges, end-to-end).
-**The pure-UI Trendyol-parity work is complete.** **Every per-finding parity item is now RESOLVED.**
+**🎉 STEP 5 COMPLETE — every parity finding is RESOLVED end-to-end.**
 **P-029 ✅ · P-030 ✅ · P-032 ✅ · P-007 ✅** (delivery-ETA end-to-end; **P-034 SUPERSEDED**, built directly in
-the P-007 PR) **· P-033 ✅** (`product_view` carries `categoryId`) **→ P-031 🔓 UNBLOCKED** (a small same-schema
-aggregation follow-up; global proxy covers historical). Remaining tail (all follow-ups / non-parity):
-**P-031** aggregation, chi-square flake (#74), PDP-strikethrough, PDP-goldens Linux regen, live-PG test for
-`LookupTransit` + `0085` seed.
+the P-007 PR) **· P-033 ✅** (`product_view` carries `categoryId`) **· P-031 ✅** (per-category bestseller live,
+`feat/category-aggregation` — chain P-029→P-033→P-031). Remaining is **post-audit polish/infra only** (not
+parity gaps): chi-square flake (#74), PDP-strikethrough (minor), wire analytics-integration + delivery-ETA
+live-PG tests into `make verify`, PDP-goldens Linux regen.

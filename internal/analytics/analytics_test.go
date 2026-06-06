@@ -12,21 +12,23 @@ const validSession = "11111111-2222-3333-4444-555555555555"
 
 // fakeRepo is an in-memory Repository for service-logic tests.
 type fakeRepo struct {
-	consent    map[int64]Consent
-	identities map[string]int64
-	events     []StoredEvent
-	recently   map[[2]int64]*RecentlyViewedItem
-	popular    []int64           // ordered global-popular product IDs
-	coViews    map[int64][]int64 // product_a → ordered partners
-	refreshed  bool              // RefreshRecommendations was invoked
+	consent      map[int64]Consent
+	identities   map[string]int64
+	events       []StoredEvent
+	recently     map[[2]int64]*RecentlyViewedItem
+	popular      []int64           // ordered global-popular product IDs
+	popularByCat map[int64][]int64 // categoryID → ordered category-popular IDs (P-031)
+	coViews      map[int64][]int64 // product_a → ordered partners
+	refreshed    bool              // RefreshRecommendations was invoked
 }
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
-		consent:    map[int64]Consent{},
-		identities: map[string]int64{},
-		recently:   map[[2]int64]*RecentlyViewedItem{},
-		coViews:    map[int64][]int64{},
+		consent:      map[int64]Consent{},
+		identities:   map[string]int64{},
+		recently:     map[[2]int64]*RecentlyViewedItem{},
+		popularByCat: map[int64][]int64{},
+		coViews:      map[int64][]int64{},
 	}
 }
 
@@ -124,6 +126,10 @@ func (f *fakeRepo) RebuildCoViews(_ context.Context, _, _ int) error { return ni
 
 func (f *fakeRepo) PopularGlobalIDs(_ context.Context, limit int) ([]int64, error) {
 	return clampSlice(f.popular, limit), nil
+}
+
+func (f *fakeRepo) PopularCategoryIDs(_ context.Context, categoryID int64, limit int) ([]int64, error) {
+	return clampSlice(f.popularByCat[categoryID], limit), nil
 }
 
 func (f *fakeRepo) CoViewIDs(_ context.Context, productID int64, limit int) ([]int64, error) {

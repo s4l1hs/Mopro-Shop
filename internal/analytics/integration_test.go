@@ -89,6 +89,16 @@ func pv(productID int) analytics.Event {
 	}
 }
 
+// pvCat is a product_view carrying categoryId (P-033) → feeds the per-category
+// popularity pass (P-031).
+func pvCat(productID, categoryID int) analytics.Event {
+	return analytics.Event{
+		Type:     analytics.EventProductView,
+		Payload:  map[string]any{"productId": float64(productID), "categoryId": float64(categoryID)},
+		ClientTs: time.Now().UTC(),
+	}
+}
+
 func u(i int64) *int64 { return &i }
 
 func TestIntegration_IngestStoresAndProjects(t *testing.T) {
@@ -322,5 +332,70 @@ func TestIntegration_HomeRecommendations_NoHistoryEmpty(t *testing.T) {
 	}
 	if len(ids) != 0 {
 		t.Fatalf("user with no history → empty (popular fallback), got %v", ids)
+	}
+}
+
+func TestIntegration_PopularPerCategory(t *testing.T) {
+	ctx := context.Background()
+	svc := newSvc()
+	// Unique IDs (shared DB). cat 9001: 8001×3, 8002×1.  cat 9002: 8003×2, 8001×1.
+	mustIngest := func(sess string, evs ...analytics.Event) {
+		if err := svc.Ingest(ctx, analytics.IngestBatch{SessionID: sess, Events: evs}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustIngest("b1b1b1b1-1111-2222-3333-444444444444", pvCat(8001, 9001), pvCat(8001, 9001), pvCat(8002, 9001))
+	mustIngest("b2b2b2b2-1111-2222-3333-444444444444", pvCat(8001, 9001), pvCat(8003, 9002), pvCat(8003, 9002))
+	mustIngest("b3b3b3b3-1111-2222-3333-444444444444", pvCat(8001, 9002))
+	if err := svc.RefreshRecommendations(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// cat 9001: 8001 (×3) out-ranks 8002 (×1); 8003 (a 9002 product) is absent.
+	c1, err := svc.PopularProductIDsInCategory(ctx, 9001, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if indexOf(c1, 8001) < 0 || indexOf(c1, 8002) < 0 {
+		t.Fatalf("cat 9001 should contain 8001 + 8002, got %v", c1)
+	}
+	if indexOf(c1, 8001) > indexOf(c1, 8002) {
+		t.Fatalf("8001 (×3) must out-rank 8002 (×1) in cat 9001, got %v", c1)
+	}
+	if contains(c1, 8003) {
+		t.Fatalf("8003 must NOT appear in cat 9001 (cross-category leak), got %v", c1)
+	}
+
+	// cat 9002: 8003 (×2) out-ranks 8001 (×1); 8002 absent.
+	c2, err := svc.PopularProductIDsInCategory(ctx, 9002, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if indexOf(c2, 8003) < 0 || indexOf(c2, 8001) < 0 {
+		t.Fatalf("cat 9002 should contain 8003 + 8001, got %v", c2)
+	}
+	if indexOf(c2, 8003) > indexOf(c2, 8001) {
+		t.Fatalf("8003 (×2) must out-rank 8001 (×1) in cat 9002, got %v", c2)
+	}
+	if contains(c2, 8002) {
+		t.Fatalf("8002 must NOT appear in cat 9002 (cross-category leak), got %v", c2)
+	}
+
+	// Unknown category → empty (the handler falls back to global).
+	empty, err := svc.PopularProductIDsInCategory(ctx, 999999, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(empty) != 0 {
+		t.Fatalf("unknown category should be empty, got %v", empty)
+	}
+
+	// Global pass still aggregates 8001 across both categories.
+	global, err := svc.PopularProductIDs(ctx, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contains(global, 8001) {
+		t.Fatalf("global popularity should include 8001, got %v", global)
 	}
 }

@@ -16,10 +16,11 @@ import (
 // fakeRecsSvc is an analytics.Service whose recommendation reads are injectable;
 // the rest of the interface is no-op (not exercised by these handlers).
 type fakeRecsSvc struct {
-	consent    analytics.Consent
-	homeIDs    []int64
-	popularIDs []int64
-	similarIDs func(productID int64) []int64
+	consent      analytics.Consent
+	homeIDs      []int64
+	popularIDs   []int64
+	popularByCat map[int64][]int64 // categoryID → category-popular IDs (P-031)
+	similarIDs   func(productID int64) []int64
 }
 
 func (f *fakeRecsSvc) Ingest(context.Context, analytics.IngestBatch) error  { return nil }
@@ -42,6 +43,13 @@ func (f *fakeRecsSvc) PopularProductIDs(_ context.Context, limit int) ([]int64, 
 		return f.popularIDs[:limit], nil
 	}
 	return f.popularIDs, nil
+}
+func (f *fakeRecsSvc) PopularProductIDsInCategory(_ context.Context, categoryID int64, limit int) ([]int64, error) {
+	ids := f.popularByCat[categoryID]
+	if len(ids) > limit {
+		return ids[:limit], nil
+	}
+	return ids, nil
 }
 func (f *fakeRecsSvc) HomeRecommendationIDs(context.Context, int64, int) ([]int64, error) {
 	return f.homeIDs, nil
