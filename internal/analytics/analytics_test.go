@@ -164,6 +164,9 @@ func TestValidateBatch(t *testing.T) {
 		wantErr error
 	}{
 		{"valid", IngestBatch{SessionID: validSession, Events: []Event{pv}}, nil},
+		// P-033: product_view accepts an OPTIONAL categoryId additively — the "valid"
+		// case above (productId only) is the backward-compat path; this is the new path.
+		{"product_view with categoryId (additive, P-033)", IngestBatch{SessionID: validSession, Events: []Event{{Type: EventProductView, Payload: map[string]any{"productId": float64(42), "categoryId": float64(5)}}}}, nil},
 		{"bad session", IngestBatch{SessionID: "nope", Events: []Event{pv}}, ErrInvalidSession},
 		{"empty", IngestBatch{SessionID: validSession}, ErrEmptyBatch},
 		{"unknown type", IngestBatch{SessionID: validSession, Events: []Event{{Type: "frobnicate", Payload: map[string]any{}}}}, ErrUnknownEventType},
@@ -175,6 +178,19 @@ func TestValidateBatch(t *testing.T) {
 				t.Fatalf("ValidateBatch = %v, want %v", got, tc.wantErr)
 			}
 		})
+	}
+}
+
+// TestValidateBatch_ProductViewCategoryIdPreserved pins the additive contract
+// (P-033): validation does not strip categoryId, so it survives into the JSONB
+// payload that P-031's RebuildPopular will GROUP BY.
+func TestValidateBatch_ProductViewCategoryIdPreserved(t *testing.T) {
+	ev := Event{Type: EventProductView, Payload: map[string]any{"productId": float64(42), "categoryId": float64(5)}}
+	if err := ValidateBatch(IngestBatch{SessionID: validSession, Events: []Event{ev}}); err != nil {
+		t.Fatalf("ValidateBatch = %v, want nil", err)
+	}
+	if ev.Payload["categoryId"] != float64(5) {
+		t.Fatalf("categoryId not preserved on the payload: got %v", ev.Payload["categoryId"])
 	}
 }
 

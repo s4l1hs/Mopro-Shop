@@ -53,6 +53,9 @@ const (
 // not value — §3.3). Types absent from the map have no required fields.
 var requiredPayloadFields = map[string][]string{
 	EventPageView:        {"path"},
+	// product_view also accepts an OPTIONAL categoryId (additive, P-033) — not
+	// required (old/offline/web clients omit it) — which enables P-031's
+	// per-category popularity via a same-schema GROUP BY in RebuildPopular.
 	EventProductView:     {"productId"},
 	EventCategoryView:    {"categoryId"},
 	EventSearch:          {"normalizedQuery"},
