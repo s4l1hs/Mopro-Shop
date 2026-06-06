@@ -4464,3 +4464,17 @@ Discovery `docs/internal/chi-square-flake-fix.md`. **Outcome: delete the statist
 
 ### Post-audit tail (updated)
 Remaining (all non-parity polish/infra): PDP-strikethrough (minor `Variant.original_price`), wiring analytics-integration + delivery-ETA live-PG tests into `make verify`, PDP-goldens Linux regen. **The chi-square flake is closed.**
+
+## PR — PDP-strikethrough (`feat/pdp-strikethrough`) — closes PARITY_AUDIT follow-up PDP-strikethrough
+
+Discovery `docs/internal/pdp-strikethrough.md`. **Outcome: RESOLVED — feed an already-built widget (discovery-shift).** Closes the P5-9 (P-030-PDP) follow-up.
+
+- **Discovery-shift.** The prompt assumed the PDP strikethrough needed building. It was **built in #94** — `PdpPriceBlock` already renders the strikethrough original + `DiscountPill` behind `_hasDiscount` (`originalPriceMinor > priceMinor`). The gap was the **data through-line**: `original_price_minor` flows to the **card** (`productSummarySelect`) but the **PDP** uses a different query (`GetByID → loadVariants → []Variant`) that didn't select it, and neither the domain `Variant`, the spec, nor the mobile model carried it. So this PR fed the widget; it did not re-render.
+- **Backend.** `OriginalPriceMinor *int64` (omitempty) on the domain `Variant` + `original_price_minor` added to the `loadVariants` SELECT/scan. Auto-serializes on `GET /products/{id}` via the existing embedded-`variantOut` (no handler change), exactly like `lowest_30d` in #94. **No migration** (column 0065 exists). `GetVariantByID` (cart) untouched → nil there (fine; omitempty).
+- **Spec + clients.** `original_price_minor` (nullable int64) added to the spec `Variant` schema, mirroring `lowest_30d_price_minor`; Go + Dart clients regenerated (+ build_runner serializer). An optional MODEL field doesn't break Dart fakes (#85/#88) or Go fakes.
+- **Mobile.** `product_detail_screen.dart` passes `originalPriceMinor` to **both** buy-box `PdpPriceBlock` calls (mobile + desktop layouts). **Gate alignment:** the PDP lowest-30d line now gates on `_hasDiscount && lowest_30d < price` (was `lowest_30d < price` alone) — matching the card's `hasDiscount && lowest_30d < price`; a lowest-30d hint with no strikethrough above it read as orphaned.
+- **0 golden flips.** The PDP fixtures set only `priceMinor` (no `original_price`), so `_hasDiscount` stays false → no strikethrough → goldens unchanged. (Unlike `lowest_30d`, the strikethrough is driven by a **static** seed value, so real seeded-discount products *will* show it in the app — the intended effect.)
+- **Tests.** Backend GetByID subtest (marked-down variant carries `original_price_minor=60000` through `loadVariants`; never-discounted stays nil) + widget tests (repurposed the #94 lowest-30d "shows" case to be discounted so the new gate is satisfied; added a "hidden when below price but no discount" case proving the gate). Catalog integration + `flutter analyze` green; `make verify` green.
+
+### Post-audit tail (final)
+Remaining (all non-parity polish/infra, no per-finding parity gaps left): wiring analytics-integration + delivery-ETA live-PG tests into `make verify`, and a PDP-goldens Linux regen. **PDP-strikethrough is closed — every parity finding AND its follow-ups are now resolved.**
