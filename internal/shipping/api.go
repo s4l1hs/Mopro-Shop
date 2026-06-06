@@ -17,6 +17,16 @@ type Service interface {
 	// CalculateRate returns the shipping cost estimate for the given package.
 	CalculateRate(ctx context.Context, carrier string, req ShipmentInput) (RateResult, error)
 
+	// EstimateETA returns a CHEAP pre-purchase delivery-time estimate (transit
+	// business days) from a seller's dispatch origin to an optional destination
+	// city. It performs only static ref_schema lookups — NO carrier call — so it
+	// is safe to call on every PDP load. destCity == nil (guest / no address)
+	// yields the conservative national fallback (ETAResult.Confident == false).
+	// Never returns an error for missing reference data: it degrades to the
+	// fallback, and to ETAResult{} (MaxDays == 0) only when even the fallback is
+	// absent. See docs/internal/p034-shipping-eta-architecture.md.
+	EstimateETA(ctx context.Context, market, originCity string, destCity *string) (ETAResult, error)
+
 	// CreateLabel creates a shipment at the carrier and returns tracking info + label PDF.
 	CreateLabel(ctx context.Context, carrier string, req ShipmentInput) (ShipmentResult, error)
 
@@ -78,4 +88,16 @@ type Repository interface {
 	FindPollableShipments(ctx context.Context, carrier string, limit int) ([]Shipment, error)
 	UpdateLastPolledAt(ctx context.Context, id int64) error
 	WithTx(ctx context.Context, fn func(pgx.Tx) error) error
+
+	// ── Pre-purchase ETA reference lookups (P-034, ref_schema, read-only) ─────
+
+	// LookupTransit resolves originCity and destCity to coarse zones and returns
+	// the transit business-day range for that zone pair. found is false when
+	// either city is unknown or the zone pair has no row — the caller then uses
+	// LookupTransitDefault. Both cities must already be normalized keys.
+	LookupTransit(ctx context.Context, market, originCity, destCity string) (minDays, maxDays int, found bool, err error)
+
+	// LookupTransitDefault returns the market's conservative national fallback
+	// range. found is false when the market has no transit_default row.
+	LookupTransitDefault(ctx context.Context, market string) (minDays, maxDays int, found bool, err error)
 }

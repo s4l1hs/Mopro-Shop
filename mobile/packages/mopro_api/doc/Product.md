@@ -19,6 +19,7 @@ Name | Type | Description | Notes
 **description** | **String** | Locale-resolved. Falls back to tr-TR if requested locale unavailable. | 
 **variants** | [**List&lt;Variant&gt;**](Variant.md) |  | 
 **cashbackPreview** | [**CashbackPreview**](CashbackPreview.md) |  | 
+**deliveryEta** | [**DeliveryEta**](DeliveryEta.md) | Pre-purchase delivery estimate (P-034). Null when no estimate is available. Not a delivery SLA — `confident=false` ranges are fallback estimates the UI hedges as \"tahmini\".  | [optional] 
 **createdAt** | [**DateTime**](DateTime.md) |  | 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

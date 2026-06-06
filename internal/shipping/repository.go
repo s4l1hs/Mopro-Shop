@@ -122,6 +122,43 @@ func (r *pgxShippingRepository) UpdateLastPolledAt(ctx context.Context, id int64
 	return err
 }
 
+// ── Pre-purchase ETA reference lookups (P-034, ref_schema, read-only) ───────────
+
+// LookupTransit joins origin/dest cities → zones → transit_days in one query.
+// A miss on any join (unknown city or zone pair) returns found=false.
+func (r *pgxShippingRepository) LookupTransit(ctx context.Context, market, originCity, destCity string) (int, int, bool, error) {
+	var minD, maxD int
+	err := r.pool.QueryRow(ctx, `
+		SELECT t.min_days, t.max_days
+		FROM ref_schema.shipping_zones o
+		JOIN ref_schema.shipping_zones d
+		  ON d.market = o.market AND d.city = $3
+		JOIN ref_schema.transit_days t
+		  ON t.market = o.market AND t.origin_zone = o.zone AND t.dest_zone = d.zone
+		WHERE o.market = $1 AND o.city = $2`, market, originCity, destCity).Scan(&minD, &maxD)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, 0, false, nil
+	}
+	if err != nil {
+		return 0, 0, false, err
+	}
+	return minD, maxD, true, nil
+}
+
+// LookupTransitDefault returns the market's conservative national fallback range.
+func (r *pgxShippingRepository) LookupTransitDefault(ctx context.Context, market string) (int, int, bool, error) {
+	var minD, maxD int
+	err := r.pool.QueryRow(ctx, `
+		SELECT min_days, max_days FROM ref_schema.transit_default WHERE market = $1`, market).Scan(&minD, &maxD)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, 0, false, nil
+	}
+	if err != nil {
+		return 0, 0, false, err
+	}
+	return minD, maxD, true, nil
+}
+
 // ── scan helpers ──────────────────────────────────────────────────────────────
 
 type querier interface {

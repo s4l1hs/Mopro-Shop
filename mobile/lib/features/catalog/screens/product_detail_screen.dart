@@ -20,6 +20,7 @@ import 'package:mopro/features/catalog/pdp/qa/pdp_qa_tab.dart';
 import 'package:mopro/features/catalog/pdp/reviews/pdp_reviews_tab.dart';
 import 'package:mopro/features/catalog/pdp/reviews/reviews_provider.dart';
 import 'package:mopro/features/catalog/providers/product_detail_provider.dart';
+import 'package:mopro/features/catalog/widgets/pdp/pdp_delivery_info.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_image_pager.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_price_block.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_seller_card.dart';
@@ -460,6 +461,10 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
           const SizedBox(height: 6),
           _StockPill(stock: v.stock),
         ],
+        if (product.deliveryEta != null) ...[
+          const SizedBox(height: 16),
+          PdpDeliveryInfo(eta: product.deliveryEta!),
+        ],
         const SizedBox(height: 16),
         _CashbackCard(preview: product.cashbackPreview),
         if (product.variants.length > 1) ...[
@@ -592,6 +597,10 @@ class _BuyBox extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             _StockPill(stock: selectedVariant!.stock),
+          ],
+          if (product.deliveryEta != null) ...[
+            const SizedBox(height: 16),
+            PdpDeliveryInfo(eta: product.deliveryEta!),
           ],
           const SizedBox(height: 16),
           _CashbackCard(preview: product.cashbackPreview),

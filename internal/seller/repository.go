@@ -15,13 +15,13 @@ type pgxRepository struct{ pool *pgxpool.Pool }
 func NewRepository(pool *pgxpool.Pool) Repository { return &pgxRepository{pool: pool} }
 
 const sellerCols = `id, slug, display_name, bio_translations, logo_image_url,
-	banner_image_url, contact_email, status, created_at`
+	banner_image_url, contact_email, dispatch_city, status, created_at`
 
 func scanSeller(row pgx.Row) (Seller, error) {
 	var s Seller
 	var bio []byte
 	if err := row.Scan(&s.ID, &s.Slug, &s.DisplayName, &bio, &s.LogoImageURL,
-		&s.BannerImageURL, &s.ContactEmail, &s.Status, &s.CreatedAt); err != nil {
+		&s.BannerImageURL, &s.ContactEmail, &s.DispatchCity, &s.Status, &s.CreatedAt); err != nil {
 		return Seller{}, err
 	}
 	if len(bio) > 0 {

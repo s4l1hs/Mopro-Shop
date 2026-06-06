@@ -184,6 +184,20 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
     static line is rejected (§9 SLA-promise + misleading). **Discovery-only:** PDP unchanged; filed **P-034**
     (shipping-ETA infra: seller origin + zone matrix + cheap `EstimateETA` + PDP widget) — unblocks P-007.
 
+13. **P5-12** `feat/delivery-eta` (impl PR; #96 deferral already merged) — ✅ **P-007 RESOLVED end-to-end**;
+    **P-034 SUPERSEDED** (the carve was built directly here, not as a separate deliverable)
+    (`docs/internal/p034-shipping-eta-architecture.md`). Built: migration `0084` (seller `dispatch_city`, seeded), migration `0085`
+    (`ref_schema.shipping_zones` + `transit_days` + `transit_default`, 7 coarse TR zones, 49-pair matrix), a **cheap
+    table-driven** `shipping.EstimateETA(market, originCity, destCity?)` (joined `ref_schema` lookup, **no carrier
+    call**, guest → conservative national fallback, `confident` flag), PDP `delivery_eta` on `GET /products/{id}`
+    (+`dest_city` query param) and a `PdpDeliveryInfo` widget ("{min}-{max} iş gününde kargoda" / hedged "tahmini…",
+    optional "{city} çıkışlı"). Spec + clients regenerated; 6 shipping + 4 handler + 3 widget tests; `-race` clean;
+    boundaries OK. **As-built:** `dispatch_city` only (no denormalized zone — `EstimateETA` resolves zones), `dest_city`
+    is a client param (authed-address auto-fill is a client concern). **Two small follow-ups (non-blocking):**
+    (a) PDP goldens need a Linux `make update-goldens` (visible widget added; no golden CI job); (b) a live-PG
+    integration test for `LookupTransit`/`LookupTransitDefault` + the `0085` seed (logic is stub-repo
+    unit-tested now; the SQL runs at deploy/`make verify` time).
+
 ✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
 CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);
 P-004 + P-009 NOT-ACTIONABLE (backend-gated — `ProductSummary` enrichment needed); P-012 + P-013 NOT-ACTIONABLE
@@ -211,6 +225,7 @@ REMOVED). ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + 
 (`feat/wire-card-badges`: favorites-count overlay + free-shipping/discount card badges, end-to-end).
 **The pure-UI Trendyol-parity work is complete.** All per-finding parity work is now resolved or
 infra-deferred. Remaining Step-5 tail (all infra-gated / non-parity): **P-033** (carry `categoryId` on
-`product_view` → unblocks deferred **P-031**), **P-034** (shipping-ETA infra → unblocks deferred **P-007**),
-chi-square flake, + the minor PDP-strikethrough follow-up. **P-030 end-to-end ✅ · P-032 ✅ · P-029 ✅**;
-P-031 ⏸️→P-033; P-007 ⏸️→P-034.
+`product_view` → unblocks deferred **P-031**), chi-square flake, + the minor PDP-strikethrough follow-up.
+**P-030 end-to-end ✅ · P-032 ✅ · P-029 ✅ · P-007 ✅** (delivery-ETA shipped end-to-end; **P-034 SUPERSEDED**,
+built directly in the P-007 PR); P-031 ⏸️→P-033. **All per-finding parity work resolved except P-031 (→P-033).**
+New small follow-ups: PDP-goldens Linux regen; live-PG test for `LookupTransit` + `0085` seed.

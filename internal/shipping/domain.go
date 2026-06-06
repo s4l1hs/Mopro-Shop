@@ -104,6 +104,18 @@ type RateResult struct {
 	ServiceLevel  string
 }
 
+// ETAResult is a pre-purchase delivery-time estimate in transit business days,
+// returned by EstimateETA. MaxDays == 0 means "no estimate available" (no transit
+// data and no national fallback for the market) — callers should omit the line.
+// Confident is false when the value came from the conservative national fallback
+// (unknown origin/dest) rather than a concrete origin×dest transit row; the UI
+// surfaces low-confidence estimates with a clearer "tahmini" hedge (§9: no SLA promise).
+type ETAResult struct {
+	MinDays   int
+	MaxDays   int
+	Confident bool
+}
+
 // Config aggregates all carrier configurations.
 // Carriers with missing fields are skipped in non-production; fatal in production
 // if they are KARGO_DEFAULT.

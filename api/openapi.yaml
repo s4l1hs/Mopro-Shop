@@ -806,6 +806,9 @@ paths:
         Uses the lowest-priced active variant for the preview amount.
         `seller_name` is joined from the seller module (in-process, core-svc only).
         `image_urls` are CDN-resolved (not raw storage keys).
+        `delivery_eta` is a cheap, table-driven pre-purchase delivery estimate
+        (P-034) from the seller's dispatch origin to the optional `dest_city`;
+        it makes NO carrier call. Omitted (null) when no estimate is available.
       parameters:
         - $ref: '#/components/parameters/TraceId'
         - name: id
@@ -814,6 +817,16 @@ paths:
           schema:
             type: integer
             format: int64
+        - name: dest_city
+          in: query
+          required: false
+          description: |
+            Destination city for the delivery estimate (P-034). The client passes
+            the user's selected delivery city when known; absent (a guest) yields
+            the conservative national fallback (delivery_eta.confident = false).
+            Case/diacritic-insensitive (folded to an ASCII key server-side).
+          schema:
+            type: string
       responses:
         '200':
           description: Product detail
@@ -2350,9 +2363,47 @@ components:
             $ref: '#/components/schemas/Variant'
         cashback_preview:
           $ref: '#/components/schemas/CashbackPreview'
+        delivery_eta:
+          allOf:
+            - $ref: '#/components/schemas/DeliveryEta'
+          nullable: true
+          description: |
+            Pre-purchase delivery estimate (P-034). Null when no estimate is
+            available. Not a delivery SLA — `confident=false` ranges are
+            fallback estimates the UI hedges as "tahmini".
         created_at:
           type: string
           format: date-time
+
+    DeliveryEta:
+      type: object
+      description: |
+        Cheap, table-driven pre-purchase delivery estimate in transit business
+        days (P-034). Computed from the seller dispatch origin + optional
+        destination via a static ref_schema lookup — NO carrier call. An estimate,
+        never a committed SLA.
+      required: [min_days, max_days, confident]
+      properties:
+        min_days:
+          type: integer
+          minimum: 0
+          description: Lower bound of the transit business-day estimate.
+        max_days:
+          type: integer
+          minimum: 0
+          description: Upper bound of the transit business-day estimate.
+        confident:
+          type: boolean
+          description: |
+            true when derived from a concrete origin×destination transit row;
+            false when it is the conservative national fallback (unknown origin
+            or destination, e.g. a guest with no address).
+        dispatch_city:
+          type: string
+          nullable: true
+          description: |
+            Normalized key of the seller's dispatch city, for an optional
+            "{city}'dan gönderilir" line. Omitted when the origin is unknown.
 
     ProductSummary:
       type: object

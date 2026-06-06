@@ -44,6 +44,7 @@ export 'package:mopro_api/src/model/create_order_request.dart';
 export 'package:mopro_api/src/model/create_product_request.dart';
 export 'package:mopro_api/src/model/cursor_pagination_meta.dart';
 export 'package:mopro_api/src/model/delete_me_request.dart';
+export 'package:mopro_api/src/model/delivery_eta.dart';
 export 'package:mopro_api/src/model/device.dart';
 export 'package:mopro_api/src/model/error_envelope.dart';
 export 'package:mopro_api/src/model/error_envelope_error.dart';
