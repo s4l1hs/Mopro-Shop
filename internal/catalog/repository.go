@@ -145,6 +145,7 @@ func (r *pgxRepository) GetByID(ctx context.Context, id int64) (Product, []Varia
 func (r *pgxRepository) loadVariants(ctx context.Context, productID, categoryID, sellerID int64) ([]Variant, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT id, product_id, sku, color, size, price_minor, price_currency, stock, image_keys,
+		        original_price_minor,
 		        (SELECT min(vph.price_minor) FROM catalog_schema.variant_price_history vph
 		         WHERE vph.variant_id = variants.id
 		           AND vph.effective_at >= now() - INTERVAL '30 days') AS lowest_30d_price_minor
@@ -164,7 +165,7 @@ func (r *pgxRepository) loadVariants(ctx context.Context, productID, categoryID,
 		if err := rows.Scan(
 			&v.ID, &v.ProductID, &v.SKU, &v.Color, &v.Size,
 			&v.PriceMinor, &v.PriceCurrency, &v.Stock, &v.ImageKeys,
-			&v.Lowest30dPriceMinor,
+			&v.OriginalPriceMinor, &v.Lowest30dPriceMinor,
 		); err != nil {
 			return nil, fmt.Errorf("catalog.repo: scan variant: %w", err)
 		}

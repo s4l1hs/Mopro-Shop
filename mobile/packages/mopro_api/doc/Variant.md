@@ -16,6 +16,7 @@ Name | Type | Description | Notes
 **priceCurrency** | **String** |  | 
 **stock** | **int** |  | 
 **imageUrls** | **List&lt;String&gt;** | CDN-resolved full URLs. Never raw storage keys. | 
+**originalPriceMinor** | **int** | Original/list (MSRP) price in minor units. When set and greater than price_minor the variant is discounted — render a strikethrough on original_price_minor in the PDP buy-box (PDP-strikethrough). Omitted when the variant was never marked down.  | [optional] 
 **lowest30dPriceMinor** | **int** | Lowest price (minor units) applied to THIS variant in the last 30 days (TR 6502 / EU Omnibus, P-030). Per-variant so the PDP — which shows a specific selected variant — is accurate. Omitted when no in-window history; equals price_minor until the price changes (P-032).  | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

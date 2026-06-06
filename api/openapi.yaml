@@ -2309,6 +2309,15 @@ components:
           items:
             type: string
             format: uri
+        original_price_minor:
+          type: integer
+          format: int64
+          nullable: true
+          description: |
+            Original/list (MSRP) price in minor units. When set and greater than
+            price_minor the variant is discounted — render a strikethrough on
+            original_price_minor in the PDP buy-box (PDP-strikethrough). Omitted
+            when the variant was never marked down.
         lowest_30d_price_minor:
           type: integer
           format: int64

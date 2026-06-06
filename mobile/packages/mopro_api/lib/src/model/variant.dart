@@ -34,6 +34,8 @@ class Variant {
 
     required  this.imageUrls,
 
+     this.originalPriceMinor,
+
      this.lowest30dPriceMinor,
   });
 
@@ -136,6 +138,19 @@ class Variant {
 
 
 
+      /// Original/list (MSRP) price in minor units. When set and greater than price_minor the variant is discounted — render a strikethrough on original_price_minor in the PDP buy-box (PDP-strikethrough). Omitted when the variant was never marked down. 
+  @JsonKey(
+    
+    name: r'original_price_minor',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final int? originalPriceMinor;
+
+
+
       /// Lowest price (minor units) applied to THIS variant in the last 30 days (TR 6502 / EU Omnibus, P-030). Per-variant so the PDP — which shows a specific selected variant — is accurate. Omitted when no in-window history; equals price_minor until the price changes (P-032). 
   @JsonKey(
     
@@ -161,6 +176,7 @@ class Variant {
       other.priceCurrency == priceCurrency &&
       other.stock == stock &&
       other.imageUrls == imageUrls &&
+      other.originalPriceMinor == originalPriceMinor &&
       other.lowest30dPriceMinor == lowest30dPriceMinor;
 
     @override
@@ -173,6 +189,7 @@ class Variant {
         priceCurrency.hashCode +
         stock.hashCode +
         imageUrls.hashCode +
+        originalPriceMinor.hashCode +
         lowest30dPriceMinor.hashCode;
 
   factory Variant.fromJson(Map<String, dynamic> json) => _$VariantFromJson(json);

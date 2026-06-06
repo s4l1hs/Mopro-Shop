@@ -170,7 +170,7 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
     #92 trigger logs history automatically. **P-030-PDP:** added **per-variant** `lowest_30d` (product-level MIN
     would mis-display a multi-variant PDP) to `loadVariants`/`Variant`/spec; `PdpPriceBlock` renders the slot when
     `lowest_30d < price`. **P-030 is now end-to-end** (cards + PDP + lifecycle). Minor follow-up: PDP strikethrough
-    (`original_price` on the variant) for full card parity. Not a compliance sign-off (legal review pending).
+    (`original_price` on the variant) for full card parity → **closed in P5-15**. Not a compliance sign-off (legal review pending).
 11. **P5-10** `feat/category-popularity` — ⏸️ **P-031 DEFERRED (Outcome C)** (`docs/internal/p031-category-popularity.md`).
     The `popular_products` schema is already category-ready (no migration), but `product_view` events carry only
     `productId` — no `categoryId`, no category column in `analytics_schema` — so true per-category aggregation needs a
@@ -213,6 +213,14 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
     out of `ProductFilter`): category-scope → **global fallback on empty** (never regress to recommended). No migration/
     frontend/event change. Per-category integration test validated on PG (`make verify` doesn't run analytics
     integration — pre-existing tooling gap); handler routing unit-tested. **Per-category bestseller is live end-to-end.**
+16. **P5-15** `feat/pdp-strikethrough` — ✅ **PDP-strikethrough RESOLVED** (closes the P5-9 follow-up)
+    (`docs/internal/pdp-strikethrough.md`). `original_price_minor` now rides the PDP through-line (`loadVariants`
+    SELECT + domain `Variant` + spec `Variant` schema + generated mobile model) into the **already-built**
+    `PdpPriceBlock` strikethrough + discount pill (built in #94, never fed), and the PDP's lowest-30d gate is
+    aligned to the card's `hasDiscount && lowest_30d < price`. **Discovery-shift:** the widget existed since #94 —
+    this PR fed the data, it did not re-render. No migration (column 0065 exists), **0 golden flips** (no PDP
+    fixture carries `original_price > price`). Backend GetByID + widget gate tests added. **PDP discount display
+    now reaches card parity.**
 
 ✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
 CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);

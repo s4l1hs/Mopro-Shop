@@ -461,6 +461,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
         if (v != null) ...[
           PdpPriceBlock(
             priceMinor: v.priceMinor,
+            originalPriceMinor: v.originalPriceMinor,
             lowestIn30DaysMinor: v.lowest30dPriceMinor,
           ),
           const SizedBox(height: 6),
@@ -598,6 +599,7 @@ class _BuyBox extends StatelessWidget {
           if (selectedVariant != null) ...[
             PdpPriceBlock(
               priceMinor: selectedVariant!.priceMinor,
+              originalPriceMinor: selectedVariant!.originalPriceMinor,
               lowestIn30DaysMinor: selectedVariant!.lowest30dPriceMinor,
             ),
             const SizedBox(height: 6),

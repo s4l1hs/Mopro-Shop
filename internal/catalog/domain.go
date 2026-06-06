@@ -66,6 +66,10 @@ type Variant struct {
 	PriceCurrency string   `json:"price_currency"`
 	Stock         int      `json:"stock"`
 	ImageKeys     []string `json:"image_keys"`
+	// OriginalPriceMinor is the static list/MSRP price (0065). When set and
+	// greater than PriceMinor the variant is discounted → strikethrough on the
+	// PDP buy-box (PDP-strikethrough). Nil when never marked down.
+	OriginalPriceMinor *int64 `json:"original_price_minor,omitempty"`
 	// Lowest30dPriceMinor is MIN(price) for THIS variant over the last 30 days
 	// (P-030, per-variant so the PDP — which shows a specific variant — is correct,
 	// unlike the product-level value on ProductSummary). Nil when no in-window

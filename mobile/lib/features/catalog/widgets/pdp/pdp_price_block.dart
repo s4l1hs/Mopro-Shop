@@ -7,9 +7,10 @@ import 'package:mopro/utils/money.dart';
 /// strikethrough original + discount-% pill, optional "lowest in 30 days" hint.
 ///
 /// [originalPriceMinor] and [lowestIn30DaysMinor] are nullable because the
-/// catalog API does not expose them yet; when null the corresponding row is
-/// simply omitted (today's behaviour). Extracted from the PDP buy-box so the
-/// mobile and desktop layouts share one price renderer.
+/// catalog API omits them when the variant was never marked down / has no
+/// in-window price history; when null the corresponding row is simply omitted.
+/// Extracted from the PDP buy-box so the mobile and desktop layouts share one
+/// price renderer.
 class PdpPriceBlock extends StatelessWidget {
   const PdpPriceBlock({
     required this.priceMinor,
@@ -62,11 +63,16 @@ class PdpPriceBlock extends StatelessWidget {
             color: cs.primary,
           ),
         ),
-        // P-030: show the lowest-30-day price only when the current price is NOT
-        // the 30-day low (lowest < price) — the consumer-protection signal. Today
-        // lowest == price for every variant (no price-update lifecycle yet), so it
-        // stays dark until a seller changes a price (P-032).
-        if (lowestIn30DaysMinor != null && lowestIn30DaysMinor! < priceMinor) ...[
+        // P-030: show the lowest-30-day price only on a discounted variant whose
+        // current price is NOT the 30-day low — the consumer-protection signal.
+        // The `_hasDiscount &&` guard aligns this with the product card's
+        // `hasDiscount && lowest_30d < price` gate (PDP-strikethrough): a lowest-30d
+        // line without a strikethrough above it read as orphaned. Today lowest ==
+        // price for every variant (no price-update lifecycle yet), so it stays
+        // dark until a seller changes a price (P-032).
+        if (_hasDiscount &&
+            lowestIn30DaysMinor != null &&
+            lowestIn30DaysMinor! < priceMinor) ...[
           const SizedBox(height: 4),
           Text(
             'product.lowest_30d'.tr(
