@@ -221,6 +221,15 @@ have been foundational HIGHs — design-token systematization (P-001) and auth-g
     this PR fed the data, it did not re-render. No migration (column 0065 exists), **0 golden flips** (no PDP
     fixture carries `original_price > price`). Backend GetByID + widget gate tests added. **PDP discount display
     now reaches card parity.**
+17. **P5-16** `chore/wire-post-audit-integration-tests` — ✅ **integration-test wiring RESOLVED (filed tail)** +
+    **F-018 filed** (`docs/internal/integration-tests-wiring.md`). `make verify` is the only CI path that runs
+    `-tags=integration`. Wired `integration-analytics` (suite self-bootstraps; reuses pg-ecom-e2e — closes the #100
+    follow-up: per-category aggregation + 7 more `TestIntegration_*` ran on no CI job) and `integration-shipping`
+    (new live-PG `LookupTransit`/`LookupTransitDefault` test that applies the **real 0085 seed** and asserts
+    seed-derived transit values — closes the #97 follow-up). **Sweep finding:** 10 more `//go:build integration`
+    suites run in no gate — the `test-integration-{order,sellerpayout,outbox}` targets port-collide with the
+    e2e-cluster (need the cart/identity-revive rework) + 7 packages have no target — **carved to TESTING_AUDIT
+    F-018** (`chore/revive-unwired-integration-suites`), not blanket-added (rotted suites would redden `verify`).
 
 ✅ **LOW tail triaged (`chore/step5-low-batch`):** P-015 FIXED (out-of-stock variant chips disabled); P-011
 CORRECTED (cart *has* a coupon field — `OrderSummaryCard`; the audit cited the orphaned `cart_totals_summary.dart`);
@@ -250,6 +259,8 @@ REMOVED). ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + 
 **🎉 STEP 5 COMPLETE — every parity finding is RESOLVED end-to-end.**
 **P-029 ✅ · P-030 ✅ · P-032 ✅ · P-007 ✅** (delivery-ETA end-to-end; **P-034 SUPERSEDED**, built directly in
 the P-007 PR) **· P-033 ✅** (`product_view` carries `categoryId`) **· P-031 ✅** (per-category bestseller live,
-`feat/category-aggregation` — chain P-029→P-033→P-031). Remaining is **post-audit polish/infra only** (not
-parity gaps): ~~chi-square flake (#74)~~ ✅ done (`fix/otp-distribution-flake`), PDP-strikethrough (minor),
-wire analytics-integration + delivery-ETA live-PG tests into `make verify`, PDP-goldens Linux regen.
+`feat/category-aggregation` — chain P-029→P-033→P-031). **The filed post-audit tail is now at zero:**
+~~chi-square flake (#74)~~ ✅ (`fix/otp-distribution-flake`); ~~PDP-strikethrough~~ ✅ (`feat/pdp-strikethrough`,
+P5-15); ~~wire analytics + delivery-ETA live-PG tests into `make verify`~~ ✅ (`chore/wire-post-audit-integration-tests`,
+P5-16). Remaining are **operational / infra only** (not code, not parity): a PDP-goldens Linux regen (no golden
+CI job; needs a Linux runner) and the **newly-filed F-018** broader integration-CI-coverage carve (`chore/revive-unwired-integration-suites`).

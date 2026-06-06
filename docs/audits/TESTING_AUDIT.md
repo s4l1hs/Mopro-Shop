@@ -10,6 +10,10 @@
 > **F-017** RESOLVED (unique zset member → limiter enforces same-ms bursts; F-016 test unskipped).
 > Every audit finding F-001→F-017 now has a terminal outcome (RESOLVED / NOT-ACTIONABLE /
 > CORRECTED). The audit-then-fix arc (#57→#58→#59→#60→this) is structurally complete.
+>
+> **Post-Step-2 addendum (2026-06-06):** wiring the Trendyol-parity post-audit tail surfaced
+> **F-018** (integration suites that run in no CI gate) — analytics + shipping wired; 10 more carved.
+> See F-018 below + `docs/internal/integration-tests-wiring.md`.
 
 - **CONFIRMED HIGH:  0**
 - **CONFIRMED MED:   7** (original) — F-001 ✅ (#58); F-006/F-011/F-012 ✅ (#59); **F-002 ✅ PARTIAL** (4 of 5 "modules" are 12-LOC stubs → not-actionable; payment.Service REAL → sliced this PR).
@@ -340,6 +344,22 @@ The existing `-race` integration gate (e2e/cart) is green (PR #55). A dedicated 
 ### §3.5 N+1 / `EXPLAIN ANALYZE` — UNKNOWN / not-run-this-pass
 Query profiling needs a seeded DB + access patterns; not done this pass. Flag for a dedicated perf follow-up.
 
+### F-018 — integration suites that run in no CI gate (post-Step-2 addendum, 2026-06-06)
+**Severity: MED | Confidence: CONFIRMED | ⏳ PARTIAL — analytics + shipping RESOLVED-BY `chore/wire-post-audit-integration-tests`; 10 suites carved**
+> Surfaced while wiring the post-audit tail (analytics #100 + delivery-ETA #97). `make verify` is the
+> **only** CI path that runs `-tags=integration` (make-verify.yml); openapi-ci runs `go test -race ./...`
+> with **no** integration tag, so any `//go:build integration` suite not chained in `verify` runs nowhere.
+> **Closed here:** `integration-analytics` (suite self-bootstraps `analytics_schema`; reuses pg-ecom-e2e)
+> + `integration-shipping` (new LookupTransit + 0085-seed test). **Still open (carved):** 10 suites —
+> `test-integration-{order,sellerpayout,outbox}` exist but **bind the same ports the e2e-cluster uses**
+> (:6435/:6434/:6380), so appending them to `verify` collides; they need the cart/identity-style
+> container-**reuse** rework. Plus `api`(fin), `attachments`, `help`, `idempotency`, `inbox`, `reconcile`,
+> `seller` have **no target** (each needs per-package triage: which DB/schema, self-bootstrap vs migration,
+> green-or-rotted). Per-package map: `docs/internal/integration-tests-wiring.md` §2/§4.
+Recommendation: a `chore/revive-unwired-integration-suites` follow-up, reviving each into the e2e-cluster
+reuse pattern (precedent: `chore/revive-cart-identity-integration-tests`), one cluster per commit — **not**
+a blanket add (a rotted suite would turn `verify` red). Fix PRs reference "closes TESTING_AUDIT F-018".
+
 ---
 
 ## §7 Verified-not-actionable (commands shown above)
@@ -359,5 +379,6 @@ Query profiling needs a seeded DB + access patterns; not done this pass. Flag fo
 6. **`chore/retry-backoff` + `chore/dlq-ctx-timeout`** (F-008, F-010) — small quality.
 7. **`chore/flutter-statenotifier-migration`** (F-004) — legacy → Notifier, per file.
 8. Deferred passes: migration-safety audit (§3.8), N+1/EXPLAIN (§3.5), ×50 `-race` repro (§6.3), Flutter rebuild-storm DevTools pass (§4.3).
+9. **`chore/revive-unwired-integration-suites`** (F-018) — revive the 10 carved suites into the e2e-cluster reuse pattern, one cluster per commit. `analytics` + `shipping` already done in `chore/wire-post-audit-integration-tests`.
 
 Fix PRs MUST reference the finding ID (e.g. "closes TESTING_AUDIT F-001").
