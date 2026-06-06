@@ -47,6 +47,11 @@ type stubShippingRepo struct {
 	shipments map[string]shipping.Shipment // key: carrier:trackingNumber
 	states    map[int64]shipping.ShipmentState
 	events    []shipping.ShipmentEvent
+
+	// P-034 ETA reference data (in-memory).
+	transit     map[string][2]int // key: "originCity:destCity" → {min,max}
+	transitDef  [2]int            // national fallback {min,max}
+	hasTransDef bool
 }
 
 func newStubRepo(carrier, tracking string, orderID int64) *stubShippingRepo {
@@ -98,6 +103,19 @@ func (r *stubShippingRepo) FindPollableShipments(_ context.Context, _ string, _ 
 func (r *stubShippingRepo) UpdateLastPolledAt(_ context.Context, _ int64) error { return nil }
 func (r *stubShippingRepo) WithTx(_ context.Context, fn func(pgx.Tx) error) error {
 	return fn(nil)
+}
+func (r *stubShippingRepo) LookupTransit(_ context.Context, _, originCity, destCity string) (int, int, bool, error) {
+	v, ok := r.transit[originCity+":"+destCity]
+	if !ok {
+		return 0, 0, false, nil
+	}
+	return v[0], v[1], true, nil
+}
+func (r *stubShippingRepo) LookupTransitDefault(_ context.Context, _ string) (int, int, bool, error) {
+	if !r.hasTransDef {
+		return 0, 0, false, nil
+	}
+	return r.transitDef[0], r.transitDef[1], true, nil
 }
 
 // stubAdapter returns a delivered event for any input.
@@ -254,5 +272,93 @@ func TestNewService_ProductionGuardMissingAdapter(t *testing.T) {
 	_, err := shipping.NewService("aras", map[string]shipping.Adapter{}, nil, nil, true)
 	if err == nil {
 		t.Error("expected error: KARGO_DEFAULT=aras adapter not configured")
+	}
+}
+
+// ── P-034 EstimateETA ───────────────────────────────────────────────────────────
+
+// newETARepo builds a stub repo seeded with a single transit row and a national
+// fallback, for the EstimateETA tests.
+func newETARepo() *stubShippingRepo {
+	return &stubShippingRepo{
+		transit:     map[string][2]int{"istanbul:ankara": {2, 3}},
+		transitDef:  [2]int{2, 5},
+		hasTransDef: true,
+	}
+}
+
+func etaService(t *testing.T, repo *stubShippingRepo) shipping.Service {
+	t.Helper()
+	svc, err := shipping.NewService("surat",
+		map[string]shipping.Adapter{"surat": &stubAdapter{}}, repo, &stubOrderSvc{}, false)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	return svc
+}
+
+func TestEstimateETA_ConfidentZonePair(t *testing.T) {
+	svc := etaService(t, newETARepo())
+	dest := "Ankara"
+	got, err := svc.EstimateETA(context.Background(), "TR", "istanbul", &dest)
+	if err != nil {
+		t.Fatalf("EstimateETA: %v", err)
+	}
+	if !got.Confident || got.MinDays != 2 || got.MaxDays != 3 {
+		t.Errorf("want confident 2-3, got %+v", got)
+	}
+}
+
+func TestEstimateETA_TurkishFoldedDest(t *testing.T) {
+	// "İSTANBUL" / "Ankara" with Turkish casing must fold to the ascii keys.
+	repo := &stubShippingRepo{
+		transit:     map[string][2]int{"istanbul:izmir": {1, 2}},
+		transitDef:  [2]int{2, 5},
+		hasTransDef: true,
+	}
+	svc := etaService(t, repo)
+	dest := "İzmir"
+	got, err := svc.EstimateETA(context.Background(), "TR", "İstanbul", &dest)
+	if err != nil {
+		t.Fatalf("EstimateETA: %v", err)
+	}
+	if !got.Confident || got.MinDays != 1 || got.MaxDays != 2 {
+		t.Errorf("want confident 1-2 after folding, got %+v", got)
+	}
+}
+
+func TestEstimateETA_GuestFallsBackToNationalRange(t *testing.T) {
+	svc := etaService(t, newETARepo())
+	got, err := svc.EstimateETA(context.Background(), "TR", "istanbul", nil) // guest: no dest
+	if err != nil {
+		t.Fatalf("EstimateETA: %v", err)
+	}
+	if got.Confident || got.MinDays != 2 || got.MaxDays != 5 {
+		t.Errorf("want non-confident 2-5 fallback, got %+v", got)
+	}
+}
+
+func TestEstimateETA_UnknownPairFallsBack(t *testing.T) {
+	svc := etaService(t, newETARepo())
+	dest := "Diyarbakir" // no transit row for istanbul:diyarbakir in the stub
+	got, err := svc.EstimateETA(context.Background(), "TR", "istanbul", &dest)
+	if err != nil {
+		t.Fatalf("EstimateETA: %v", err)
+	}
+	if got.Confident || got.MaxDays != 5 {
+		t.Errorf("want non-confident fallback, got %+v", got)
+	}
+}
+
+func TestEstimateETA_NoDataReturnsEmpty(t *testing.T) {
+	repo := &stubShippingRepo{transit: map[string][2]int{}} // no transit, no fallback
+	svc := etaService(t, repo)
+	dest := "ankara"
+	got, err := svc.EstimateETA(context.Background(), "TR", "istanbul", &dest)
+	if err != nil {
+		t.Fatalf("EstimateETA: %v", err)
+	}
+	if got.MaxDays != 0 {
+		t.Errorf("want empty (MaxDays 0) when no data, got %+v", got)
 	}
 }
