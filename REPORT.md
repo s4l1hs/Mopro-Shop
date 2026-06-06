@@ -4426,3 +4426,16 @@ Design `docs/internal/p034-shipping-eta-architecture.md`. The #96 PR deferred P-
 
 ### Step 5 status (post P-007 close)
 **P-007 ✅ closed end-to-end; P-034 SUPERSEDED** (carve built directly here). Remaining tail: **P-033** (event `categoryId` → P-031), chi-square flake, + minor PDP-strikethrough, + two new small non-blocking follow-ups: **(a)** PDP goldens Linux `make update-goldens` (visible widget added; platform-guard blocks macOS regen; no golden CI job); **(b)** live-PG integration test for `LookupTransit`/`LookupTransitDefault` + the `0085` seed (logic stub-repo unit-tested; SQL runs at deploy/`make verify`).
+
+## PR — P-033 carry categoryId on product_view (`feat/event-categoryid`) — closes PARITY_AUDIT P-033 (carry categoryId on product_view); unblocks P-031
+
+Discovery `docs/internal/p033-event-categoryid.md`. **Outcome A (additive).**
+
+- **Backend — already accepts it; minimal change.** `ValidateBatch` is **presence-only** and does not reject extra keys, and the payload is **JSONB** — so a `product_view` carrying `categoryId` was already accepted and stored untouched. So: **no migration**, **no required-field change** (kept optional — old/offline clients + web omit it, and requiring it would reject in-flight events), **no value-validation** (out of the codebase's presence-only convention; `RebuildPopular`/P-031 will parse `(payload->>'categoryId')::numeric::bigint` defensively). Added a documenting comment + a contract test pinning the additive behaviour (accepted with/without; payload preserved).
+- **Mobile emit — the real change (one site).** `product_detail_screen.dart` now emits `product_view` with `{productId, categoryId}`; the loaded `Product` always carries `categoryId`, so it's the product's own category regardless of how the PDP was reached — **no null/edge case**. A focused capturing-`AnalyticsService` test asserts the emitted payload carries `categoryId` (==5).
+- **Web — no-op (documented).** `web/` (Next.js) emits no `product_view` to the in-house pipeline at all; nothing to change. (Web/mobile analytics parity is a separate, broader gap — not P-033.)
+- **No spec/regen** (the analytics ingest is hand-written, not in OpenAPI). 3 backend test cases + 1 mobile widget test; `flutter analyze` clean; `make verify` green.
+- **P-031 status: UNBLOCKED** — now a small same-schema follow-up (extend `RebuildPopular` with a `category:` GROUP BY + a scoped `PopularProductIDs` + handler wiring). Per-category data accrues from new events; the global proxy covers historical.
+
+### Step 5 status (post P-033)
+**Every per-finding parity item is RESOLVED.** Remaining (all follow-ups / non-parity): **P-031** aggregation (now unblocked), chi-square flake, PDP-strikethrough, PDP-goldens Linux regen, live-PG `LookupTransit`/`0085` test.

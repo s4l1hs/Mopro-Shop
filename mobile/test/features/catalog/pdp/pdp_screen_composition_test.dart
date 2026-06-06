@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mopro/api/client.dart';
 import 'package:mopro/design/theme.dart';
 import 'package:mopro/design/theme_controller.dart';
+import 'package:mopro/features/analytics/analytics_service.dart';
 import 'package:mopro/features/catalog/screens/product_detail_screen.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_image_pager.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_seller_card.dart';
@@ -141,5 +142,53 @@ void main() {
     await _pump(tester, const Size(375, 900));
     expect(find.byType(PdpStickyCta), findsOneWidget);
     expect(find.byType(PdpImagePager), findsNothing);
+  });
+
+  testWidgets('PDP emits product_view with the product categoryId (P-033)',
+      (tester) async {
+    final captured = <AnalyticsEvent>[];
+    final analytics = AnalyticsService(
+      sessionId: 'test-sess',
+      gate: () => true,
+      sink: (_, batch) async => captured.addAll(batch),
+      batchSize: 1, // flush each event immediately
+      flushInterval: const Duration(milliseconds: 10),
+    );
+    addTearDown(analytics.dispose);
+
+    final original = FlutterError.onError;
+    FlutterError.onError = (d) {
+      if (d.exceptionAsString().contains('overflowed')) return;
+      original?.call(d);
+    };
+    addTearDown(() => FlutterError.onError = original);
+    tester.view.physicalSize = const Size(390, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    final prefs = await SharedPreferences.getInstance();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          sharedPreferencesProvider.overrideWithValue(prefs),
+          catalogApiProvider.overrideWithValue(_FakeCatalogApi()),
+          analyticsServiceProvider.overrideWithValue(analytics),
+        ],
+        child: MaterialApp(
+          theme: buildLightTheme(),
+          home: const ProductDetailScreen(productId: 123),
+        ),
+      ),
+    );
+    await tester.pump(); // resolve the product fetch
+    await tester.pump(const Duration(milliseconds: 50)); // post-frame product_view emit
+    await analytics.flush();
+
+    final pv = captured.where((e) => e.type == 'product_view').toList();
+    expect(pv, isNotEmpty, reason: 'PDP must emit a product_view on mount');
+    expect(pv.first.payload['productId'], 123);
+    expect(pv.first.payload['categoryId'], 5); // _product().categoryId
   });
 }
