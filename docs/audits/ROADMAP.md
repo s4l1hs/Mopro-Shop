@@ -92,8 +92,9 @@ LATER/PARK: **A-004** shipping carrier test-mode (PROBABLE — confirm during A4
 auth-coverage sweep (PROBABLE, maybe a small analyzer); **A-005** Flutter feature layering (PARK).
 
 **Open tail carried past Step 4 (non-blocking follow-ups):** idempotency-surface analyzer (T-007
-split); cron-overlap sim (T-008, needs fin-svc HTTP harness); the PR #74 chi-square flake
-(`TestProperty_OTPCodeDistribution`, candidate finding). A-004/A-007 PROBABLE; A-005 PARK.
+split); cron-overlap sim (T-008, needs fin-svc HTTP harness); ~~the PR #74 chi-square flake
+(`TestProperty_OTPCodeDistribution`)~~ ✅ **RESOLVED** (`fix/otp-distribution-flake` — chi-square replaced
+by a deterministic format test). A-004/A-007 PROBABLE; A-005 PARK.
 
 ## Step 5 — parity PRs pending (from `TRENDYOL_PARITY_AUDIT.md` §6)
 
@@ -230,7 +231,7 @@ evidence but PROBABLE *Trendyol* comparison — each PROBABLE finding gets re-co
 phase (#59→#60 pattern).
 
 **Open tail (unchanged, non-blocking):** idempotency-surface analyzer (T-007 split); cron-overlap sim (T-008);
-PR #74 chi-square flake; A-004/A-007 PROBABLE; A-005 PARK. **P-029 ✅ RESOLVED end-to-end** (backend
+PR #74 chi-square flake ✅ RESOLVED (`fix/otp-distribution-flake`); A-004/A-007 PROBABLE; A-005 PARK. **P-029 ✅ RESOLVED end-to-end** (backend
 `feat/bestseller-sort`, Pattern B — analytics is in-process, so the catalog handler reads `PopularProductIDs` +
 orders via `array_position`; no cross-schema JOIN, no schema change, no sync infra; global scope, category-scope
 carved → **P-031**; frontend un-hide `feat/bestseller-unhide`). P-026 ✅ RESOLVED (frontend wired,
@@ -242,5 +243,5 @@ REMOVED). ProductSummary enriched (`feat/productsummary-enrich`) **then P-004 + 
 **P-029 ✅ · P-030 ✅ · P-032 ✅ · P-007 ✅** (delivery-ETA end-to-end; **P-034 SUPERSEDED**, built directly in
 the P-007 PR) **· P-033 ✅** (`product_view` carries `categoryId`) **· P-031 ✅** (per-category bestseller live,
 `feat/category-aggregation` — chain P-029→P-033→P-031). Remaining is **post-audit polish/infra only** (not
-parity gaps): chi-square flake (#74), PDP-strikethrough (minor), wire analytics-integration + delivery-ETA
-live-PG tests into `make verify`, PDP-goldens Linux regen.
+parity gaps): ~~chi-square flake (#74)~~ ✅ done (`fix/otp-distribution-flake`), PDP-strikethrough (minor),
+wire analytics-integration + delivery-ETA live-PG tests into `make verify`, PDP-goldens Linux regen.
