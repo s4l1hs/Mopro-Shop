@@ -20,7 +20,7 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
         caddy-validate caddy-reload \
         test-integration-catalog integration-eventbus integration-outbox integration-order \
-        integration-sellerpayout integration-apifin integration-attachments integration-help \
+        integration-sellerpayout integration-apifin integration-reconcile integration-attachments integration-help \
         integration-inbox integration-idempotency \
         test-e2e integration-e2e integration-cart integration-identity integration-identity-race integration-payment e2e-test-up e2e-test-down \
         api-gen-models api-gen-core api-gen-fin api-gen-dart api-gen api-lint contract-test \
@@ -37,7 +37,7 @@ help: ## Show this help.
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## /{printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment integration-analytics integration-shipping integration-order integration-sellerpayout integration-outbox integration-eventbus integration-apifin integration-attachments integration-help integration-inbox integration-idempotency test-integration-catalog verify-image-manifest verify-contrast ## Full verification gate (run before every push).
+verify: fmt vet test lint boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment integration-analytics integration-shipping integration-order integration-sellerpayout integration-outbox integration-eventbus integration-apifin integration-reconcile integration-attachments integration-help integration-inbox integration-idempotency test-integration-catalog verify-image-manifest verify-contrast ## Full verification gate (run before every push).
 
 # WCAG contrast check for the documented brand colour pairs. Fails if any
 # non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.
@@ -333,6 +333,16 @@ integration-sellerpayout: pg-ledger-test-up
 integration-apifin: pg-ledger-test-up
 	LEDGER_TEST_DSN=postgres://ledger_admin:test123@localhost:6434/mopro_ledger \
 	  go test -tags=integration -count=1 -race -timeout 5m ./internal/api/...
+
+# reconcile cross-schema invariant suite (F-018 batch 2). Needs both the admin
+# DSN and the reconcile_user DSN — the suite asserts least-privilege behavior,
+# incl. CleanupOldAttempts, which requires the SELECT grant from migration 0081
+# (F-019). pg-ledger-test-up applies init/* + migrations, so the fixture carries
+# the grant. No legacy target to delete (reconcile was "no target", not colliding).
+integration-reconcile: pg-ledger-test-up
+	LEDGER_TEST_DSN=postgres://ledger_admin:test123@localhost:6434/mopro_ledger \
+	RECONCILE_TEST_DSN=postgres://reconcile_user:reconcile_password@localhost:6434/mopro_ledger \
+	  go test -tags=integration -count=1 -race -timeout 8m ./internal/reconcile/...
 
 # attachments (applies 0079 itself), help, inbox: self-contained on pg-ecom-e2e.
 integration-attachments: e2e-test-up
