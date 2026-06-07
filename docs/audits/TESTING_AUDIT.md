@@ -360,6 +360,10 @@ Recommendation: a `chore/revive-unwired-integration-suites` follow-up, reviving 
 reuse pattern (precedent: `chore/revive-cart-identity-integration-tests`), one cluster per commit — **not**
 a blanket add (a rotted suite would turn `verify` red). Fix PRs reference "closes TESTING_AUDIT F-018".
 
+**RESOLUTION (2026-06-07): 10/10 REVIVED — FULLY CLOSED.** Batch 1 (`chore/revive-unwired-integration-suites`,
+9 suites); batch 2 (`fix/f019-reconcile-grant`, reconcile) once F-019's grant unblocked it. All 10 dark
+suites now run in `verify` under `-race`. Original batch-1 note below.
+
 **RESOLUTION (2026-06-07, `chore/revive-unwired-integration-suites`): 9/10 REVIVED, 1 DEFER → F-019.**
 Empirical triage + revival (`docs/internal/f018-integration-suites.md`): eventbus, outbox, order,
 sellerpayout, api(fin), attachments, help, inbox, idempotency all green under `-race` on the shared
@@ -370,7 +374,12 @@ idempotency gained a FLUSHDB TestMain (derived-key residue). **reconcile is the 
 **F-019** below, the production bug its revival surfaced.
 
 ### F-019 — reconcile_user lacks SELECT on event_delivery_attempts → CleanupOldAttempts fails in prod (2026-06-07)
-**Severity: MED-HIGH | Confidence: CONFIRMED (reproduced directly against PG as reconcile_user) | ❌ OPEN**
+**Severity: MED-HIGH | Confidence: CONFIRMED (reproduced directly against PG as reconcile_user) | ✅ FIXED (`fix/f019-reconcile-grant`)**
+> **FIX (2026-06-07):** migration `0081_reconcile_select_grant` + init/73 converge on `GRANT SELECT, DELETE`
+> (DELETE was already present; SELECT was the gap). `integration-reconcile` revived (F-018 batch 2), green
+> under `-race` on a fresh fixture carrying the grant. Live 42501 stops when 0081 rides the deploy-runway
+> `ledger up`. Original finding below.
+
 > `init/73-reconcile-cleanup-grant.sql` grants **DELETE only**; PostgreSQL requires **SELECT** to evaluate
 > a DELETE's WHERE predicate, so `reconcile/repository.go CleanupOldAttempts` (`DELETE … WHERE attempt_at <
 > now()-'7 days'`) throws 42501 **every weekly reconcile cron run in production** — the error lands in
