@@ -26,11 +26,23 @@ import (
 // Connection details for the ephemeral test containers (Phase 0.4 integration run).
 // PG16:  docker run --rm -d --name pg-test  -p 6434:5432 -e POSTGRES_USER=ledger_admin ...
 // Redis: docker run --rm -d --name redis-test -p 6380:6379 redis:7-alpine
-const (
-	testDSN       = "postgres://ledger_admin:test123@localhost:6434/mopro_ledger"
-	testRedisAddr = "localhost:6380"
-	testTable     = "wallet_schema.outbox"
-)
+// DSN/addr are env-overridable (F-018) so the suite reuses the shared verify
+// fixtures (pg-ledger-test :6434 / redis-e2e :6381) — same envs as eventbus.
+const testTable = "wallet_schema.outbox"
+
+func testDSN() string {
+	if v := os.Getenv("LEDGER_TEST_DSN"); v != "" {
+		return v
+	}
+	return "postgres://ledger_admin:test123@localhost:6434/mopro_ledger" //nolint:gosec
+}
+
+func testRedisAddr() string {
+	if v := os.Getenv("REDIS_TEST_ADDR"); v != "" {
+		return v
+	}
+	return "localhost:6380"
+}
 
 var (
 	tPool *pgxpool.Pool
@@ -41,9 +53,9 @@ func TestMain(m *testing.M) {
 	ctx := context.Background()
 
 	var err error
-	tPool, err = pgxpool.New(ctx, testDSN)
+	tPool, err = pgxpool.New(ctx, testDSN())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "outbox integration: cannot connect to postgres (%s): %v\n", testDSN, err)
+		fmt.Fprintf(os.Stderr, "outbox integration: cannot connect to postgres (%s): %v\n", testDSN(), err)
 		os.Exit(1)
 	}
 	if err := tPool.Ping(ctx); err != nil {
@@ -51,9 +63,9 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	tRdb = redis.NewClient(&redis.Options{Addr: testRedisAddr})
+	tRdb = redis.NewClient(&redis.Options{Addr: testRedisAddr()})
 	if err := tRdb.Ping(ctx).Err(); err != nil {
-		fmt.Fprintf(os.Stderr, "outbox integration: cannot connect to redis (%s): %v\n", testRedisAddr, err)
+		fmt.Fprintf(os.Stderr, "outbox integration: cannot connect to redis (%s): %v\n", testRedisAddr(), err)
 		os.Exit(1)
 	}
 

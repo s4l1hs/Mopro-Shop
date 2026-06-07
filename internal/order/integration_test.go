@@ -71,6 +71,9 @@ CREATE TABLE order_schema.orders (
   cashback_eligible BOOLEAN      NOT NULL DEFAULT TRUE,
   cashback_currency TEXT         NOT NULL DEFAULT 'TRY_COIN',
   idempotency_key   TEXT         NOT NULL UNIQUE,
+  -- v8 multi-seller split (0059_orders_v8): repo scans both via COALESCE.
+  seller_id           BIGINT,
+  checkout_session_id TEXT,
   created_at        TIMESTAMPTZ  NOT NULL DEFAULT now(),
   updated_at        TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
