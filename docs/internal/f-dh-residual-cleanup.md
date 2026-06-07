@@ -71,6 +71,12 @@ mtime proves it isn't rewriting resolv.conf; if a future lease renewal ever does
 is `supersede domain-name-servers …;` in `/etc/dhcp/dhclient.conf` (documented in RUNBOOK).
 Plan: append `1.1.1.1` + `9.9.9.9` (host-wide complement of #106's caddy-only `dns:` fix).
 
+**APPLIED 2026-06-07.** Before: `nameserver 8.8.8.8` (1 line). After: 8.8.8.8 + 1.1.1.1 + 9.9.9.9.
+Sanity: default path OK, 1.1.1.1 OK, 9.9.9.9 OK; a fresh container inherits all 3 nameservers.
+Note: containers created before this change keep their startup-time resolver list until
+recreated — the next deploy recreates the three Go services; caddy carries its own `dns:`
+override (#106) independently.
+
 ## 5. Execution order
 
 1. Commit 1: this doc. 2. Commit 2: delete scripts + Makefile targets + retag `docker-build`.
