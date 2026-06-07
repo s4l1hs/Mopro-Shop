@@ -64,10 +64,9 @@ Every SEV1 and SEV2: blameless post-mortem within 5 business days.
    Required keys: `ECOM_DB_PASSWORD`, `LEDGER_DB_PASSWORD`, `JWT_SIGNING_KEY`, `PII_ENCRYPTION_KEY`,
    `RESTIC_PASSWORD`, `B2_KEY_ID`, `B2_APP_KEY`, `B2_BUCKET`, and all PSP/shipping/Slack/PD keys.
 
-4. **Deploy application**:
-   ```bash
-   make deploy SERVER=mopro@<new-ip> SSH_PORT=4625
-   ```
+4. **Deploy application**: add `GHCR_USER`/`GHCR_PAT` (read:packages) to the new host's
+   `/etc/mopro/.env`, update the `DEPLOY_HOST` GitHub secret to the new IP, then dispatch
+   the **`deploy` workflow** (`verify_only=false`). See `docs/deploy.md`.
 
 5. **Run database migrations**:
    ```bash

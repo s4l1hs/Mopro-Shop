@@ -28,7 +28,7 @@ One or more of the three Mopro service binaries (`core-svc`, `fin-svc`, `jobs-sv
 - **If OOM**: `docker stats --no-stream` to confirm; raise mem_limit temporarily in `.env` per `INFRASTRUCTURE.md`; note the Resource Limits table in `CLAUDE.md §7` — do not permanently raise without CFO review
 - **If dependency down**: restart pgbouncer first: `docker compose -f deploy/docker-compose.prod.yml restart pgbouncer-ecom` (or `pgbouncer-ledger` for fin-svc), then restart the service
 - **If bad env var**: inspect `.env` on the VDS at `/opt/mopro/.env`; correct the offending value; restart the container
-- **Emergency rollback**: `make rollback SERVER=mopro@195.85.207.92` — re-deploys the previous image
+- **Emergency rollback**: roll back to the previous build per `deploy/RUNBOOK.md` § "Rollback manually" (pinned `:<full-sha>` GHCR tag)
 
 ## Escalation
 - Slack: #mopro-panic immediately (all three services down = full outage)

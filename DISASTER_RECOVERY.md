@@ -317,10 +317,11 @@ The CLI uses each row's `idempotency_key`, so re-publishing is safe. Consumers w
 
 ### 5.4 If Consumer Is Broken
 
-1. Roll back consumer service to previous image:
+1. Roll back consumer service to the previous build (pinned GHCR tag — see
+   `deploy/RUNBOOK.md` § "Rollback manually"):
    ```bash
-   cd /opt/mopro
-   ./scripts/deploy.sh "$(cat .previous-tag)"
+   sudo IMAGE_NS=s4l1hs VERSION=<previous-full-sha> \
+     docker compose -f /opt/mopro/deploy/docker-compose.prod.yml up -d fin-svc
    ```
 2. Wait for outbox-publisher to drain.
 3. If drained: investigate consumer in staging.

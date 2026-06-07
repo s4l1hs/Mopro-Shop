@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # deploy/scripts/install-backup.sh — One-shot VDS setup for the restic backup pipeline.
-# Run as root after deploy.sh has placed the repo at /opt/mopro.
+# Run as root after the repo has been placed at /opt/mopro.
 #
 # What it does:
 #   1. Verifies / installs restic

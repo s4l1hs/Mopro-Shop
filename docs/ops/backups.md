@@ -56,7 +56,7 @@ All units are installed at `/etc/systemd/system/` on the VDS and run as `User=mo
 
 ## First-Time Setup
 
-Run **once per VDS** as root after `deploy.sh` has checked out the repo to `/opt/mopro`:
+Run **once per VDS** as root after the repo has been placed at `/opt/mopro`:
 
 ```bash
 # On the VDS as root:

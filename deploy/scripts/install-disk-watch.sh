@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # install-disk-watch.sh — installs and enables the disk-watch systemd timer on the VDS.
-# Run once as root after deploy.sh has copied the repo to /opt/mopro.
+# Run once as root after the repo has been placed at /opt/mopro.
 set -euo pipefail
 
 REPO_ROOT="/opt/mopro"

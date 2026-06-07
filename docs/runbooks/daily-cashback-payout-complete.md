@@ -15,7 +15,7 @@ There are two info alerts that use this runbook:
 ### If this is a `DeploySucceeded` alert
 - No action required unless a warning or critical alert fires within 10 minutes of the deploy
 - The alert annotation includes the `service`, `version`, and `buildtime` labels — use these to confirm which binary was updated
-- If a regression appears: check `git log --oneline -5` to identify what changed, then `make rollback SERVER=mopro@195.85.207.92`
+- If a regression appears: check `git log --oneline -5` to identify what changed, then roll back to the previous build per `deploy/RUNBOOK.md` § "Rollback manually" (pinned `:<full-sha>` GHCR tag)
 
 ### If this is a `DailyCashbackPayoutComplete` alert
 - No action required — this is a confirmation heartbeat

@@ -27,7 +27,7 @@ The ratio of `cart→abandoned` order status transitions to `cart→checkout` tr
 ## Mitigation
 - **If PSP is causing it**: follow `docs/runbooks/sipay-handoff-failing.md`
 - **If latency is causing it**: follow `docs/runbooks/api-latency-p95-high.md`
-- **If a deploy caused a UI/flow regression**: `make rollback SERVER=mopro@195.85.207.92`
+- **If a deploy caused a UI/flow regression**: roll back to the previous build per `deploy/RUNBOOK.md` § "Rollback manually" (pinned `:<full-sha>` GHCR tag)
 - **If OTP is broken**: check identity service logs; if a config issue, fix and restart core-svc
 - **If traffic spike from campaign** (no errors, just high volume): monitor; no action if error rates are normal
 
