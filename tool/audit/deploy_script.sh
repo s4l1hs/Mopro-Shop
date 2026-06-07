@@ -29,11 +29,15 @@ echo "MODE: VERIFY_ONLY=$VERIFY_ONLY  SKIP_PHOTO_SMOKE=$SKIP_PHOTO_SMOKE"
 echo
 
 # ── Compose directory discovery ─────────────────────────────────────────────────
-# Override:  COMPOSE_DIR=/path sudo bash deploy_script.sh
+# F-DH-1 §3.2: the PRODUCTION compose file is required and targeted explicitly
+# with -f on every invocation. A bare `docker compose` auto-loads the DEV
+# docker-compose.yml (same project name!) — that's defect ① of the #104 no-op
+# deploy. deploy.yml scps a fresh docker-compose.prod.yml here each run.
+# Override:  COMPOSE_DIR=/path bash deploy_script.sh
 # Else tries: /opt/mopro/deploy → /opt/mopro → find / (maxdepth 4).
-has_compose() { [ -f "$1/docker-compose.yml" ] || [ -f "$1/docker-compose.prod.yml" ]; }
+has_compose() { [ -f "$1/docker-compose.prod.yml" ]; }
 if [ -n "${COMPOSE_DIR:-}" ]; then
-  has_compose "$COMPOSE_DIR" || { echo "FATAL: COMPOSE_DIR=$COMPOSE_DIR has no docker-compose*.yml"; exit 1; }
+  has_compose "$COMPOSE_DIR" || { echo "FATAL: COMPOSE_DIR=$COMPOSE_DIR has no docker-compose.prod.yml"; exit 1; }
   echo "Using COMPOSE_DIR=$COMPOSE_DIR (env override)"
 elif has_compose /opt/mopro/deploy; then
   COMPOSE_DIR=/opt/mopro/deploy; echo "Discovered: $COMPOSE_DIR"
@@ -41,15 +45,17 @@ elif has_compose /opt/mopro; then
   COMPOSE_DIR=/opt/mopro; echo "Discovered: $COMPOSE_DIR"
 else
   echo "Compose file not in known locations; searching (find, maxdepth 4)..."
-  FOUND=$(find / -maxdepth 4 -name 'docker-compose*.yml' \
+  FOUND=$(find / -maxdepth 4 -name 'docker-compose.prod.yml' \
     -not -path '*/proc/*' -not -path '*/sys/*' -not -path '*/.git/*' 2>/dev/null | head -1)
-  [ -n "$FOUND" ] || { echo "FATAL: no docker-compose*.yml found anywhere on host"; exit 1; }
+  [ -n "$FOUND" ] || { echo "FATAL: no docker-compose.prod.yml found anywhere on host"; exit 1; }
   COMPOSE_DIR=$(dirname "$FOUND"); echo "Discovered (via find): $COMPOSE_DIR"
 fi
 cd "$COMPOSE_DIR" || { echo "FATAL: cd $COMPOSE_DIR failed"; exit 1; }
+COMPOSE_FILE="$COMPOSE_DIR/docker-compose.prod.yml"
 echo "Working directory: $(pwd)"
+echo "Compose file:      $COMPOSE_FILE"
 echo
-dc() { sudo docker compose "$@"; }
+dc() { sudo docker compose -f "$COMPOSE_FILE" "$@"; }
 
 echo "===== STEP 0: PRE-DEPLOY STATE ====="
 dc ps
