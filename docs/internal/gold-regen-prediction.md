@@ -40,9 +40,15 @@ produce the workflow's "No golden changes to commit." path.
 
 ## 4. Reconciliation (filled after the workflow run)
 
-- Dispatched: _<run url>_
-- Actual changed-set: _<list or "none — workflow reported 'No golden changes to commit.'">_
-- Verdict vs prediction: _<match / mismatches with resolution>_
+- Dispatched: `golden-rebaseline.yml` run **27102117580** on this branch (ubuntu-latest),
+  2026-06-07 19:17 UTC — concluded **success**.
+- Actual changed-set: **none** — the workflow regenerated all goldens with `--update-goldens`
+  and reported **"No golden changes to commit."** (no auto-commit pushed).
+- Verdict vs prediction: **exact match — predicted ∅, actual ∅.** No unexpected flips (no env
+  drift on the runner since the 06-03/06-04 baselines), and both predicted-but-unflipped
+  candidates behaved per §2 (fixtures don't carry `deliveryEta`/`originalPriceMinor` — the
+  #94-class case, documented, not forced per §7-5). The committed Linux baselines are confirmed
+  in sync with post-#103 widget state; the Path-B Home/PDP PR starts from an unambiguous baseline.
 
 ## 5. Documented residual (NOT this PR)
 
