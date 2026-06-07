@@ -158,10 +158,12 @@ CORE_TAG=<previous-tag> FIN_TAG=<previous-tag> JOBS_TAG=<previous-tag> \
   sudo docker compose up -d --no-deps core-svc fin-svc jobs-svc
 ```
 
-### Option B — Full rollback via rollback.sh
+### Option B — Full rollback to the previous build (pinned GHCR tag)
 
 ```bash
-./deploy/scripts/rollback.sh
+# On the VDS (ghcr keeps :<full-sha> per main build):
+sudo IMAGE_NS=s4l1hs VERSION=<previous-full-sha> \
+  docker compose -f /opt/mopro/deploy/docker-compose.prod.yml up -d core-svc fin-svc jobs-svc
 ```
 
 ### Option C — Enable maintenance mode (traffic block)

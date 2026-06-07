@@ -2,7 +2,7 @@
 
 **Server:** 195.85.207.92 | **OS:** Debian 13 (trixie) | **SSH:** port 4625, user `mopro`  
 **Services:** core-svc · fin-svc · jobs-svc · caddy · postgres-ecom · postgres-ledger · postgres-config · redis · pgbouncer-ecom · pgbouncer-ledger · grafana-agent  
-**Deploy pattern:** `docker save` → `scp` → `docker load` (no container registry)
+**Deploy pattern:** `deploy` GitHub workflow → GHCR pull (`ghcr.io/s4l1hs/*`) → `up -d` + image-ID assertion (legacy tarball path retired — F-DH-RESIDUAL)
 
 ---
 
@@ -38,12 +38,11 @@ scp -P 4625 <local-file> mopro@195.85.207.92:/opt/mopro/
 
 ### First deploy
 
-```sh
-# On dev machine:
-make deploy VERSION=0.1.0 SERVER=mopro@195.85.207.92
-```
-
-This runs: `docker build` → `docker save` → `scp` → `docker load` → rolling restart.
+Dispatch the **`deploy` GitHub workflow** (`workflow_dispatch`, `verify_only=false`).
+It scps a fresh `docker-compose.prod.yml` + `deploy_script.sh` to the host, logs into
+GHCR, pulls `ghcr.io/s4l1hs/*`, `up -d`, waits on `/healthz`, and **asserts the running
+image == the pulled ref**. Prereq: `GHCR_USER`/`GHCR_PAT` in the host `.env` (docs/deploy.md).
+(The legacy `make deploy` tarball path is retired — F-DH-RESIDUAL.)
 
 ### Install systemd backup timer (on VDS as root)
 
@@ -104,19 +103,39 @@ ssh -p 4625 mopro@195.85.207.92 "docker logs --tail 100 -f caddy"
 
 ### Deploy a new version
 
-```sh
-make deploy VERSION=1.2.3 SERVER=mopro@195.85.207.92
-```
-
-The script restarts in order: **jobs-svc → core-svc → fin-svc**. Health checks each before proceeding. Auto-rolls back if any service fails to become healthy within 60 s.
+Dispatch the **`deploy` GitHub workflow** (Actions → deploy → run, `verify_only=false`).
+Fail-fast: a denied pull, failed login, unhealthy service, or image-ID mismatch exits
+non-zero — a green run means the new images are live.
 
 ### Rollback manually
 
+GHCR keeps a `:<full-sha>` tag per main build (`build-images.yml`), so rollback =
+re-run the previous build pinned by tag, on-host:
+
 ```sh
-make rollback SERVER=mopro@195.85.207.92
+ssh -p 4625 mopro@195.85.207.92
+sudo IMAGE_NS=s4l1hs VERSION=<previous-full-sha> \
+  docker compose -f /opt/mopro/deploy/docker-compose.prod.yml up -d core-svc fin-svc jobs-svc
+curl -s http://127.0.0.1:8080/__version   # confirm the rolled-back SHA
 ```
 
-Restores from `bin/prev/` tarballs loaded during the previous deploy.
+(The tarball-based `make rollback` / `bin/prev/` path is retired — F-DH-RESIDUAL.
+DEFER: a `version` input on the deploy workflow to make rollback a dispatch too.)
+
+### Post-flip cleanup: purge stale `mopro/*` images (one-time, gated)
+
+Once a real deploy has flipped prod onto `ghcr.io/s4l1hs/*` (verify first line below
+shows only ghcr refs for the three services), the legacy local images + tarballs can go:
+
+```sh
+sudo docker ps --format '{{.Names}}\t{{.Image}}' | grep -E 'core-svc|fin-svc|jobs-svc'
+# ALL three must show ghcr.io/s4l1hs/* — if ANY shows mopro/*, STOP (deploy gap).
+sudo docker image ls --format '{{.Repository}}:{{.Tag}}' | grep '^mopro/' \
+  | xargs -r -n1 sudo docker image rm     # refuses in-use images — that's the guard
+rm -rf /opt/mopro/bin/*.tar /opt/mopro/bin/prev/
+```
+
+Never `docker system prune` / `image prune -a`; never touch `ghcr.io/*`, volumes, networks.
 
 ### Apply a database migration
 
@@ -244,7 +263,8 @@ ssh -p 4625 mopro@195.85.207.92 "docker exec redis redis-cli INFO memory | grep 
 | Hetzner Storage Box SSH port 23 | Hetzner uses port 23 (not 22) for Storage Box SFTP/rsync |
 | UFW uses nftables backend | Debian 13 default; inspect rules with `nft list ruleset` not `iptables -L` |
 | Caddy pinned `2.8-alpine` | Do NOT use `caddy:2-alpine` (unpinned); breaking changes in minor versions |
-| `docker load` pattern | No container registry; all images shipped as tarballs via `scp -P 4625` |
+| GHCR pull deploys | Images pull from `ghcr.io/s4l1hs/*` (private — `GHCR_USER`/`GHCR_PAT` in host `.env`); the old tarball/`docker load` path is retired |
+| Host DNS | `/etc/resolv.conf` carries multiple nameservers (8.8.8.8 + 1.1.1.1 + 9.9.9.9) — single-resolver SERVFAIL broke ACME lookups (F-DH-3/RESIDUAL). A `dhclient` runs but does not manage the file; if that ever changes, use `supersede domain-name-servers` in `/etc/dhcp/dhclient.conf` |
 | fin-svc dual-homed | fin-svc is on both `mopro-net` (Redis) and `mopro-fin-net` (postgres-ledger) |
 | postgres-config stub | Empty cluster, no services connect to it in Phase 4.0.5 |
 | Secrets at `/etc/mopro/.env` | chmod 600 root:root; `/opt/mopro/.env` is a symlink to this file |

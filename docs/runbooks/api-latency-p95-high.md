@@ -33,7 +33,7 @@ The p95 HTTP response latency across one or more services has exceeded 500 ms fo
 ## Mitigation
 - **If a slow query is found**: add a missing index or rewrite the query; deploy the fix; monitor latency
 - **If pool is near-exhausted**: follow `docs/runbooks/db-conn-pool-exhausted.md`
-- **If deploy caused it**: `make rollback SERVER=mopro@195.85.207.92` if latency is user-impacting
+- **If deploy caused it**: roll back per `deploy/RUNBOOK.md` § "Rollback manually" if latency is user-impacting
 - **If Redis latency**: check `docker stats --no-stream redis` for memory pressure; `docker compose restart redis` as a last resort (brief unavailability, services recover automatically)
 - **If Meilisearch**: check index size and host CPU; consider reducing concurrent search requests or adding a rate limit
 

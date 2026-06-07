@@ -113,8 +113,9 @@ If the entire VDS is gone and you're starting from scratch:
 bash setup-server.sh
 
 # 3. Restore secrets from password manager to /opt/mopro/.env
-# 4. Deploy application
-make deploy SERVER=mopro@<new-ip>
+# 4. Deploy application: set DEPLOY_HOST secret to the new IP, add GHCR_USER/GHCR_PAT
+#    to /etc/mopro/.env, then dispatch the `deploy` workflow — see docs/deploy.md
+
 
 # 5. Install backup tooling (creates repos, SSH config)
 sudo bash /opt/mopro/deploy/scripts/install-backup.sh

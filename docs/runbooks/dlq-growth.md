@@ -25,7 +25,7 @@ The dead-letter queue (DLQ) for Redis Streams event consumers is receiving messa
 6. **Check outbox lag**: Grafana → Infra Health → "Outbox Publisher Lag" — if lag is high, the outbox publisher may be the problem upstream
 
 ## Mitigation
-- **If a schema mismatch after a deploy**: roll back the deploy (`make rollback SERVER=mopro@195.85.207.92`) OR write a migration consumer that handles both old and new format (v-bump the event topic)
+- **If a schema mismatch after a deploy**: roll back the deploy (previous-build rollback per `deploy/RUNBOOK.md` § "Rollback manually") OR write a migration consumer that handles both old and new format (v-bump the event topic)
 - **If dependency unavailable**: fix the dependency first (see `docs/runbooks/api-down.md` or `docs/runbooks/db-conn-pool-exhausted.md`); then replay DLQ:
   ```bash
   docker exec redis redis-cli XRANGE mopro:dlq:<service>:<consumer> - + COUNT 100

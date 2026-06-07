@@ -22,7 +22,7 @@ The 5xx error rate on one or more Mopro services has exceeded 5% of total reques
 6. **Check deploy timing**: `git log --oneline -5` — correlate with alert start time
 
 ## Mitigation
-- **If a deploy caused it**: `make rollback SERVER=mopro@195.85.207.92` — this re-deploys the previous image
+- **If a deploy caused it**: roll back per `deploy/RUNBOOK.md` § "Rollback manually" — re-deploys the previous build
 - **If OOM**: raise container memory limit temporarily in `.env`, restart: `docker compose -f deploy/docker-compose.prod.yml up -d <service>`
 - **If DB unreachable**: check `docker ps | grep pgbouncer` and postgres containers; restart pgbouncer first
 - **If specific route**: add a feature flag or emergency disable in `cmd/<service>/main.go`, redeploy

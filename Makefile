@@ -1,10 +1,8 @@
 COMPOSE      := docker compose -f deploy/docker-compose.yml
 COMPOSE_PROD := docker compose -f deploy/docker-compose.prod.yml
 
-# Production deploy settings — override on CLI: make deploy SERVER=mopro@195.85.207.92
-SERVER   ?= mopro@195.85.207.92
-SSH_PORT ?= 4625
-SSH_USER ?= mopro
+# Image tag for local builds (docker-build). Production deploys are driven by
+# the `deploy` GitHub workflow, not make — see docs/deploy.md (F-DH-RESIDUAL).
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
 OAPI_CODEGEN_VERSION  := v2.4.1
@@ -24,7 +22,7 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
         test-integration-catalog test-integration-outbox test-integration-cart test-integration-order \
         test-integration-sellerpayout test-e2e integration-e2e integration-cart integration-identity integration-identity-race integration-payment e2e-test-up e2e-test-down \
         api-gen-models api-gen-core api-gen-fin api-gen-dart api-gen api-lint contract-test \
-        docker-build release deploy deploy-staging rollback \
+        docker-build \
         seed-dry-run seed-staging seed-prod build-seed \
         smoke loadtest grafana-deploy
 
@@ -255,53 +253,35 @@ caddy-validate:
 caddy-reload:
 	$(COMPOSE) --env-file .env.local exec caddy caddy reload --config /etc/caddy/Caddyfile
 
-# ── Production build + deploy ─────────────────────────────────────────────────
+# ── Production build (local mirror of build-images.yml) ──────────────────────
+# F-DH-RESIDUAL: the tarball deploy path (release/deploy/deploy-staging/rollback
+# targets + deploy/scripts/{deploy,rollback}.sh) is RETIRED. Canonical deploy is
+# the `deploy` workflow (workflow_dispatch) → tool/audit/deploy_script.sh pulling
+# ghcr.io/${IMAGE_NS}/* — see docs/deploy.md. Rollback = re-deploy a pinned
+# previous :<full-sha> tag (deploy/RUNBOOK.md "Rollback").
 
 # Build all three service images with VERSION tag.
 # BUILD_SHA defaults to VERSION (the git SHA or tag); BUILT_AT is captured at make-time.
 BUILD_SHA ?= $(VERSION)
 BUILT_AT  ?= $(shell date -u +%FT%TZ)
+IMAGE_NS  ?= s4l1hs
 
 docker-build:
 	docker build --platform=linux/amd64 \
 	  --build-arg SERVICE=core-svc \
 	  --build-arg BUILD_SHA=$(BUILD_SHA) \
 	  --build-arg BUILT_AT=$(BUILT_AT) \
-	  -t mopro/core-svc:$(VERSION) -f build/Dockerfile .
+	  -t ghcr.io/$(IMAGE_NS)/core-svc:$(VERSION) -f build/Dockerfile .
 	docker build --platform=linux/amd64 \
 	  --build-arg SERVICE=fin-svc \
 	  --build-arg BUILD_SHA=$(BUILD_SHA) \
 	  --build-arg BUILT_AT=$(BUILT_AT) \
-	  -t mopro/fin-svc:$(VERSION) -f build/Dockerfile .
+	  -t ghcr.io/$(IMAGE_NS)/fin-svc:$(VERSION) -f build/Dockerfile .
 	docker build --platform=linux/amd64 \
 	  --build-arg SERVICE=jobs-svc \
 	  --build-arg BUILD_SHA=$(BUILD_SHA) \
 	  --build-arg BUILT_AT=$(BUILT_AT) \
-	  -t mopro/jobs-svc:$(VERSION) -f build/Dockerfile .
-
-# Save images as tarballs in bin/ ready for scp to VDS.
-release: docker-build ## Build + save release image tarballs to bin/.
-	mkdir -p bin
-	docker save mopro/core-svc:$(VERSION) -o bin/core-svc-$(VERSION).tar
-	docker save mopro/fin-svc:$(VERSION)  -o bin/fin-svc-$(VERSION).tar
-	docker save mopro/jobs-svc:$(VERSION) -o bin/jobs-svc-$(VERSION).tar
-	@echo "Tarballs written to bin/ — run 'make deploy' to ship"
-
-# Upload + rolling restart on VDS.
-deploy: release ## Build + deploy to production over SSH.
-	VERSION=$(VERSION) SERVER=$(SERVER) SSH_PORT=$(SSH_PORT) \
-	  ./deploy/scripts/deploy.sh $(VERSION)
-
-# Restore previous image set on VDS.
-rollback: ## Roll production back to the previous image set.
-	SERVER=$(SERVER) SSH_PORT=$(SSH_PORT) ./deploy/scripts/rollback.sh
-
-# Deploy to staging VDS.
-# Override defaults: make deploy-staging STAGING_SERVER=mopro@<staging-ip> VERSION=<sha>
-STAGING_SERVER ?= $(SERVER)
-deploy-staging: release ## Build + deploy to staging.
-	@echo "Deploying $(VERSION) to staging: $(STAGING_SERVER)"
-	SERVER=$(STAGING_SERVER) SSH_PORT=$(SSH_PORT) ./deploy/scripts/deploy.sh $(VERSION)
+	  -t ghcr.io/$(IMAGE_NS)/jobs-svc:$(VERSION) -f build/Dockerfile .
 
 # Integration test targets — each spins up an ephemeral container, runs tests, then tears down.
 
