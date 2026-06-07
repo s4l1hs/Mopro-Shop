@@ -77,11 +77,15 @@ jobs:
         env:
           VERIFY_ONLY: ${{ inputs.verify_only }}
           SKIP_PHOTO_SMOKE: ${{ inputs.skip_photo_smoke }}
+          # Owner-relative, mirroring build-images.yml's push namespace; the
+          # script lowercases it (GHCR requirement).
+          IMAGE_NS: ${{ github.repository_owner }}
         run: |
           ssh -i ~/.ssh/deploy_key -p "${{ secrets.DEPLOY_PORT }}" \
             "mopro@${{ secrets.DEPLOY_HOST }}" \
             "chmod +x /tmp/deploy_script.sh && \
              VERIFY_ONLY='${VERIFY_ONLY}' SKIP_PHOTO_SMOKE='${SKIP_PHOTO_SMOKE}' \
+             IMAGE_NS='${IMAGE_NS}' \
              bash /tmp/deploy_script.sh"
 
       - name: Cleanup SSH key from runner

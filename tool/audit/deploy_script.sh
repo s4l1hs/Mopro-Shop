@@ -18,7 +18,12 @@ mkdir -p "$OUT_DIR"
 exec > >(tee "$OUT_DIR/full_output.log") 2>&1
 
 SERVICES="core-svc fin-svc jobs-svc"
-EXPECTED_SHA_PREFIX="7b8d96cc"   # PR #49 = last backend build; :latest points here
+
+# F-DH-1 §3.3: image namespace + tag, passed into compose interpolation through
+# sudo on every dc() call. Default matches what build-images.yml actually
+# pushes (owner-relative: ghcr.io/s4l1hs/* today). GHCR requires lowercase.
+IMAGE_NS="$(printf '%s' "${IMAGE_NS:-s4l1hs}" | tr '[:upper:]' '[:lower:]')"
+VERSION="${VERSION:-latest}"
 
 # VERIFY_ONLY=true → exercise SSH/scp/discovery/compose-config WITHOUT pull/up or the
 #   photo-upload POST. Non-destructive; used to smoke-test the deploy workflow.
@@ -55,7 +60,7 @@ COMPOSE_FILE="$COMPOSE_DIR/docker-compose.prod.yml"
 echo "Working directory: $(pwd)"
 echo "Compose file:      $COMPOSE_FILE"
 echo
-dc() { sudo docker compose -f "$COMPOSE_FILE" "$@"; }
+dc() { sudo IMAGE_NS="$IMAGE_NS" VERSION="$VERSION" docker compose -f "$COMPOSE_FILE" "$@"; }
 
 echo "===== STEP 0: PRE-DEPLOY STATE ====="
 dc ps
@@ -66,19 +71,14 @@ echo "--- pre-deploy core-svc /__version (current SHA before rollout) ---"
 curl -fsS -m 5 http://localhost/__version || echo "(unreachable — service may be down pre-deploy)"
 echo; echo
 
-echo "===== STEP 1: SET IMAGE_NS in compose .env ====="
-# Compose reads .env from the compose file's directory — write IMAGE_NS THERE,
-# not an assumed /opt/mopro/.env (today's bug: it landed where compose never reads).
-COMPOSE_ENV="$COMPOSE_DIR/.env"
-if grep -q '^IMAGE_NS=' "$COMPOSE_ENV" 2>/dev/null; then
-  echo "Already set in $COMPOSE_ENV: $(grep '^IMAGE_NS=' "$COMPOSE_ENV" | head -1)"
-else
-  echo 'IMAGE_NS=s4l1hs' | sudo tee -a "$COMPOSE_ENV" > /dev/null
-  echo "Set in $COMPOSE_ENV: IMAGE_NS=s4l1hs"
-fi
-echo
+echo "===== STEP 1: IMAGE REFS (IMAGE_NS=${IMAGE_NS} VERSION=${VERSION}) ====="
+# F-DH-1 §3.3: namespace/tag flow ONLY through dc()'s env passthrough — the old
+# append-to-.env hack is gone (it mutated the root-only secrets file via a
+# broken unprivileged existence check, and was inert against the stale host
+# dev compose anyway: #104 F-DH-6).
 echo "--- resolved image refs (docker compose config) ---"
-dc config 2>/dev/null | grep -E 'image: ghcr' | sort -u || echo "(compose config produced no ghcr image refs — check parse)"
+dc config 2>/dev/null | grep -E 'image: ghcr' | sort -u \
+  || { echo "FATAL: compose config resolved no ghcr image refs — check $COMPOSE_FILE" >&2; exit 1; }
 echo
 
 if [ "$VERIFY_ONLY" = "true" ]; then
@@ -109,7 +109,7 @@ echo "===== STEP 5: HEALTH + DEPLOYED SHA (via Caddy on :80; distroless-safe) ==
 echo "--- Caddy native /healthz (ingress up?) ---"
 curl -fsS -m 5 http://localhost/healthz || echo "CADDY HEALTHZ FAILED"
 echo
-echo "--- core-svc /__version (expect sha prefix ${EXPECTED_SHA_PREFIX}) ---"
+echo "--- core-svc /__version ---"
 curl -fsS -m 5 http://localhost/__version || echo "CORE-SVC /__version UNREACHABLE"
 echo
 echo "(fin-svc/jobs-svc have no host-reachable health route through Caddy — judged"
