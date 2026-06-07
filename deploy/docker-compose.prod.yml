@@ -323,6 +323,16 @@ services:
     image: caddy:2.8-alpine
     restart: unless-stopped
     networks: [mopro-net]
+    # F-DH-3: redundant upstream resolvers for Docker's embedded DNS. The host
+    # has a single nameserver (8.8.8.8); its SERVFAIL episodes (2026-06-01/02)
+    # broke ACME-endpoint lookups from this container ("lookup acme-v02.… on
+    # 127.0.0.11:53: server misbehaving") and would threaten cert renewal if
+    # one landed inside the renewal window. Three independent anycast resolvers
+    # make a single-upstream failure non-fatal. NOTE: applying this on a live
+    # host is `docker compose -f docker-compose.prod.yml up -d caddy` (container
+    # recreate, ~2-5s listener blip; cert state persists in caddy-data) — NOT
+    # `caddy reload`. See docs/internal/f-dh-3-caddy-acme.md.
+    dns: [1.1.1.1, 8.8.8.8, 9.9.9.9]
     mem_limit: 256m
     cpus: '0.5'
     cap_drop: [ALL]
