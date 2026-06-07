@@ -8,8 +8,10 @@
 # checks go through Caddy on localhost:80, and env is read via `docker inspect`
 # (the container config), never via `docker compose exec ... env`.
 
-set -u
-set -o pipefail
+# Fail-fast (F-DH-1 §3.1): any unhandled failure aborts the deploy with a
+# non-zero exit — a denied pull or failed login can never scroll past into a
+# green run again. Lines that may legitimately fail carry explicit handlers.
+set -euo pipefail
 
 OUT_DIR="/tmp/deploy_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$OUT_DIR"
@@ -78,7 +80,11 @@ if [ "$VERIFY_ONLY" = "true" ]; then
   echo
 else
 echo "===== STEP 2: DOCKER COMPOSE PULL ====="
-dc pull $SERVICES
+if ! dc pull $SERVICES; then
+  echo "FATAL: docker compose pull failed — NOTHING was deployed." >&2
+  echo "       Check GHCR login (STEP 1.5) and that the image refs above exist." >&2
+  exit 1
+fi
 echo
 
 echo "===== STEP 3: DOCKER COMPOSE UP ====="
@@ -136,7 +142,7 @@ elif [ -f /root/.deploy_test_creds ]; then
   TOKEN=$(curl -sS -m 10 -X POST http://localhost/auth/login \
     -H 'Content-Type: application/json' \
     -d "{\"email\":\"${TEST_EMAIL:-}\",\"password\":\"${TEST_PASSWORD:-}\"}" \
-    | jq -r '.access_token // .token // empty' 2>/dev/null)
+    | jq -r '.access_token // .token // empty' 2>/dev/null || true)
   if [ -z "$TOKEN" ]; then
     echo "Could not obtain test auth token — login failed (check creds / /auth/login path)."
   else
@@ -146,7 +152,7 @@ elif [ -f /root/.deploy_test_creds ]; then
     curl -sS -m 15 -i -X POST http://localhost/uploads/photos \
       -H "Authorization: Bearer $TOKEN" \
       -F "file=@/tmp/test_upload.png;type=image/png" \
-      -F "entity_type=review" 2>&1 | head -40
+      -F "entity_type=review" 2>&1 | head -40 || true
     rm -f /tmp/test_upload.png
   fi
 else
