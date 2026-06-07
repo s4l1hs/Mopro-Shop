@@ -361,7 +361,7 @@ services:
   core-svc:
     <<: *go-defaults
     container_name: core-svc
-    image: ghcr.io/${IMAGE_NS:-mopro}/core-svc:${VERSION:-latest}
+    image: ghcr.io/${IMAGE_NS:-s4l1hs}/core-svc:${VERSION:-latest}
     env_file: [.env]
     environment:
       SVC_NAME: core-svc
@@ -395,7 +395,7 @@ services:
     <<: *go-defaults
     container_name: fin-svc
     networks: [mopro-net, mopro-fin-net]
-    image: ghcr.io/${IMAGE_NS:-mopro}/fin-svc:${VERSION:-latest}
+    image: ghcr.io/${IMAGE_NS:-s4l1hs}/fin-svc:${VERSION:-latest}
     env_file: [.env]
     environment:
       SVC_NAME: fin-svc
@@ -424,7 +424,7 @@ services:
     mem_limit: 1200m
     mem_reservation: 384m
     cpus: '0.8'
-    image: ghcr.io/${IMAGE_NS:-mopro}/jobs-svc:${VERSION:-latest}
+    image: ghcr.io/${IMAGE_NS:-s4l1hs}/jobs-svc:${VERSION:-latest}
     env_file: [.env]
     environment:
       SVC_NAME: jobs-svc

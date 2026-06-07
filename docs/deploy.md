@@ -16,28 +16,54 @@ Backend service images build + push automatically on every `main` push via
 `ghcr.io/<repo-owner>/<service>`, i.e. `ghcr.io/s4l1hs/<service>` on the current
 fork and `ghcr.io/mopro/<service>` if/when the repo migrates to the `mopro` org.
 
-**Match the host pull via `IMAGE_NS`.** `deploy/docker-compose.yml` pulls
-`ghcr.io/${IMAGE_NS:-mopro}/<service>`, so the puller must be pointed at the same
-namespace the workflow pushed to. The default is `mopro` (for the eventual org
-migration); until then, set `IMAGE_NS` to the current owner in the host's `.env`:
+**`IMAGE_NS` now defaults to `s4l1hs`** (F-DH-1). `deploy/docker-compose.prod.yml`
+pulls `ghcr.io/${IMAGE_NS:-s4l1hs}/<service>` and `deploy.yml` passes
+`IMAGE_NS=<repository_owner>` through to the deploy script, so namespace alignment
+is automatic. If the repo migrates to the `mopro` org, flip the default + the
+workflow follows the owner automatically. (The dev `deploy/docker-compose.yml`
+keeps `:-mopro`; it is no longer reachable from the deploy path, which targets
+the prod file explicitly with `-f`.)
+
+**Registry login is mandatory (F-DH-1 §3.4).** The `ghcr.io/s4l1hs/*` packages
+are private; the deploy script logs in before pulling, reading two keys from the
+host's compose-dir `.env` (symlink → `/etc/mopro/.env`, root-only):
 
 ```sh
-# On the deploy host, in the compose dir (e.g. /opt/mopro):
-echo 'IMAGE_NS=s4l1hs' | sudo tee -a /opt/mopro/.env   # match the GHCR push owner
+# One-time host prep — PAT scope: read:packages ONLY.
+echo 'GHCR_USER=<github-user>' | sudo tee -a /opt/mopro/deploy/.env > /dev/null
+echo 'GHCR_PAT=<pat>'          | sudo tee -a /opt/mopro/deploy/.env > /dev/null
 ```
 
-Without this, `docker compose pull` resolves to `ghcr.io/mopro/<service>` and 404s
-(no `mopro` org exists yet). When the repo does move to `mopro`, clear the override.
+Without these keys the deploy **fails fast with instructions** — that is correct
+behavior, not a bug. (Alternative: make the three packages public on GitHub and
+the login becomes a no-op safety net.)
 
-## Rolling a build out to a host (manual)
+## Deploying via the `deploy` workflow (canonical)
 
-Building + pushing does **not** deploy. To roll a new image onto a host:
+`workflow_dispatch` → `.github/workflows/deploy.yml` scps a fresh
+`deploy/docker-compose.prod.yml` + `tool/audit/deploy_script.sh` to the host and
+runs the script, which: logs into GHCR → `compose pull` (fail-fast) → `up -d` →
+bounded `/healthz` wait → **asserts each running container's image ID equals the
+freshly pulled ref** (a green no-op deploy is impossible) → prints a deploy
+summary. `verify_only=true` exercises ssh/scp/login/config without pull/up.
+
+**Migrations are NOT part of the deploy script.** When a release includes new
+migrations, apply them BEFORE dispatching the deploy (additive-first ordering):
 
 ```sh
-# On the deploy host (from the compose dir, e.g. /opt/mopro):
-# (one-time) ensure IMAGE_NS matches the push owner — see above.
-sudo docker compose pull core-svc        # or fin-svc / jobs-svc / all
-sudo docker compose up -d core-svc
+./deploy/scripts/apply-migration.sh --db ecom status   # then: up
+./deploy/scripts/apply-migration.sh --db ledger status # then: up
+```
+
+## Rolling a build out to a host (manual fallback)
+
+Building + pushing does **not** deploy. Prefer the workflow above. By hand:
+
+```sh
+# On the deploy host (compose dir /opt/mopro/deploy):
+sudo docker login ghcr.io -u "$GHCR_USER"   # paste the read:packages PAT
+sudo IMAGE_NS=s4l1hs docker compose -f docker-compose.prod.yml pull core-svc
+sudo IMAGE_NS=s4l1hs docker compose -f docker-compose.prod.yml up -d core-svc
 ```
 
 If watchtower (or a similar auto-pull agent) is configured on the host, this
