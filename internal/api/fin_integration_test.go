@@ -90,13 +90,17 @@ func finSeedPlan(t *testing.T, pool *pgxpool.Pool, userID int64) int64 {
 	t.Helper()
 	uid := finUniqueID()
 	var id int64
+	// v8 columns (0076): price/commission/total_months/last are NOT NULL with
+	// plans_principal_exact CHECK: (months-1)*monthly + last == price → 11*500+500=6000.
 	err := pool.QueryRow(context.Background(), `
 		INSERT INTO cashback_schema.plans
 		    (order_id, user_id, monthly_amount_minor, currency,
 		     reference_interest_rate_bps, start_date, status,
-		     delivered_at, market, commission_snapshot, idempotency_key)
+		     delivered_at, market, commission_snapshot, idempotency_key,
+		     price_minor, commission_bps, total_months, monthly_amount_last_minor)
 		VALUES ($1, $2, 500, 'TRY_COIN', 5000, '2026-01-01', 'active',
-		        now()-interval '5 days', 'TR', '[]'::jsonb, $3)
+		        now()-interval '5 days', 'TR', '[]'::jsonb, $3,
+		        6000, 1000, 12, 500)
 		RETURNING id`,
 		uid, userID, fmt.Sprintf("fin:test:plan:%d", uid),
 	).Scan(&id)

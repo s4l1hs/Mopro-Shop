@@ -16,6 +16,25 @@ import (
 	"github.com/mopro/platform/internal/idempotency"
 )
 
+// TestMain flushes the dedicated test DB (15) before the run: the middleware
+// stores responses under derived keys, so per-test Del cleanups miss them and
+// a residual saved response replays on the next run (handler executes 0 times).
+// Best-effort — an unreachable Redis is handled by the per-test Skip.
+func TestMain(m *testing.M) {
+	addr := os.Getenv("REDIS_URL")
+	if addr == "" {
+		addr = "redis://localhost:6379/15"
+	}
+	if opt, err := redis.ParseURL(addr); err == nil {
+		rc := redis.NewClient(opt)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		_ = rc.FlushDB(ctx).Err()
+		cancel()
+		_ = rc.Close()
+	}
+	os.Exit(m.Run())
+}
+
 func redisClient(t *testing.T) *redis.Client {
 	t.Helper()
 	addr := os.Getenv("REDIS_URL")
