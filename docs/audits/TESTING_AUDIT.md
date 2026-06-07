@@ -360,6 +360,25 @@ Recommendation: a `chore/revive-unwired-integration-suites` follow-up, reviving 
 reuse pattern (precedent: `chore/revive-cart-identity-integration-tests`), one cluster per commit — **not**
 a blanket add (a rotted suite would turn `verify` red). Fix PRs reference "closes TESTING_AUDIT F-018".
 
+**RESOLUTION (2026-06-07, `chore/revive-unwired-integration-suites`): 9/10 REVIVED, 1 DEFER → F-019.**
+Empirical triage + revival (`docs/internal/f018-integration-suites.md`): eventbus, outbox, order,
+sellerpayout, api(fin), attachments, help, inbox, idempotency all green under `-race` on the shared
+fixtures and registered in `verify`; the colliding legacy targets (`test-integration-{outbox,cart,order,
+sellerpayout}`) are deleted. Rot fixed en route (harness-only): order TestMain DDL gained the 0059_v8
+columns; fin seed gained the 0076 NOT NULLs; outbox gained env overrides + a stale-backlog sweep;
+idempotency gained a FLUSHDB TestMain (derived-key residue). **reconcile is the 1 DEFER** — blocked on
+**F-019** below, the production bug its revival surfaced.
+
+### F-019 — reconcile_user lacks SELECT on event_delivery_attempts → CleanupOldAttempts fails in prod (2026-06-07)
+**Severity: MED-HIGH | Confidence: CONFIRMED (reproduced directly against PG as reconcile_user) | ❌ OPEN**
+> `init/73-reconcile-cleanup-grant.sql` grants **DELETE only**; PostgreSQL requires **SELECT** to evaluate
+> a DELETE's WHERE predicate, so `reconcile/repository.go CleanupOldAttempts` (`DELETE … WHERE attempt_at <
+> now()-'7 days'`) throws 42501 **every weekly reconcile cron run in production** — the error lands in
+> `result.Errors` (alert noise) and `event_delivery_attempts` never gets pruned (unbounded growth).
+> Surfaced by reviving the reconcile integration suite (F-018) — the suite that would have caught it ran in
+> no gate. Fix: 1-line `GRANT SELECT` as a **ledger migration** (init doesn't re-run on existing clusters)
+> + same line in init/73 for fresh clusters; then revive the reconcile suite (F-018 batch 2).
+
 ---
 
 ## §7 Verified-not-actionable (commands shown above)

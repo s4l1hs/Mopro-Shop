@@ -72,11 +72,14 @@ func TestMain(m *testing.M) {
 	// F-018: the shared pg-ledger-test fixture accumulates unpublished outbox
 	// residue from earlier suites in the verify chain (wallet/api insert rows
 	// but never run a publisher). FetchUnpublished is ORDER BY id ASC LIMIT n,
-	// so a backlog starves this suite's fresh rows — clear it for determinism.
-	// Safe: verify's chain is sequential and no other target re-reads its
-	// outbox rows after completing.
-	if _, err := tPool.Exec(ctx, "TRUNCATE "+testTable); err != nil {
-		fmt.Fprintf(os.Stderr, "outbox integration: truncate %s failed: %v\n", testTable, err)
+	// so a backlog starves this suite's fresh rows — mark stale rows published
+	// for determinism. UPDATE (not TRUNCATE/DELETE): wallet's suite asserts
+	// COUNT(*) on its fixed idempotency keys across runs, so rows must survive;
+	// published_at is irrelevant to that count. TestMain runs before any test
+	// inserts, so no age-guard is needed.
+	if _, err := tPool.Exec(ctx,
+		"UPDATE "+testTable+" SET published_at = now() WHERE published_at IS NULL"); err != nil {
+		fmt.Fprintf(os.Stderr, "outbox integration: backlog sweep on %s failed: %v\n", testTable, err)
 		os.Exit(1)
 	}
 
