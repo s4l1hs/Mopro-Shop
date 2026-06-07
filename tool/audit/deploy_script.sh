@@ -81,6 +81,29 @@ dc config 2>/dev/null | grep -E 'image: ghcr' | sort -u \
   || { echo "FATAL: compose config resolved no ghcr image refs — check $COMPOSE_FILE" >&2; exit 1; }
 echo
 
+echo "===== STEP 1.5: GHCR LOGIN (F-DH-1 §3.4) ====="
+# The ghcr.io/s4l1hs/* packages are PRIVATE (anonymous manifest GET → 403), and
+# the host had no docker login at all (defect ③ of the #104 no-op deploy).
+# Creds live in the compose-dir .env (symlink → /etc/mopro/.env, root-only):
+#   GHCR_USER=<github username>
+#   GHCR_PAT=<classic PAT, read:packages scope ONLY>
+# The PAT is piped via --password-stdin and is never echoed or put on argv.
+# Login runs in VERIFY_ONLY mode too — it's the most fragile plumbing link.
+ENV_FILE="$COMPOSE_DIR/.env"
+GHCR_USER="$(sudo grep -m1 '^GHCR_USER=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)"
+GHCR_PAT="$(sudo grep -m1 '^GHCR_PAT=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)"
+if [ -z "$GHCR_USER" ] || [ -z "$GHCR_PAT" ]; then
+  echo "FATAL: GHCR_USER / GHCR_PAT not set in $ENV_FILE — cannot pull private images." >&2
+  echo "Provision once (PAT needs read:packages ONLY):" >&2
+  echo "  echo 'GHCR_USER=<github-user>' | sudo tee -a $ENV_FILE > /dev/null" >&2
+  echo "  echo 'GHCR_PAT=<pat>'          | sudo tee -a $ENV_FILE > /dev/null" >&2
+  exit 1
+fi
+printf '%s' "$GHCR_PAT" | sudo docker login ghcr.io -u "$GHCR_USER" --password-stdin
+unset GHCR_PAT
+echo "GHCR login OK (user=${GHCR_USER})"
+echo
+
 if [ "$VERIFY_ONLY" = "true" ]; then
   echo "===== STEP 2-3: SKIPPED (VERIFY_ONLY=true — no pull/up; plumbing-only run) ====="
   echo
