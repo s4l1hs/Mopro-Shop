@@ -56,6 +56,19 @@ init/73 for fresh clusters. Filed as **TESTING_AUDIT F-019**; suite revival foll
 batch-2 PR once merged. This bug is exactly the class F-018 exists to surface: the suite that
 would have caught it ran in no gate.
 
+## 3.5 Second failure class found during revival: shared-fixture residue
+
+Beyond ports, the long-lived fixtures accumulate cross-run state the fresh-container legacy
+targets never saw. Two suites needed determinism guards (TestMain-level, assertions untouched):
+- **outbox**: 71k unpublished `wallet_schema.outbox` rows (residue of wallet/api suites that
+  insert but never publish) starved `FetchUnpublished`'s `ORDER BY id ASC LIMIT n` → "got 0
+  published". Fix: `TRUNCATE wallet_schema.outbox` in TestMain (sequential chain; no target
+  re-reads its outbox rows after completing).
+- **idempotency**: the middleware stores responses under **derived** keys, so per-test `Del`
+  cleanups miss them; a residual saved response replays on the next run ("handler executed 0
+  times"). Fix: best-effort `FLUSHDB` of the dedicated test DB 15 in a new TestMain.
+All revived suites verified **repeat-stable** (run twice back-to-back).
+
 ## 4. Sequencing + isolation notes
 
 - Suites on the **shared** clusters self-bootstrap idempotently; `order`'s TestMain

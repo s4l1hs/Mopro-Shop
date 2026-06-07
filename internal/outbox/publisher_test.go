@@ -69,6 +69,17 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
+	// F-018: the shared pg-ledger-test fixture accumulates unpublished outbox
+	// residue from earlier suites in the verify chain (wallet/api insert rows
+	// but never run a publisher). FetchUnpublished is ORDER BY id ASC LIMIT n,
+	// so a backlog starves this suite's fresh rows — clear it for determinism.
+	// Safe: verify's chain is sequential and no other target re-reads its
+	// outbox rows after completing.
+	if _, err := tPool.Exec(ctx, "TRUNCATE "+testTable); err != nil {
+		fmt.Fprintf(os.Stderr, "outbox integration: truncate %s failed: %v\n", testTable, err)
+		os.Exit(1)
+	}
+
 	code := m.Run()
 	tPool.Close()
 	tRdb.Close()

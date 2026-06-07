@@ -19,8 +19,10 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
         caddy-validate caddy-reload \
-        test-integration-catalog test-integration-outbox test-integration-cart test-integration-order \
-        test-integration-sellerpayout test-e2e integration-e2e integration-cart integration-identity integration-identity-race integration-payment e2e-test-up e2e-test-down \
+        test-integration-catalog integration-eventbus integration-outbox integration-order \
+        integration-sellerpayout integration-apifin integration-attachments integration-help \
+        integration-inbox integration-idempotency \
+        test-e2e integration-e2e integration-cart integration-identity integration-identity-race integration-payment e2e-test-up e2e-test-down \
         api-gen-models api-gen-core api-gen-fin api-gen-dart api-gen api-lint contract-test \
         docker-build \
         seed-dry-run seed-staging seed-prod build-seed \
@@ -35,7 +37,7 @@ help: ## Show this help.
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## /{printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment integration-analytics integration-shipping test-integration-catalog verify-image-manifest verify-contrast ## Full verification gate (run before every push).
+verify: fmt vet test lint boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment integration-analytics integration-shipping integration-order integration-sellerpayout integration-outbox integration-eventbus integration-apifin integration-attachments integration-help integration-inbox integration-idempotency test-integration-catalog verify-image-manifest verify-contrast ## Full verification gate (run before every push).
 
 # WCAG contrast check for the documented brand colour pairs. Fails if any
 # non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.
@@ -159,8 +161,8 @@ lint-discipline: ## Run the repo-discipline go/analysis analyzers.
 # `pg-ledger-test-up` is idempotent: reuses an existing container if one
 # is on the expected name, otherwise spins up fresh + waits for postgres
 # ready + applies every deploy/postgres-ledger/init/*.sql migration.
-# `pg-ledger-test-down` is a manual escape hatch (also useful before
-# running test-integration-sellerpayout which uses port 6434 too).
+# `pg-ledger-test-down` is a manual escape hatch when cross-run state
+# drift needs a clean slate (the F-018 ledger suites also share :6434).
 #
 # Reuse caveat: state persists across `make verify` runs. Most property
 # tests TRUNCATE / DROP what they need; if cross-run drift causes a
@@ -295,49 +297,60 @@ test-integration-catalog:
 	  go test -tags=integration -count=1 -race ./internal/catalog/... ; \
 	  STATUS=$$? ; docker rm -f pg-ecom-test ; exit $$STATUS
 
-test-integration-outbox:
-	docker rm -f pg-ledger-test redis-outbox-test 2>/dev/null || true
-	docker run -d --name pg-ledger-test -p 6434:5432 \
-	  -e POSTGRES_USER=ledger_admin -e POSTGRES_PASSWORD=test123 \
-	  -e POSTGRES_DB=mopro_ledger postgres:16-alpine
-	docker run -d --name redis-outbox-test -p 6380:6379 redis:7-alpine
-	sleep 3
-	for f in $$(ls deploy/postgres-ledger/init/*.sql | sort); do \
-	  docker exec -i pg-ledger-test psql -U ledger_admin -d mopro_ledger < $$f || exit 1; \
-	done
-	go test -tags=integration -count=1 -race ./internal/eventbus/... ./internal/outbox/... ; \
-	  STATUS=$$? ; docker rm -f pg-ledger-test redis-outbox-test ; exit $$STATUS
+# ── F-018 revived integration suites ──────────────────────────────────────────
+# The legacy self-spinning targets (test-integration-{outbox,cart,order,
+# sellerpayout}) are GONE — they bound :6434/:6435/:6380, colliding with the
+# shared fixtures (pg-ledger-test / pg-ecom-e2e / each other), which is why
+# these suites ran in no gate (TESTING_AUDIT F-018). Revived as env-pointer
+# targets on the idempotent-reuse fixtures — the cart/identity pattern.
+# See docs/internal/f018-integration-suites.md for the per-suite triage.
 
-test-integration-cart:
-	docker rm -f redis-cart-test 2>/dev/null || true
-	docker run -d --name redis-cart-test -p 6380:6379 redis:7-alpine
-	sleep 1
-	CART_TEST_REDIS=localhost:6380 \
-	  go test -tags=integration -count=1 -race ./internal/cart/... ; \
-	  STATUS=$$? ; docker rm -f redis-cart-test ; exit $$STATUS
+# eventbus (autoclaim + DLQ) — pg-ledger schema + Redis streams.
+integration-eventbus: pg-ledger-test-up e2e-test-up
+	REDIS_TEST_ADDR=localhost:6381 \
+	LEDGER_TEST_DSN=postgres://ledger_admin:test123@localhost:6434/mopro_ledger \
+	  go test -tags=integration -count=1 -race -timeout 8m ./internal/eventbus/...
 
-test-integration-order:
-	docker rm -f pg-ecom-order-test 2>/dev/null || true
-	docker run -d --name pg-ecom-order-test -p 6435:5432 \
-	  -e POSTGRES_USER=ecom_admin -e POSTGRES_PASSWORD=test123 \
-	  -e POSTGRES_DB=mopro_ecom postgres:16-alpine
-	sleep 2
+# outbox publisher properties + chaos — wallet_schema.outbox + Redis.
+integration-outbox: pg-ledger-test-up e2e-test-up
+	REDIS_TEST_ADDR=localhost:6381 \
+	LEDGER_TEST_DSN=postgres://ledger_admin:test123@localhost:6434/mopro_ledger \
+	  go test -tags=integration -count=1 -race -timeout 8m ./internal/outbox/...
+
+# order full integration (TestMain self-bootstraps order_schema with DROP+CREATE;
+# sequenced after the rest of the chain — verify runs targets serially).
+integration-order: e2e-test-up
 	ORDER_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
-	  go test -tags=integration -count=1 -race ./internal/order/... ; \
-	  STATUS=$$? ; docker rm -f pg-ecom-order-test ; exit $$STATUS
+	  go test -tags=integration -count=1 -race -timeout 5m ./internal/order/...
 
-test-integration-sellerpayout:
-	docker rm -f pg-ledger-sp-test 2>/dev/null || true
-	docker run -d --name pg-ledger-sp-test -p 6434:5432 \
-	  -e POSTGRES_USER=ledger_admin -e POSTGRES_PASSWORD=test123 \
-	  -e POSTGRES_DB=mopro_ledger postgres:16-alpine
-	sleep 3
-	for f in $$(ls deploy/postgres-ledger/init/*.sql | sort); do \
-	  docker exec -i pg-ledger-sp-test psql -U ledger_admin -d mopro_ledger < $$f || exit 1; \
-	done
+# sellerpayout full integration (-skip Property: the Property suite already runs
+# under property-payout — same split as integration-wallet vs property-ledger).
+integration-sellerpayout: pg-ledger-test-up
 	SELLERPAYOUT_TEST_DSN=postgres://ledger_admin:test123@localhost:6434/mopro_ledger \
-	  go test -tags=integration -count=1 -race ./internal/sellerpayout/... ; \
-	  STATUS=$$? ; docker rm -f pg-ledger-sp-test ; exit $$STATUS
+	  go test -tags=integration -count=1 -race -skip Property -timeout 8m ./internal/sellerpayout/...
+
+# fin HTTP API IDOR suite (real wallet/cashback schemas + JWT middleware).
+integration-apifin: pg-ledger-test-up
+	LEDGER_TEST_DSN=postgres://ledger_admin:test123@localhost:6434/mopro_ledger \
+	  go test -tags=integration -count=1 -race -timeout 5m ./internal/api/...
+
+# attachments (applies 0079 itself), help, inbox: self-contained on pg-ecom-e2e.
+integration-attachments: e2e-test-up
+	MEDIA_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	  go test -tags=integration -count=1 -race -timeout 5m ./internal/attachments/...
+
+integration-help: e2e-test-up
+	HELP_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	  go test -tags=integration -count=1 -race -timeout 5m ./internal/help/...
+
+integration-inbox: e2e-test-up
+	INBOX_TEST_DSN=postgres://ecom_admin:test123@localhost:6435/mopro_ecom \
+	  go test -tags=integration -count=1 -race -timeout 5m ./internal/inbox/...
+
+# idempotency middleware — Redis only (DB 15 keeps keys scoped).
+integration-idempotency: e2e-test-up
+	REDIS_URL=redis://localhost:6381/15 \
+	  go test -tags=integration -count=1 -race -timeout 5m ./internal/idempotency/...
 
 # ── OpenAPI codegen targets ────────────────────────────────────────────────────
 
