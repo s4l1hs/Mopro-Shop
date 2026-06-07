@@ -80,6 +80,10 @@ plumbing link), pull/up/assertion skipped.
 
 - Auto-rollback on failed assertion — DEFER (deploy.yml stays fail-loud; `deploy/scripts/rollback.sh`
   remains the manual lever for the legacy path).
-- `deploy/scripts/deploy.sh` legacy path left as-is.
+- `deploy/scripts/deploy.sh` legacy path left as-is — note it tags `mopro/<svc>` local images from
+  tarballs, which the **repo's** prod compose (ghcr refs) already didn't match; that's how the host
+  ended up running `mopro/core-svc:latest` against a host-pinned compose. Once the fresh-SCP'd prod
+  compose lands on the host, the legacy tarball path is visibly incompatible (it always was with the
+  repo) — retiring/aligning it is a DEFER follow-up, not silently "fixed" here.
 - Host `/etc/mopro/.env` duplicate `IMAGE_NS` lines left as-is (secrets file untouched per anti-goals).
 - F-DH-3 (Caddy ACME) — separate PR, sequenced after this.
