@@ -3,10 +3,11 @@
 # Consolidated deploy + verify + photo-upload-gate script for the Mopro deploy host.
 # Run on the deploy host with sudo. Paste the ENTIRE stdout back to Claude Code.
 #
-# This stack is distroless (no shell/nc/wget/curl/env inside the service images)
-# and the services publish NO host ports — only Caddy exposes :80. So health/SHA
-# checks go through Caddy on localhost:80, and env is read via `docker inspect`
-# (the container config), never via `docker compose exec ... env`.
+# This stack is distroless (no shell/nc/wget/curl/env inside the service images).
+# The prod compose publishes localhost-only service ports (127.0.0.1:8080/8081/8082)
+# used for /healthz readiness + /__version; Caddy exposes :80 for routed smoke
+# checks. Env is read via `docker inspect` (the container config), never via
+# `docker compose exec ... env`.
 
 # Fail-fast (F-DH-1 §3.1): any unhandled failure aborts the deploy with a
 # non-zero exit — a denied pull or failed login can never scroll past into a
@@ -118,7 +119,32 @@ echo
 
 echo "===== STEP 3: DOCKER COMPOSE UP ====="
 dc up -d $SERVICES
-sleep 15
+echo
+
+# Bounded readiness wait (replaces blind sleep 15). The Go services are
+# distroless with Docker healthchecks disabled; readiness = HTTP 200 on the
+# localhost-published /healthz ports (prod compose: 8080/8081/8082).
+_svc_port() {
+  case "$1" in
+    core-svc) echo 8080 ;;
+    fin-svc)  echo 8081 ;;
+    jobs-svc) echo 8082 ;;
+  esac
+}
+for svc in $SERVICES; do
+  port=$(_svc_port "$svc")
+  elapsed=0
+  until [ "$(curl -s -o /dev/null -w '%{http_code}' -m 3 "http://127.0.0.1:${port}/healthz" || true)" = "200" ]; do
+    if [ "$elapsed" -ge 60 ]; then
+      echo "FATAL: ${svc} /healthz on :${port} not 200 within 60s of up -d" >&2
+      dc logs --tail 40 "$svc" 2>&1 | tail -40 || true
+      exit 1
+    fi
+    sleep 5
+    elapsed=$((elapsed + 5))
+  done
+  echo "  ${svc}: /healthz 200 ✓ (:${port}, ${elapsed}s)"
+done
 echo
 fi
 
@@ -128,16 +154,47 @@ echo
 dc images $SERVICES
 echo
 
-echo "===== STEP 5: HEALTH + DEPLOYED SHA (via Caddy on :80; distroless-safe) ====="
+echo "===== STEP 5: POST-DEPLOY IMAGE ASSERTION (F-DH-1 §3.5) ====="
+# THE guard that makes a green no-op impossible: each running container's
+# image ID must equal the image ID of the freshly pulled ghcr ref. Asserting
+# image-ID equality (not "app SHA == deploy ref") is deliberate — :latest
+# legitimately trails the deploy ref on docs-only merges, which never rebuild.
+if [ "$VERIFY_ONLY" = "true" ]; then
+  echo "SKIPPED — VERIFY_ONLY=true (no pull/up happened; nothing to assert)."
+else
+  ASSERT_FAIL=0
+  for svc in $SERVICES; do
+    ref="ghcr.io/${IMAGE_NS}/${svc}:${VERSION}"
+    want="$(sudo docker image inspect "$ref" --format '{{.Id}}' 2>/dev/null || echo MISSING-PULLED-IMAGE)"
+    have="$(sudo docker inspect "$svc" --format '{{.Image}}' 2>/dev/null || echo MISSING-CONTAINER)"
+    digest="$(sudo docker image inspect "$ref" --format '{{join .RepoDigests ", "}}' 2>/dev/null || echo '(no digest)')"
+    if [ "$want" = "$have" ] && [ "$want" != "MISSING-PULLED-IMAGE" ]; then
+      echo "  OK   ${svc}  running == ${ref}"
+      echo "       ${digest}"
+    else
+      echo "  FAIL ${svc}  running image != pulled ${ref}" >&2
+      echo "       expected image id: ${want}" >&2
+      echo "       running  image id: ${have}" >&2
+      ASSERT_FAIL=1
+    fi
+  done
+  if [ "$ASSERT_FAIL" -ne 0 ]; then
+    echo "FATAL: image assertion failed — the deploy is NOT live. Old containers may still be running." >&2
+    exit 1
+  fi
+fi
+echo
 echo "--- Caddy native /healthz (ingress up?) ---"
 curl -fsS -m 5 http://localhost/healthz || echo "CADDY HEALTHZ FAILED"
 echo
-echo "--- core-svc /__version ---"
-curl -fsS -m 5 http://localhost/__version || echo "CORE-SVC /__version UNREACHABLE"
+echo "--- core-svc /__version (audit line; may trail deploy ref on docs-only merges) ---"
+curl -fsS -m 5 http://127.0.0.1:8080/__version || echo "CORE-SVC /__version UNREACHABLE"
 echo
-echo "(fin-svc/jobs-svc have no host-reachable health route through Caddy — judged"
-echo " by State=Up in STEP 4 + absence of panics in STEP 6; both build from the same"
-echo " workflow run as core-svc.)"
+echo "--- DEPLOY SUMMARY (§3.6) ---"
+echo "  IMAGE_NS=${IMAGE_NS}  VERSION=${VERSION}  VERIFY_ONLY=${VERIFY_ONLY}"
+for svc in $SERVICES; do
+  echo "  ${svc}: $(sudo docker inspect "$svc" --format 'image={{.Config.Image}} id={{.Image}} started={{.State.StartedAt}}' 2>/dev/null || echo 'not running')"
+done
 echo
 
 echo "===== STEP 6: STARTUP LOGS (errors only, last 80 lines) ====="
