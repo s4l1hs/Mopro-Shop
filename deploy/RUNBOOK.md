@@ -66,6 +66,27 @@ ssh -p 4625 mopro@195.85.207.92 "docker ps --format 'table {{.Names}}\t{{.Status
 
 ## Routine operations
 
+### TLS / ACME renewal health (F-DH-3)
+
+The Caddy service carries `dns: [1.1.1.1, 8.8.8.8, 9.9.9.9]` — the host's single
+upstream resolver (8.8.8.8) had SERVFAIL episodes that broke ACME-endpoint lookups
+(`lookup acme-v02.… on 127.0.0.11:53: server misbehaving`). Check renewal health:
+
+```sh
+# Failures (want: none recent) vs successes (want: steady stream)
+ssh -p 4625 mopro@195.85.207.92 "docker logs caddy --since 168h 2>&1 | grep -c 'server misbehaving'"
+ssh -p 4625 mopro@195.85.207.92 "docker logs caddy --since 168h 2>&1 | grep -c 'got renewal info'"
+# Cert expiry per domain (earliest currently 2026-08-18; renewal window opens ~Jul 19)
+echo | openssl s_client -connect api.moproshop.com:443 -servername api.moproshop.com 2>/dev/null \
+  | openssl x509 -noout -enddate
+```
+
+Applying a compose-level change to caddy = container **recreate** (`docker compose
+-f docker-compose.prod.yml up -d caddy`, ~2–5 s listener blip, cert state persists
+in `caddy-data`) — `caddy reload` only re-reads the Caddyfile. Always
+`caddy validate` first. Staging-CA test procedure (no rate-limit exposure):
+`docs/internal/f-dh-3-caddy-acme.md` §6.
+
 ### Check container health
 
 ```sh
