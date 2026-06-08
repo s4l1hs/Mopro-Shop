@@ -38,7 +38,7 @@ import 'package:mopro/features/checkout/presentation/checkout_payment_screen.dar
 import 'package:mopro/features/checkout/presentation/checkout_redirect_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_result_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_review_screen.dart';
-import 'package:mopro/features/coin/coin_screen.dart';
+import 'package:mopro/features/coin/coin_hub_screen.dart';
 import 'package:mopro/features/favorites/favorites_screen.dart';
 import 'package:mopro/features/help/contact_form_screen.dart';
 import 'package:mopro/features/help/help_article_screen.dart';
@@ -739,7 +739,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/coin',
-                builder: (_, __) => _titled('Coin', const CoinScreen()),
+                builder: (_, __) => _titled('Coin', const CoinHubScreen()),
               ),
             ],
           ),
