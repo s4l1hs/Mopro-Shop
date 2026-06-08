@@ -261,10 +261,8 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 				yearlyYield := commMinor * referenceInterestRateBps / 10000
 				monthlyMinor := yearlyYield / 12
 				cashbackPreview = &cashbackPreviewJSON{
-					MonthlyAmountMinor: monthlyMinor,
-					Currency:           cashbackCurrency,
-					ReferenceRateBps:   referenceInterestRateBps,
-					CommissionPctBps:   comm.CommissionPctBps,
+					MonthlyCoinMinor: monthlyMinor,
+					Currency:         cashbackCurrency,
 				}
 			}
 		}
@@ -350,11 +348,13 @@ func handleListBanners() http.HandlerFunc {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+// cashbackPreviewJSON is the OpenAPI CashbackPreview wire shape:
+// {monthly_coin_minor, currency} ONLY. The earlier monthly_amount_minor key (+
+// the off-spec reference_rate_bps/commission_pct_bps extras) broke the strict
+// generated ProductSummary/CashbackPreview parse on every consumer — F-021.
 type cashbackPreviewJSON struct {
-	MonthlyAmountMinor int64  `json:"monthly_amount_minor"`
-	Currency           string `json:"currency"`
-	ReferenceRateBps   int    `json:"reference_rate_bps"`
-	CommissionPctBps   int    `json:"commission_pct_bps"`
+	MonthlyCoinMinor int64  `json:"monthly_coin_minor"`
+	Currency         string `json:"currency"`
 }
 
 // deliveryEtaJSON is the pre-purchase delivery estimate shown on the PDP (P-034).
@@ -447,10 +447,8 @@ func buildProductSummaryJSON(r catalog.ProductSummaryRow, cashbackCurrency strin
 		FavoritesCount:      r.FavoritesCount,
 		Lowest30dPriceMinor: r.Lowest30dPriceMinor,
 		CashbackPreview: cashbackPreviewJSON{
-			MonthlyAmountMinor: monthlyMinor,
-			Currency:           cashbackCurrency,
-			ReferenceRateBps:   referenceInterestRateBps,
-			CommissionPctBps:   r.CommissionPctBps,
+			MonthlyCoinMinor: monthlyMinor,
+			Currency:         cashbackCurrency,
 		},
 	}
 }
@@ -466,7 +464,10 @@ func buildProductListResponse(rows []catalog.ProductSummaryRow, total, page, per
 	}
 	return map[string]any{
 		"data": out,
-		"meta": paginationMeta{
+		// Envelope key is "pagination" per the OpenAPI ListProducts/SearchProducts
+		// 200 schema (required [data, pagination]); the generated clients type it
+		// as a required PaginationMeta. (Was "meta" — F-021.)
+		"pagination": paginationMeta{
 			Page:       page,
 			PerPage:    perPage,
 			Total:      total,
