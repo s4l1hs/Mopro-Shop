@@ -90,12 +90,14 @@ class _MobileShell extends ConsumerWidget {
                   muted: muted,
                   onTap: () => _branch(0),
                 ),
+                // IA-01: Categories tab replaced by Coin (placeholder; IA-02
+                // builds the hub). The category tree moved to Home's rail entry.
                 _NavItem(
                   index: 1,
                   currentIndex: navigationShell.currentIndex,
-                  icon: Icons.grid_view_outlined,
-                  activeIcon: Icons.grid_view,
-                  label: 'nav.categories'.tr(),
+                  icon: Icons.monetization_on_outlined,
+                  activeIcon: Icons.monetization_on,
+                  label: 'nav.coin'.tr(),
                   primary: primary,
                   muted: muted,
                   onTap: () => _branch(1),
