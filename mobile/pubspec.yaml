@@ -22,7 +22,7 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
   go_router: ^14.2.0
-  google_fonts: ^6.2.1
+  google_fonts: ^8.1.0
   intl: ^0.20.2
   mopro_api:
     path: packages/mopro_api
