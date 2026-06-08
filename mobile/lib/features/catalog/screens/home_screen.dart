@@ -10,7 +10,7 @@ import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/features/catalog/providers/home_provider.dart';
 import 'package:mopro/features/catalog/providers/products_rail_provider.dart';
-import 'package:mopro/features/catalog/widgets/home_category_grid.dart';
+import 'package:mopro/features/catalog/widgets/home_category_rail.dart';
 import 'package:mopro/features/catalog/widgets/home_footer.dart';
 import 'package:mopro/features/catalog/widgets/mood_stories_strip.dart';
 import 'package:mopro/features/catalog/widgets/product_list_rail.dart';
@@ -88,8 +88,8 @@ class CatalogHomeScreen extends ConsumerWidget {
             // ── Flash deals (additive; renders nothing when no active deal) ──
             SliverToBoxAdapter(child: wrap(const FlashDealsRail())),
 
-            // ── Category puck grid ─────────────────────────────────────
-            SliverToBoxAdapter(child: wrap(const HomeCategoryGrid())),
+            // ── Category shortcut rail + "Tüm Kategoriler" entry (IA-01) ──
+            SliverToBoxAdapter(child: wrap(const HomeCategoryRail())),
             const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
             // ── Trust bar ──────────────────────────────────────────────
