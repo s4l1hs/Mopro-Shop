@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,6 +22,7 @@ type stubCatalogSvc struct {
 	toggleHelpfulFn   func() (catalog.HelpfulVoteResult, error)
 	getByIDFn         func(id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error)
 	listByIDsFn       func(ids []int64) ([]catalog.ProductSummaryRow, error)
+	listProductsFn    func(filter catalog.ProductFilter) ([]catalog.ProductSummaryRow, int, error)
 }
 
 func (s *stubCatalogSvc) CreateProduct(_ context.Context, _ catalog.CreateProductRequest) (catalog.Product, error) {
@@ -58,6 +60,12 @@ func (s *stubCatalogSvc) ListCategories(ctx context.Context, locale string, maxD
 	return []catalog.CategoryRow{}, nil
 }
 func (s *stubCatalogSvc) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return nil, 0, nil
+}
+func (s *stubCatalogSvc) ListProducts(_ context.Context, _, _ string, filter catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	if s.listProductsFn != nil {
+		return s.listProductsFn(filter)
+	}
 	return nil, 0, nil
 }
 func (s *stubCatalogSvc) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
@@ -284,4 +292,101 @@ func contains(haystack, needle string) bool {
 		}
 	}
 	return false
+}
+
+// TestHandleListProducts_CategoryOptional locks the F-020 contract: category_id
+// is optional on GET /products. Absent → the global (catalog-wide) list the Home
+// rails need; present+valid → the category PLP (must NOT take the global path);
+// present+malformed → 400 (category-scoped validation intact).
+func TestHandleListProducts_CategoryOptional(t *testing.T) {
+	var globalHit bool
+	svc := &stubCatalogSvc{
+		listProductsFn: func(_ catalog.ProductFilter) ([]catalog.ProductSummaryRow, int, error) {
+			globalHit = true
+			return []catalog.ProductSummaryRow{}, 0, nil
+		},
+	}
+	h := handleListProducts(&fakeRecsSvc{}, svc, "tr-TR", "TR", "TRY_COIN")
+
+	t.Run("no category_id serves the global list", func(t *testing.T) {
+		globalHit = false
+		rec := httptest.NewRecorder()
+		h(rec, httptest.NewRequest(http.MethodGet, "/products?sort=newest&per_page=6", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("want 200, got %d", rec.Code)
+		}
+		if !globalHit {
+			t.Fatal("no category_id must route to the global ListProducts")
+		}
+	})
+
+	t.Run("malformed category_id is 400", func(t *testing.T) {
+		for _, bad := range []string{"0", "-1", "abc"} {
+			rec := httptest.NewRecorder()
+			h(rec, httptest.NewRequest(http.MethodGet, "/products?category_id="+bad, nil))
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("category_id=%q: want 400, got %d", bad, rec.Code)
+			}
+		}
+	})
+
+	t.Run("valid category_id does not take the global path", func(t *testing.T) {
+		globalHit = false
+		rec := httptest.NewRecorder()
+		h(rec, httptest.NewRequest(http.MethodGet, "/products?category_id=5", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("want 200, got %d", rec.Code)
+		}
+		if globalHit {
+			t.Fatal("category-scoped call must not invoke the global ListProducts")
+		}
+	})
+}
+
+// TestF021_ProductListResponse_SpecKeys locks the /products serializer to the
+// OpenAPI shape so the generated ProductSummary/CashbackPreview parse never
+// silently breaks again (the systemic root of F-020 + F-021): the pagination
+// envelope must be `pagination` (not `meta`), and cashback_preview must carry
+// `monthly_coin_minor` only (not the old `monthly_amount_minor` + off-spec extras).
+func TestF021_ProductListResponse_SpecKeys(t *testing.T) {
+	row := catalog.ProductSummaryRow{
+		ID: 1, SellerID: 1, CategoryID: 1, Brand: "B", Status: "active",
+		Title: "T", PriceMinor: 1000, PriceCurrency: "TRY", CommissionPctBps: 1000,
+	}
+	b, err := json.Marshal(buildProductListResponse([]catalog.ProductSummaryRow{row}, 1, 1, 20, "TRY_COIN"))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+
+	if _, ok := m["pagination"]; !ok {
+		t.Error("missing OpenAPI `pagination` envelope key")
+	}
+	if _, ok := m["meta"]; ok {
+		t.Error("off-spec `meta` envelope key present")
+	}
+
+	data, ok := m["data"].([]any)
+	if !ok || len(data) == 0 {
+		t.Fatal("response `data` missing or empty")
+	}
+	item, ok := data[0].(map[string]any)
+	if !ok {
+		t.Fatal("data[0] not an object")
+	}
+	cb, ok := item["cashback_preview"].(map[string]any)
+	if !ok {
+		t.Fatal("cashback_preview missing/not an object")
+	}
+	if _, ok := cb["monthly_coin_minor"]; !ok {
+		t.Error("cashback_preview missing required `monthly_coin_minor`")
+	}
+	for _, bad := range []string{"monthly_amount_minor", "reference_rate_bps", "commission_pct_bps"} {
+		if _, ok := cb[bad]; ok {
+			t.Errorf("cashback_preview carries off-spec key %q", bad)
+		}
+	}
 }

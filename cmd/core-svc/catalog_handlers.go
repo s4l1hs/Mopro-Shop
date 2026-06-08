@@ -94,15 +94,20 @@ func applyBestsellerOrder(ctx context.Context, analyticsSvc analytics.Service, c
 func handleListProducts(analyticsSvc analytics.Service, svc catalog.Service, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
-		categoryIDStr := q.Get("category_id")
-		if categoryIDStr == "" {
-			jsonError(w, "category_id required", http.StatusBadRequest)
-			return
-		}
-		categoryID, err := strconv.ParseInt(categoryIDStr, 10, 64)
-		if err != nil || categoryID <= 0 {
-			jsonError(w, "invalid category_id", http.StatusBadRequest)
-			return
+
+		// category_id is OPTIONAL (OpenAPI FilterCategoryId is required:false).
+		// Present → category-scoped PLP; absent → the global, catalog-wide listing
+		// the server-driven Home rails (recommended / bestseller / newest) need. A
+		// present-but-malformed value is still a 400 (category-scoped validation
+		// is unchanged for callers that pass one).
+		var categoryID *int64
+		if categoryIDStr := q.Get("category_id"); categoryIDStr != "" {
+			id, err := strconv.ParseInt(categoryIDStr, 10, 64)
+			if err != nil || id <= 0 {
+				jsonError(w, "invalid category_id", http.StatusBadRequest)
+				return
+			}
+			categoryID = &id
 		}
 
 		page := parseIntQuery(q.Get("page"), 1)
@@ -118,10 +123,22 @@ func handleListProducts(analyticsSvc analytics.Service, svc catalog.Service, def
 		}
 
 		filter := parseProductFilter(q, false)
-		applyBestsellerOrder(r.Context(), analyticsSvc, &categoryID, &filter)
-		rows, total, err := svc.ListProductsByCategory(r.Context(), categoryID, locale, market, filter, page, perPage)
+		// nil categoryID → global bestseller popularity (applyBestsellerOrder
+		// already handles the nil case).
+		applyBestsellerOrder(r.Context(), analyticsSvc, categoryID, &filter)
+
+		var (
+			rows  []catalog.ProductSummaryRow
+			total int
+			err   error
+		)
+		if categoryID != nil {
+			rows, total, err = svc.ListProductsByCategory(r.Context(), *categoryID, locale, market, filter, page, perPage)
+		} else {
+			rows, total, err = svc.ListProducts(r.Context(), locale, market, filter, page, perPage)
+		}
 		if err != nil {
-			slog.Error("catalog: ListProductsByCategory", "category_id", categoryID, "err", err)
+			slog.Error("catalog: list products", "category_id", categoryID, "err", err)
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
@@ -244,10 +261,8 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 				yearlyYield := commMinor * referenceInterestRateBps / 10000
 				monthlyMinor := yearlyYield / 12
 				cashbackPreview = &cashbackPreviewJSON{
-					MonthlyAmountMinor: monthlyMinor,
-					Currency:           cashbackCurrency,
-					ReferenceRateBps:   referenceInterestRateBps,
-					CommissionPctBps:   comm.CommissionPctBps,
+					MonthlyCoinMinor: monthlyMinor,
+					Currency:         cashbackCurrency,
 				}
 			}
 		}
@@ -333,11 +348,13 @@ func handleListBanners() http.HandlerFunc {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+// cashbackPreviewJSON is the OpenAPI CashbackPreview wire shape:
+// {monthly_coin_minor, currency} ONLY. The earlier monthly_amount_minor key (+
+// the off-spec reference_rate_bps/commission_pct_bps extras) broke the strict
+// generated ProductSummary/CashbackPreview parse on every consumer — F-021.
 type cashbackPreviewJSON struct {
-	MonthlyAmountMinor int64  `json:"monthly_amount_minor"`
-	Currency           string `json:"currency"`
-	ReferenceRateBps   int    `json:"reference_rate_bps"`
-	CommissionPctBps   int    `json:"commission_pct_bps"`
+	MonthlyCoinMinor int64  `json:"monthly_coin_minor"`
+	Currency         string `json:"currency"`
 }
 
 // deliveryEtaJSON is the pre-purchase delivery estimate shown on the PDP (P-034).
@@ -430,10 +447,8 @@ func buildProductSummaryJSON(r catalog.ProductSummaryRow, cashbackCurrency strin
 		FavoritesCount:      r.FavoritesCount,
 		Lowest30dPriceMinor: r.Lowest30dPriceMinor,
 		CashbackPreview: cashbackPreviewJSON{
-			MonthlyAmountMinor: monthlyMinor,
-			Currency:           cashbackCurrency,
-			ReferenceRateBps:   referenceInterestRateBps,
-			CommissionPctBps:   r.CommissionPctBps,
+			MonthlyCoinMinor: monthlyMinor,
+			Currency:         cashbackCurrency,
 		},
 	}
 }
@@ -449,7 +464,10 @@ func buildProductListResponse(rows []catalog.ProductSummaryRow, total, page, per
 	}
 	return map[string]any{
 		"data": out,
-		"meta": paginationMeta{
+		// Envelope key is "pagination" per the OpenAPI ListProducts/SearchProducts
+		// 200 schema (required [data, pagination]); the generated clients type it
+		// as a required PaginationMeta. (Was "meta" — F-021.)
+		"pagination": paginationMeta{
 			Page:       page,
 			PerPage:    perPage,
 			Total:      total,

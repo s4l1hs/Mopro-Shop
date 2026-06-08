@@ -298,3 +298,39 @@ func TestIntegration_BestsellerOrder(t *testing.T) {
 		pfAssertOrder(t, got, c)
 	})
 }
+
+// TestIntegration_ListProductsGlobal covers the F-020 global (no-category) list
+// path: catalog-wide results (no category scope), with sort + filters composing.
+// A unique brand isolates the rows so the catalog-wide result is deterministic.
+func TestIntegration_ListProductsGlobal(t *testing.T) {
+	ctx := context.Background()
+	pfSetupCat(t, ctx)
+	repo := catalog.NewRepository(integPool)
+
+	const brand = "ZqGlobalBrand"
+	a := pfSeed(t, ctx, brand, "F020 Alpha", 10000, pfF64(4.0), 5, true, 5)
+	b := pfSeed(t, ctx, brand, "F020 Beta", 20000, pfF64(3.0), 4, false, 3)
+	c := pfSeed(t, ctx, brand, "F020 Gamma", 30000, pfF64(5.0), 8, true, 10)
+
+	list := func(t *testing.T, f catalog.ProductFilter) []int64 {
+		t.Helper()
+		f.Brands = []string{brand}
+		rows, _, err := repo.ListProducts(ctx, "tr-TR", f, 0, 50)
+		if err != nil {
+			t.Fatalf("ListProducts: %v", err)
+		}
+		return pfIDs(rows)
+	}
+
+	// IDs ascend a<b<c. No category arg is passed — the rows are still returned,
+	// proving the global path applies no category scope.
+	t.Run("global recommended is id desc", func(t *testing.T) {
+		pfAssertOrder(t, list(t, catalog.ProductFilter{Sort: "recommended"}), c, b, a)
+	})
+	t.Run("global bestseller orders by PopularIDs (unranked last)", func(t *testing.T) {
+		pfAssertOrder(t, list(t, catalog.ProductFilter{Sort: "bestseller", PopularIDs: []int64{b, c}}), b, c, a)
+	})
+	t.Run("filters compose on the global list", func(t *testing.T) {
+		pfAssertSet(t, list(t, catalog.ProductFilter{FreeShipping: pfBool(true)}), a, c)
+	})
+}

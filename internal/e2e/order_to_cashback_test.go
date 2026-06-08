@@ -396,6 +396,9 @@ func (m *catalogMock) ListCategories(_ context.Context, _ string, _ int) ([]cata
 func (m *catalogMock) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
+func (m *catalogMock) ListProducts(_ context.Context, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return nil, 0, nil
+}
 func (m *catalogMock) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }

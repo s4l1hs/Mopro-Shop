@@ -151,6 +151,23 @@ func (s *catalogService) ListProductsByCategory(ctx context.Context, categoryID 
 	return s.repo.ListProductsByCategory(ctx, categoryID, locale, filter, offset, perPage)
 }
 
+// ListProducts is the global (catalog-wide) listing backing the Home rails
+// (recommended / bestseller / newest). Mirrors ListProductsByCategory's
+// normalization; no category scope.
+func (s *catalogService) ListProducts(ctx context.Context, locale, market string, filter ProductFilter, page, perPage int) ([]ProductSummaryRow, int, error) {
+	if locale == "" {
+		locale = s.defaultLocale
+	}
+	if page < 1 {
+		page = 1
+	}
+	if perPage < 1 || perPage > 50 {
+		perPage = 20
+	}
+	offset := (page - 1) * perPage
+	return s.repo.ListProducts(ctx, locale, filter, offset, perPage)
+}
+
 func (s *catalogService) SearchSummary(ctx context.Context, query, locale, market string, filter ProductFilter, page, perPage int) ([]ProductSummaryRow, int, error) {
 	if locale == "" {
 		locale = s.defaultLocale

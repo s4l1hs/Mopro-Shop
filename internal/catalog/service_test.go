@@ -411,6 +411,9 @@ func (m *mockRepo) ListCategories(_ context.Context, _ string, _ int) ([]catalog
 func (m *mockRepo) ListProductsByCategory(_ context.Context, _ int64, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return []catalog.ProductSummaryRow{}, 0, nil
 }
+func (m *mockRepo) ListProducts(_ context.Context, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return []catalog.ProductSummaryRow{}, 0, nil
+}
 
 func (m *mockRepo) SearchProductsSummary(_ context.Context, query, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	// Return a matching row when query matches the hard-coded test title "elbise".

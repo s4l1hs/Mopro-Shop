@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/di/providers.dart';
-import 'package:mopro/features/catalog/data/product_summary_api.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 /// Co-view recommendations for the PDP "Benzer ürünler" rail, keyed by product
@@ -20,7 +19,7 @@ final similarProductsProvider =
     );
     final data = (resp.data?['data'] as List<dynamic>?) ?? const [];
     return data
-        .map((e) => productSummaryFromApi(e as Map<String, dynamic>))
+        .map((e) => ProductSummary.fromJson(e as Map<String, dynamic>))
         .toList();
   } catch (_) {
     return const [];
