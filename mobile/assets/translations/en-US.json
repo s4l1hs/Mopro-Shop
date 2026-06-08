@@ -107,7 +107,8 @@
     "cart": "Cart",
     "account": "Account",
     "wallet": "Wallet",
-    "profile": "Profile"
+    "profile": "Profile",
+    "coin": "Coin"
   },
   "home": {
     "categories_title": "Categories",
@@ -138,7 +139,8 @@
         "personalized_title": "Picked for you",
         "popular_title": "Popular products"
       }
-    }
+    },
+    "all_categories": "All Categories"
   },
   "plp": {
     "filter_category": "Category",
@@ -863,5 +865,9 @@
   "theme": {
     "toggle_dark": "Dark theme",
     "toggle_light": "Light theme"
+  },
+  "coin": {
+    "placeholder_title": "Mopro Coin",
+    "placeholder_body": "Coin features are coming here very soon."
   }
 }
