@@ -73,7 +73,30 @@ gate fails on EXTRA keys / dead+missing — add only what's used.
    `/categories` deep-links resolve (top-level) → no 404.
 5. **i18n:** `nav.coin`, `home.all_categories`, `coin.placeholder_title/body`
    (TR + EN). 0 dead / 0 missing.
-6. **Goldens:** predicted flips — Home (category section grid→rail; section
-   shifts) + bottom nav (slot 1 icon+label Categories→Coin). Regen on **Linux**
-   via `golden-rebaseline.yml` (never macOS); reconcile actual vs predicted.
+6. **Goldens:** predicted flips — Home (category section grid→rail) + bottom nav
+   (slot 1 icon+label Categories→Coin). Regen on **Linux** via
+   `golden-rebaseline.yml` (never macOS); reconcile actual vs predicted.
    (No golden CI gate in `make verify`, so it stays green; regen is operational.)
+
+## Verification + golden reconciliation (post-impl)
+
+- **Emulator (local):** Coin tab → "Mopro Coin" placeholder ✅; horizontal
+  category rail on Home ✅; a rail puck pushes the `/categories/:id` PLP route ✅
+  (data fetch hit the known adb-reverse tunnel flake — routing resolved, not a
+  regression). The `/categories` tree + "Tüm Kategoriler" entry use the same
+  top-level `push` mechanism the puck exercised; CategoryScreen carries its own
+  AppBar. `make verify` green; flutter analyze / i18n (0/0) / riverpod green.
+- **Golden flips (predicted == confirmed-shape):** `home_goldens_5a` ×3
+  (mobile/tablet/desktop — category grid→rail) + `app_shell bottom_nav`
+  light/dark (slot-1 icon/label) = **5 files**. The `app_shell_test` *icon*
+  assertions (non-golden) were updated in-tree (grid_view→monetization_on).
+  NOTE: on macOS the platform-guarded comparator fails **all** Linux-baselined
+  goldens (e.g. web_header, account_hover — untouched), so macOS runs can't
+  enumerate flips; the 5 above are determined analytically (only Home's category
+  section + the nav slot-1 changed; flash-deals/recs goldens render those
+  widgets in isolation, unaffected). Regen on Linux + reconcile when the branch
+  is pushed/PR'd.
+- **F-021 fallout fixed here:** 3 consumer test fixtures
+  (recently-viewed / recommendations) still emitted `monthly_amount_minor`;
+  updated to `monthly_coin_minor` (these aren't in `make verify`, so F-021
+  missed them).
