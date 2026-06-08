@@ -107,7 +107,8 @@
     "cart": "Sepet",
     "account": "Hesabım",
     "wallet": "Cüzdan",
-    "profile": "Profil"
+    "profile": "Profil",
+    "coin": "Coin"
   },
   "home": {
     "categories_title": "Kategoriler",
@@ -138,7 +139,8 @@
         "personalized_title": "Senin için seçtiklerimiz",
         "popular_title": "Popüler ürünler"
       }
-    }
+    },
+    "all_categories": "Tüm Kategoriler"
   },
   "plp": {
     "filter_category": "Kategori",
@@ -899,5 +901,9 @@
   "theme": {
     "toggle_dark": "Koyu tema",
     "toggle_light": "Açık tema"
+  },
+  "coin": {
+    "placeholder_title": "Mopro Coin",
+    "placeholder_body": "Coin özellikleri çok yakında burada olacak."
   }
 }

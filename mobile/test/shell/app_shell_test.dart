@@ -101,23 +101,24 @@ void main() {
       // easy_localization isn't initialized in tests so it returns the key.
       // Match by partial label text or fallback to icon presence.
       expect(find.byIcon(Icons.home), findsOneWidget); // active home
-      expect(find.byIcon(Icons.grid_view_outlined), findsOneWidget);
+      // IA-01: slot 1 is the Coin tab (was Categories/grid_view).
+      expect(find.byIcon(Icons.monetization_on_outlined), findsOneWidget);
       expect(find.byIcon(Icons.favorite_border_rounded), findsOneWidget);
       expect(find.byIcon(Icons.shopping_bag_outlined), findsOneWidget);
       expect(find.byIcon(Icons.person_outline_rounded), findsOneWidget);
     });
 
-    testWidgets('tapping Categories tab switches active icon', (tester) async {
+    testWidgets('tapping Coin tab switches active icon', (tester) async {
       await _pumpShell(tester);
       // Initially home is active (filled).
       expect(find.byIcon(Icons.home), findsOneWidget);
-      expect(find.byIcon(Icons.grid_view_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.monetization_on_outlined), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.grid_view_outlined));
+      await tester.tap(find.byIcon(Icons.monetization_on_outlined));
       await tester.pumpAndSettle();
 
-      // After tap, Categories should be active (filled icon)
-      expect(find.byIcon(Icons.grid_view), findsOneWidget);
+      // After tap, Coin should be active (filled icon)
+      expect(find.byIcon(Icons.monetization_on), findsOneWidget);
       // Home is now inactive (outlined)
       expect(find.byIcon(Icons.home_outlined), findsOneWidget);
     });

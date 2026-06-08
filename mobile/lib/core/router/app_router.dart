@@ -38,6 +38,7 @@ import 'package:mopro/features/checkout/presentation/checkout_payment_screen.dar
 import 'package:mopro/features/checkout/presentation/checkout_redirect_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_result_screen.dart';
 import 'package:mopro/features/checkout/presentation/checkout_review_screen.dart';
+import 'package:mopro/features/coin/coin_screen.dart';
 import 'package:mopro/features/favorites/favorites_screen.dart';
 import 'package:mopro/features/help/contact_form_screen.dart';
 import 'package:mopro/features/help/help_article_screen.dart';
@@ -240,8 +241,7 @@ String? computeSellerRedirect({
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 final _homeNavKey = GlobalKey<NavigatorState>(debugLabel: 'homeNav');
-final _categoriesNavKey =
-    GlobalKey<NavigatorState>(debugLabel: 'categoriesNav');
+final _coinNavKey = GlobalKey<NavigatorState>(debugLabel: 'coinNav');
 final _favoritesNavKey =
     GlobalKey<NavigatorState>(debugLabel: 'favoritesNav');
 final _cartNavKey = GlobalKey<NavigatorState>(debugLabel: 'cartNav');
@@ -497,6 +497,14 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
       ),
+      // IA-01: the full category tree, no longer a bottom-nav tab. Reached from
+      // Home's "Tüm Kategoriler" entry (push) and the product-rail "see all";
+      // kept as a top-level route so deep-links to /categories still resolve.
+      GoRoute(
+        path: '/categories',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, __) => _titled('Kategoriler', const CategoryScreen()),
+      ),
       GoRoute(
         path: '/categories/:id',
         parentNavigatorKey: rootNavigatorKey,
@@ -723,13 +731,15 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
+          // IA-01: the Categories tab is now a Coin tab (placeholder; IA-02
+          // builds the hub). The full category tree moved to a top-level
+          // `/categories` route, reached from Home's "Tüm Kategoriler" entry.
           StatefulShellBranch(
-            navigatorKey: _categoriesNavKey,
+            navigatorKey: _coinNavKey,
             routes: [
               GoRoute(
-                path: '/categories',
-                builder: (_, __) =>
-                    _titled('Kategoriler', const CategoryScreen()),
+                path: '/coin',
+                builder: (_, __) => _titled('Coin', const CoinScreen()),
               ),
             ],
           ),

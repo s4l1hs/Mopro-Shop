@@ -55,7 +55,7 @@ class _Adapter implements HttpClientAdapter {
               'title': 'Ürün $i',
               'price_minor': 12900,
               'price_currency': 'TRY',
-              'cashback_preview': {'monthly_amount_minor': 100, 'currency': 'TRY_COIN'},
+              'cashback_preview': {'monthly_coin_minor': 100, 'currency': 'TRY_COIN'},
             },
         ],
       });
