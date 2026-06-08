@@ -903,7 +903,19 @@
     "toggle_light": "Açık tema"
   },
   "coin": {
-    "placeholder_title": "Mopro Coin",
-    "placeholder_body": "Coin özellikleri çok yakında burada olacak."
+    "hub_title": "Mopro Coin",
+    "recent_activity": "Son hareketler",
+    "ways_to_earn_title": "Nasıl kazanılır?",
+    "earn_shop_title": "Alışveriş yap",
+    "earn_shop_body": "Her siparişte komisyon üzerinden cashback kazanırsın.",
+    "earn_perpetual_title": "Süresiz cashback",
+    "earn_perpetual_body": "Kazandığın cashback her ay Mopro Coin olarak cüzdanına yatar — süresiz.",
+    "redeem_title": "Coinlerini kullan",
+    "redeem_coming_soon": "Coin harcama yakında burada olacak.",
+    "coming_soon": "Yakında",
+    "see_all": "Tüm planlar ve hareketler",
+    "login_required_title": "Coinlerin için giriş yap",
+    "login_required_body": "Mopro Coin bakiyen ve hareketlerin hesabına özeldir.",
+    "login_cta": "Giriş yap"
   }
 }

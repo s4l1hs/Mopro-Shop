@@ -867,7 +867,19 @@
     "toggle_light": "Light theme"
   },
   "coin": {
-    "placeholder_title": "Mopro Coin",
-    "placeholder_body": "Coin features are coming here very soon."
+    "hub_title": "Mopro Coin",
+    "recent_activity": "Recent activity",
+    "ways_to_earn_title": "Ways to earn",
+    "earn_shop_title": "Shop",
+    "earn_shop_body": "Earn cashback on the commission of every order.",
+    "earn_perpetual_title": "Perpetual cashback",
+    "earn_perpetual_body": "Your cashback lands in your wallet as Mopro Coin every month — forever.",
+    "redeem_title": "Use your coins",
+    "redeem_coming_soon": "Spending coins is coming here soon.",
+    "coming_soon": "Coming soon",
+    "see_all": "All plans & activity",
+    "login_required_title": "Log in for your coins",
+    "login_required_body": "Your Mopro Coin balance and activity are personal to your account.",
+    "login_cta": "Log in"
   }
 }
