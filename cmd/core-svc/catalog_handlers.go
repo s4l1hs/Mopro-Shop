@@ -94,15 +94,20 @@ func applyBestsellerOrder(ctx context.Context, analyticsSvc analytics.Service, c
 func handleListProducts(analyticsSvc analytics.Service, svc catalog.Service, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
-		categoryIDStr := q.Get("category_id")
-		if categoryIDStr == "" {
-			jsonError(w, "category_id required", http.StatusBadRequest)
-			return
-		}
-		categoryID, err := strconv.ParseInt(categoryIDStr, 10, 64)
-		if err != nil || categoryID <= 0 {
-			jsonError(w, "invalid category_id", http.StatusBadRequest)
-			return
+
+		// category_id is OPTIONAL (OpenAPI FilterCategoryId is required:false).
+		// Present → category-scoped PLP; absent → the global, catalog-wide listing
+		// the server-driven Home rails (recommended / bestseller / newest) need. A
+		// present-but-malformed value is still a 400 (category-scoped validation
+		// is unchanged for callers that pass one).
+		var categoryID *int64
+		if categoryIDStr := q.Get("category_id"); categoryIDStr != "" {
+			id, err := strconv.ParseInt(categoryIDStr, 10, 64)
+			if err != nil || id <= 0 {
+				jsonError(w, "invalid category_id", http.StatusBadRequest)
+				return
+			}
+			categoryID = &id
 		}
 
 		page := parseIntQuery(q.Get("page"), 1)
@@ -118,10 +123,22 @@ func handleListProducts(analyticsSvc analytics.Service, svc catalog.Service, def
 		}
 
 		filter := parseProductFilter(q, false)
-		applyBestsellerOrder(r.Context(), analyticsSvc, &categoryID, &filter)
-		rows, total, err := svc.ListProductsByCategory(r.Context(), categoryID, locale, market, filter, page, perPage)
+		// nil categoryID → global bestseller popularity (applyBestsellerOrder
+		// already handles the nil case).
+		applyBestsellerOrder(r.Context(), analyticsSvc, categoryID, &filter)
+
+		var (
+			rows  []catalog.ProductSummaryRow
+			total int
+			err   error
+		)
+		if categoryID != nil {
+			rows, total, err = svc.ListProductsByCategory(r.Context(), *categoryID, locale, market, filter, page, perPage)
+		} else {
+			rows, total, err = svc.ListProducts(r.Context(), locale, market, filter, page, perPage)
+		}
 		if err != nil {
-			slog.Error("catalog: ListProductsByCategory", "category_id", categoryID, "err", err)
+			slog.Error("catalog: list products", "category_id", categoryID, "err", err)
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}

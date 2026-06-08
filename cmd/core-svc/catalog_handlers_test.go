@@ -21,6 +21,7 @@ type stubCatalogSvc struct {
 	toggleHelpfulFn   func() (catalog.HelpfulVoteResult, error)
 	getByIDFn         func(id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error)
 	listByIDsFn       func(ids []int64) ([]catalog.ProductSummaryRow, error)
+	listProductsFn    func(filter catalog.ProductFilter) ([]catalog.ProductSummaryRow, int, error)
 }
 
 func (s *stubCatalogSvc) CreateProduct(_ context.Context, _ catalog.CreateProductRequest) (catalog.Product, error) {
@@ -58,6 +59,12 @@ func (s *stubCatalogSvc) ListCategories(ctx context.Context, locale string, maxD
 	return []catalog.CategoryRow{}, nil
 }
 func (s *stubCatalogSvc) ListProductsByCategory(_ context.Context, _ int64, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	return nil, 0, nil
+}
+func (s *stubCatalogSvc) ListProducts(_ context.Context, _, _ string, filter catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
+	if s.listProductsFn != nil {
+		return s.listProductsFn(filter)
+	}
 	return nil, 0, nil
 }
 func (s *stubCatalogSvc) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
@@ -284,4 +291,53 @@ func contains(haystack, needle string) bool {
 		}
 	}
 	return false
+}
+
+// TestHandleListProducts_CategoryOptional locks the F-020 contract: category_id
+// is optional on GET /products. Absent → the global (catalog-wide) list the Home
+// rails need; present+valid → the category PLP (must NOT take the global path);
+// present+malformed → 400 (category-scoped validation intact).
+func TestHandleListProducts_CategoryOptional(t *testing.T) {
+	var globalHit bool
+	svc := &stubCatalogSvc{
+		listProductsFn: func(_ catalog.ProductFilter) ([]catalog.ProductSummaryRow, int, error) {
+			globalHit = true
+			return []catalog.ProductSummaryRow{}, 0, nil
+		},
+	}
+	h := handleListProducts(&fakeRecsSvc{}, svc, "tr-TR", "TR", "TRY_COIN")
+
+	t.Run("no category_id serves the global list", func(t *testing.T) {
+		globalHit = false
+		rec := httptest.NewRecorder()
+		h(rec, httptest.NewRequest(http.MethodGet, "/products?sort=newest&per_page=6", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("want 200, got %d", rec.Code)
+		}
+		if !globalHit {
+			t.Fatal("no category_id must route to the global ListProducts")
+		}
+	})
+
+	t.Run("malformed category_id is 400", func(t *testing.T) {
+		for _, bad := range []string{"0", "-1", "abc"} {
+			rec := httptest.NewRecorder()
+			h(rec, httptest.NewRequest(http.MethodGet, "/products?category_id="+bad, nil))
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("category_id=%q: want 400, got %d", bad, rec.Code)
+			}
+		}
+	})
+
+	t.Run("valid category_id does not take the global path", func(t *testing.T) {
+		globalHit = false
+		rec := httptest.NewRecorder()
+		h(rec, httptest.NewRequest(http.MethodGet, "/products?category_id=5", nil))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("want 200, got %d", rec.Code)
+		}
+		if globalHit {
+			t.Fatal("category-scoped call must not invoke the global ListProducts")
+		}
+	})
 }

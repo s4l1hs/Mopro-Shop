@@ -480,6 +480,30 @@ func (r *pgxRepository) ListProductsByCategory(ctx context.Context, categoryID i
 	return scanProductSummaries(rows, "product summary")
 }
 
+// ListProducts is the global (catalog-wide) summary list — the no-category
+// variant of ListProductsByCategory, backing the server-driven Home rails
+// (recommended / bestseller / newest), which are catalog-wide. Same SELECT,
+// filters, ordering, and pagination; the category predicate is NULL-guarded
+// ($1) so the arg layout (and every appendProductFilters/appendOrderBy path) is
+// shared with the category query. A typed-nil $1 means "no category scope".
+func (r *pgxRepository) ListProducts(ctx context.Context, locale string, filter ProductFilter, offset, limit int) ([]ProductSummaryRow, int, error) {
+	var sb strings.Builder
+	sb.WriteString(productSummarySelect)
+	sb.WriteString(" WHERE p.status = 'active' AND ($1::bigint IS NULL OR p.category_id = $1)")
+	args := []any{(*int64)(nil), locale}
+	args, argN := appendProductFilters(&sb, args, filter, 3)
+	args, argN = appendOrderBy(&sb, args, filter, argN)
+	fmt.Fprintf(&sb, " LIMIT $%d OFFSET $%d", argN, argN+1)
+	args = append(args, limit, offset)
+
+	rows, err := r.pool.Query(ctx, sb.String(), args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("catalog.repo: ListProducts: %w", err)
+	}
+	defer rows.Close()
+	return scanProductSummaries(rows, "product summary")
+}
+
 func (r *pgxRepository) SearchProductsSummary(ctx context.Context, query, locale string, filter ProductFilter, offset, limit int) ([]ProductSummaryRow, int, error) {
 	var sb strings.Builder
 	sb.WriteString(productSummarySelect)
