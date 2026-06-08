@@ -94,9 +94,9 @@ class SellerStorefrontRepository {
     );
     final data = resp.data ?? const {};
     final items = ((data['data'] as List<dynamic>?) ?? const [])
-        .map((e) => sellerProductFromApi(e as Map<String, dynamic>))
+        .map((e) => ProductSummary.fromJson(e as Map<String, dynamic>))
         .toList();
-    final meta = (data['meta'] as Map<String, dynamic>?) ?? const {};
+    final meta = (data['pagination'] as Map<String, dynamic>?) ?? const {};
     final totalPages = (meta['total_pages'] as num?)?.toInt() ?? page;
     return (items, page < totalPages);
   }
@@ -117,37 +117,6 @@ class SellerStorefrontRepository {
     final hasMore = (data['hasMore'] as bool?) ?? false;
     return (items, hasMore);
   }
-}
-
-/// Maps the shared buildProductSummaryJSON shape (snake_case, cashback key
-/// `monthly_amount_minor`) to the generated [ProductSummary] — the generated
-/// `fromJson` expects `monthly_coin_minor`, so map explicitly (same trap the
-/// recently-viewed rail handles).
-ProductSummary sellerProductFromApi(Map<String, dynamic> j) {
-  final cb = (j['cashback_preview'] as Map<String, dynamic>?) ?? const {};
-  return ProductSummary(
-    id: (j['id'] as num).toInt(),
-    sellerId: (j['seller_id'] as num?)?.toInt() ?? 0,
-    categoryId: (j['category_id'] as num?)?.toInt() ?? 0,
-    brand: (j['brand'] as String?) ?? '',
-    status: switch (j['status'] as String?) {
-      'inactive' => ProductSummaryStatusEnum.inactive,
-      'draft' => ProductSummaryStatusEnum.draft,
-      _ => ProductSummaryStatusEnum.active,
-    },
-    title: (j['title'] as String?) ?? '',
-    priceMinor: (j['price_minor'] as num?)?.toInt() ?? 0,
-    priceCurrency: (j['price_currency'] as String?) ?? '',
-    coverImageUrl: j['cover_image_url'] as String?,
-    originalPriceMinor: (j['original_price_minor'] as num?)?.toInt(),
-    discountPct: (j['discount_pct'] as num?)?.toInt(),
-    ratingAvg: (j['rating_avg'] as num?)?.toDouble(),
-    ratingCount: (j['rating_count'] as num?)?.toInt() ?? 0,
-    cashbackPreview: CashbackPreview(
-      monthlyCoinMinor: (cb['monthly_amount_minor'] as num?)?.toInt() ?? 0,
-      currency: (cb['currency'] as String?) ?? '',
-    ),
-  );
 }
 
 final sellerStorefrontRepositoryProvider =

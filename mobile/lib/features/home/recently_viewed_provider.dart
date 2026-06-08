@@ -4,7 +4,6 @@ import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/core/di/providers.dart';
 import 'package:mopro/core/feature_flags.dart';
 import 'package:mopro/features/analytics/user_consent_provider.dart';
-import 'package:mopro/features/catalog/data/product_summary_api.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 /// Recently-viewed products for the "Son baktıkların" home rail (Tranche 4c).
@@ -37,10 +36,10 @@ class RecentlyViewedNotifier extends Notifier<AsyncValue<List<ProductSummary>>> 
         queryParameters: <String, dynamic>{'limit': 20},
       );
       final data = (resp.data?['data'] as List<dynamic>?) ?? const [];
-      // GET /me/recently-viewed returns the shared buildProductSummaryJSON shape;
-      // map it via the shared helper (see product_summary_api.dart).
+      // GET /me/recently-viewed returns the shared buildProductSummaryJSON shape,
+      // now OpenAPI-compliant (F-021), so the generated parse handles it directly.
       final products = data
-          .map((e) => productSummaryFromApi(e as Map<String, dynamic>))
+          .map((e) => ProductSummary.fromJson(e as Map<String, dynamic>))
           .toList();
       state = AsyncValue.data(products);
     } catch (_) {

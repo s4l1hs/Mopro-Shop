@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
 import 'package:mopro/core/di/providers.dart';
-import 'package:mopro/features/catalog/data/product_summary_api.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 /// Result of GET /recommendations/home: the products plus which variant the
@@ -46,7 +45,7 @@ class HomeRecommendationsNotifier
       );
       final data = (resp.data?['data'] as List<dynamic>?) ?? const [];
       final products = data
-          .map((e) => productSummaryFromApi(e as Map<String, dynamic>))
+          .map((e) => ProductSummary.fromJson(e as Map<String, dynamic>))
           .toList();
       final personalized = resp.data?['source'] == 'personalized';
       state = AsyncValue.data(
