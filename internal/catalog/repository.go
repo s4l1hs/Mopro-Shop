@@ -405,22 +405,33 @@ func appendProductFilters(sb *strings.Builder, args []any, f ProductFilter, argN
 	return args, argN
 }
 
-// orderByClause maps a PlpSort token to a safe ORDER BY. Unknown/unsupported
-// tokens — including bestseller until P-029 — fall back to recommended; it never
+// explicitOrderByClause maps an *explicit* PlpSort token to a safe ORDER BY and
+// true. The default/recommended token (and any unknown/unsupported one) returns
+// ("", false), leaving the default ORDER BY to the caller — id-order for listing
+// (orderByClause), relevance for search (appendSearchOrderBy, SE-08). It never
 // errors and never interpolates the token. The trailing p.id keeps order stable.
-func orderByClause(sort string) string {
+func explicitOrderByClause(sort string) (string, bool) {
 	switch sort {
 	case "newest":
-		return " ORDER BY p.created_at DESC, p.id DESC"
+		return " ORDER BY p.created_at DESC, p.id DESC", true
 	case "price_asc":
-		return " ORDER BY v.price_minor ASC, p.id DESC"
+		return " ORDER BY v.price_minor ASC, p.id DESC", true
 	case "price_desc":
-		return " ORDER BY v.price_minor DESC, p.id DESC"
+		return " ORDER BY v.price_minor DESC, p.id DESC", true
 	case "cashback_desc":
-		return " ORDER BY (v.price_minor * COALESCE(cr.commission_pct_bps, 0)) DESC, p.id DESC"
+		return " ORDER BY (v.price_minor * COALESCE(cr.commission_pct_bps, 0)) DESC, p.id DESC", true
 	default:
-		return " ORDER BY p.id DESC"
+		return "", false
 	}
+}
+
+// orderByClause is the listing ORDER BY: an explicit token, else id-order (the
+// recommended default for browse, where there is no relevance signal).
+func orderByClause(sort string) string {
+	if clause, ok := explicitOrderByClause(sort); ok {
+		return clause
+	}
+	return " ORDER BY p.id DESC"
 }
 
 // appendOrderBy writes the ORDER BY clause. Bestseller (filter.PopularIDs set —
@@ -435,6 +446,27 @@ func appendOrderBy(sb *strings.Builder, args []any, filter ProductFilter, argN i
 		return args, argN + 1
 	}
 	sb.WriteString(orderByClause(filter.Sort))
+	return args, argN
+}
+
+// appendSearchOrderBy is the search ORDER BY (SE-08). Priority: a bestseller
+// ranking (PopularIDs → array_position, identical to appendOrderBy) wins; then an
+// explicit sort token (price/newest/cashback); otherwise — the recommended
+// default — results rank by full-text RELEVANCE: ts_rank over the same
+// search_vector and bound query ($1) the WHERE matches on. ts_rank reuses $1, so
+// no new placeholder is bound. Rows matched only by the ILIKE fallback score 0
+// and sort last (p.id DESC tiebreak keeps the order stable + deterministic).
+func appendSearchOrderBy(sb *strings.Builder, args []any, filter ProductFilter, argN int) ([]any, int) {
+	if len(filter.PopularIDs) > 0 {
+		fmt.Fprintf(sb, " ORDER BY array_position($%d::bigint[], p.id) NULLS LAST, p.id DESC", argN)
+		args = append(args, filter.PopularIDs)
+		return args, argN + 1
+	}
+	if clause, ok := explicitOrderByClause(filter.Sort); ok {
+		sb.WriteString(clause)
+		return args, argN
+	}
+	sb.WriteString(" ORDER BY ts_rank(t.search_vector, plainto_tsquery('simple', $1)) DESC, p.id DESC")
 	return args, argN
 }
 
@@ -526,7 +558,7 @@ func (r *pgxRepository) SearchProductsSummary(ctx context.Context, query, locale
 		" OR t.title ILIKE '%' || $1 || '%')")
 	args := []any{query, locale}
 	args, argN := appendProductFilters(&sb, args, filter, 3)
-	args, argN = appendOrderBy(&sb, args, filter, argN)
+	args, argN = appendSearchOrderBy(&sb, args, filter, argN)
 	fmt.Fprintf(&sb, " LIMIT $%d OFFSET $%d", argN, argN+1)
 	args = append(args, limit, offset)
 

@@ -257,6 +257,48 @@ func TestIntegration_SearchFilters(t *testing.T) {
 	})
 }
 
+// TestIntegration_SearchRelevance covers SE-08: with the default (recommended)
+// sort, SearchProductsSummary ranks by ts_rank relevance, NOT id order. A product
+// whose title carries the query term twice out-ranks one carrying it once; since
+// the higher-relevance row is seeded FIRST (lower id), a relevance order is the
+// inverse of the id-desc recommended fallback — proving relevance is applied.
+// An explicit sort token still wins over relevance.
+func TestIntegration_SearchRelevance(t *testing.T) {
+	ctx := context.Background()
+	pfSetupCat(t, ctx)
+	repo := catalog.NewRepository(integPool)
+
+	// "Zqwidget" twice => higher ts_rank; once => lower. hi seeded first (id<lo).
+	hi := pfSeed(t, ctx, "Apple", "Zqwidget Zqwidget premium", 50000, nil, 0, false, 5)
+	lo := pfSeed(t, ctx, "Apple", "Zqwidget basic", 10000, nil, 0, false, 5)
+
+	search := func(t *testing.T, f catalog.ProductFilter) []int64 {
+		t.Helper()
+		rows, _, err := repo.SearchProductsSummary(ctx, "Zqwidget", "tr-TR", f, 0, 50)
+		if err != nil {
+			t.Fatalf("SearchProductsSummary: %v", err)
+		}
+		return pfIDs(rows)
+	}
+
+	// Default (recommended) ranks by relevance: hi (2 hits) before lo (1 hit).
+	t.Run("recommended ranks by ts_rank, not id desc", func(t *testing.T) {
+		pfAssertOrder(t, search(t, catalog.ProductFilter{}), hi, lo)
+	})
+	t.Run("empty token ranks by ts_rank", func(t *testing.T) {
+		pfAssertOrder(t, search(t, catalog.ProductFilter{Sort: ""}), hi, lo)
+	})
+	// Explicit sort wins over relevance: price_asc => cheaper (lo) first.
+	t.Run("explicit sort overrides relevance", func(t *testing.T) {
+		pfAssertOrder(t, search(t, catalog.ProductFilter{Sort: "price_asc"}), lo, hi)
+	})
+	// bestseller PopularIDs win over relevance too.
+	t.Run("bestseller order wins over relevance", func(t *testing.T) {
+		got := search(t, catalog.ProductFilter{Sort: "bestseller", PopularIDs: []int64{lo, hi}})
+		pfAssertOrder(t, got, lo, hi)
+	})
+}
+
 // TestIntegration_BestsellerOrder covers P-029: the repo orders by the
 // handler-supplied PopularIDs (array_position, NULLS LAST), composes with
 // filters, and falls back to recommended when PopularIDs is empty.
