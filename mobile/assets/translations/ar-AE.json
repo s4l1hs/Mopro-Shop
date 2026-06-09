@@ -9,7 +9,9 @@
     "recent_searches": "عمليات البحث الأخيرة",
     "trending": "الأكثر بحثًا",
     "clear_recent": "مسح",
-    "suggested_categories": "الفئات"
+    "suggested_categories": "الفئات",
+    "brands": "العلامات التجارية",
+    "products": "المنتجات"
   },
   "nav": {
     "favorites": "المفضلة"

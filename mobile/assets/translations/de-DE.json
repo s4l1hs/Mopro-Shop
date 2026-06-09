@@ -9,7 +9,9 @@
     "recent_searches": "Zuletzt gesucht",
     "trending": "Beliebt",
     "clear_recent": "Löschen",
-    "suggested_categories": "Kategorien"
+    "suggested_categories": "Kategorien",
+    "brands": "Marken",
+    "products": "Produkte"
   },
   "nav": {
     "favorites": "Favoriten"
