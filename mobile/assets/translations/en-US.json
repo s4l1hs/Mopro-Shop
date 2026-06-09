@@ -161,7 +161,9 @@
     "free_shipping": "Free Shipping",
     "chip_brand": "Brand: {brand}",
     "chip_price": "Price: {min}–{max}",
-    "chip_rating": "{rating}★ and up"
+    "chip_rating": "{rating}★ and up",
+    "filter_price_history": "Price History",
+    "filter_price_dropped": "Price Dropped"
   },
   "catalog": {
     "categories": "Categories",

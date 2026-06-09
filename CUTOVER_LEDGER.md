@@ -62,11 +62,11 @@
 
 ---
 
-## 4c. PLP-14 — price-history filter ("Fiyat Geçmişi") — DEFER (feasible, design-ready)
+## 4c. PLP-14 — price-history filter ("Fiyatı düşenler") — ✅ RESOLVED (`feat/catalog-backend-vertical`, PR 2)
 
-- **Feasible** — `catalog_schema.variant_price_history` (0083, indexed) supports a §5-safe `price_dropped` predicate (`EXISTS … vph.price_minor > current`). The P-028 `free_shipping`/`in_stock` params prove the full path.
-- **Deferred** as its own **OpenAPI-codegen vertical** (spec `price_dropped` param → `make api-gen` Go+Dart regen → backend WHERE → `PlpFilters`/codec + toggle UI on both surfaces + chip → i18n → tests → 8 `plp_sidebar_*` golden flips). Ready-to-build; not bundled into the multi-track batch to avoid a noisy/partial codegen landing. Design: `docs/internal/plp-14-price-history.md`.
-- **BUILD (PR 2, `feat/catalog-backend-vertical`):** in progress — the codegen vertical above, sequenced after the SE-08 PR.
+- **Built** as the OpenAPI-codegen vertical: `price_dropped` boolean param on `listProducts`+`search` → `ProductFilter.PriceDropped` → §5-safe `EXISTS` over `catalog_schema.variant_price_history` (0083, index-served `vph.price_minor > v.price_minor` within 30d) → `make api-gen` Go+Dart regen → `PlpFilters.priceDropped` + codec (`drop=down`) + `FilterPanel` & `PlpFilterSheet` toggle + removable chip + i18n (`plp.filter_price_dropped`/`plp.filter_price_history`).
+- **Tests:** `TestIntegration_PriceDroppedFilter` (backend, fresh-PG), filter-wiring + codec/model round-trips (Dart). 15 generated-client fakes updated for the new method param.
+- **Goldens:** `plp_sidebar_*` + `search_sidebar_*` flip (a new sidebar toggle row) — **not regenerated locally** (anti-goal); the Linux golden-rebaseline job rebaselines on the PR. Design: `docs/internal/plp-14-price-history.md`.
 
 ## 4d. SE-08 / SE-03 — search relevance + result count — ✅ RESOLVED (`feat/catalog-backend-vertical`, PR 1)
 

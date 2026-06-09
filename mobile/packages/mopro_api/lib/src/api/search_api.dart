@@ -35,6 +35,7 @@ class SearchApi {
   /// * [rating] - Minimum average rating (products with rating_avg >= this).
   /// * [freeShipping] - When true, only products flagged free-shipping.
   /// * [inStock] - When true, only products with at least one in-stock variant.
+  /// * [priceDropped] - When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, \"Fiyatı düşenler\"). Served from catalog_schema.variant_price_history. 
   /// * [sort] - Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` orders by global popularity (P-029); it degrades to `recommended` until the analytics popularity projection has data. 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -57,6 +58,7 @@ class SearchApi {
     int? rating,
     bool? freeShipping,
     bool? inStock,
+    bool? priceDropped,
     String? sort = 'recommended',
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -96,6 +98,7 @@ class SearchApi {
       if (rating != null) r'rating': rating,
       if (freeShipping != null) r'free_shipping': freeShipping,
       if (inStock != null) r'in_stock': inStock,
+      if (priceDropped != null) r'price_dropped': priceDropped,
       if (sort != null) r'sort': sort,
     };
 

@@ -199,7 +199,7 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **listProducts**
-> ListProducts200Response listProducts(xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, sort)
+> ListProducts200Response listProducts(xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, priceDropped, sort)
 
 List products with category filter, price/brand/rating/shipping filters, pagination, and sort
 
@@ -218,10 +218,11 @@ final List<String> brand = ; // List<String> | Repeatable; matches any of the gi
 final int rating = 56; // int | Minimum average rating (products with rating_avg >= this).
 final bool freeShipping = true; // bool | When true, only products flagged free-shipping.
 final bool inStock = true; // bool | When true, only products with at least one in-stock variant.
+final bool priceDropped = true; // bool | When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, \"Fiyatı düşenler\"). Served from catalog_schema.variant_price_history. 
 final String sort = sort_example; // String | Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` orders by global popularity (P-029); it degrades to `recommended` until the analytics popularity projection has data. 
 
 try {
-    final response = api.listProducts(xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, sort);
+    final response = api.listProducts(xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, priceDropped, sort);
     print(response);
 } catch on DioException (e) {
     print('Exception when calling CatalogApi->listProducts: $e\n');
@@ -242,6 +243,7 @@ Name | Type | Description  | Notes
  **rating** | **int**| Minimum average rating (products with rating_avg >= this). | [optional] 
  **freeShipping** | **bool**| When true, only products flagged free-shipping. | [optional] 
  **inStock** | **bool**| When true, only products with at least one in-stock variant. | [optional] 
+ **priceDropped** | **bool**| When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, \"Fiyatı düşenler\"). Served from catalog_schema.variant_price_history.  | [optional] 
  **sort** | **String**| Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` orders by global popularity (P-029); it degrades to `recommended` until the analytics popularity projection has data.  | [optional] [default to 'recommended']
 
 ### Return type

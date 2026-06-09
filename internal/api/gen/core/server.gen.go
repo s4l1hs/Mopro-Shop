@@ -722,6 +722,9 @@ type FilterMaxPrice = int64
 // FilterMinPrice defines model for FilterMinPrice.
 type FilterMinPrice = int64
 
+// FilterPriceDropped defines model for FilterPriceDropped.
+type FilterPriceDropped = bool
+
 // FilterRating defines model for FilterRating.
 type FilterRating = int
 
@@ -1262,6 +1265,9 @@ type ListProductsParams struct {
 	// InStock When true, only products with at least one in-stock variant.
 	InStock *FilterInStock `form:"in_stock,omitempty" json:"in_stock,omitempty"`
 
+	// PriceDropped When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, "Fiyatı düşenler"). Served from catalog_schema.variant_price_history.
+	PriceDropped *FilterPriceDropped `form:"price_dropped,omitempty" json:"price_dropped,omitempty"`
+
 	// Sort Sort order. Unknown/unsupported tokens fall back to `recommended`.
 	// `bestseller` orders by global popularity (P-029); it degrades to
 	// `recommended` until the analytics popularity projection has data.
@@ -1346,6 +1352,9 @@ type SearchParams struct {
 
 	// InStock When true, only products with at least one in-stock variant.
 	InStock *FilterInStock `form:"in_stock,omitempty" json:"in_stock,omitempty"`
+
+	// PriceDropped When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, "Fiyatı düşenler"). Served from catalog_schema.variant_price_history.
+	PriceDropped *FilterPriceDropped `form:"price_dropped,omitempty" json:"price_dropped,omitempty"`
 
 	// Sort Sort order. Unknown/unsupported tokens fall back to `recommended`.
 	// `bestseller` orders by global popularity (P-029); it degrades to
@@ -3732,6 +3741,14 @@ func (siw *ServerInterfaceWrapper) ListProducts(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// ------------- Optional query parameter "price_dropped" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "price_dropped", r.URL.Query(), &params.PriceDropped)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "price_dropped", Err: err})
+		return
+	}
+
 	// ------------- Optional query parameter "sort" -------------
 
 	err = runtime.BindQueryParameter("form", true, false, "sort", r.URL.Query(), &params.Sort)
@@ -4048,6 +4065,14 @@ func (siw *ServerInterfaceWrapper) Search(w http.ResponseWriter, r *http.Request
 	err = runtime.BindQueryParameter("form", true, false, "in_stock", r.URL.Query(), &params.InStock)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "in_stock", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "price_dropped" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "price_dropped", r.URL.Query(), &params.PriceDropped)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "price_dropped", Err: err})
 		return
 	}
 

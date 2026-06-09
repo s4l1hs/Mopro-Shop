@@ -161,7 +161,9 @@
     "free_shipping": "Ücretsiz Kargo",
     "chip_brand": "Marka: {brand}",
     "chip_price": "Fiyat: {min}–{max}",
-    "chip_rating": "{rating}★ ve üzeri"
+    "chip_rating": "{rating}★ ve üzeri",
+    "filter_price_history": "Fiyat Geçmişi",
+    "filter_price_dropped": "Fiyatı Düşenler"
   },
   "catalog": {
     "categories": "Kategoriler",

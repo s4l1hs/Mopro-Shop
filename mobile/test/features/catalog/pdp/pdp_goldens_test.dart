@@ -88,6 +88,7 @@ class _FakeCatalogApi extends CatalogApi {
     int? rating,
     bool? freeShipping,
     bool? inStock,
+    bool? priceDropped,
     String? xTraceId,
     int? categoryId,
     int? page = 1,

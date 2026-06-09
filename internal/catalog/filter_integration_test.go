@@ -257,6 +257,61 @@ func TestIntegration_SearchFilters(t *testing.T) {
 	})
 }
 
+// pfSetVariantPrice updates the variant price for a product, firing the 0083
+// price-history trigger so a higher-priced historical row is recorded (a "drop").
+func pfSetVariantPrice(t *testing.T, ctx context.Context, productID, price int64) {
+	t.Helper()
+	if _, err := integPool.Exec(ctx,
+		`UPDATE catalog_schema.variants SET price_minor = $2 WHERE product_id = $1`,
+		productID, price); err != nil {
+		t.Fatalf("pfSetVariantPrice: %v", err)
+	}
+}
+
+// TestIntegration_PriceDroppedFilter covers PLP-14: the price_dropped filter keeps
+// only products whose cheapest live price is below a price they carried within the
+// last 30 days (variant_price_history). A never-changed product (single history
+// row == current price) and a price-rise product (only lower historical rows) are
+// both excluded; the filter threads into search the same way.
+func TestIntegration_PriceDroppedFilter(t *testing.T) {
+	ctx := context.Background()
+	pfSetupCat(t, ctx)
+	repo := catalog.NewRepository(integPool)
+
+	// A: never changed -> one history row at current price -> NOT a drop.
+	a := pfSeed(t, ctx, "Apple", "PDrop Alpha", 10000, nil, 0, false, 5)
+	// B: 20000 -> 15000 -> a higher historical row than current -> dropped.
+	b := pfSeed(t, ctx, "Apple", "PDrop Beta", 20000, nil, 0, false, 5)
+	pfSetVariantPrice(t, ctx, b, 15000)
+	// C: 10000 -> 30000 (a rise) -> only lower historical rows -> NOT a drop.
+	c := pfSeed(t, ctx, "Apple", "PDrop Gamma", 10000, nil, 0, false, 5)
+	pfSetVariantPrice(t, ctx, c, 30000)
+
+	listCat := func(t *testing.T, f catalog.ProductFilter) []int64 {
+		t.Helper()
+		rows, _, err := repo.ListProductsByCategory(ctx, pfCat, "tr-TR", f, 0, 50)
+		if err != nil {
+			t.Fatalf("ListProductsByCategory: %v", err)
+		}
+		return pfIDs(rows)
+	}
+
+	t.Run("only the dropped product matches", func(t *testing.T) {
+		pfAssertSet(t, listCat(t, catalog.ProductFilter{PriceDropped: pfBool(true)}), b)
+	})
+	t.Run("no filter keeps all three", func(t *testing.T) {
+		pfAssertSet(t, listCat(t, catalog.ProductFilter{}), a, b, c)
+	})
+	t.Run("threads into search", func(t *testing.T) {
+		rows, _, err := repo.SearchProductsSummary(ctx, "PDrop", "tr-TR",
+			catalog.ProductFilter{PriceDropped: pfBool(true)}, 0, 50)
+		if err != nil {
+			t.Fatalf("SearchProductsSummary: %v", err)
+		}
+		pfAssertSet(t, pfIDs(rows), b)
+	})
+}
+
 // TestIntegration_SearchRelevance covers SE-08: with the default (recommended)
 // sort, SearchProductsSummary ranks by ts_rank relevance, NOT id order. A product
 // whose title carries the query term twice out-ranks one carrying it once; since
