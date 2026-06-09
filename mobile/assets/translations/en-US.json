@@ -654,6 +654,7 @@
   },
   "notifications": {
     "title": "Notifications",
+    "bell_tooltip": "Notifications",
     "unread_badge": "{} unread notifications",
     "filter_all": "All",
     "filter_unread": "Unread",
