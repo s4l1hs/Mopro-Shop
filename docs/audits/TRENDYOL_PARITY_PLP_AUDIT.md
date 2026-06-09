@@ -27,15 +27,14 @@
 
 ## §1 — Summary
 
-- **RESOLVED: 4** — PLP-01 (mobile brand/rating facets), PLP-03 (mobile infinite
-  scroll) [#142]; **PLP-04 (result count), PLP-05 (breadcrumb)** [this batch].
-- **DEFER'd (backend track): 1** — PLP-13 (attribute facets, Outcome C — no
-  attribute/facet model; ledger §4b).
-- **CONFIRMED open (structural): 4** — PLP-12 (subtree rollup, **HIGH**, backend),
-  PLP-14 (price-history filter), PLP-15 (desktop numbered pages), PLP-09
-  (fast-delivery).
-- **PROBABLE (await visual walk): 8** — PLP-02, PLP-06, PLP-07 (softened), PLP-08,
-  PLP-10, PLP-18, PLP-19, PLP-20, + the unnumbered visual bucket (§9).
+- **RESOLVED: 8** — PLP-01/03 (mobile facets + infinite scroll, #142), PLP-04/05
+  (count + breadcrumb), **PLP-15 (desktop numbered pages), PLP-18 (sticky sidebar —
+  already-matched), PLP-19 (ultra-wide breakpoints), PLP-20 (sticky mobile bar)**.
+- **DEFER'd (backend track): 1** — PLP-13 (attribute facets, Outcome C; ledger §4b).
+- **CONFIRMED open (backend/data): 3** — PLP-12 (subtree rollup, **HIGH**),
+  PLP-14 (price-history filter), PLP-09 (fast-delivery).
+- **PROBABLE (await visual walk): 5** — PLP-02, PLP-06, PLP-07 (softened), PLP-08,
+  PLP-10, + the unnumbered visual bucket (§9).
 - **NEW from markup: 5** — PLP-13, PLP-14, PLP-15, PLP-16, PLP-17.
 - **NOT-ACTIONABLE (intentional / Mopro PLUS): 4** — D1–D4 (§5).
 - **CONFIRMED-HIGH fix queue:** §8.
@@ -87,12 +86,12 @@ IDs PR #142 shipped against). New findings take **PLP-13…PLP-20**. Aliases:
 | **PLP-12** | exact-`category_id` scoping (`repository.go:373`) → parent/root PLPs empty; **Trendyol rolls the subtree up** (multi-brand under one category, subcats as filters) | markup | **CONFIRMED** | **HIGH** (backend — ledger §4) |
 | **PLP-13** 🆕 | **no attribute/variant facets** → Trendyol's deep stack. **DEFER'd (Outcome C)**: only `variants.color/size` are structured (unfiltered + sparse); `products.specs` is opaque per-category JSONB; **no normalized attribute/facet model or aggregation** → a backend data-modeling track (ledger §4b), not a UI add. See `docs/internal/plp-batch.md`. | markup | **CONFIRMED → DEFER** | **HIGH** (backend) |
 | **PLP-14** 🆕 | **no price-history *filter*** → Trendyol "Fiyat Geçmişi" (last 10/14/30 days). *Distinct from Mopro's on-card lowest-30d.* | markup | **CONFIRMED** | MED |
-| **PLP-15** 🆕 | desktop pagination = **numbered pages** on Trendyol (`1 [2] … [121]`), Mopro uses a load-more button. *Split from PLP-03 (mobile).* | markup | **CONFIRMED** | MED |
+| **PLP-15** 🆕 | ~~desktop load-more~~ → **RESOLVED**: desktop `_NumberedPages` control (`goToPage` replaces the grid); mobile keeps infinite scroll. | markup | **RESOLVED** | MED |
 | **PLP-16** 🆕 | **ranked** bestseller / most-visited badge ("En Çok Satan 1. Ürün") — Mopro has an unranked bestseller stamp | markup | markup-observed | MED |
 | **PLP-17** 🆕 | **official-seller** badge ("Resmi satıcı rozeti") / seller-type chips — Mopro has none | markup | markup-observed | LOW |
-| **PLP-18** | non-sticky desktop filter sidebar → Trendyol sidebar pins on scroll | walk | **PROBABLE** | MED |
-| **PLP-19** | grid doesn't add columns at ultra-wide breakpoints (caps at 5) | walk | **PROBABLE** | MED |
-| **PLP-20** | mobile sort/filter bar scrolls away (not sticky) | walk | **PROBABLE** | LOW |
+| **PLP-18** | ~~non-sticky desktop sidebar~~ → **RESOLVED (already-matched)**: `_buildWide` puts the sidebar in a height-bounded, non-scrolling column (the grid scrolls inside its own `CustomScrollView`) → it **already pins**. No code. | src | **RESOLVED** | MED |
+| **PLP-19** | ~~flat 5-col + 1240 clamp~~ → **RESOLVED**: width-aware columns 2/3/4/5 + ultra-wide content clamp (1600 ≥1440) — less outer-margin whitespace. | walk | **RESOLVED** | MED |
+| **PLP-20** | ~~bar scrolls away~~ → **RESOLVED**: mobile sort/filter bar is a pinned `SliverPersistentHeader` (opaque bg). | walk | **RESOLVED** | LOW |
 
 > Visual-only items (mobile filter-sheet styling, hover chevrons, banner-indicator
 > style, exact colours/spacing) stay **PROBABLE** in the §9 bucket — markup can't
@@ -153,21 +152,18 @@ distinct / free-ship populated**. **Walk category: `elektr-kea`.** Apply
 
 ## §8 — CONFIRMED-HIGH fix queue (the next fix prompts draw from here)
 
-Ordered; severities firmed by markup/walk. **Shipped:** PLP-01/03 (#142),
-**PLP-04 + PLP-05** (count + breadcrumb). **DEFER'd:** PLP-13 (backend track).
+**Shipped:** PLP-01/03 (#142), PLP-04/05 (count + breadcrumb), **PLP-15/18/19/20**
+(numbered pages / sticky sidebar / breakpoints / sticky mobile bar). **DEFER'd:**
+PLP-13 (backend track). **Remaining = backend + MED/LOW:**
 
-1. ~~**PLP-04** result count~~ — ✅ shipped (`PlpResultCount`).
-2. ~~**PLP-05** breadcrumb~~ — ✅ shipped (`PlpBreadcrumb`).
-3. **PLP-13 — attribute/variant facets** → **DEFER (Outcome C)**: no normalized
-   attribute/facet model (only opaque `specs` JSONB + unfiltered color/size) →
-   backend data-modeling track, see `CUTOVER_LEDGER.md §4b`. **Not a UI add.**
-4. **PLP-12 — subtree rollup** (CONFIRMED, **HIGH**, backend; recursive CTE in
-   `repository.go`). `CUTOVER_LEDGER.md §4`; backend PR.
-5. **PLP-15 — desktop numbered pages** (CONFIRMED, MED). Desktop-only.
-6. **PLP-14 — price-history filter** (CONFIRMED, MED). Backend param + control.
-7. **MED/LOW batch:** PLP-09 (fast-delivery), PLP-16 (ranked badge), PLP-18/19/20
-   (sticky sidebar / ultra-wide grid / sticky mobile bar), PLP-02 (mobile chips),
-   PLP-06/07/08/10/11/17.
+1. **PLP-13 — attribute/variant facets** → **DEFER (Outcome C)**: no normalized
+   attribute/facet model → backend data-modeling track, `CUTOVER_LEDGER.md §4b`.
+2. **PLP-12 — subtree rollup** (CONFIRMED, **HIGH**, backend; recursive CTE).
+   `CUTOVER_LEDGER.md §4`; backend PR.
+3. **PLP-14 — price-history filter** (CONFIRMED, MED). Backend param + control.
+4. **MED/LOW batch:** PLP-09 (fast-delivery), PLP-16 (ranked badge), PLP-02
+   (mobile chips), PLP-06/07/08/10/11/17 — most are LOW polish or await the
+   visual walk (§9).
 
 ---
 
