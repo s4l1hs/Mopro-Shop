@@ -62,6 +62,13 @@
 
 ---
 
+## 4c. PLP-14 — price-history filter ("Fiyat Geçmişi") — DEFER (feasible, design-ready)
+
+- **Feasible** — `catalog_schema.variant_price_history` (0083, indexed) supports a §5-safe `price_dropped` predicate (`EXISTS … vph.price_minor > current`). The P-028 `free_shipping`/`in_stock` params prove the full path.
+- **Deferred** as its own **OpenAPI-codegen vertical** (spec `price_dropped` param → `make api-gen` Go+Dart regen → backend WHERE → `PlpFilters`/codec + toggle UI on both surfaces + chip → i18n → tests → 8 `plp_sidebar_*` golden flips). Ready-to-build; not bundled into the multi-track batch to avoid a noisy/partial codegen landing. Design: `docs/internal/plp-14-price-history.md`.
+
+---
+
 ## 5. CI / branch-protection
 
 - **F-022b (#138)** made `flutter analyze` green-on-compile (`--no-fatal-infos`; errors/warnings still fatal).
