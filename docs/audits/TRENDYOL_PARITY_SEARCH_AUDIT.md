@@ -79,10 +79,10 @@ wiring → it did **not** pick up the recent per-screen PLP fixes:
 | **SE-03** | No **result count** ("X ürün"). **UI wired (Session 1)** — `SearchState.total` (nullable) → `_ResultCount` on both; lights up with the backend `pagination.total` (see Session 2's note). | src | **RESOLVED** (UI) | MED |
 | **SE-04** | ~~load-more on both~~ → **RESOLVED** (Session 1): `SearchState.totalPages` + `goToPage`; `CatalogShell` mounted with `infiniteScroll` (mobile) + numbered pages (desktop). | src | **RESOLVED** | MED |
 | **SE-05** | ~~flat breakpoints~~ → **RESOLVED** (Session 1): `_gridColumns` 2/3/4/5 (mirrors PLP-19). | src | **RESOLVED** | LOW |
-| **SE-06** | Suggestions dropdown = recent + trending + **category** shortcuts; **no brand**, **no product (as-you-type)** suggestions | src | **CONFIRMED** (Trendyol-side PROBABLE) | MED |
-| **SE-07** | No-results = generic `EmptyState.empty()`; **no "did you mean"/spelling correction**, no suggested alternatives | src | **CONFIRMED** (Trendyol-side PROBABLE) | MED |
+| **SE-06** | Suggestions dropdown = recent + trending + **category**; **no brand/product** suggestions. **FLAGGED (backend)**: `/search/suggest` returns `List<String>` query completions (unused — ready to wire); **structured brand/product suggestions need a new backend surface** → follow-up / DEFER. | src | **CONFIRMED → flagged** | MED |
+| **SE-07** | ~~generic empty~~ → **RESOLVED (UI)** (Session 1): a 0-result query routes to `_NoResultsBody` — query echo + trending + category shortcuts. **"Did you mean"/spelling correction NOT built** — needs a backend correction surface (flagged / DEFER). | src | **RESOLVED (UI)** | MED |
 | **SE-08** | Results order by the `PlpSort` token (default `recommended`), **not ts_rank relevance** → no relevance ranking | src | **PROBABLE** (backend; confirm) | MED |
-| **SE-09** | Mobile empty-search shows recent + categories but **not trending** (the desktop dropdown has trending) | src | **CONFIRMED** | LOW |
+| **SE-09** | ~~mobile empty lacked trending~~ → **RESOLVED** (Session 1): `_TrendingChips` on the mobile empty state (parity with the desktop dropdown). | src | **RESOLVED** | LOW |
 | **SE-10** | No "search within results" refine box; no sponsored results | src | **PROBABLE** | LOW |
 
 > Search-bar mic, exact suggestion styling, relevance quality, and no-results copy
