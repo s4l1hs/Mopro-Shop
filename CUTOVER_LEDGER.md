@@ -20,7 +20,7 @@
 | Host-prep | Add `GHCR_USER` + `GHCR_PAT` (read:packages) to `/etc/mopro/.env` (via the `/opt/mopro/deploy/.env` symlink). |
 | Backup | `pg_dump -Fc` ecom + ledger before migrating (tiny DBs). The §3-era backups are stale — re-take fresh at cutover. |
 | Dry-run | Dispatch deploy `verify_only=true` (login-only; proves GHCR auth). |
-| Migrations | `apply-migration.sh --db ecom up` then `--db ledger up`. Count is large now (ecom 62→0087+, ledger 77→0081) — apply, then deploy promptly (tight window). |
+| Migrations | `apply-migration.sh --db ecom up` then `--db ledger up`. Count is large now (ecom 62→0088+, ledger 77→0081) — apply, then deploy promptly (tight window). |
 | Deploy | Dispatch `verify_only=false`; #105 fail-fast + image-ID assertion guards a no-op. |
 | Health | Re-run the #104 diagnosis; expect GREEN + smoke 5/5. |
 | Post-flip purge | RUNBOOK "Post-flip cleanup": stale `mopro/*` images + `bin/*.tar` tarballs (gated on prod confirmed on `ghcr.io/s4l1hs/*`). |
@@ -49,18 +49,23 @@
 
 ---
 
-## 4. PLP-12 — subtree rollup (CONFIRMED-HIGH backend debt)
+## 4. PLP-12 — subtree rollup — ✅ RESOLVED (`feat/plp-subtree-rollup`)
 
-- `internal/catalog/repository.go:373` scopes products by **exact `category_id`**; no recursive subtree rollup.
-- Walk- **and markup-confirmed**: Trendyol browsing a parent category aggregates all nested subcategory products (multi-brand under one category, subcats as filters).
-- **Fix:** recursive CTE in `repository.go` (server-side; **no client wrapper**). Not built; tracked here for a dedicated backend PR.
-- Canonical ID **PLP-12** (CONFIRMED-HIGH) — see the PLP registry `docs/audits/TRENDYOL_PARITY_PLP_AUDIT.md` §3/§8.
+- ~~`repository.go` scoped products by exact `category_id`~~ → **`ListProductsByCategory` now scopes via a `WITH RECURSIVE` subtree over `ref_schema.categories`** (parent_id walk): a parent aggregates all descendant products, a leaf resolves to itself. §5-safe (ref_schema is the cross-module-readable exception). Migration **0088** + init snapshot add `categories_parent_id_idx`. Integration test (parent→child→grandchild) + live-verified (root-elektronik 0→31, leaf elektr-kea 28).
+- **Deploy note:** migration 0088 lands at the §1 cutover (`apply-migration.sh --db ecom up`); the index is additive (`IF NOT EXISTS`).
 
 ## 4b. PLP-13 — attribute facets (CONFIRMED-HIGH backend debt — DEFER'd)
 
 - Trendyol's deep, **category-aware** attribute stack (storage/RAM/screen/colour/condition/camera…). Mopro has **no normalized attribute/facet model**: only `catalog_schema.variants.color/size` (structured but **not** filter params + sparse) and `catalog_schema.products.specs` (**opaque per-category JSONB**, no facet schema/index). No facet-aggregation (values+counts) surface.
 - **Verdict: Outcome C — DEFER** (per the batch discovery). Building JSONB-key faceting on opaque `specs` = a fragile attribute store (anti-goal). The real fix is a **schema/data-modeling track**: a normalized product-attribute model + per-category facet config + an aggregation endpoint (mirror brand/rating) + filter params + accordion UI.
 - **Design (Track D) ready:** `docs/internal/plp-13-attribute-model.md` — `attribute_keys` / `category_facets` / `product_attributes` (catalog_schema, §5-safe), a brand/rating-style facet aggregation, accordion UI reusing `PlpBrandFacet`, and a **4-phase plan**. Even Phase 1 (schema + backfill `renk`/`depolama` + one facet + UI) is a full vertical → each phase is its own scoped PR. Build DEFER'd.
+
+---
+
+## 4c. PLP-14 — price-history filter ("Fiyat Geçmişi") — DEFER (feasible, design-ready)
+
+- **Feasible** — `catalog_schema.variant_price_history` (0083, indexed) supports a §5-safe `price_dropped` predicate (`EXISTS … vph.price_minor > current`). The P-028 `free_shipping`/`in_stock` params prove the full path.
+- **Deferred** as its own **OpenAPI-codegen vertical** (spec `price_dropped` param → `make api-gen` Go+Dart regen → backend WHERE → `PlpFilters`/codec + toggle UI on both surfaces + chip → i18n → tests → 8 `plp_sidebar_*` golden flips). Ready-to-build; not bundled into the multi-track batch to avoid a noisy/partial codegen landing. Design: `docs/internal/plp-14-price-history.md`.
 
 ---
 
@@ -83,6 +88,9 @@
 | Dead legacy columns | `discount_price_minor`, `rating_stars` — API no longer reads them. |
 | init vs migration 0078 (`sellers`) | Provisioning-snapshot drift; prod already provisioned. |
 | `local-phaseb.sh` orchestrator | Dev tooling, never merged to main. |
+| PLP-16 bestseller rank (backend-surface) | Rank exists in `analytics_schema.popular_products`; surface as `ProductSummary.bestseller_rank` (handler app-merge, §5-safe) + spec/codegen + ranked card badge ("Çok Satan N"). Own task. |
+| PLP-09 fast-delivery flag (backend) | No `fast_delivery`/delivery-SLA column or API param — add the flag first, then a badge/filter. |
+| PLP-17 official-seller flag (backend) | No seller `is_official`/verified flag — add it, then the "Resmi satıcı" badge. |
 
 ---
 

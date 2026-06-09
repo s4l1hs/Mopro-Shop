@@ -80,15 +80,15 @@ IDs PR #142 shipped against). New findings take **PLP-13…PLP-20**. Aliases:
 | **PLP-06** | no predefined quick-filter pills above the grid | src | **PROBABLE** | LOW |
 | **PLP-07** | brand facet has no counts + derived from the loaded page | src; markup **inconclusive** (counts not in SSR) | **PROBABLE** (softened) | LOW |
 | **PLP-08** | no-results state (`EmptyState.empty()`) has no clear-filters CTA | src | **PROBABLE** | LOW |
-| **PLP-09** | no **fast-delivery** filter toggle (only free-cargo) → Trendyol has "Hızlı Teslimat" | src+markup | **CONFIRMED** (structural) | LOW–MED |
+| **PLP-09** | no **fast-delivery** filter (only free-cargo) → "Hızlı Teslimat". **DATA-GATED** (Track A): no `fast_delivery`/delivery-SLA column or API param exists — needs a backend flag first (ledger). | src+markup | **CONFIRMED → DATA-GATED** | LOW–MED |
 | **PLP-10** | no search bar in the PLP header (title + share only) | src | **PROBABLE** | LOW |
 | **PLP-11** | in-stock toggle on mobile sheet but missing from the desktop sidebar (Mopro-internal) | src | **PROBABLE** | LOW |
-| **PLP-12** | exact-`category_id` scoping (`repository.go:373`) → parent/root PLPs empty; **Trendyol rolls the subtree up** (multi-brand under one category, subcats as filters) | markup | **CONFIRMED** | **HIGH** (backend — ledger §4) |
-| **PLP-13** 🆕 | **no attribute/variant facets** → Trendyol's deep stack. **DEFER'd (Outcome C)** — only `variants.color/size` (unfiltered/sparse) + opaque `products.specs` JSONB; no normalized model. **Design ready (Track D):** `docs/internal/plp-13-attribute-model.md` (`attribute_keys`/`category_facets`/`product_attributes` + facet aggregation + 4-phase plan). Build is multi-phase schema work → ledger §4b. | markup | **CONFIRMED → DEFER** (designed) | **HIGH** (backend) |
-| **PLP-14** 🆕 | **no price-history *filter*** → Trendyol "Fiyat Geçmişi" (last 10/14/30 days). *Distinct from Mopro's on-card lowest-30d.* | markup | **CONFIRMED** | MED |
+| **PLP-12** | ~~exact-`category_id` scoping → parent/root PLPs empty~~ → **RESOLVED**: `ListProductsByCategory` scopes via a `WITH RECURSIVE` subtree over `ref_schema.categories` (parent_id walk) → a parent aggregates all descendants, a leaf resolves to itself. §5-safe; indexed (migration 0088). Verified: root 0→31, leaf 28. | markup | **RESOLVED** | **HIGH** (backend) |
+| **PLP-13** 🆕 | **no attribute/variant facets** → Trendyol's deep stack. **DEFER'd (Outcome C)**: only `variants.color/size` are structured (unfiltered + sparse); `products.specs` is opaque per-category JSONB; **no normalized attribute/facet model or aggregation** → a backend data-modeling track (ledger §4b), not a UI add. See `docs/internal/plp-batch.md`. | markup | **CONFIRMED → DEFER** | **HIGH** (backend) |
+| **PLP-14** 🆕 | **no price-history *filter*** → "Fiyat Geçmişi". **DEFER (feasible, design-ready)** (Track C): data exists (`variant_price_history`, 0083) + the P-028 param pattern proves it — a `price_dropped` WHERE (§5-safe `EXISTS` over the table). Deferred as its own **codegen vertical** (spec param → Go/Dart regen → toggle UI + chip + goldens). Design: `docs/internal/plp-14-price-history.md`. | markup | **CONFIRMED → DEFER** (ready) | MED |
 | **PLP-15** 🆕 | ~~desktop load-more~~ → **RESOLVED**: desktop `_NumberedPages` control (`goToPage` replaces the grid); mobile keeps infinite scroll. | markup | **RESOLVED** | MED |
-| **PLP-16** 🆕 | **ranked** bestseller / most-visited badge ("En Çok Satan 1. Ürün") — Mopro has an unranked bestseller stamp | markup | markup-observed | MED |
-| **PLP-17** 🆕 | **official-seller** badge ("Resmi satıcı rozeti") / seller-type chips — Mopro has none | markup | markup-observed | LOW |
+| **PLP-16** 🆕 | **ranked** bestseller badge ("Çok Satan N") vs Mopro's unranked stamp. **DEFER (backend-surfacing)** (Track A): rank exists in `analytics_schema.popular_products` but isn't attached to `ProductSummary`; surfacing = handler rank-attach (§5-safe app-merge) + `bestseller_rank` field + spec/codegen + card badge. Its own task (ledger). | markup | markup-observed → **DEFER** | MED |
+| **PLP-17** 🆕 | **official-seller** badge ("Resmi satıcı") — Mopro has none. **DATA-GATED** (Track A): no seller `is_official`/verified flag exists — backend prerequisite (ledger). | markup | markup-observed → **DATA-GATED** | LOW |
 | **PLP-18** | ~~non-sticky desktop sidebar~~ → **RESOLVED (already-matched)**: `_buildWide` puts the sidebar in a height-bounded, non-scrolling column (the grid scrolls inside its own `CustomScrollView`) → it **already pins**. No code. | src | **RESOLVED** | MED |
 | **PLP-19** | ~~flat 5-col + 1240 clamp~~ → **RESOLVED**: width-aware columns 2/3/4/5 + ultra-wide content clamp (1600 ≥1440) — less outer-margin whitespace. | walk | **RESOLVED** | MED |
 | **PLP-20** | ~~bar scrolls away~~ → **RESOLVED**: mobile sort/filter bar is a pinned `SliverPersistentHeader` (opaque bg). | walk | **RESOLVED** | LOW |
@@ -158,7 +158,7 @@ PLP-13 (backend track). **Remaining = backend + MED/LOW:**
 
 1. **PLP-13 — attribute/variant facets** → **DEFER (Outcome C)**: no normalized
    attribute/facet model → backend data-modeling track, `CUTOVER_LEDGER.md §4b`.
-2. **PLP-12 — subtree rollup** (CONFIRMED, **HIGH**, backend; recursive CTE).
+2. ~~**PLP-12 — subtree rollup**~~ — ✅ shipped (recursive CTE, migration 0088).
    `CUTOVER_LEDGER.md §4`; backend PR.
 3. **PLP-14 — price-history filter** (CONFIRMED, MED). Backend param + control.
 4. **MED/LOW batch:** PLP-09 (fast-delivery), PLP-16 (ranked badge), PLP-02

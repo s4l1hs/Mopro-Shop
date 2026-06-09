@@ -466,7 +466,20 @@ func scanProductSummaries(rows pgx.Rows, label string) ([]ProductSummaryRow, int
 func (r *pgxRepository) ListProductsByCategory(ctx context.Context, categoryID int64, locale string, filter ProductFilter, offset, limit int) ([]ProductSummaryRow, int, error) {
 	var sb strings.Builder
 	sb.WriteString(productSummarySelect)
-	sb.WriteString(" WHERE p.category_id = $1 AND p.status = 'active'")
+	// PLP-12: subtree rollup — a parent category aggregates ALL descendant
+	// products (Trendyol behaviour), a leaf resolves to just itself. Recursive
+	// walk of ref_schema.categories (the shared ref schema is cross-module
+	// readable per the §5 exception); the categories tree is tiny + indexed on
+	// parent_id (migration 0088).
+	sb.WriteString(` WHERE p.category_id IN (
+		WITH RECURSIVE subtree AS (
+			SELECT id FROM ref_schema.categories WHERE id = $1
+			UNION ALL
+			SELECT c.id FROM ref_schema.categories c
+			JOIN subtree s ON c.parent_id = s.id
+		)
+		SELECT id FROM subtree
+	) AND p.status = 'active'`)
 	args := []any{categoryID, locale}
 	args, argN := appendProductFilters(&sb, args, filter, 3)
 	args, argN = appendOrderBy(&sb, args, filter, argN)
