@@ -87,7 +87,10 @@ jobs:
         run: go test -race ./...
 
       - name: Contract tests
-        run: go test -tags=contract -v ./internal/api/...
+        # Spec-fixture conformance (internal/api) + live-handler conformance
+        # (cmd/core-svc: GET /products/{id} etc. validated against the OpenAPI
+        # schema, catching server↔spec drift like PD-06).
+        run: go test -tags=contract -v -run TestContract ./internal/api/... ./cmd/core-svc/...
 
   dart-analyze:
     name: Flutter analyze (dart-dio client)
