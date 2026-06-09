@@ -20,7 +20,7 @@
 | Host-prep | Add `GHCR_USER` + `GHCR_PAT` (read:packages) to `/etc/mopro/.env` (via the `/opt/mopro/deploy/.env` symlink). |
 | Backup | `pg_dump -Fc` ecom + ledger before migrating (tiny DBs). The §3-era backups are stale — re-take fresh at cutover. |
 | Dry-run | Dispatch deploy `verify_only=true` (login-only; proves GHCR auth). |
-| Migrations | `apply-migration.sh --db ecom up` then `--db ledger up`. Count is large now (ecom 62→0087+, ledger 77→0081) — apply, then deploy promptly (tight window). |
+| Migrations | `apply-migration.sh --db ecom up` then `--db ledger up`. Count is large now (ecom 62→0088+, ledger 77→0081) — apply, then deploy promptly (tight window). |
 | Deploy | Dispatch `verify_only=false`; #105 fail-fast + image-ID assertion guards a no-op. |
 | Health | Re-run the #104 diagnosis; expect GREEN + smoke 5/5. |
 | Post-flip purge | RUNBOOK "Post-flip cleanup": stale `mopro/*` images + `bin/*.tar` tarballs (gated on prod confirmed on `ghcr.io/s4l1hs/*`). |
@@ -49,12 +49,10 @@
 
 ---
 
-## 4. PLP-12 — subtree rollup (CONFIRMED-HIGH backend debt)
+## 4. PLP-12 — subtree rollup — ✅ RESOLVED (`feat/plp-subtree-rollup`)
 
-- `internal/catalog/repository.go:373` scopes products by **exact `category_id`**; no recursive subtree rollup.
-- Walk- **and markup-confirmed**: Trendyol browsing a parent category aggregates all nested subcategory products (multi-brand under one category, subcats as filters).
-- **Fix:** recursive CTE in `repository.go` (server-side; **no client wrapper**). Not built; tracked here for a dedicated backend PR.
-- Canonical ID **PLP-12** (CONFIRMED-HIGH) — see the PLP registry `docs/audits/TRENDYOL_PARITY_PLP_AUDIT.md` §3/§8.
+- ~~`repository.go` scoped products by exact `category_id`~~ → **`ListProductsByCategory` now scopes via a `WITH RECURSIVE` subtree over `ref_schema.categories`** (parent_id walk): a parent aggregates all descendant products, a leaf resolves to itself. §5-safe (ref_schema is the cross-module-readable exception). Migration **0088** + init snapshot add `categories_parent_id_idx`. Integration test (parent→child→grandchild) + live-verified (root-elektronik 0→31, leaf elektr-kea 28).
+- **Deploy note:** migration 0088 lands at the §1 cutover (`apply-migration.sh --db ecom up`); the index is additive (`IF NOT EXISTS`).
 
 ## 4b. PLP-13 — attribute facets (CONFIRMED-HIGH backend debt — DEFER'd)
 

@@ -83,7 +83,7 @@ IDs PR #142 shipped against). New findings take **PLP-13…PLP-20**. Aliases:
 | **PLP-09** | no **fast-delivery** filter toggle (only free-cargo) → Trendyol has "Hızlı Teslimat" | src+markup | **CONFIRMED** (structural) | LOW–MED |
 | **PLP-10** | no search bar in the PLP header (title + share only) | src | **PROBABLE** | LOW |
 | **PLP-11** | in-stock toggle on mobile sheet but missing from the desktop sidebar (Mopro-internal) | src | **PROBABLE** | LOW |
-| **PLP-12** | exact-`category_id` scoping (`repository.go:373`) → parent/root PLPs empty; **Trendyol rolls the subtree up** (multi-brand under one category, subcats as filters) | markup | **CONFIRMED** | **HIGH** (backend — ledger §4) |
+| **PLP-12** | ~~exact-`category_id` scoping → parent/root PLPs empty~~ → **RESOLVED**: `ListProductsByCategory` scopes via a `WITH RECURSIVE` subtree over `ref_schema.categories` (parent_id walk) → a parent aggregates all descendants, a leaf resolves to itself. §5-safe; indexed (migration 0088). Verified: root 0→31, leaf 28. | markup | **RESOLVED** | **HIGH** (backend) |
 | **PLP-13** 🆕 | **no attribute/variant facets** → Trendyol's deep stack. **DEFER'd (Outcome C)**: only `variants.color/size` are structured (unfiltered + sparse); `products.specs` is opaque per-category JSONB; **no normalized attribute/facet model or aggregation** → a backend data-modeling track (ledger §4b), not a UI add. See `docs/internal/plp-batch.md`. | markup | **CONFIRMED → DEFER** | **HIGH** (backend) |
 | **PLP-14** 🆕 | **no price-history *filter*** → Trendyol "Fiyat Geçmişi" (last 10/14/30 days). *Distinct from Mopro's on-card lowest-30d.* | markup | **CONFIRMED** | MED |
 | **PLP-15** 🆕 | ~~desktop load-more~~ → **RESOLVED**: desktop `_NumberedPages` control (`goToPage` replaces the grid); mobile keeps infinite scroll. | markup | **RESOLVED** | MED |
@@ -158,7 +158,7 @@ PLP-13 (backend track). **Remaining = backend + MED/LOW:**
 
 1. **PLP-13 — attribute/variant facets** → **DEFER (Outcome C)**: no normalized
    attribute/facet model → backend data-modeling track, `CUTOVER_LEDGER.md §4b`.
-2. **PLP-12 — subtree rollup** (CONFIRMED, **HIGH**, backend; recursive CTE).
+2. ~~**PLP-12 — subtree rollup**~~ — ✅ shipped (recursive CTE, migration 0088).
    `CUTOVER_LEDGER.md §4`; backend PR.
 3. **PLP-14 — price-history filter** (CONFIRMED, MED). Backend param + control.
 4. **MED/LOW batch:** PLP-09 (fast-delivery), PLP-16 (ranked badge), PLP-02
