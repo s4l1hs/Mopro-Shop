@@ -83,6 +83,9 @@
 | Dead legacy columns | `discount_price_minor`, `rating_stars` — API no longer reads them. |
 | init vs migration 0078 (`sellers`) | Provisioning-snapshot drift; prod already provisioned. |
 | `local-phaseb.sh` orchestrator | Dev tooling, never merged to main. |
+| PLP-16 bestseller rank (backend-surface) | Rank exists in `analytics_schema.popular_products`; surface as `ProductSummary.bestseller_rank` (handler app-merge, §5-safe) + spec/codegen + ranked card badge ("Çok Satan N"). Own task. |
+| PLP-09 fast-delivery flag (backend) | No `fast_delivery`/delivery-SLA column or API param — add the flag first, then a badge/filter. |
+| PLP-17 official-seller flag (backend) | No seller `is_official`/verified flag — add it, then the "Resmi satıcı" badge. |
 
 ---
 
