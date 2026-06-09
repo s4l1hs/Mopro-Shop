@@ -14,7 +14,9 @@ import 'package:mopro/features/catalog/providers/home_provider.dart';
 class MoodStoriesStrip extends ConsumerWidget {
   const MoodStoriesStrip({super.key});
 
-  static const double _avatarSize = 64;
+  /// Trendyol spec: the avatar ring is exactly 72dp in diameter (was a legacy
+  /// 64+6 = 70dp). Exposed so widget tests can lock the value.
+  static const double _avatarSize = 72;
   static const double _stripHeight = 110;
 
   @override
@@ -48,12 +50,30 @@ class MoodStoriesStrip extends ConsumerWidget {
         }
         return SizedBox(
           height: _stripHeight,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            itemCount: stories.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, i) => _MoodTile(story: stories[i]),
+          child: ShaderMask(
+            // Premium 2.5% horizontal edge-fade on both ends — the same
+            // transparent→opaque→transparent dstIn mask the mega-menu bar uses
+            // (mega_menu_bar.dart:124) so the scroller dissolves at the rail
+            // edges instead of hard-clipping.
+            shaderCallback: (rect) {
+              return const LinearGradient(
+                colors: [
+                  Colors.transparent,
+                  Colors.black,
+                  Colors.black,
+                  Colors.transparent,
+                ],
+                stops: [0.0, 0.025, 0.975, 1.0],
+              ).createShader(rect);
+            },
+            blendMode: BlendMode.dstIn,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              itemCount: stories.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, i) => _MoodTile(story: stories[i]),
+            ),
           ),
         );
       },
@@ -75,8 +95,8 @@ class _MoodTile extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              width: MoodStoriesStrip._avatarSize + 6,
-              height: MoodStoriesStrip._avatarSize + 6,
+              width: MoodStoriesStrip._avatarSize,
+              height: MoodStoriesStrip._avatarSize,
               padding: const EdgeInsets.all(2),
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
