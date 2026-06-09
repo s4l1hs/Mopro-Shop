@@ -75,10 +75,10 @@ wiring → it did **not** pick up the recent per-screen PLP fixes:
 | ID | Finding (Mopro current → Trendyol) | Source | Confidence | Sev |
 |---|---|---|---|---|
 | **SE-01** | PLP-inheritance is **partial** (shared widgets only; screen-level wiring not ported) — see §2 | src | **CONFIRMED** | — |
-| **SE-02** | **Mobile search has no filter affordance** (`onFilter` unset) → can only sort, not filter, on a phone | src | **CONFIRMED** | **MED** |
-| **SE-03** | No **result count** on the results page ("X ürün") — `SearchState` has no `total` | src | **CONFIRMED** | MED |
-| **SE-04** | Pagination = **load-more button on both** breakpoints (no mobile infinite scroll, no desktop numbered pages) | src | **CONFIRMED** | MED |
-| **SE-05** | Grid uses **flat breakpoints** (`wide ? 5/3 : 2`), not the PLP-19 2/3/4/5 + ultra-wide clamp | src | **CONFIRMED** | LOW |
+| **SE-02** | ~~mobile search has no filter~~ → **RESOLVED** (Session 1): `_shell` wires `onFilter` → `showPlpFilterSheet(plpKey, brands)` on mobile. | src | **RESOLVED** | **MED** |
+| **SE-03** | No **result count** ("X ürün"). **UI wired (Session 1)** — `SearchState.total` (nullable) → `_ResultCount` on both; lights up with the backend `pagination.total` (see Session 2's note). | src | **RESOLVED** (UI) | MED |
+| **SE-04** | ~~load-more on both~~ → **RESOLVED** (Session 1): `SearchState.totalPages` + `goToPage`; `CatalogShell` mounted with `infiniteScroll` (mobile) + numbered pages (desktop). | src | **RESOLVED** | MED |
+| **SE-05** | ~~flat breakpoints~~ → **RESOLVED** (Session 1): `_gridColumns` 2/3/4/5 (mirrors PLP-19). | src | **RESOLVED** | LOW |
 | **SE-06** | Suggestions dropdown = recent + trending + **category** shortcuts; **no brand**, **no product (as-you-type)** suggestions | src | **CONFIRMED** (Trendyol-side PROBABLE) | MED |
 | **SE-07** | No-results = generic `EmptyState.empty()`; **no "did you mean"/spelling correction**, no suggested alternatives | src | **CONFIRMED** (Trendyol-side PROBABLE) | MED |
 | **SE-08** | Results order by the `PlpSort` token (default `recommended`), **not ts_rank relevance** → no relevance ranking | src | **PROBABLE** (backend; confirm) | MED |
