@@ -30,6 +30,8 @@ class ProductCard extends ConsumerWidget {
     this.ratingAvg,
     this.ratingCount = 0,
     this.priceOverride,
+    this.basketDiscountPct,
+    this.isBestseller = false,
   });
 
   final ProductSummary product;
@@ -38,6 +40,13 @@ class ProductCard extends ConsumerWidget {
   final int? discountPct;
   final double? ratingAvg;
   final int ratingCount;
+
+  /// "Sepette %X İndirim" basket-discount: the extra percentage knocked off at
+  /// the cart. Null → no pill (the common case until the backend emits it).
+  final int? basketDiscountPct;
+
+  /// When true, stamps a "Çok Satan" ribbon over the image (Trendyol-style).
+  final bool isBestseller;
 
   /// Flash-deal override: when set, this is shown as the (brand-orange) price
   /// and the product's regular `priceMinor` becomes the strikethrough original
@@ -120,10 +129,25 @@ class ProductCard extends ConsumerWidget {
                       child:
                           _FavoritesCountBadge(count: product.favoritesCount ?? 0),
                     ),
-                  // P-009: free-shipping ("Kargo Bedava") badge — top-left image
-                  // overlay (off the text column so it can't overflow tight cells).
-                  if (product.freeShipping ?? false)
-                    const Positioned(top: 6, left: 6, child: _FreeShippingBadge()),
+                  // Top-left badge stack (off the text column so they can't
+                  // overflow tight cells): the "Çok Satan" bestseller stamp
+                  // (G-3) above the free-shipping ("Kargo Bedava") badge (P-009).
+                  if (isBestseller || (product.freeShipping ?? false))
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isBestseller) const _BestsellerBadge(),
+                          if (isBestseller && (product.freeShipping ?? false))
+                            const SizedBox(height: 4),
+                          if (product.freeShipping ?? false)
+                            const _FreeShippingBadge(),
+                        ],
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -189,6 +213,13 @@ class ProductCard extends ConsumerWidget {
                       color: cs.primary,
                     ),
                   ),
+                  // G-3: "Sepette %X İndirim" basket-discount pill, brand-orange,
+                  // directly under the price. Hidden until a non-null pct is
+                  // passed (backend signal pending).
+                  if (basketDiscountPct != null) ...[
+                    const SizedBox(height: 4),
+                    _BasketDiscountPill(percent: basketDiscountPct!),
+                  ],
                   if (showLowest30d) ...[
                     const SizedBox(height: 2),
                     Text(
@@ -280,6 +311,73 @@ class _FreeShippingBadge extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// "Çok Satan" bestseller stamp — a compact solid brand-orange ribbon over the
+/// image's top-left (G-3). Fixed brand orange + white text reads consistently
+/// over any product photo in both themes (same rationale as _FreeShippingBadge).
+class _BestsellerBadge extends StatelessWidget {
+  const _BestsellerBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: MoproTokens.primaryLight,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.local_fire_department, size: 11, color: Colors.white),
+          const SizedBox(width: 3),
+          Text(
+            'product.bestseller'.tr(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Sepette %X İndirim" basket-discount pill — brand-orange, high-visibility,
+/// directly under the price (G-3). Theme-aware via `cs.primary` (P-005). Lives
+/// in the bounded text column, so the text ellipsizes rather than overflowing
+/// at tight 375dp cells.
+class _BasketDiscountPill extends StatelessWidget {
+  const _BasketDiscountPill({required this.percent});
+  final int percent;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        'product.basket_discount'.tr(namedArgs: {'pct': '$percent'}),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        softWrap: false,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: cs.primary,
+        ),
       ),
     );
   }
