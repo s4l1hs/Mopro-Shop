@@ -111,6 +111,7 @@ Suggested severity is a *hint for the walk*, not a commitment.
 | **HP-04** | Search pill has search + **mic** icon, **no camera/visual-search icon** (`home_screen.dart:322`) | Trendyol search bar has a **camera** (visual search) icon | LOW | top-bar icon (+ visual-search route, likely DEFER) |
 | **HP-05** | **No location/address selector** in the Home header (`_HomeTopBar` = search + coin only) | Trendyol header has a location/address selector | LOW | header chrome (needs address model — likely DEFER) |
 | **HP-06** | ~~**No notification bell** in the Home header~~ → **RESOLVED** (Sprint A): `NotificationBell` mounted in `_HomeTopBar` (mobile) + `WebHeader` (desktop), reusing the Tranche-2a `unreadNotificationCountProvider` + `NotificationBadge`; taps to `/account/notifications`. Always-visible, badge auto-hidden for guests. See `docs/internal/hp06-notification-bell.md`. | Trendyol header has a notifications bell | LOW | **DONE** — header chrome (reused the shipped inbox stack) |
+| **HP-07** | ~~Desktop/tablet product rails were a **static fixed-column grid** (`RailLayout.grid` — 5-col/`maxItems:10` desktop, 3-col/6 tablet), clipping the set with no horizontal scroll~~ → **RESOLVED** (Sprint B): `RailLayout.carousel` — lazy horizontal `ListView.builder` (full set up to `maxItems`) + desktop **hover chevrons** (white circular floating cards, `HoverRegion` fade, slide one viewport, gated at extents). Tablet = scroller without chevrons; mobile scroller untouched. See `docs/internal/sprint-b-rail-carousel.md`. | Trendyol web rails scroll horizontally with left/right hover chevrons | **HIGH** (interaction parity) | **DONE** — `ProductRail` (`product_rail.dart`) |
 
 > **Walk note:** HP-04/05/06 may be **NOT-ACTIONABLE** if Salih decides Mopro's mobile-first
 > bottom-nav IA deliberately omits header chrome — record that call in §6 and reclassify.
@@ -146,7 +147,10 @@ Suggested severity is a *hint for the walk*, not a commitment.
      hidden at count 0). Discovery: docs/internal/hp06-notification-bell.md -->
 
 <!-- ── New findings from the walk (HP-07+) ───────────────────────────────── -->
-<!-- HP-07 … -->
+<!-- HP-07 — RESOLVED in Sprint B (feat/desktop-rail-carousel). Desktop/tablet
+     rails: static grid → horizontal carousel (RailLayout.carousel) with desktop
+     hover chevrons + extent gating; mobile scroller untouched. Discovery:
+     docs/internal/sprint-b-rail-carousel.md -->
 <!-- HP-08 … -->
 
 ---
