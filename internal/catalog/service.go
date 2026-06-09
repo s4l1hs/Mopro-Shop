@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -180,6 +181,36 @@ func (s *catalogService) SearchSummary(ctx context.Context, query, locale, marke
 	}
 	offset := (page - 1) * perPage
 	return s.repo.SearchProductsSummary(ctx, query, locale, filter, offset, perPage)
+}
+
+// Suggest returns structured autocomplete data for the search dropdown (SE-06).
+// Brands come from SuggestBrands; products reuse SearchProductsSummary (top
+// matches, no filter, page 1). A blank query short-circuits to an empty result
+// so the dropdown falls back to recent/trending/categories.
+func (s *catalogService) Suggest(ctx context.Context, query, locale string, brandLimit, productLimit int) (SuggestResult, error) {
+	q := strings.TrimSpace(query)
+	if q == "" {
+		return SuggestResult{Brands: []BrandSuggestion{}, Products: []ProductSummaryRow{}}, nil
+	}
+	if locale == "" {
+		locale = s.defaultLocale
+	}
+	if brandLimit < 1 {
+		brandLimit = 5
+	}
+	if productLimit < 1 {
+		productLimit = 6
+	}
+
+	brands, err := s.repo.SuggestBrands(ctx, q, brandLimit)
+	if err != nil {
+		return SuggestResult{}, err
+	}
+	products, _, err := s.repo.SearchProductsSummary(ctx, q, locale, ProductFilter{}, 0, productLimit)
+	if err != nil {
+		return SuggestResult{}, err
+	}
+	return SuggestResult{Brands: brands, Products: products}, nil
 }
 
 func (s *catalogService) ListAllVariantStocks(ctx context.Context) ([]VariantStock, error) {

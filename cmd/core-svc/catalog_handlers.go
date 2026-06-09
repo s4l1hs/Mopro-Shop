@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/mopro/platform/internal/analytics"
 	"github.com/mopro/platform/internal/catalog"
@@ -179,6 +180,47 @@ func handleSearch(analyticsSvc analytics.Service, svc catalog.Service, defaultLo
 		}
 
 		jsonOK(w, http.StatusOK, buildProductListResponse(rows, total, page, perPage, cashbackCurrency))
+	}
+}
+
+// handleSearchSuggest serves GET /search/suggest?q= (SE-06): structured brand +
+// product autocomplete for the search dropdown. Products reuse the ProductSummary
+// shape (same as /search) so the dropdown can route to PDP; brands route to the
+// brand-filtered listing. Both come from catalog_schema (§5-safe). Limits are
+// small (top brands + top products) — this is a type-ahead surface, not a listing.
+func handleSearchSuggest(svc catalog.Service, defaultLocale, cashbackCurrency string) http.HandlerFunc {
+	const (
+		brandLimit   = 5
+		productLimit = 6
+	)
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := strings.TrimSpace(r.URL.Query().Get("q"))
+		if q == "" {
+			jsonError(w, "q required", http.StatusBadRequest)
+			return
+		}
+		locale := parseLocale(r, defaultLocale)
+
+		res, err := svc.Suggest(r.Context(), q, locale, brandLimit, productLimit)
+		if err != nil {
+			slog.Error("catalog: Suggest", "query", q, "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		products := make([]productSummaryJSON, len(res.Products))
+		for i, p := range res.Products {
+			products[i] = buildProductSummaryJSON(p, cashbackCurrency)
+		}
+		brands := res.Brands
+		if brands == nil {
+			brands = []catalog.BrandSuggestion{}
+		}
+
+		jsonOK(w, http.StatusOK, map[string]any{
+			"brands":   brands,
+			"products": products,
+		})
 	}
 }
 

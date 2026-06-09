@@ -37,6 +37,11 @@ type Service interface {
 	ListProducts(ctx context.Context, locale, market string, filter ProductFilter, page, perPage int) ([]ProductSummaryRow, int, error)
 	SearchSummary(ctx context.Context, query, locale, market string, filter ProductFilter, page, perPage int) ([]ProductSummaryRow, int, error)
 
+	// Suggest returns structured autocomplete data (SE-06): up to brandLimit
+	// brand rows + up to productLimit product summaries matching query, all from
+	// catalog_schema (§5-safe). An empty/blank query yields an empty result.
+	Suggest(ctx context.Context, query, locale string, brandLimit, productLimit int) (SuggestResult, error)
+
 	// ListProductsByIDs fetches product summaries for the given IDs (guest favorites, batch hydration).
 	ListProductsByIDs(ctx context.Context, ids []int64, locale, market string) ([]ProductSummaryRow, error)
 
@@ -96,6 +101,10 @@ type Repository interface {
 	ListProductsByCategory(ctx context.Context, categoryID int64, locale string, filter ProductFilter, offset, limit int) ([]ProductSummaryRow, int, error)
 	ListProducts(ctx context.Context, locale string, filter ProductFilter, offset, limit int) ([]ProductSummaryRow, int, error)
 	SearchProductsSummary(ctx context.Context, query, locale string, filter ProductFilter, offset, limit int) ([]ProductSummaryRow, int, error)
+	// SuggestBrands returns up to limit distinct active-product brands whose name
+	// prefix-matches query (case-insensitive), ordered by product count desc.
+	// Single-schema (catalog_schema.products) — §5-safe.
+	SuggestBrands(ctx context.Context, query string, limit int) ([]BrandSuggestion, error)
 
 	ListProductsByIDs(ctx context.Context, ids []int64, locale string) ([]ProductSummaryRow, error)
 	HomeRails(ctx context.Context) ([]HomeRailRow, error)

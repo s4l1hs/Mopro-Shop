@@ -580,6 +580,40 @@ func (r *pgxRepository) SearchProductsSummary(ctx context.Context, query, locale
 	return scanProductSummaries(rows, "search summary")
 }
 
+// SuggestBrands returns distinct active-product brands whose name prefix-matches
+// query (case-insensitive), ordered by product count desc then name (SE-06).
+// Single-schema (catalog_schema.products) — no cross-schema JOIN (§5).
+func (r *pgxRepository) SuggestBrands(ctx context.Context, query string, limit int) ([]BrandSuggestion, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT p.brand, count(*)::int AS product_count
+		 FROM catalog_schema.products p
+		 WHERE p.status = 'active'
+		   AND p.brand <> ''
+		   AND p.brand ILIKE $1 || '%'
+		 GROUP BY p.brand
+		 ORDER BY product_count DESC, p.brand ASC
+		 LIMIT $2`,
+		query, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: SuggestBrands: %w", err)
+	}
+	defer rows.Close()
+
+	out := []BrandSuggestion{}
+	for rows.Next() {
+		var b BrandSuggestion
+		if err := rows.Scan(&b.Name, &b.ProductCount); err != nil {
+			return nil, fmt.Errorf("catalog.repo: SuggestBrands scan: %w", err)
+		}
+		out = append(out, b)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("catalog.repo: SuggestBrands rows: %w", err)
+	}
+	return out, nil
+}
+
 func (r *pgxRepository) GetVariantByID(ctx context.Context, variantID int64) (Variant, error) {
 	var v Variant
 	err := r.pool.QueryRow(ctx,

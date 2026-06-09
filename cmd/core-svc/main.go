@@ -480,6 +480,9 @@ func main() {
 	mux.Handle("GET /search",
 		httpTrace(http.HandlerFunc(handleSearch(analyticsSvc, catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)
+	mux.Handle("GET /search/suggest",
+		httpTrace(http.HandlerFunc(handleSearchSuggest(catalogSvc, defaultLocale, cashbackCurrency))),
+	)
 	mux.Handle("GET /banners",
 		httpTrace(http.HandlerFunc(handleListBanners())),
 	)

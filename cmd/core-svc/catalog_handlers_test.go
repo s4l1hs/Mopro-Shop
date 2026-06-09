@@ -71,6 +71,10 @@ func (s *stubCatalogSvc) ListProducts(_ context.Context, _, _ string, filter cat
 func (s *stubCatalogSvc) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
+
+func (s *stubCatalogSvc) Suggest(_ context.Context, _, _ string, _, _ int) (catalog.SuggestResult, error) {
+	return catalog.SuggestResult{}, nil
+}
 func (s *stubCatalogSvc) ListProductsByIDs(_ context.Context, ids []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {
 	if s.listByIDsFn != nil {
 		return s.listByIDsFn(ids)

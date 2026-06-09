@@ -19,6 +19,7 @@ type mockRepo struct {
 	getCommissionFn     func(ctx context.Context, market string, categoryID int64) (catalog.CategoryCommission, error)
 	isCurrencyActiveFn  func(ctx context.Context, code string) (bool, error)
 	getVariantByIDFn    func(ctx context.Context, variantID int64) (catalog.Variant, error)
+	suggestBrandsFn     func(ctx context.Context, query string, limit int) ([]catalog.BrandSuggestion, error)
 }
 
 func (m *mockRepo) InsertProduct(ctx context.Context, p catalog.Product) (catalog.Product, error) {
@@ -298,6 +299,52 @@ func TestSearch_ExplicitLocale(t *testing.T) {
 	}
 }
 
+func TestSuggest_BrandsAndProducts(t *testing.T) {
+	var brandQuery string
+	repo := &mockRepo{
+		suggestBrandsFn: func(_ context.Context, query string, _ int) ([]catalog.BrandSuggestion, error) {
+			brandQuery = query
+			return []catalog.BrandSuggestion{{Name: "Elbisem", ProductCount: 3}}, nil
+		},
+		// mockRepo.SearchProductsSummary returns one row for the query "elbise".
+	}
+
+	res, err := newTestService(repo).Suggest(context.Background(), "  elbise  ", "", 5, 6)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Query is trimmed before reaching the repo.
+	if brandQuery != "elbise" {
+		t.Errorf("expected trimmed brand query %q, got %q", "elbise", brandQuery)
+	}
+	if len(res.Brands) != 1 || res.Brands[0].Name != "Elbisem" {
+		t.Errorf("expected 1 brand suggestion Elbisem, got %+v", res.Brands)
+	}
+	if len(res.Products) != 1 || res.Products[0].Title != "Kırmızı Elbise" {
+		t.Errorf("expected 1 product suggestion, got %+v", res.Products)
+	}
+}
+
+func TestSuggest_BlankQueryShortCircuits(t *testing.T) {
+	called := false
+	repo := &mockRepo{
+		suggestBrandsFn: func(_ context.Context, _ string, _ int) ([]catalog.BrandSuggestion, error) {
+			called = true
+			return nil, nil
+		},
+	}
+	res, err := newTestService(repo).Suggest(context.Background(), "   ", "tr-TR", 5, 6)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if called {
+		t.Error("blank query must not hit the repo")
+	}
+	if len(res.Brands) != 0 || len(res.Products) != 0 {
+		t.Errorf("expected empty result, got %+v", res)
+	}
+}
+
 func TestAddVariant_CurrencyCheckError(t *testing.T) {
 	dbErr := errors.New("pg: connection error")
 	repo := &mockRepo{
@@ -413,6 +460,13 @@ func (m *mockRepo) ListProductsByCategory(_ context.Context, _ int64, _ string, 
 }
 func (m *mockRepo) ListProducts(_ context.Context, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return []catalog.ProductSummaryRow{}, 0, nil
+}
+
+func (m *mockRepo) SuggestBrands(ctx context.Context, query string, limit int) ([]catalog.BrandSuggestion, error) {
+	if m.suggestBrandsFn != nil {
+		return m.suggestBrandsFn(ctx, query, limit)
+	}
+	return nil, nil
 }
 
 func (m *mockRepo) SearchProductsSummary(_ context.Context, query, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {

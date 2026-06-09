@@ -161,6 +161,23 @@ type ProductFilter struct {
 	PopularIDs []int64
 }
 
+// BrandSuggestion is a single brand autocomplete row (SE-06): the brand name
+// plus how many active products carry it (drives ordering + an optional count
+// label). Brand is the plain `catalog_schema.products.brand` column — there is
+// no brand entity; a tapped suggestion routes to the brand-filtered listing.
+type BrandSuggestion struct {
+	Name         string `json:"name"`
+	ProductCount int    `json:"product_count"`
+}
+
+// SuggestResult is the structured autocomplete payload (SE-06): brand rows plus
+// a short list of matching product summaries. Both are sourced from
+// catalog_schema alone (no cross-schema JOIN — CLAUDE.md §5).
+type SuggestResult struct {
+	Brands   []BrandSuggestion
+	Products []ProductSummaryRow
+}
+
 // CategoryCommission holds the currently active commission + KDV rates for a
 // market/category pair, read from ref_schema.commission_rules.
 type CategoryCommission struct {
