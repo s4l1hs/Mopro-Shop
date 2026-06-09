@@ -39,8 +39,7 @@ class CatalogHomeScreen extends ConsumerWidget {
     // rails. Tablet/desktop center content in a CenteredContentColumn and
     // render rails as grids.
     final isMobile = context.isMobile;
-    final railLayout = isMobile ? RailLayout.scroller : RailLayout.grid;
-    final gridColumns = context.isDesktop ? 5 : 3;
+    final railLayout = isMobile ? RailLayout.scroller : RailLayout.carousel;
     final maxItems = context.isDesktop ? 10 : 6;
 
     // Center + clamp + pad non-mobile sections; pass through on mobile so the
@@ -53,7 +52,6 @@ class CatalogHomeScreen extends ConsumerWidget {
           sort: sort,
           seeAllRoute: '/categories',
           layout: railLayout,
-          gridColumns: gridColumns,
           maxItems: maxItems,
         );
 
@@ -198,7 +196,7 @@ class _EditorsPicksSection extends StatelessWidget {
         child: ProductRail(
           title: 'home.editors_picks'.tr(),
           sort: 'bestseller',
-          layout: RailLayout.grid,
+          layout: RailLayout.carousel,
           maxItems: 6,
         ),
       ),
