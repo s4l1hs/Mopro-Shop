@@ -60,7 +60,7 @@
 
 - Trendyol's deep, **category-aware** attribute stack (storage/RAM/screen/colour/condition/camera…). Mopro has **no normalized attribute/facet model**: only `catalog_schema.variants.color/size` (structured but **not** filter params + sparse) and `catalog_schema.products.specs` (**opaque per-category JSONB**, no facet schema/index). No facet-aggregation (values+counts) surface.
 - **Verdict: Outcome C — DEFER** (per the batch discovery). Building JSONB-key faceting on opaque `specs` = a fragile attribute store (anti-goal). The real fix is a **schema/data-modeling track**: a normalized product-attribute model + per-category facet config + an aggregation endpoint (mirror brand/rating) + filter params + accordion UI.
-- Not built. Tracked for a dedicated backend design + PR. See `docs/internal/plp-batch.md`.
+- **Design (Track D) ready:** `docs/internal/plp-13-attribute-model.md` — `attribute_keys` / `category_facets` / `product_attributes` (catalog_schema, §5-safe), a brand/rating-style facet aggregation, accordion UI reusing `PlpBrandFacet`, and a **4-phase plan**. Even Phase 1 (schema + backfill `renk`/`depolama` + one facet + UI) is a full vertical → each phase is its own scoped PR. Build DEFER'd.
 
 ---
 
