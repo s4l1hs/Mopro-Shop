@@ -440,14 +440,17 @@ class _BannerCarouselState extends ConsumerState<_BannerCarousel> {
                 left: 0,
                 right: 0,
                 child: Center(
+                  // Trendyol-style pill dots: inactive dots, active expands to a
+                  // brand-colored pill. (Replaces the former worm effect.)
                   child: AnimatedSmoothIndicator(
                     activeIndex: _page,
                     count: banners.length,
-                    effect: WormEffect(
-                      dotWidth: 7,
-                      dotHeight: 7,
-                      activeDotColor: Colors.white,
-                      dotColor: Colors.white.withAlpha(128),
+                    effect: ExpandingDotsEffect(
+                      dotWidth: 6,
+                      dotHeight: 6,
+                      spacing: 4,
+                      activeDotColor: Theme.of(context).colorScheme.primary,
+                      dotColor: Colors.white.withAlpha(140),
                     ),
                   ),
                 ),
