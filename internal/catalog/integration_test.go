@@ -125,10 +125,12 @@ CREATE TABLE catalog_schema.products (
     default_currency TEXT         NOT NULL DEFAULT 'TRY',
     default_locale   TEXT         NOT NULL DEFAULT 'tr-TR',
     status           TEXT         NOT NULL DEFAULT 'draft',
-    -- additive display/filter columns (migrations 0065 + 0081)
-    rating_avg       NUMERIC(2,1),
-    rating_count     INT          NOT NULL DEFAULT 0,
-    free_shipping    BOOLEAN      NOT NULL DEFAULT FALSE,
+    -- additive display/filter columns (migrations 0065 + 0081 + 0087)
+    rating_avg          NUMERIC(2,1),
+    rating_count        INT          NOT NULL DEFAULT 0,
+    free_shipping       BOOLEAN      NOT NULL DEFAULT FALSE,
+    is_bestseller       BOOLEAN      NOT NULL DEFAULT FALSE,
+    basket_discount_pct SMALLINT,
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ  NOT NULL DEFAULT now()
 );

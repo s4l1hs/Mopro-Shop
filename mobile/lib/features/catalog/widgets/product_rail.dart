@@ -94,6 +94,8 @@ class ProductRail extends ConsumerWidget {
                     width: 152,
                     child: ProductCard(
                       product: p,
+                      isBestseller: p.isBestseller ?? false,
+                      basketDiscountPct: p.basketDiscountPct,
                       onTap: () => context.push('/products/${p.id}'),
                     ),
                   );
@@ -139,6 +141,8 @@ class _RailGrid extends StatelessWidget {
           final p = items[i];
           return ProductCard(
             product: p,
+            isBestseller: p.isBestseller ?? false,
+            basketDiscountPct: p.basketDiscountPct,
             onTap: () => context.push('/products/${p.id}'),
           );
         },

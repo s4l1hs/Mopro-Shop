@@ -127,6 +127,12 @@ type ProductSummaryRow struct {
 	RatingCount        int
 	FreeShipping       bool // products.free_shipping flag (P-028 column) — P-009 badge
 	FavoritesCount     int  // count of user_favorites rows for this product (P-004)
+	// IsBestseller backs the "Çok Satan" card stamp; BasketDiscountPct backs the
+	// "Sepette %X İndirim" pill (G-3). Sourced from products.is_bestseller /
+	// products.basket_discount_pct (migration 0087). BasketDiscountPct is nil when
+	// unset → no pill.
+	IsBestseller      bool
+	BasketDiscountPct *int
 	// Lowest30dPriceMinor is MIN(variant price) over the product's price history
 	// in the last 30 days (P-030, TR 6502 / EU Omnibus). Nil when no history rows
 	// in window. Today it equals PriceMinor for every product (prices are immutable

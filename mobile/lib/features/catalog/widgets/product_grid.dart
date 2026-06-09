@@ -28,6 +28,8 @@ class ProductGrid extends StatelessWidget {
       itemCount: products.length,
       itemBuilder: (_, i) => ProductCard(
         product: products[i],
+        isBestseller: products[i].isBestseller ?? false,
+        basketDiscountPct: products[i].basketDiscountPct,
         onTap: () => onProductTap(products[i]),
       ),
     );

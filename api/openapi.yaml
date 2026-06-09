@@ -2491,6 +2491,19 @@ components:
           description: |
             Number of users who favorited this product — social proof by the
             heart on the card / PDP (P-004). Zero when none.
+        is_bestseller:
+          type: boolean
+          default: false
+          description: |
+            When true, render the "Çok Satan" bestseller stamp on the card (G-3).
+            Sourced from the products.is_bestseller flag.
+        basket_discount_pct:
+          type: integer
+          nullable: true
+          description: |
+            Extra discount percentage applied at the basket — renders the
+            "Sepette %X İndirim" pill (G-3). Omitted when null (no pill).
+            Sourced from the products.basket_discount_pct column.
         lowest_30d_price_minor:
           type: integer
           format: int64

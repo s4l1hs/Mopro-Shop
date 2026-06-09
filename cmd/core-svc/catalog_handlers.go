@@ -406,6 +406,12 @@ type productSummaryJSON struct {
 	FreeShipping   bool `json:"free_shipping"`
 	FavoritesCount int  `json:"favorites_count"`
 
+	// IsBestseller drives the "Çok Satan" stamp; BasketDiscountPct drives the
+	// "Sepette %X İndirim" pill (G-3). IsBestseller is always emitted (false when
+	// absent); BasketDiscountPct is omitted when null (no pill).
+	IsBestseller      bool `json:"is_bestseller"`
+	BasketDiscountPct *int `json:"basket_discount_pct,omitempty"`
+
 	// Lowest30dPriceMinor is the lowest price in the last 30 days (P-030, TR 6502 /
 	// EU Omnibus). The frontend shows "30 günün en düşük fiyatı" only when it is
 	// below PriceMinor — today it equals PriceMinor for every product (prices are
@@ -445,6 +451,8 @@ func buildProductSummaryJSON(r catalog.ProductSummaryRow, cashbackCurrency strin
 		RatingCount:         r.RatingCount,
 		FreeShipping:        r.FreeShipping,
 		FavoritesCount:      r.FavoritesCount,
+		IsBestseller:        r.IsBestseller,
+		BasketDiscountPct:   r.BasketDiscountPct,
 		Lowest30dPriceMinor: r.Lowest30dPriceMinor,
 		CashbackPreview: cashbackPreviewJSON{
 			MonthlyCoinMinor: monthlyMinor,
