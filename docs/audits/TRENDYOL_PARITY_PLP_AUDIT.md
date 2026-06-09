@@ -1,163 +1,195 @@
 # Trendyol Parity Audit — PLP / Category-Browse
 
-> **Audit only — no code changed.** Self-audit of the current PLP
-> (product-grid-with-filters reached from the category pucks and from search)
-> against a **provisional** ~May-2025 Trendyol baseline. The baseline is a
-> checklist, **not truth** — every row is "confirm against live" in Salih's walk.
-> Sibling of `TRENDYOL_PARITY_HOME_AUDIT.md`; findings use the #09 format.
+> **Canonical PLP registry — audit-doc only, no code.** One stable ID per finding,
+> each tagged with **evidence source** + **confidence**. Reconciles the original
+> #139 audit, Salih's Part-3 contract, and the markup reads (Claude Code + Cowork
+> fetch of the homepage + `/cep-telefonu-x-c103498`). `/sr` search is bot-blocked
+> (403) → search-specific behavior needs Salih's eyes, not markup.
 >
-> **Surface under audit:** `CategoryProductsScreen`
-> (`lib/features/catalog/screens/category_products_screen.dart`) + its substrate:
-> `CatalogShell`, `FilterPanel` (desktop sidebar), `FilterSheet` (mobile sheet),
-> `PlpFilterChips`, `sort_sheet.dart`, `PlpFilters`/`filtered_products_provider`.
-> The same shell + `FilterPanel` back **SearchScreen** (filters cascade to the
-> later search audit — `FilterPanel.showCategoryTree=false` there).
+> **Surface:** `CategoryProductsScreen` + `CatalogShell` · `FilterPanel` (desktop
+> sidebar) · `FilterSheet`/`PlpFilterSheet` (mobile) · `PlpFilterChips` ·
+> `sort_sheet` · `PlpFilters`/`filtered_products_provider`. The same shell +
+> `FilterPanel` back **SearchScreen** (these patterns cascade to the search audit).
 
 ---
 
-## §1 — Summary (provisional, pre-walk)
+## §0 — Evidence + confidence legend
 
-- **PROBABLE deltas: 11** (PLP-01…PLP-11) — mostly **mobile/desktop filter
-  parity** (mobile sheet is a subset) + **load-more vs infinite-scroll** +
-  missing chrome (result count, breadcrumb, quick pills). None are structural;
-  the desktop PLP is already Trendyol-shaped.
-- **NOT-ACTIONABLE (intentional / Mopro PLUS): 4** (D1–D4).
-- **Already-matched (VERIFIED from source): ~10** — desktop sidebar
-  (searchable brands, price slider+fields, rating buckets, free-shipping, clear-
-  all), 6-option sort (dropdown + sheet), responsive grid reusing the parity'd
-  card, removable applied-chips (desktop), load-more w/ spinner+retry, empty +
-  error states, live (no-apply) filtering, URL-synced shareable filters.
-- **Highest-value-if-confirmed:** PLP-01 (mobile can't filter by brand/rating)
-  and PLP-03 (manual load-more vs infinite scroll). Both interaction parity.
-- **Seed caveat (see §5):** global facet variety is rich, but **per-category
-  density is 2–3 products** — a single category PLP can't meaningfully exercise
-  the filters during the walk without an aggregating parent or a seed bump.
+- **Source tag** — `src` (Mopro code fact) · `walk` (Salih, mobile/visual) ·
+  `markup` (Trendyol desktop SSR, **structural** only — not rendered pixels).
+- **Confidence** — **CONFIRMED** (structural fact via markup or walk) ·
+  **PROBABLE** (visual/interaction — awaiting Salih's visual walk) ·
+  **RESOLVED** (shipped) · **NOT-ACTIONABLE** (intentional divergence).
+- **Rule:** markup CONFIRMS *structural* facts (a control/element exists) but
+  **never** promotes a *visual/interaction* finding to CONFIRMED (markup ≠ pixels).
 
 ---
 
-## §2 — Self-audit table (Mopro-current vs provisional baseline)
+## §1 — Summary
 
-| Baseline item | Mopro current (from source) | Delta | Status |
+- **RESOLVED: 2** — PLP-01 (mobile brand/rating facets), PLP-03 (mobile infinite
+  scroll). Shipped in PR #142.
+- **CONFIRMED (structural, markup/walk): 7** — PLP-04 (result count), PLP-05
+  (breadcrumb), PLP-12 (subtree rollup, **HIGH**, backend), PLP-13 (attribute
+  facets, **HIGH**), PLP-14 (price-history filter), PLP-15 (desktop numbered
+  pages), PLP-09 (fast-delivery).
+- **PROBABLE (await visual walk): 8** — PLP-02, PLP-06, PLP-07 (softened), PLP-08,
+  PLP-10, PLP-18, PLP-19, PLP-20, + the unnumbered visual bucket (§9).
+- **NEW from markup: 5** — PLP-13, PLP-14, PLP-15, PLP-16, PLP-17.
+- **NOT-ACTIONABLE (intentional / Mopro PLUS): 4** — D1–D4 (§5).
+- **CONFIRMED-HIGH fix queue:** §8.
+
+---
+
+## §2 — Canonical ID map (drift resolution — nothing lost)
+
+This doc's **PLP-01…PLP-12 are canonical** (they're the published registry + the
+IDs PR #142 shipped against). New findings take **PLP-13…PLP-20**. Aliases:
+
+| Canonical | Finding | Prior / alias IDs |
+|---|---|---|
+| **PLP-01** | mobile sheet: brand + rating facets (RESOLVED) | audit PLP-01; **contract "PLP-25"** (bundled with PLP-03) |
+| **PLP-03** | mobile pagination: infinite scroll (RESOLVED) | audit PLP-03; **contract "PLP-25"** |
+| **PLP-04** | no visible result count | audit PLP-04 |
+| **PLP-05** | no visible breadcrumb | audit PLP-05 |
+| **PLP-07** | brand-facet counts (softened) | audit PLP-07 |
+| **PLP-12** | no subtree rollup | ledger §4 PLP-12 |
+| **PLP-18** | sticky desktop sidebar | **contract/ledger "PLP-02"** ⚠ |
+| **PLP-19** | ultra-wide grid breakpoints | **contract/ledger "PLP-05"** ⚠ |
+| **PLP-20** | sticky mobile sort/filter bar | **contract/ledger "PLP-07"** ⚠ |
+
+> **⚠ The PLP-02/05/07 collision (resolved):** Salih's contract/ledger reused
+> `PLP-02/05/07` for *sticky-sidebar / ultra-wide-grid / sticky-mobile-bar*, which
+> already mean *chips / breadcrumb / brand-counts* in this audit. To keep **one
+> meaning per ID**, the contract's three findings are re-numbered **PLP-18/19/20**
+> here; the audit's PLP-02 (chips), PLP-05 (breadcrumb — markup-CONFIRMED), PLP-07
+> (counts) keep their numbers. **`CUTOVER_LEDGER.md §7` updated to match.**
+> *Discovery shift to confirm with Salih: this picks the audit's numbering as
+> canonical for 02/05/07.*
+
+---
+
+## §3 — Findings registry (canonical)
+
+| ID | Finding (Mopro current → Trendyol) | Source | Confidence | Sev |
+|---|---|---|---|---|
+| **PLP-01** | ~~mobile sheet had no brand/rating~~ → searchable Brand + Rating accordions added | src+walk | **RESOLVED** (#142) | HIGH |
+| **PLP-03** | ~~mobile load-more button~~ → infinite scroll (150px, gated) | walk | **RESOLVED** (#142) | HIGH |
+| **PLP-04** | `pagination.total` returned but **not shown** → Trendyol shows a prominent count (e.g. "3966+ Ürün") | markup | **CONFIRMED** | MED |
+| **PLP-05** | breadcrumb is **JSON-LD only** → Trendyol shows a visible trail (`Trendyol › Elektronik › … › Cep Telefonu`) | markup | **CONFIRMED** | MED |
+| **PLP-06** | no predefined quick-filter pills above the grid | src | **PROBABLE** | LOW |
+| **PLP-07** | brand facet has no counts + derived from the loaded page | src; markup **inconclusive** (counts not in SSR) | **PROBABLE** (softened) | LOW |
+| **PLP-08** | no-results state (`EmptyState.empty()`) has no clear-filters CTA | src | **PROBABLE** | LOW |
+| **PLP-09** | no **fast-delivery** filter toggle (only free-cargo) → Trendyol has "Hızlı Teslimat" | src+markup | **CONFIRMED** (structural) | LOW–MED |
+| **PLP-10** | no search bar in the PLP header (title + share only) | src | **PROBABLE** | LOW |
+| **PLP-11** | in-stock toggle on mobile sheet but missing from the desktop sidebar (Mopro-internal) | src | **PROBABLE** | LOW |
+| **PLP-12** | exact-`category_id` scoping (`repository.go:373`) → parent/root PLPs empty; **Trendyol rolls the subtree up** (multi-brand under one category, subcats as filters) | markup | **CONFIRMED** | **HIGH** (backend — ledger §4) |
+| **PLP-13** 🆕 | **no attribute/variant facets** → Trendyol has a deep stack (storage, RAM, screen, colour, NFC, camera, condition/refurb, campaign, seller-type…) | markup | **CONFIRMED** | **HIGH** |
+| **PLP-14** 🆕 | **no price-history *filter*** → Trendyol "Fiyat Geçmişi" (last 10/14/30 days). *Distinct from Mopro's on-card lowest-30d.* | markup | **CONFIRMED** | MED |
+| **PLP-15** 🆕 | desktop pagination = **numbered pages** on Trendyol (`1 [2] … [121]`), Mopro uses a load-more button. *Split from PLP-03 (mobile).* | markup | **CONFIRMED** | MED |
+| **PLP-16** 🆕 | **ranked** bestseller / most-visited badge ("En Çok Satan 1. Ürün") — Mopro has an unranked bestseller stamp | markup | markup-observed | MED |
+| **PLP-17** 🆕 | **official-seller** badge ("Resmi satıcı rozeti") / seller-type chips — Mopro has none | markup | markup-observed | LOW |
+| **PLP-18** | non-sticky desktop filter sidebar → Trendyol sidebar pins on scroll | walk | **PROBABLE** | MED |
+| **PLP-19** | grid doesn't add columns at ultra-wide breakpoints (caps at 5) | walk | **PROBABLE** | MED |
+| **PLP-20** | mobile sort/filter bar scrolls away (not sticky) | walk | **PROBABLE** | LOW |
+
+> Visual-only items (mobile filter-sheet styling, hover chevrons, banner-indicator
+> style, exact colours/spacing) stay **PROBABLE** in the §9 bucket — markup can't
+> confirm pixels.
+
+---
+
+## §4 — Self-audit cross-check (Mopro source vs Trendyol)
+
+| Area | Mopro (source) | Trendyol | Finding |
 |---|---|---|---|
-| **Filters — desktop sidebar** (category, brand searchable, price, rating, attrs, free-cargo/fast-delivery; apply + clear-all; live count) | `FilterPanel`: category tree, **searchable brand list** (search box + show-more >8), price **RangeSlider + min/max fields**, rating (All/4+/3+/2+), free-shipping switch, clear-all + (no-op) apply. Live-applied via URL. | **No fast-delivery** toggle (only free-cargo); **no in-stock** in the desktop panel (it's in the model + mobile only → PLP-11); **no brand counts** (PLP-07); no attribute/variant facets | **PROBABLE** (mostly matched) |
-| **Filters — mobile bottom-sheet** (same set as desktop) | ~~`FilterSheet`: price/free-ship/in-stock only~~ → **RESOLVED (PLP-01)**: provider-backed sheet now has **searchable Brand + Rating accordions** (shared `PlpBrandFacet`/`PlpRatingFacet` extracted from the desktop sidebar) + price/free-ship/in-stock, all live-applied to `plpFiltersProvider`. | ~~mobile is a strict subset~~ — closed | **RESOLVED** — `filter_sheet.dart` (`docs/internal/plp-01-03.md`) |
-| **Applied-filter chips** (removable, above grid) | `PlpFilterChips`: one removable `InputChip` per active filter + clear-all (≥2). **Desktop `_buildWide` only.** | Mobile shows a filter-count **badge** on the bar, **no removable chips** | **PROBABLE** — **PLP-02** |
-| **Quick-filter pills** above the grid | None (applied-chips ≠ predefined quick pills) | No one-tap common-filter pills | **PROBABLE** — **PLP-06** (LOW) |
-| **Sort** — dropdown: recommended, price ↑/↓, newest, bestseller, rating | `PlpSort`: recommended, bestseller, newest, price_asc, price_desc, **cashback_desc**. Desktop `PopupMenuButton` + mobile `sort_sheet`. | **No "rating" sort**; **cashback_desc** added (brand → D1) | **PROBABLE** (near-match) |
-| **Grid** — 2-col mobile / multi-col desktop, parity'd card | `ProductGrid` via `CatalogShell`: **2 mobile / 3 tablet / 5 desktop**, reuses `ProductCard` (badges / "Sepette %X" pill / rating / bestseller) | Matches | **NOT-ACTIONABLE** (matched) |
-| **Result count** + breadcrumbs | `pagination.total` **is returned** but **not surfaced**; no count text. Breadcrumb is **JSON-LD only** (SEO) — no visible UI; AppBar shows the category title | No visible count (**PLP-04**); no visible breadcrumb (**PLP-05**) | **PROBABLE** (LOW each) |
-| **Pagination** — infinite scroll (mobile) / load-more (desktop) | ~~Manual "Load more" button on both~~ → **RESOLVED (PLP-03)**: **mobile auto-loads** page N+1 within 150px of the bottom (`CatalogShell.infiniteScroll`, gated by `hasMore && !loadingMore`, no double-fetch); button hidden on mobile, spinner + error/retry kept. **Desktop keeps the button** (numbered-pages parity is PLP-NN, separate). | mobile infinite scroll — closed | **RESOLVED** — `catalog_shell.dart` |
-| **Empty / no-results** with suggestions or reset | `EmptyState.empty()` — message only; `onAction` **not wired** | No **clear-filters** CTA in the zero-results state | **PROBABLE** — **PLP-08** (LOW) |
-| **Header** — search bar + category title | AppBar: category **title** + **share** button. No search bar on the PLP. | No in-PLP search affordance | **PROBABLE** — **PLP-10** (LOW) |
+| Desktop sidebar | category tree, searchable brands, price slider+fields, rating, free-ship, clear-all | + **deep attribute facets**, price-history, seller-type, campaign | PLP-13/14/09 |
+| Mobile filters | Brand+Rating+price+free-ship+in-stock (RESOLVED) | full set | PLP-01 ✅ |
+| Chips | removable, **desktop only** | applied chips on both | PLP-02 |
+| Sort | 6 opts incl. `cashback_desc`; no rating-sort | recommended/price/newest/bestseller/rating | near-match (D1) |
+| Grid | 2/3/5 cols, parity'd card | ~4–5 cols + ranked/seller badges | PLP-16/17/19 |
+| Count / breadcrumb | `total` unused; JSON-LD only | visible count + trail | PLP-04/05 |
+| Pagination | load-more (both) → mobile infinite (RESOLVED) | mobile infinite / **desktop numbered pages** | PLP-03 ✅ / PLP-15 |
+| Empty | message only | suggestions/reset | PLP-08 |
+| Header | title + share, no search | search bar present | PLP-10 |
+| Category scope | exact `category_id` | subtree rollup | PLP-12 |
 
 ---
 
-## §3 — Intentional divergences (NOT-ACTIONABLE — do not flag as gaps)
+## §5 — Intentional divergences (NOT-ACTIONABLE — do not flag)
 
-- **D1 — Cashback sort + cashback-only filter.** `cashback_desc` sort and the
-  (disabled) cashback-only toggle are Mopro's perpetual-cashback model, not a
-  Trendyol miss. The cashback filter is intentionally vacuous (every product
-  earns cashback — P-028) with an explanatory hint.
-- **D2 — URL-synced, shareable/deep-linkable filters + SEO.** `PlpFiltersCodec`
-  round-trips all filters to/from the query string; `SeoHead` + JSON-LD
-  breadcrumb/structured-data. A Mopro **PLUS** beyond the baseline.
-- **D3 — Brand-orange active tokens** (`colorScheme.primary`) on selected
-  filters/sort — the Mopro brand token, not a parity defect.
+- **D1 — Cashback sort + cashback-only filter** (perpetual-cashback model; the
+  cashback toggle was intentionally vacuous — removed in PLP-01, P-028).
+- **D2 — URL-synced, shareable/deep-linkable filters + SEO** (`PlpFiltersCodec`,
+  `SeoHead`, JSON-LD) — a Mopro **PLUS** beyond the baseline.
+- **D3 — Brand-orange active tokens** (`colorScheme.primary`).
 - **D4 — Share button on the PLP** (`MoproShareButton`) — additive.
 
 ---
 
-## §4 — Already-matched (VERIFIED from source — re-open only if the walk disagrees)
+## §6 — Already-matched (VERIFIED from source)
 
-Desktop sidebar (category tree, **searchable** brand list, price slider+fields,
-rating buckets, free-shipping, clear-all) · 6-option **sort** (desktop dropdown +
-mobile sheet) · responsive **grid** (2/3/5) reusing the parity'd `ProductCard` ·
-**removable applied-chips** + clear-all (desktop) · **load-more** with
-spinner + error-retry · **empty + error** states · **live filtering** (no manual
-apply needed) · **URL-synced** filter state.
-
----
-
-## §5 — Seed-facet adequacy (for the walk)
-
-- **Global variety is rich:** `scripts/seed/data/products.json` = **50 products,
-  25 distinct brands** (Nike, Adidas, Apple, Samsung, Sony, Koton, LC Waikiki,
-  Dyson, IKEA, …), **11 distinct rating values**, price spread **₺89 → ₺89,999**.
-- **But the PLP is category-scoped and per-category density is 2–3 products**
-  (max 3: `spor-fitness`, `moda-ayakkabi`, `kozmetik-cilt`, `elektr-kea`). Within
-  one leaf category the searchable brand list (designed for >8 brands), the price
-  RangeSlider, and the rating buckets have **almost nothing to act on**.
-- **RESOLVED (PLP-SEED, `chore/plp-seed-density`):** the PLP scopes by **exact
-  `category_id` — no subtree rollup** (`repository.go:373`), so option (a) is out
-  (and is itself a finding → **PLP-12**). Shipped option (b) as a dev-only
-  idempotent `scripts/seed/data/plp-density-extras.sql` that concentrates **~28
-  existing SKUs into `elektr-kea` ("Küçük Ev Aletleri")** + spreads ratings + sets
-  free-shipping. **Walk category: `elektr-kea`** — verified **28 products / 23
-  brands / rating buckets 2+/3+/4+ distinct / ₺89–₺89,999 / free-ship populated**.
-  Apply: `psql … < scripts/seed/data/plp-density-extras.sql` after `make seed`.
-  See `docs/internal/plp-seed-density.md`.
-
-- **PLP-12 (new finding — no subtree rollup):** because product scoping is exact
-  `category_id`, **parent/root category PLPs are empty** (the 6 roots
-  `root-elektronik` … have zero direct products — products live on leaves).
-  Trendyol rolls a category's whole subtree into the PLP. **PROBABLE** (MED?) —
-  confirm in the walk; **not built here** (would be a backend change).
+Desktop sidebar (category tree, **searchable** brands, price slider+fields, rating
+buckets, free-shipping, clear-all) · 6-option **sort** (dropdown + sheet) ·
+responsive **grid** (2/3/5) reusing the parity'd `ProductCard` (incl. "Sepette %X"
+pill + bestseller stamp) · **removable applied-chips** (desktop) · **load-more**
+w/ spinner+retry · **empty + error** states · **live filtering** · **URL-synced**
+state · **mobile brand/rating facets + infinite scroll** (PLP-01/03).
 
 ---
 
-## §6 — Walk-findings slots (Salih — paste live-Trendyol observations here)
+## §7 — Seed-facet adequacy (RESOLVED — for the walk)
 
-> One block per observation. On confirming a §2 row, set its **Status** to
-> CONFIRMED + **Severity**; add new items as PLP-12, PLP-13, …. Mark anything the
-> walk decides is intentional **NOT-ACTIONABLE** + why. Severity only when CONFIRMED.
+Global variety is rich (50 products / 25 brands / ₺89–₺89,999 / 11 ratings) but
+the PLP is category-scoped (2–3 products/leaf). **PLP-SEED** (`chore/plp-seed-
+density`, merged #140) concentrated **~28 SKUs into `elektr-kea`** + spread
+ratings + set free-shipping → verified **28 products / 23 brands / 2+/3+/4+ buckets
+distinct / free-ship populated**. **Walk category: `elektr-kea`.** Apply
+`scripts/seed/data/plp-density-extras.sql` after `make seed`. See
+`docs/internal/plp-seed-density.md`. (The empty-parent-PLP this exposed = PLP-12.)
+
+---
+
+## §8 — CONFIRMED-HIGH fix queue (the next fix prompts draw from here)
+
+Ordered; severities firmed by markup/walk. PLP-01/03 already shipped (#142).
+
+1. **PLP-13 — attribute/variant facets** (CONFIRMED, **HIGH**). The big one:
+   needs a backend facet-aggregation surface (values + counts per category) + the
+   sidebar/sheet UI. Likely the largest remaining PLP item.
+2. **PLP-12 — subtree rollup** (CONFIRMED, **HIGH**, backend; recursive CTE in
+   `repository.go`). Tracked in `CUTOVER_LEDGER.md §4`; needs a backend PR.
+3. **PLP-04 — visible result count** (CONFIRMED, MED). Data exists
+   (`pagination.total`) — pure surfacing.
+4. **PLP-05 — visible breadcrumb** (CONFIRMED, MED). Data exists (the JSON-LD
+   trail) — pure surfacing.
+5. **PLP-15 — desktop numbered pages** (CONFIRMED, MED). Desktop-only; pairs
+   naturally with #3/#4 (a PLP-chrome batch).
+6. **PLP-14 — price-history filter** (CONFIRMED, MED). Backend filter param +
+   sidebar control.
+7. **MED/LOW batch:** PLP-09 (fast-delivery), PLP-16 (ranked badge), PLP-18/19/20
+   (sticky sidebar / ultra-wide grid / sticky mobile bar), PLP-02 (mobile chips),
+   PLP-06/07/08/10/11/17.
+
+---
+
+## §9 — Walk-findings slots (Salih — visual confirmation still needed)
+
+> markup CONFIRMED the structural items above. These remain **PROBABLE** until a
+> visual/mobile walk — paste observations in #09 format; flip PROBABLE → CONFIRMED
+> + set severity, or NOT-ACTIONABLE + why. New items continue at **PLP-21+**.
+
+- Mobile filter-sheet styling/accordions vs Trendyol's bottom sheet.
+- PLP-02 mobile applied-chips (Trendyol-mobile unverified — `/sr` was 403).
+- PLP-18/19/20 sticky sidebar / ultra-wide grid / sticky mobile bar (walk-sourced).
+- Exact colours, spacing, hover chevrons, badge styling.
 
 ```
 ### PLP-NN — <one-line title>
-- **Surface/region:** PLP › <filter sidebar | mobile filter sheet | chips | sort | grid | pagination | empty | header | breadcrumb>
-- **Trendyol (live):** <what Trendyol does — screenshot ref / observation>  [walk date: ____]
-- **Mopro (current):** <what Mopro does — file:line if known>
-- **Delta:** <the difference>
-- **Status:** CONFIRMED | PROBABLE | NOT-ACTIONABLE
-- **Severity:** HIGH | MED | LOW   (only if CONFIRMED)
-- **Notes:** <intentional? backend-gated? golden-flip? depends-on?>
+- **Surface/region:** PLP › <sidebar | mobile sheet | chips | sort | grid | pagination | empty | header | breadcrumb | badge>
+- **Trendyol (live):** <observation / screenshot ref>  [walk date: ____]
+- **Mopro (current):** <file:line if known>
+- **Delta / Status / Severity / Notes**
 ```
 
-<!-- ── §2-seed findings (confirm/correct against live) ───────────────────── -->
-<!-- PLP-01 — RESOLVED (feat/plp-mobile-facets-and-scroll): mobile sheet now has
-     searchable Brand + Rating facets (shared with desktop). -->
-<!-- PLP-02 — applied-filter chips are desktop-only (mobile = count badge). -->
-<!-- PLP-03 — RESOLVED (feat/plp-mobile-facets-and-scroll): mobile infinite scroll
-     (150px, hasMore-gated); desktop keeps the button. Note: Trendyol desktop is
-     numbered pages, not infinite scroll (markup-observed) — a separate item. -->
-<!-- PLP-04 — no visible result count (pagination.total is available, unused). -->
-<!-- PLP-05 — no visible breadcrumb on desktop (JSON-LD only). -->
-<!-- PLP-06 — no predefined quick-filter pills above the grid. -->
-<!-- PLP-07 — brand facet has no counts + derived from loaded page, not a server facet. -->
-<!-- PLP-08 — no-results state has no clear-filters CTA (EmptyState onAction unused). -->
-<!-- PLP-09 — no fast-delivery toggle (only free-cargo). -->
-<!-- PLP-10 — no search bar in the PLP header (title + share only). -->
-<!-- PLP-11 — in-stock toggle is on mobile sheet but missing from the desktop sidebar. -->
-
-<!-- ── New findings from the walk (PLP-12+) ──────────────────────────────── -->
-<!-- PLP-12 — no subtree rollup: PLP scopes by exact category_id
-     (repository.go:373) → parent/root category PLPs are empty. PROBABLE; confirm
-     in the walk. Surfaced by PLP-SEED (docs/internal/plp-seed-density.md). -->
-<!-- PLP-13 … -->
-
----
-
-## §7 — Prioritized fix list (after the walk flips PROBABLE → CONFIRMED)
-
-1. **PLP-01** — bring brand + rating (+ category) filters to the mobile sheet
-   (close the mobile/desktop parity gap). *Likely the highest-value confirm.*
-2. **PLP-03** — mobile infinite-scroll (scroll-triggered `loadMore`) alongside
-   the load-more button.
-3. **PLP-02** — removable applied-chips on mobile.
-4. **PLP-04 / PLP-05** — surface result count + a visible breadcrumb (both data
-   already exist: `pagination.total`, the JSON-LD trail).
-5. **PLP-07 / PLP-08 / PLP-06 / PLP-09 / PLP-10 / PLP-11** — facet counts,
-   no-results clear-filters CTA, quick pills, fast-delivery, header search,
-   desktop in-stock. LOW; batch as polish.
-
-> Severities are **provisional** until the walk confirms each row. No fixes in
-> this PR (audit-only).
+<!-- PLP-21 … -->

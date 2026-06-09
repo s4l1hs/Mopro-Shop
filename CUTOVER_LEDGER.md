@@ -52,8 +52,9 @@
 ## 4. PLP-12 — subtree rollup (CONFIRMED-HIGH backend debt)
 
 - `internal/catalog/repository.go:373` scopes products by **exact `category_id`**; no recursive subtree rollup.
-- Walk-confirmed: Trendyol browsing a parent category aggregates all nested subcategory products.
+- Walk- **and markup-confirmed**: Trendyol browsing a parent category aggregates all nested subcategory products (multi-brand under one category, subcats as filters).
 - **Fix:** recursive CTE in `repository.go` (server-side; **no client wrapper**). Not built; tracked here for a dedicated backend PR.
+- Canonical ID **PLP-12** (CONFIRMED-HIGH) — see the PLP registry `docs/audits/TRENDYOL_PARITY_PLP_AUDIT.md` §3/§8.
 
 ---
 
@@ -84,7 +85,7 @@
 | Surface | Status |
 |---|---|
 | Home | ✅ Parity-complete (IA-01/02, Sprints A/B, closeout #135–#137) within the Deliberately-Lean IA. |
-| PLP / category browse | In progress — audit #139, walk done; PLP-01/03 building (`feat/plp-mobile-facets-and-scroll`); PLP-02/05/07 CONFIRMED + queued; PLP-12 → §4. |
+| PLP / category browse | In progress — audit #139 reconciled into a canonical registry (`docs/audits/TRENDYOL_PARITY_PLP_AUDIT.md`); **PLP-01/03 RESOLVED** (#142, `feat/plp-mobile-facets-and-scroll`; = contract "PLP-25"). Markup folded → CONFIRMED-HIGH queue: **PLP-13** attribute facets, **PLP-12** rollup (→ §4), PLP-04 count, PLP-05 breadcrumb, PLP-15 desktop numbered-pages, PLP-14 price-history filter. **ID re-map:** the contract's `PLP-02/05/07` (sticky sidebar / ultra-wide grid / sticky mobile bar) are now **PLP-18/19/20** (the audit's PLP-02/05/07 = chips/breadcrumb/counts keep their numbers). |
 | Search | Pending (inherits PLP grid/filter patterns). |
 | PDP | Pending (own walk; may need seed extension: reviews/variants/gallery). |
 | Phase C (divergences) | After parity surfaces — coin redeem (deferred), etc. |
