@@ -1,109 +1,78 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mopro/features/catalog/plp/plp_filters.dart';
+import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
+import 'package:mopro/features/catalog/plp/widgets/plp_facets.dart';
 
-class ProductFilterOptions {
-  const ProductFilterOptions({
-    this.minPriceMinor,
-    this.maxPriceMinor,
-    this.freeShippingOnly = false,
-    this.inStockOnly = false,
-    this.cashbackOnly = false,
-  });
-
-  final int? minPriceMinor;
-  final int? maxPriceMinor;
-  final bool freeShippingOnly;
-  final bool inStockOnly;
-  final bool cashbackOnly;
-
-  int get activeCount {
-    var n = 0;
-    if (minPriceMinor != null || maxPriceMinor != null) n++;
-    if (freeShippingOnly) n++;
-    if (inStockOnly) n++;
-    if (cashbackOnly) n++;
-    return n;
-  }
-
-  ProductFilterOptions copyWith({
-    int? minPriceMinor,
-    int? maxPriceMinor,
-    bool? freeShippingOnly,
-    bool? inStockOnly,
-    bool? cashbackOnly,
-    bool clearMinPrice = false,
-    bool clearMaxPrice = false,
-  }) {
-    return ProductFilterOptions(
-      minPriceMinor: clearMinPrice ? null : (minPriceMinor ?? this.minPriceMinor),
-      maxPriceMinor: clearMaxPrice ? null : (maxPriceMinor ?? this.maxPriceMinor),
-      freeShippingOnly: freeShippingOnly ?? this.freeShippingOnly,
-      inStockOnly: inStockOnly ?? this.inStockOnly,
-      cashbackOnly: cashbackOnly ?? this.cashbackOnly,
-    );
-  }
-}
-
-Future<ProductFilterOptions?> showFilterSheet(
+/// Mobile PLP filter bottom sheet (PLP-01). **Provider-backed** — every control
+/// applies live to `plpFiltersProvider(plpKey)` (same semantics as the desktop
+/// sidebar), so the result count + removable chips reflect immediately and the
+/// state round-trips to the URL. Surfaces **Brand (searchable) + Rating**
+/// accordions — reusing [PlpBrandFacet]/[PlpRatingFacet] — alongside price,
+/// free-shipping and in-stock.
+Future<void> showPlpFilterSheet(
   BuildContext context, {
-  ProductFilterOptions? current,
+  required String plpKey,
+  required List<String> brands,
 }) {
-  return showModalBottomSheet<ProductFilterOptions>(
+  return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
-    builder: (_) => FilterSheet(current: current ?? const ProductFilterOptions()),
+    builder: (_) => PlpFilterSheet(plpKey: plpKey, brands: brands),
   );
 }
 
-class FilterSheet extends StatefulWidget {
-  const FilterSheet({required this.current, super.key});
+class PlpFilterSheet extends ConsumerStatefulWidget {
+  const PlpFilterSheet({required this.plpKey, required this.brands, super.key});
 
-  final ProductFilterOptions current;
+  final String plpKey;
+  final List<String> brands;
 
   @override
-  State<FilterSheet> createState() => _FilterSheetState();
+  ConsumerState<PlpFilterSheet> createState() => _PlpFilterSheetState();
 }
 
-class _FilterSheetState extends State<FilterSheet> {
-  late ProductFilterOptions _opts;
-  final _minController = TextEditingController();
-  final _maxController = TextEditingController();
+class _PlpFilterSheetState extends ConsumerState<PlpFilterSheet> {
+  final _minCtrl = TextEditingController();
+  final _maxCtrl = TextEditingController();
+
+  PlpFiltersNotifier get _notifier =>
+      ref.read(plpFiltersProvider(widget.plpKey).notifier);
 
   @override
   void initState() {
     super.initState();
-    _opts = widget.current;
-    if (_opts.minPriceMinor != null) {
-      _minController.text = (_opts.minPriceMinor! ~/ 100).toString();
+    final f = ref.read(plpFiltersProvider(widget.plpKey));
+    if (f.priceMinMinor != null) {
+      _minCtrl.text = (f.priceMinMinor! ~/ 100).toString();
     }
-    if (_opts.maxPriceMinor != null) {
-      _maxController.text = (_opts.maxPriceMinor! ~/ 100).toString();
+    if (f.priceMaxMinor != null) {
+      _maxCtrl.text = (f.priceMaxMinor! ~/ 100).toString();
     }
   }
 
   @override
   void dispose() {
-    _minController.dispose();
-    _maxController.dispose();
+    _minCtrl.dispose();
+    _maxCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final filters = ref.watch(plpFiltersProvider(widget.plpKey));
 
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: DraggableScrollableSheet(
-        initialChildSize: 0.6,
+        initialChildSize: 0.7,
         minChildSize: 0.4,
-        maxChildSize: 0.9,
+        maxChildSize: 0.95,
         expand: false,
         builder: (_, scrollController) => Column(
           children: [
@@ -112,7 +81,7 @@ class _FilterSheetState extends State<FilterSheet> {
               width: 32,
               height: 4,
               decoration: BoxDecoration(
-                color: colorScheme.outlineVariant,
+                color: theme.colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -128,7 +97,11 @@ class _FilterSheetState extends State<FilterSheet> {
                     ),
                   ),
                   TextButton(
-                    onPressed: _resetAll,
+                    onPressed: () {
+                      _minCtrl.clear();
+                      _maxCtrl.clear();
+                      _notifier.set(const PlpFilters());
+                    },
                     child: Text('catalog.filter_reset'.tr()),
                   ),
                 ],
@@ -139,6 +112,23 @@ class _FilterSheetState extends State<FilterSheet> {
                 controller: scrollController,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
+                  // Brand (searchable) accordion — reuses the desktop facet.
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: Text('plp.filter_brand'.tr()),
+                    initiallyExpanded: filters.brands.isNotEmpty,
+                    children: [
+                      PlpBrandFacet(plpKey: widget.plpKey, brands: widget.brands),
+                    ],
+                  ),
+                  // Rating accordion — reuses the desktop facet.
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: Text('plp.filter_rating'.tr()),
+                    initiallyExpanded: filters.ratingMin != null,
+                    children: [PlpRatingFacet(plpKey: widget.plpKey)],
+                  ),
+                  const Divider(),
                   Text(
                     'catalog.filter_price_range'.tr(),
                     style: theme.textTheme.titleSmall,
@@ -147,70 +137,29 @@ class _FilterSheetState extends State<FilterSheet> {
                   Row(
                     children: [
                       Expanded(
-                        child: TextField(
-                          controller: _minController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: 'catalog.filter_min_price'.tr(),
-                            prefixText: '₺',
-                          ),
-                          onChanged: (v) {
-                            final n = int.tryParse(v);
-                            setState(() {
-                              _opts = _opts.copyWith(
-                                minPriceMinor: n != null ? n * 100 : null,
-                                clearMinPrice: n == null,
-                              );
-                            });
-                          },
-                        ),
+                        child: _priceField(_minCtrl, 'catalog.filter_min_price', true),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: TextField(
-                          controller: _maxController,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: 'catalog.filter_max_price'.tr(),
-                            prefixText: '₺',
-                          ),
-                          onChanged: (v) {
-                            final n = int.tryParse(v);
-                            setState(() {
-                              _opts = _opts.copyWith(
-                                maxPriceMinor: n != null ? n * 100 : null,
-                                clearMaxPrice: n == null,
-                              );
-                            });
-                          },
-                        ),
+                        child: _priceField(_maxCtrl, 'catalog.filter_max_price', false),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   const Divider(),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text('catalog.filter_free_shipping'.tr()),
-                    value: _opts.freeShippingOnly,
+                    value: filters.freeShippingOnly,
                     onChanged: (v) =>
-                        setState(() => _opts = _opts.copyWith(freeShippingOnly: v)),
+                        _notifier.update((f) => f.copyWith(freeShippingOnly: v)),
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text('catalog.filter_in_stock'.tr()),
-                    value: _opts.inStockOnly,
+                    value: filters.inStock,
                     onChanged: (v) =>
-                        setState(() => _opts = _opts.copyWith(inStockOnly: v)),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('catalog.filter_cashback_only'.tr()),
-                    subtitle: Text('catalog.filter_cashback_hint'.tr()),
-                    value: false,
-                    // Disabled: vacuous server-side — every Mopro product earns
-                    // cashback (P-028 excluded it). The hint conveys that.
-                    onChanged: null,
+                        _notifier.update((f) => f.copyWith(inStock: v)),
                   ),
                 ],
               ),
@@ -218,7 +167,7 @@ class _FilterSheetState extends State<FilterSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: FilledButton(
-                onPressed: () => Navigator.of(context).pop(_opts),
+                onPressed: () => Navigator.of(context).pop(),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(52),
                 ),
@@ -231,11 +180,20 @@ class _FilterSheetState extends State<FilterSheet> {
     );
   }
 
-  void _resetAll() {
-    setState(() {
-      _opts = const ProductFilterOptions();
-      _minController.clear();
-      _maxController.clear();
-    });
+  Widget _priceField(TextEditingController ctrl, String labelKey, bool isMin) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: TextInputType.number,
+      decoration: InputDecoration(labelText: labelKey.tr(), prefixText: '₺'),
+      onChanged: (raw) {
+        final tl = int.tryParse(raw.trim());
+        final minor = tl == null ? null : tl * 100;
+        _notifier.update(
+          (f) => isMin
+              ? f.copyWith(priceMinMinor: minor, page: 1)
+              : f.copyWith(priceMaxMinor: minor, page: 1),
+        );
+      },
+    );
   }
 }

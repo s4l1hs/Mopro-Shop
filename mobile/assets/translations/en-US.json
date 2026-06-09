@@ -177,8 +177,6 @@
     "filter_max_price": "Max",
     "filter_free_shipping": "Free Shipping",
     "filter_in_stock": "In Stock",
-    "filter_cashback_only": "Cashback Products Only",
-    "filter_cashback_hint": "All Mopro products earn cashback",
     "filter_apply": "Apply",
     "filter_reset": "Reset"
   },

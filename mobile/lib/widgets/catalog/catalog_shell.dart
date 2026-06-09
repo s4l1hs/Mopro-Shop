@@ -22,6 +22,7 @@ class CatalogShell extends StatelessWidget {
     this.activeFilterCount = 0,
     this.onRefresh,
     this.gridCrossAxisCount = 2,
+    this.infiniteScroll = false,
     super.key,
   });
 
@@ -37,6 +38,13 @@ class CatalogShell extends StatelessWidget {
   final int activeFilterCount;
   final Future<void> Function()? onRefresh;
   final int gridCrossAxisCount;
+
+  /// When true (mobile), the next page auto-loads as the user nears the bottom
+  /// and the "load more" button is hidden. Desktop keeps the explicit button.
+  final bool infiniteScroll;
+
+  /// Trigger the next page when the user scrolls within this many px of the end.
+  static const double _loadMoreThreshold = 150;
 
   @override
   Widget build(BuildContext context) {
@@ -75,16 +83,37 @@ class CatalogShell extends StatelessWidget {
               loadingMore: loadingMore,
               loadMoreError: loadMoreError,
               onLoadMore: onLoadMore,
+              // Mobile auto-loads via scroll → no button; spinner/error stay.
+              showButton: !infiniteScroll,
             ),
           ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );
 
+    // Infinite scroll (mobile): fetch page N+1 within _loadMoreThreshold px of
+    // the bottom. `loadMore()` is synchronously guarded (sets loadingMore before
+    // its await) so repeated notifications can't double-fetch.
+    var content = infiniteScroll
+        ? NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              if (hasMore &&
+                  !loadingMore &&
+                  n.metrics.axis == Axis.vertical &&
+                  n.metrics.pixels >=
+                      n.metrics.maxScrollExtent - _loadMoreThreshold) {
+                onLoadMore();
+              }
+              return false;
+            },
+            child: body,
+          )
+        : body;
+
     if (onRefresh != null) {
-      return RefreshIndicator(onRefresh: onRefresh!, child: body);
+      content = RefreshIndicator(onRefresh: onRefresh!, child: content);
     }
-    return body;
+    return content;
   }
 }
 
@@ -239,12 +268,14 @@ class _LoadMoreSection extends StatelessWidget {
     required this.loadingMore,
     required this.onLoadMore,
     this.loadMoreError,
+    this.showButton = true,
   });
 
   final bool hasMore;
   final bool loadingMore;
   final VoidCallback onLoadMore;
   final AppError? loadMoreError;
+  final bool showButton;
 
   @override
   Widget build(BuildContext context) {
@@ -260,7 +291,7 @@ class _LoadMoreSection extends StatelessWidget {
         child: Center(child: CircularProgressIndicator()),
       );
     }
-    if (hasMore) {
+    if (hasMore && showButton) {
       return Padding(
         padding: const EdgeInsets.all(16),
         child: Center(

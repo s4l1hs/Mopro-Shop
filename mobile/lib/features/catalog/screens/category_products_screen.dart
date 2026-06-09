@@ -134,6 +134,9 @@ class _CategoryProductsScreenState
       onFilter: context.isMobile ? _showFilterSheet : null,
       activeFilterCount: filters.activeChipCount,
       gridCrossAxisCount: context.isMobile ? 2 : (context.isDesktop ? 5 : 3),
+      // PLP-03: mobile auto-loads the next page on scroll; desktop keeps the
+      // explicit "load more" button.
+      infiniteScroll: context.isMobile,
       onRefresh: () async =>
           ref.read(filteredProductsProvider(_key).notifier).refresh(),
     );
@@ -262,24 +265,11 @@ class _CategoryProductsScreenState
   }
 
   Future<void> _showFilterSheet() async {
-    final filters = ref.read(plpFiltersProvider(_key));
-    final current = ProductFilterOptions(
-      minPriceMinor: filters.priceMinMinor,
-      maxPriceMinor: filters.priceMaxMinor,
-      freeShippingOnly: filters.freeShippingOnly,
-      inStockOnly: filters.inStock,
-    );
-    final result = await showFilterSheet(context, current: current);
-    if (result != null) {
-      ref.read(plpFiltersProvider(_key).notifier).update(
-            (f) => f.copyWith(
-              priceMinMinor: result.minPriceMinor,
-              priceMaxMinor: result.maxPriceMinor,
-              freeShippingOnly: result.freeShippingOnly,
-              inStock: result.inStockOnly,
-              page: 1,
-            ),
-          );
-    }
+    // Brand facet sources its options from the loaded result set (distinct
+    // brands) — same as the desktop sidebar (no aggregation endpoint yet).
+    final products =
+        ref.read(filteredProductsProvider(_key)).products.valueOrNull ?? [];
+    final brands = products.map((p) => p.brand).toSet().toList()..sort();
+    await showPlpFilterSheet(context, plpKey: _key, brands: brands);
   }
 }
