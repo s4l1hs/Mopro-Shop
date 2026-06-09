@@ -13,11 +13,11 @@ import 'package:mopro/design/theme.dart';
 import 'package:mopro/design/theme_controller.dart';
 import 'package:mopro/features/catalog/providers/categories_provider.dart';
 import 'package:mopro/features/catalog/screens/category_products_screen.dart';
+import 'package:mopro/features/catalog/widgets/product_grid.dart';
 import 'package:mopro_api/mopro_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// PLP-03: mobile PLP auto-loads the next page near the bottom (no button);
-// desktop keeps the explicit "load more" button.
+// PLP-19: grid columns 2 (mobile) / 3 (tablet) / 4 (desktop <1440) / 5 (≥1440).
 
 ProductSummary _p(int id) => ProductSummary(
       id: id,
@@ -25,17 +25,14 @@ ProductSummary _p(int id) => ProductSummary(
       categoryId: 5,
       brand: 'B$id',
       status: ProductSummaryStatusEnum.active,
-      title: 'P$id',
+      title: 'Item $id',
       priceMinor: 20000,
       priceCurrency: 'TRY',
       cashbackPreview: CashbackPreview(monthlyCoinMinor: 100, currency: 'TRY_COIN'),
     );
 
-class _PagedCatalogApi extends CatalogApi {
-  _PagedCatalogApi() : super(Dio());
-
-  final pagesRequested = <int>[];
-
+class _Api extends CatalogApi {
+  _Api() : super(Dio());
   @override
   Future<Response<ListProducts200Response>> listProducts({
     int? minPrice,
@@ -55,22 +52,23 @@ class _PagedCatalogApi extends CatalogApi {
     ValidateStatus? validateStatus,
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
-  }) async {
-    final p = page ?? 1;
-    pagesRequested.add(p);
-    return Response(
-      data: ListProducts200Response(
-        data: [for (var i = 0; i < 8; i++) _p((p - 1) * 8 + i + 1)],
-        // 2 pages total → page 1 hasMore, page 2 is the end.
-        pagination: PaginationMeta(page: p, perPage: 8, total: 16, totalPages: 2),
-      ),
-      requestOptions: RequestOptions(),
-      statusCode: 200,
-    );
-  }
+  }) async =>
+      Response(
+        data: ListProducts200Response(
+          data: [for (var i = 0; i < 8; i++) _p(i + 1)],
+          pagination: PaginationMeta(page: 1, perPage: 20, total: 8, totalPages: 1),
+        ),
+        requestOptions: RequestOptions(),
+        statusCode: 200,
+      );
 }
 
-Future<_PagedCatalogApi> _pump(WidgetTester tester, {required double width}) async {
+class _Cats extends CategoriesNotifier {
+  @override
+  CategoriesState build() => const CategoriesState(categories: AsyncData([]));
+}
+
+Future<int> _columnsAt(WidgetTester tester, double width) async {
   final original = FlutterError.onError;
   FlutterError.onError = (d) {
     if (d.exceptionAsString().contains('overflowed')) return;
@@ -78,21 +76,20 @@ Future<_PagedCatalogApi> _pump(WidgetTester tester, {required double width}) asy
   };
   addTearDown(() => FlutterError.onError = original);
 
-  tester.view.physicalSize = Size(width, 800);
+  tester.view.physicalSize = Size(width, 1200);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final prefs = await SharedPreferences.getInstance();
-  final api = _PagedCatalogApi();
 
   final router = GoRouter(
     initialLocation: '/categories/5',
     routes: [
       GoRoute(
         path: '/categories/:id',
-        builder: (_, s) => CategoryProductsScreen(
-          categoryId: int.parse(s.pathParameters['id']!),
+        builder: (_, __) => const CategoryProductsScreen(
+          categoryId: 5,
           categoryName: 'Elektronik',
         ),
       ),
@@ -108,21 +105,15 @@ Future<_PagedCatalogApi> _pump(WidgetTester tester, {required double width}) asy
       child: ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
-          catalogApiProvider.overrideWithValue(api),
-          categoriesProvider.overrideWith(_SeededCategories.new),
+          catalogApiProvider.overrideWithValue(_Api()),
+          categoriesProvider.overrideWith(_Cats.new),
         ],
         child: MaterialApp.router(theme: buildLightTheme(), routerConfig: router),
       ),
     ),
   );
   await tester.pumpAndSettle();
-  return api;
-}
-
-class _SeededCategories extends CategoriesNotifier {
-  @override
-  CategoriesState build() =>
-      CategoriesState(categories: AsyncData([Category(id: 5, name: 'E', slug: 'e', commissionPctBps: 1000)]));
+  return tester.widget<ProductGrid>(find.byType(ProductGrid)).crossAxisCount;
 }
 
 void main() {
@@ -138,35 +129,8 @@ void main() {
     await EasyLocalization.ensureInitialized();
   });
 
-  testWidgets('mobile: no load-more button; scroll near bottom fetches page 2 once',
-      (tester) async {
-    final api = await _pump(tester, width: 375);
-    expect(api.pagesRequested, [1]);
-    // Mobile uses infinite scroll — the explicit button is gone.
-    expect(find.text('catalog.load_more'), findsNothing);
-
-    // Target the grid's vertical scroller specifically — the breadcrumb adds a
-    // horizontal SingleChildScrollView, so `Scrollable.first` is ambiguous.
-    final scrollable = find.descendant(
-      of: find.byType(CustomScrollView),
-      matching: find.byType(Scrollable),
-    );
-    await tester.drag(scrollable, const Offset(0, -4000));
-    await tester.pumpAndSettle();
-
-    expect(api.pagesRequested, [1, 2]); // exactly one extra fetch
-    expect(api.pagesRequested.where((p) => p == 2).length, 1); // no duplicate
-
-    // At the end (hasMore == false) further scrolling fetches nothing.
-    await tester.drag(scrollable, const Offset(0, -4000));
-    await tester.pumpAndSettle();
-    expect(api.pagesRequested, [1, 2]);
-  });
-
-  testWidgets('desktop: no infinite scroll — numbered pages instead (PLP-15)',
-      (tester) async {
-    await _pump(tester, width: 1440); // fixture has 2 pages
-    expect(find.text('catalog.load_more'), findsNothing);
-    expect(find.byKey(const ValueKey('plp-page-2')), findsOneWidget);
-  });
+  testWidgets('2 cols @375 (mobile)', (t) async => expect(await _columnsAt(t, 375), 2));
+  testWidgets('3 cols @768 (tablet)', (t) async => expect(await _columnsAt(t, 768), 3));
+  testWidgets('4 cols @1024 (desktop <1440)', (t) async => expect(await _columnsAt(t, 1024), 4));
+  testWidgets('5 cols @1440 (ultra-wide)', (t) async => expect(await _columnsAt(t, 1440), 5));
 }

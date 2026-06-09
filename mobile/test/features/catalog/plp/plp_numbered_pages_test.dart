@@ -16,8 +16,7 @@ import 'package:mopro/features/catalog/screens/category_products_screen.dart';
 import 'package:mopro_api/mopro_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// PLP-03: mobile PLP auto-loads the next page near the bottom (no button);
-// desktop keeps the explicit "load more" button.
+// PLP-15: desktop numbered pages (mobile keeps PLP-03 infinite scroll).
 
 ProductSummary _p(int id) => ProductSummary(
       id: id,
@@ -25,16 +24,15 @@ ProductSummary _p(int id) => ProductSummary(
       categoryId: 5,
       brand: 'B$id',
       status: ProductSummaryStatusEnum.active,
-      title: 'P$id',
+      title: 'Item $id',
       priceMinor: 20000,
       priceCurrency: 'TRY',
       cashbackPreview: CashbackPreview(monthlyCoinMinor: 100, currency: 'TRY_COIN'),
     );
 
-class _PagedCatalogApi extends CatalogApi {
-  _PagedCatalogApi() : super(Dio());
-
-  final pagesRequested = <int>[];
+class _PagedApi extends CatalogApi {
+  _PagedApi() : super(Dio());
+  final pages = <int>[];
 
   @override
   Future<Response<ListProducts200Response>> listProducts({
@@ -57,12 +55,11 @@ class _PagedCatalogApi extends CatalogApi {
     ProgressCallback? onReceiveProgress,
   }) async {
     final p = page ?? 1;
-    pagesRequested.add(p);
+    pages.add(p);
     return Response(
       data: ListProducts200Response(
         data: [for (var i = 0; i < 8; i++) _p((p - 1) * 8 + i + 1)],
-        // 2 pages total → page 1 hasMore, page 2 is the end.
-        pagination: PaginationMeta(page: p, perPage: 8, total: 16, totalPages: 2),
+        pagination: PaginationMeta(page: p, perPage: 8, total: 24, totalPages: 3),
       ),
       requestOptions: RequestOptions(),
       statusCode: 200,
@@ -70,7 +67,12 @@ class _PagedCatalogApi extends CatalogApi {
   }
 }
 
-Future<_PagedCatalogApi> _pump(WidgetTester tester, {required double width}) async {
+class _Cats extends CategoriesNotifier {
+  @override
+  CategoriesState build() => const CategoriesState(categories: AsyncData([]));
+}
+
+Future<_PagedApi> _pump(WidgetTester tester, {required double width}) async {
   final original = FlutterError.onError;
   FlutterError.onError = (d) {
     if (d.exceptionAsString().contains('overflowed')) return;
@@ -78,13 +80,13 @@ Future<_PagedCatalogApi> _pump(WidgetTester tester, {required double width}) asy
   };
   addTearDown(() => FlutterError.onError = original);
 
-  tester.view.physicalSize = Size(width, 800);
+  tester.view.physicalSize = Size(width, 1000);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final prefs = await SharedPreferences.getInstance();
-  final api = _PagedCatalogApi();
+  final api = _PagedApi();
 
   final router = GoRouter(
     initialLocation: '/categories/5',
@@ -109,7 +111,7 @@ Future<_PagedCatalogApi> _pump(WidgetTester tester, {required double width}) asy
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
           catalogApiProvider.overrideWithValue(api),
-          categoriesProvider.overrideWith(_SeededCategories.new),
+          categoriesProvider.overrideWith(_Cats.new),
         ],
         child: MaterialApp.router(theme: buildLightTheme(), routerConfig: router),
       ),
@@ -117,12 +119,6 @@ Future<_PagedCatalogApi> _pump(WidgetTester tester, {required double width}) asy
   );
   await tester.pumpAndSettle();
   return api;
-}
-
-class _SeededCategories extends CategoriesNotifier {
-  @override
-  CategoriesState build() =>
-      CategoriesState(categories: AsyncData([Category(id: 5, name: 'E', slug: 'e', commissionPctBps: 1000)]));
 }
 
 void main() {
@@ -138,35 +134,24 @@ void main() {
     await EasyLocalization.ensureInitialized();
   });
 
-  testWidgets('mobile: no load-more button; scroll near bottom fetches page 2 once',
+  testWidgets('desktop shows numbered pages; tapping a page replaces the grid',
       (tester) async {
-    final api = await _pump(tester, width: 375);
-    expect(api.pagesRequested, [1]);
-    // Mobile uses infinite scroll — the explicit button is gone.
+    final api = await _pump(tester, width: 1440);
+    expect(api.pages, [1]);
+    // No load-more button on desktop; numbered control instead.
     expect(find.text('catalog.load_more'), findsNothing);
+    expect(find.byKey(const ValueKey('plp-page-1')), findsOneWidget);
+    expect(find.byKey(const ValueKey('plp-page-2')), findsOneWidget);
+    expect(find.byKey(const ValueKey('plp-page-3')), findsOneWidget);
 
-    // Target the grid's vertical scroller specifically — the breadcrumb adds a
-    // horizontal SingleChildScrollView, so `Scrollable.first` is ambiguous.
-    final scrollable = find.descendant(
-      of: find.byType(CustomScrollView),
-      matching: find.byType(Scrollable),
-    );
-    await tester.drag(scrollable, const Offset(0, -4000));
+    await tester.tap(find.byKey(const ValueKey('plp-page-2')));
     await tester.pumpAndSettle();
-
-    expect(api.pagesRequested, [1, 2]); // exactly one extra fetch
-    expect(api.pagesRequested.where((p) => p == 2).length, 1); // no duplicate
-
-    // At the end (hasMore == false) further scrolling fetches nothing.
-    await tester.drag(scrollable, const Offset(0, -4000));
-    await tester.pumpAndSettle();
-    expect(api.pagesRequested, [1, 2]);
+    expect(api.pages.last, 2); // jumped to page 2 (replace, not append)
   });
 
-  testWidgets('desktop: no infinite scroll — numbered pages instead (PLP-15)',
+  testWidgets('mobile shows no numbered pages (infinite scroll path)',
       (tester) async {
-    await _pump(tester, width: 1440); // fixture has 2 pages
-    expect(find.text('catalog.load_more'), findsNothing);
-    expect(find.byKey(const ValueKey('plp-page-2')), findsOneWidget);
+    await _pump(tester, width: 375);
+    expect(find.byKey(const ValueKey('plp-page-2')), findsNothing);
   });
 }

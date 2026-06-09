@@ -91,7 +91,7 @@
 | Surface | Status |
 |---|---|
 | Home | ✅ Parity-complete (IA-01/02, Sprints A/B, closeout #135–#137) within the Deliberately-Lean IA. |
-| PLP / category browse | In progress — canonical registry `docs/audits/TRENDYOL_PARITY_PLP_AUDIT.md`. **RESOLVED:** PLP-01/03 (#142; = contract "PLP-25"), **PLP-04 count + PLP-05 breadcrumb** (`feat/plp-count-breadcrumb`). **DEFER'd:** **PLP-13** attribute facets (Outcome C → §4b backend track). **Open CONFIRMED:** PLP-12 rollup (→ §4), PLP-15 desktop numbered-pages, PLP-14 price-history. **ID re-map:** contract `PLP-02/05/07` (sticky sidebar / ultra-wide grid / sticky mobile bar) → **PLP-18/19/20** (audit's 02/05/07 = chips/breadcrumb/counts keep their numbers). |
+| PLP / category browse | **UI parity ~done** — canonical registry `docs/audits/TRENDYOL_PARITY_PLP_AUDIT.md`. **RESOLVED:** PLP-01/03 (#142), PLP-04/05 (count+breadcrumb), **PLP-15/18/19/20** (numbered pages / sticky sidebar [already-matched] / ultra-wide breakpoints / sticky mobile bar, `feat/plp-layout-closeout`). **DEFER'd (backend):** **PLP-13** attribute facets (§4b), **PLP-12** rollup (§4). **Open CONFIRMED:** PLP-14 price-history (backend), PLP-09 fast-delivery. Remaining = MED/LOW polish + PROBABLE visual items awaiting Salih's live walk (§9). **ID re-map:** contract `PLP-02/05/07` (sticky sidebar / ultra-wide grid / sticky mobile bar) = **PLP-18/19/20**. |
 | Search | Pending (inherits PLP grid/filter patterns). |
 | PDP | Pending (own walk; may need seed extension: reviews/variants/gallery). |
 | Phase C (divergences) | After parity surfaces — coin redeem (deferred), etc. |

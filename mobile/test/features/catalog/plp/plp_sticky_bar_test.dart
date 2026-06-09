@@ -16,8 +16,7 @@ import 'package:mopro/features/catalog/screens/category_products_screen.dart';
 import 'package:mopro_api/mopro_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// PLP-03: mobile PLP auto-loads the next page near the bottom (no button);
-// desktop keeps the explicit "load more" button.
+// PLP-20: the mobile sort/filter bar is pinned (stays put on scroll).
 
 ProductSummary _p(int id) => ProductSummary(
       id: id,
@@ -25,17 +24,14 @@ ProductSummary _p(int id) => ProductSummary(
       categoryId: 5,
       brand: 'B$id',
       status: ProductSummaryStatusEnum.active,
-      title: 'P$id',
+      title: 'Item $id',
       priceMinor: 20000,
       priceCurrency: 'TRY',
       cashbackPreview: CashbackPreview(monthlyCoinMinor: 100, currency: 'TRY_COIN'),
     );
 
-class _PagedCatalogApi extends CatalogApi {
-  _PagedCatalogApi() : super(Dio());
-
-  final pagesRequested = <int>[];
-
+class _Api extends CatalogApi {
+  _Api() : super(Dio());
   @override
   Future<Response<ListProducts200Response>> listProducts({
     int? minPrice,
@@ -55,22 +51,23 @@ class _PagedCatalogApi extends CatalogApi {
     ValidateStatus? validateStatus,
     ProgressCallback? onSendProgress,
     ProgressCallback? onReceiveProgress,
-  }) async {
-    final p = page ?? 1;
-    pagesRequested.add(p);
-    return Response(
-      data: ListProducts200Response(
-        data: [for (var i = 0; i < 8; i++) _p((p - 1) * 8 + i + 1)],
-        // 2 pages total → page 1 hasMore, page 2 is the end.
-        pagination: PaginationMeta(page: p, perPage: 8, total: 16, totalPages: 2),
-      ),
-      requestOptions: RequestOptions(),
-      statusCode: 200,
-    );
-  }
+  }) async =>
+      Response(
+        data: ListProducts200Response(
+          data: [for (var i = 0; i < 12; i++) _p(i + 1)],
+          pagination: PaginationMeta(page: 1, perPage: 20, total: 12, totalPages: 1),
+        ),
+        requestOptions: RequestOptions(),
+        statusCode: 200,
+      );
 }
 
-Future<_PagedCatalogApi> _pump(WidgetTester tester, {required double width}) async {
+class _Cats extends CategoriesNotifier {
+  @override
+  CategoriesState build() => const CategoriesState(categories: AsyncData([]));
+}
+
+Future<void> _pumpMobile(WidgetTester tester) async {
   final original = FlutterError.onError;
   FlutterError.onError = (d) {
     if (d.exceptionAsString().contains('overflowed')) return;
@@ -78,21 +75,20 @@ Future<_PagedCatalogApi> _pump(WidgetTester tester, {required double width}) asy
   };
   addTearDown(() => FlutterError.onError = original);
 
-  tester.view.physicalSize = Size(width, 800);
+  tester.view.physicalSize = const Size(375, 800);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   SharedPreferences.setMockInitialValues(<String, Object>{});
   final prefs = await SharedPreferences.getInstance();
-  final api = _PagedCatalogApi();
 
   final router = GoRouter(
     initialLocation: '/categories/5',
     routes: [
       GoRoute(
         path: '/categories/:id',
-        builder: (_, s) => CategoryProductsScreen(
-          categoryId: int.parse(s.pathParameters['id']!),
+        builder: (_, __) => const CategoryProductsScreen(
+          categoryId: 5,
           categoryName: 'Elektronik',
         ),
       ),
@@ -108,21 +104,14 @@ Future<_PagedCatalogApi> _pump(WidgetTester tester, {required double width}) asy
       child: ProviderScope(
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
-          catalogApiProvider.overrideWithValue(api),
-          categoriesProvider.overrideWith(_SeededCategories.new),
+          catalogApiProvider.overrideWithValue(_Api()),
+          categoriesProvider.overrideWith(_Cats.new),
         ],
         child: MaterialApp.router(theme: buildLightTheme(), routerConfig: router),
       ),
     ),
   );
   await tester.pumpAndSettle();
-  return api;
-}
-
-class _SeededCategories extends CategoriesNotifier {
-  @override
-  CategoriesState build() =>
-      CategoriesState(categories: AsyncData([Category(id: 5, name: 'E', slug: 'e', commissionPctBps: 1000)]));
 }
 
 void main() {
@@ -138,35 +127,17 @@ void main() {
     await EasyLocalization.ensureInitialized();
   });
 
-  testWidgets('mobile: no load-more button; scroll near bottom fetches page 2 once',
+  testWidgets('mobile sort/filter bar is pinned and survives a scroll',
       (tester) async {
-    final api = await _pump(tester, width: 375);
-    expect(api.pagesRequested, [1]);
-    // Mobile uses infinite scroll — the explicit button is gone.
-    expect(find.text('catalog.load_more'), findsNothing);
+    await _pumpMobile(tester);
+    // Pinned via a SliverPersistentHeader; the bar (filter label) is visible.
+    expect(find.byType(SliverPersistentHeader), findsOneWidget);
+    expect(find.text('catalog.filter_title'), findsOneWidget);
 
-    // Target the grid's vertical scroller specifically — the breadcrumb adds a
-    // horizontal SingleChildScrollView, so `Scrollable.first` is ambiguous.
-    final scrollable = find.descendant(
-      of: find.byType(CustomScrollView),
-      matching: find.byType(Scrollable),
-    );
-    await tester.drag(scrollable, const Offset(0, -4000));
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -600));
     await tester.pumpAndSettle();
 
-    expect(api.pagesRequested, [1, 2]); // exactly one extra fetch
-    expect(api.pagesRequested.where((p) => p == 2).length, 1); // no duplicate
-
-    // At the end (hasMore == false) further scrolling fetches nothing.
-    await tester.drag(scrollable, const Offset(0, -4000));
-    await tester.pumpAndSettle();
-    expect(api.pagesRequested, [1, 2]);
-  });
-
-  testWidgets('desktop: no infinite scroll — numbered pages instead (PLP-15)',
-      (tester) async {
-    await _pump(tester, width: 1440); // fixture has 2 pages
-    expect(find.text('catalog.load_more'), findsNothing);
-    expect(find.byKey(const ValueKey('plp-page-2')), findsOneWidget);
+    // Still visible after scrolling — it pinned rather than scrolling away.
+    expect(find.text('catalog.filter_title'), findsOneWidget);
   });
 }

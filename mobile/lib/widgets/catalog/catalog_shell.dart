@@ -23,6 +23,9 @@ class CatalogShell extends StatelessWidget {
     this.onRefresh,
     this.gridCrossAxisCount = 2,
     this.infiniteScroll = false,
+    this.currentPage = 1,
+    this.totalPages = 1,
+    this.onGoToPage,
     super.key,
   });
 
@@ -43,6 +46,12 @@ class CatalogShell extends StatelessWidget {
   /// and the "load more" button is hidden. Desktop keeps the explicit button.
   final bool infiniteScroll;
 
+  /// Desktop numbered-pages control (PLP-15): the active page, the page count,
+  /// and the jump callback. Used only when `!infiniteScroll`.
+  final int currentPage;
+  final int totalPages;
+  final ValueChanged<int>? onGoToPage;
+
   /// Trigger the next page when the user scrolls within this many px of the end.
   static const double _loadMoreThreshold = 150;
 
@@ -52,12 +61,16 @@ class CatalogShell extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         if (onSort != null || onFilter != null)
-          SliverToBoxAdapter(
-            child: _FilterSortBar(
-              currentSort: currentSort,
-              activeFilterCount: activeFilterCount,
-              onSort: onSort,
-              onFilter: onFilter,
+          // PLP-20: pin the mobile sort/filter bar so it stays in reach on scroll.
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _PinnedBarDelegate(
+              _FilterSortBar(
+                currentSort: currentSort,
+                activeFilterCount: activeFilterCount,
+                onSort: onSort,
+                onFilter: onFilter,
+              ),
             ),
           ),
         if (isLoading)
@@ -78,14 +91,23 @@ class CatalogShell extends StatelessWidget {
           ),
         if (!isLoading)
           SliverToBoxAdapter(
-            child: _LoadMoreSection(
-              hasMore: hasMore,
-              loadingMore: loadingMore,
-              loadMoreError: loadMoreError,
-              onLoadMore: onLoadMore,
-              // Mobile auto-loads via scroll → no button; spinner/error stay.
-              showButton: !infiniteScroll,
-            ),
+            // Mobile = infinite scroll (no button; spinner/error stay). Desktop =
+            // numbered pages (PLP-15) when there's more than one page.
+            child: !infiniteScroll && onGoToPage != null
+                ? (totalPages > 1
+                    ? _NumberedPages(
+                        currentPage: currentPage,
+                        totalPages: totalPages,
+                        onGoToPage: onGoToPage!,
+                      )
+                    : const SizedBox.shrink())
+                : _LoadMoreSection(
+                    hasMore: hasMore,
+                    loadingMore: loadingMore,
+                    loadMoreError: loadMoreError,
+                    onLoadMore: onLoadMore,
+                    showButton: !infiniteScroll,
+                  ),
           ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
@@ -139,6 +161,8 @@ class _FilterSortBar extends StatelessWidget {
       height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
+        // Opaque so scrolled content doesn't show through when pinned (PLP-20).
+        color: colorScheme.surface,
         border: Border(
           bottom: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
         ),
@@ -304,4 +328,143 @@ class _LoadMoreSection extends StatelessWidget {
     }
     return const SizedBox.shrink();
   }
+}
+
+/// Desktop numbered-pages control (PLP-15): `‹ 1 … 4 [5] 6 … 20 ›`. The active
+/// page uses the brand token; ends are always shown with `…` gaps.
+class _NumberedPages extends StatelessWidget {
+  const _NumberedPages({
+    required this.currentPage,
+    required this.totalPages,
+    required this.onGoToPage,
+  });
+
+  final int currentPage;
+  final int totalPages;
+  final ValueChanged<int> onGoToPage;
+
+  /// Page numbers to render, with `null` marking an ellipsis gap. Always shows
+  /// the first + last page and a ±1 window around the current page.
+  static List<int?> _window(int current, int total) {
+    if (total <= 7) return [for (var i = 1; i <= total; i++) i];
+    final keep = <int>{1, total};
+    for (var i = current - 1; i <= current + 1; i++) {
+      if (i >= 1 && i <= total) keep.add(i);
+    }
+    final sorted = keep.toList()..sort();
+    final out = <int?>[];
+    int? prev;
+    for (final p in sorted) {
+      if (prev != null && p - prev > 1) out.add(null);
+      out.add(p);
+      prev = p;
+    }
+    return out;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          _arrow(
+            Icons.chevron_left,
+            currentPage > 1 ? () => onGoToPage(currentPage - 1) : null,
+            cs,
+          ),
+          for (final p in _window(currentPage, totalPages))
+            if (p == null)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6),
+                child: Text('…'),
+              )
+            else
+              _PageButton(
+                key: ValueKey('plp-page-$p'),
+                page: p,
+                selected: p == currentPage,
+                onTap: () => onGoToPage(p),
+              ),
+          _arrow(
+            Icons.chevron_right,
+            currentPage < totalPages ? () => onGoToPage(currentPage + 1) : null,
+            cs,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _arrow(IconData icon, VoidCallback? onTap, ColorScheme cs) => IconButton(
+        onPressed: onTap,
+        icon: Icon(icon, size: 20),
+        visualDensity: VisualDensity.compact,
+        color: cs.onSurface,
+        disabledColor: cs.outlineVariant,
+      );
+}
+
+class _PageButton extends StatelessWidget {
+  const _PageButton({
+    required this.page,
+    required this.selected,
+    required this.onTap,
+    super.key,
+  });
+
+  final int page;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? cs.primary : null,
+            borderRadius: BorderRadius.circular(6),
+            border: selected ? null : Border.all(color: cs.outlineVariant),
+          ),
+          child: Text(
+            '$page',
+            style: TextStyle(
+              color: selected ? cs.onPrimary : cs.onSurface,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Pins the mobile sort/filter bar at the top of the scroll view (PLP-20). Fixed
+/// 48dp; rebuilds when the (already-rebuilt) [child] changes (sort/count).
+class _PinnedBarDelegate extends SliverPersistentHeaderDelegate {
+  _PinnedBarDelegate(this.child);
+
+  final Widget child;
+
+  @override
+  double get minExtent => 48;
+
+  @override
+  double get maxExtent => 48;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) =>
+      child;
+
+  @override
+  bool shouldRebuild(_PinnedBarDelegate oldDelegate) => oldDelegate.child != child;
 }
