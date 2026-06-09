@@ -12,6 +12,7 @@ class ProductsState {
     this.hasMore = false,
     this.page = 1,
     this.total,
+    this.totalPages = 1,
   });
 
   final AsyncValue<List<ProductSummary>> products;
@@ -24,6 +25,10 @@ class ProductsState {
   /// until the first page lands. Surfaced for the PLP result count (PLP-04).
   final int? total;
 
+  /// Total pages for the active filter (`pagination.total_pages`). Drives the
+  /// desktop numbered-pages control (PLP-15).
+  final int totalPages;
+
   ProductsState copyWith({
     AsyncValue<List<ProductSummary>>? products,
     bool? loadingMore,
@@ -32,6 +37,7 @@ class ProductsState {
     bool? hasMore,
     int? page,
     int? total,
+    int? totalPages,
   }) =>
       ProductsState(
         products: products ?? this.products,
@@ -41,6 +47,7 @@ class ProductsState {
         hasMore: hasMore ?? this.hasMore,
         page: page ?? this.page,
         total: total ?? this.total,
+        totalPages: totalPages ?? this.totalPages,
       );
 }
 

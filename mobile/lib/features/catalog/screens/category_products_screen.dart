@@ -135,9 +135,14 @@ class _CategoryProductsScreenState
       onFilter: context.isMobile ? _showFilterSheet : null,
       activeFilterCount: filters.activeChipCount,
       gridCrossAxisCount: context.isMobile ? 2 : (context.isDesktop ? 5 : 3),
-      // PLP-03: mobile auto-loads the next page on scroll; desktop keeps the
-      // explicit "load more" button.
+      // PLP-03: mobile auto-loads the next page on scroll. PLP-15: desktop uses
+      // numbered pages instead.
       infiniteScroll: context.isMobile,
+      currentPage: state.page,
+      totalPages: state.totalPages,
+      onGoToPage: context.isMobile
+          ? null
+          : (p) => ref.read(filteredProductsProvider(_key).notifier).goToPage(p),
       onRefresh: () async =>
           ref.read(filteredProductsProvider(_key).notifier).refresh(),
     );

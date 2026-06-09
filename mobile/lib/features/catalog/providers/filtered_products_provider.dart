@@ -40,6 +40,13 @@ class FilteredProductsNotifier
     await _load(state.page + 1, replace: false);
   }
 
+  /// Jump to a specific page, replacing the grid with just that page's results
+  /// (desktop numbered pages, PLP-15). No-op for the current page.
+  Future<void> goToPage(int page) async {
+    if (page == state.page || page < 1) return;
+    await _load(page, replace: true);
+  }
+
   Future<void> _load(int page, {required bool replace}) async {
     if (replace) {
       state = state.copyWith(products: const AsyncLoading(), page: 1);
@@ -68,6 +75,7 @@ class FilteredProductsNotifier
         hasMore: meta != null && page < meta.totalPages,
         page: page,
         total: meta?.total,
+        totalPages: meta?.totalPages,
         clearLoadMoreError: true,
       );
     } on DioException catch (e, st) {
