@@ -40,13 +40,13 @@
 | Baseline item | Mopro current (from source) | Delta | Status |
 |---|---|---|---|
 | **Filters — desktop sidebar** (category, brand searchable, price, rating, attrs, free-cargo/fast-delivery; apply + clear-all; live count) | `FilterPanel`: category tree, **searchable brand list** (search box + show-more >8), price **RangeSlider + min/max fields**, rating (All/4+/3+/2+), free-shipping switch, clear-all + (no-op) apply. Live-applied via URL. | **No fast-delivery** toggle (only free-cargo); **no in-stock** in the desktop panel (it's in the model + mobile only → PLP-11); **no brand counts** (PLP-07); no attribute/variant facets | **PROBABLE** (mostly matched) |
-| **Filters — mobile bottom-sheet** (same set as desktop) | `FilterSheet`: price min/max, free-shipping, in-stock, cashback-only (**disabled**). **No brand, no rating, no category.** | Mobile is a **strict subset** of desktop — can't filter by **brand or rating** on a phone | **PROBABLE** — **PLP-01** (MED candidate) |
+| **Filters — mobile bottom-sheet** (same set as desktop) | ~~`FilterSheet`: price/free-ship/in-stock only~~ → **RESOLVED (PLP-01)**: provider-backed sheet now has **searchable Brand + Rating accordions** (shared `PlpBrandFacet`/`PlpRatingFacet` extracted from the desktop sidebar) + price/free-ship/in-stock, all live-applied to `plpFiltersProvider`. | ~~mobile is a strict subset~~ — closed | **RESOLVED** — `filter_sheet.dart` (`docs/internal/plp-01-03.md`) |
 | **Applied-filter chips** (removable, above grid) | `PlpFilterChips`: one removable `InputChip` per active filter + clear-all (≥2). **Desktop `_buildWide` only.** | Mobile shows a filter-count **badge** on the bar, **no removable chips** | **PROBABLE** — **PLP-02** |
 | **Quick-filter pills** above the grid | None (applied-chips ≠ predefined quick pills) | No one-tap common-filter pills | **PROBABLE** — **PLP-06** (LOW) |
 | **Sort** — dropdown: recommended, price ↑/↓, newest, bestseller, rating | `PlpSort`: recommended, bestseller, newest, price_asc, price_desc, **cashback_desc**. Desktop `PopupMenuButton` + mobile `sort_sheet`. | **No "rating" sort**; **cashback_desc** added (brand → D1) | **PROBABLE** (near-match) |
 | **Grid** — 2-col mobile / multi-col desktop, parity'd card | `ProductGrid` via `CatalogShell`: **2 mobile / 3 tablet / 5 desktop**, reuses `ProductCard` (badges / "Sepette %X" pill / rating / bestseller) | Matches | **NOT-ACTIONABLE** (matched) |
 | **Result count** + breadcrumbs | `pagination.total` **is returned** but **not surfaced**; no count text. Breadcrumb is **JSON-LD only** (SEO) — no visible UI; AppBar shows the category title | No visible count (**PLP-04**); no visible breadcrumb (**PLP-05**) | **PROBABLE** (LOW each) |
-| **Pagination** — infinite scroll (mobile) / load-more (desktop) | **Manual "Load more" button** on **both** (spinner while loading, error-retry banner). No scroll-triggered auto-load. | No mobile **infinite scroll** | **PROBABLE** — **PLP-03** (MED candidate) |
+| **Pagination** — infinite scroll (mobile) / load-more (desktop) | ~~Manual "Load more" button on both~~ → **RESOLVED (PLP-03)**: **mobile auto-loads** page N+1 within 150px of the bottom (`CatalogShell.infiniteScroll`, gated by `hasMore && !loadingMore`, no double-fetch); button hidden on mobile, spinner + error/retry kept. **Desktop keeps the button** (numbered-pages parity is PLP-NN, separate). | mobile infinite scroll — closed | **RESOLVED** — `catalog_shell.dart` |
 | **Empty / no-results** with suggestions or reset | `EmptyState.empty()` — message only; `onAction` **not wired** | No **clear-filters** CTA in the zero-results state | **PROBABLE** — **PLP-08** (LOW) |
 | **Header** — search bar + category title | AppBar: category **title** + **share** button. No search bar on the PLP. | No in-PLP search affordance | **PROBABLE** — **PLP-10** (LOW) |
 
@@ -123,9 +123,12 @@ apply needed) · **URL-synced** filter state.
 ```
 
 <!-- ── §2-seed findings (confirm/correct against live) ───────────────────── -->
-<!-- PLP-01 — mobile filter sheet lacks brand + rating (+ category). MED? -->
+<!-- PLP-01 — RESOLVED (feat/plp-mobile-facets-and-scroll): mobile sheet now has
+     searchable Brand + Rating facets (shared with desktop). -->
 <!-- PLP-02 — applied-filter chips are desktop-only (mobile = count badge). -->
-<!-- PLP-03 — manual "Load more" on mobile, not infinite scroll. MED? -->
+<!-- PLP-03 — RESOLVED (feat/plp-mobile-facets-and-scroll): mobile infinite scroll
+     (150px, hasMore-gated); desktop keeps the button. Note: Trendyol desktop is
+     numbered pages, not infinite scroll (markup-observed) — a separate item. -->
 <!-- PLP-04 — no visible result count (pagination.total is available, unused). -->
 <!-- PLP-05 — no visible breadcrumb on desktop (JSON-LD only). -->
 <!-- PLP-06 — no predefined quick-filter pills above the grid. -->
