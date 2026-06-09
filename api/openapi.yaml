@@ -848,7 +848,11 @@ paths:
     get:
       operationId: SearchSuggest
       tags: [search]
-      summary: Autocomplete suggestions (debounce 250 ms on client)
+      summary: Structured autocomplete suggestions (debounce 300 ms on client)
+      description: |
+        Returns structured brand + product suggestions for the search dropdown
+        (SE-06). Brands route to the brand-filtered listing; products route to
+        the PDP. Both are sourced from the catalog alone.
       parameters:
         - $ref: '#/components/parameters/TraceId'
         - name: q
@@ -859,17 +863,11 @@ paths:
             minLength: 1
       responses:
         '200':
-          description: Suggestion list
+          description: Structured brand + product suggestions
           content:
             application/json:
               schema:
-                type: object
-                required: [suggestions]
-                properties:
-                  suggestions:
-                    type: array
-                    items:
-                      type: string
+                $ref: '#/components/schemas/SuggestResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -2425,6 +2423,37 @@ components:
           description: |
             Normalized key of the seller's dispatch city, for an optional
             "{city}'dan gönderilir" line. Omitted when the origin is unknown.
+
+    BrandSuggestion:
+      type: object
+      description: |
+        A single brand autocomplete row (SE-06). Brand is a plain product
+        attribute (no brand entity); a tapped suggestion routes to the
+        brand-filtered listing.
+      required: [name, product_count]
+      properties:
+        name:
+          type: string
+          description: Brand name
+        product_count:
+          type: integer
+          description: Number of active products carrying this brand
+
+    SuggestResponse:
+      type: object
+      description: Structured search autocomplete payload (SE-06).
+      required: [brands, products]
+      properties:
+        brands:
+          type: array
+          description: Matching brands, ordered by active-product count desc
+          items:
+            $ref: '#/components/schemas/BrandSuggestion'
+        products:
+          type: array
+          description: Top matching product summaries (route to PDP)
+          items:
+            $ref: '#/components/schemas/ProductSummary'
 
     ProductSummary:
       type: object

@@ -8,6 +8,7 @@ doc/AddressInput.md
 doc/AdminApi.md
 doc/AuthApi.md
 doc/Banner.md
+doc/BrandSuggestion.md
 doc/Cart.md
 doc/CartApi.md
 doc/CartItem.md
@@ -63,7 +64,6 @@ doc/Reservation.md
 doc/ReturnRequest.md
 doc/ReturnRequestItemsInner.md
 doc/SearchApi.md
-doc/SearchSuggest200Response.md
 doc/SearchTrending200Response.md
 doc/SellerApi.md
 doc/SellerBinding.md
@@ -72,6 +72,7 @@ doc/SellerOrderBreakdownItemsInner.md
 doc/SellerOrderBreakdownTotals.md
 doc/StepUpRequest.md
 doc/StepUpTokenResponse.md
+doc/SuggestResponse.md
 doc/TokenPair.md
 doc/UpdateMeRequest.md
 doc/User.md
@@ -105,6 +106,7 @@ lib/src/model/add_cart_item_request.dart
 lib/src/model/address.dart
 lib/src/model/address_input.dart
 lib/src/model/banner.dart
+lib/src/model/brand_suggestion.dart
 lib/src/model/cart.dart
 lib/src/model/cart_item.dart
 lib/src/model/cashback_payment.dart
@@ -152,7 +154,6 @@ lib/src/model/request_otp_request.dart
 lib/src/model/reservation.dart
 lib/src/model/return_request.dart
 lib/src/model/return_request_items_inner.dart
-lib/src/model/search_suggest200_response.dart
 lib/src/model/search_trending200_response.dart
 lib/src/model/seller_binding.dart
 lib/src/model/seller_order_breakdown.dart
@@ -160,6 +161,7 @@ lib/src/model/seller_order_breakdown_items_inner.dart
 lib/src/model/seller_order_breakdown_totals.dart
 lib/src/model/step_up_request.dart
 lib/src/model/step_up_token_response.dart
+lib/src/model/suggest_response.dart
 lib/src/model/token_pair.dart
 lib/src/model/update_me_request.dart
 lib/src/model/user.dart
@@ -167,3 +169,5 @@ lib/src/model/variant.dart
 lib/src/model/verify_otp_request.dart
 lib/src/model/wallet_balance.dart
 lib/src/model/wallet_transaction.dart
+test/brand_suggestion_test.dart
+test/suggest_response_test.dart

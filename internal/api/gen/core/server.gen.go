@@ -227,6 +227,17 @@ type Banner struct {
 // BannerActionType defines model for Banner.ActionType.
 type BannerActionType string
 
+// BrandSuggestion A single brand autocomplete row (SE-06). Brand is a plain product
+// attribute (no brand entity); a tapped suggestion routes to the
+// brand-filtered listing.
+type BrandSuggestion struct {
+	// Name Brand name
+	Name string `json:"name"`
+
+	// ProductCount Number of active products carrying this brand
+	ProductCount int `json:"product_count"`
+}
+
 // Cart defines model for Cart.
 type Cart struct {
 	CoinCurrency     string     `json:"coin_currency"`
@@ -644,6 +655,15 @@ type StepUpTokenResponse struct {
 
 	// StepUpToken Bearer token with scope=high_sensitivity. Use as Authorization header.
 	StepUpToken string `json:"step_up_token"`
+}
+
+// SuggestResponse Structured search autocomplete payload (SE-06).
+type SuggestResponse struct {
+	// Brands Matching brands, ordered by active-product count desc
+	Brands []BrandSuggestion `json:"brands"`
+
+	// Products Top matching product summaries (route to PDP)
+	Products []ProductSummary `json:"products"`
 }
 
 // TokenPair defines model for TokenPair.
@@ -1566,7 +1586,7 @@ type ServerInterface interface {
 	// Full-text product search with filters
 	// (GET /search)
 	Search(w http.ResponseWriter, r *http.Request, params SearchParams)
-	// Autocomplete suggestions (debounce 250 ms on client)
+	// Structured autocomplete suggestions (debounce 300 ms on client)
 	// (GET /search/suggest)
 	SearchSuggest(w http.ResponseWriter, r *http.Request, params SearchSuggestParams)
 	// Current trending search terms
@@ -6315,9 +6335,7 @@ type SearchSuggestResponseObject interface {
 	VisitSearchSuggestResponse(w http.ResponseWriter) error
 }
 
-type SearchSuggest200JSONResponse struct {
-	Suggestions []string `json:"suggestions"`
-}
+type SearchSuggest200JSONResponse SuggestResponse
 
 func (response SearchSuggest200JSONResponse) VisitSearchSuggestResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
@@ -6539,7 +6557,7 @@ type StrictServerInterface interface {
 	// Full-text product search with filters
 	// (GET /search)
 	Search(ctx context.Context, request SearchRequestObject) (SearchResponseObject, error)
-	// Autocomplete suggestions (debounce 250 ms on client)
+	// Structured autocomplete suggestions (debounce 300 ms on client)
 	// (GET /search/suggest)
 	SearchSuggest(ctx context.Context, request SearchSuggestRequestObject) (SearchSuggestResponseObject, error)
 	// Current trending search terms

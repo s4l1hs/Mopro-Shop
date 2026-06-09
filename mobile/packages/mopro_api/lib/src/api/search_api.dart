@@ -11,8 +11,8 @@ import 'package:dio/dio.dart';
 
 import 'package:mopro_api/src/model/error_envelope.dart';
 import 'package:mopro_api/src/model/list_products200_response.dart';
-import 'package:mopro_api/src/model/search_suggest200_response.dart';
 import 'package:mopro_api/src/model/search_trending200_response.dart';
+import 'package:mopro_api/src/model/suggest_response.dart';
 
 class SearchApi {
 
@@ -138,8 +138,8 @@ _responseData = rawData == null ? null : deserialize<ListProducts200Response, Li
     );
   }
 
-  /// Autocomplete suggestions (debounce 250 ms on client)
-  /// 
+  /// Structured autocomplete suggestions (debounce 300 ms on client)
+  /// Returns structured brand + product suggestions for the search dropdown (SE-06). Brands route to the brand-filtered listing; products route to the PDP. Both are sourced from the catalog alone. 
   ///
   /// Parameters:
   /// * [q] 
@@ -151,9 +151,9 @@ _responseData = rawData == null ? null : deserialize<ListProducts200Response, Li
   /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
   /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
   ///
-  /// Returns a [Future] containing a [Response] with a [SearchSuggest200Response] as data
+  /// Returns a [Future] containing a [Response] with a [SuggestResponse] as data
   /// Throws [DioException] if API call or serialization fails
-  Future<Response<SearchSuggest200Response>> searchSuggest({ 
+  Future<Response<SuggestResponse>> searchSuggest({ 
     required String q,
     String? xTraceId,
     CancelToken? cancelToken,
@@ -196,11 +196,11 @@ _responseData = rawData == null ? null : deserialize<ListProducts200Response, Li
       onReceiveProgress: onReceiveProgress,
     );
 
-    SearchSuggest200Response? _responseData;
+    SuggestResponse? _responseData;
 
     try {
 final rawData = _response.data;
-_responseData = rawData == null ? null : deserialize<SearchSuggest200Response, SearchSuggest200Response>(rawData, 'SearchSuggest200Response', growable: true);
+_responseData = rawData == null ? null : deserialize<SuggestResponse, SuggestResponse>(rawData, 'SuggestResponse', growable: true);
     } catch (error, stackTrace) {
       throw DioException(
         requestOptions: _response.requestOptions,
@@ -211,7 +211,7 @@ _responseData = rawData == null ? null : deserialize<SearchSuggest200Response, S
       );
     }
 
-    return Response<SearchSuggest200Response>(
+    return Response<SuggestResponse>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

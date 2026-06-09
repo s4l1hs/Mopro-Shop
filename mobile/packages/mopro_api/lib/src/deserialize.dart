@@ -2,6 +2,7 @@ import 'package:mopro_api/src/model/add_cart_item_request.dart';
 import 'package:mopro_api/src/model/address.dart';
 import 'package:mopro_api/src/model/address_input.dart';
 import 'package:mopro_api/src/model/banner.dart';
+import 'package:mopro_api/src/model/brand_suggestion.dart';
 import 'package:mopro_api/src/model/cart.dart';
 import 'package:mopro_api/src/model/cart_item.dart';
 import 'package:mopro_api/src/model/cashback_payment.dart';
@@ -49,7 +50,6 @@ import 'package:mopro_api/src/model/request_otp_request.dart';
 import 'package:mopro_api/src/model/reservation.dart';
 import 'package:mopro_api/src/model/return_request.dart';
 import 'package:mopro_api/src/model/return_request_items_inner.dart';
-import 'package:mopro_api/src/model/search_suggest200_response.dart';
 import 'package:mopro_api/src/model/search_trending200_response.dart';
 import 'package:mopro_api/src/model/seller_binding.dart';
 import 'package:mopro_api/src/model/seller_order_breakdown.dart';
@@ -57,6 +57,7 @@ import 'package:mopro_api/src/model/seller_order_breakdown_items_inner.dart';
 import 'package:mopro_api/src/model/seller_order_breakdown_totals.dart';
 import 'package:mopro_api/src/model/step_up_request.dart';
 import 'package:mopro_api/src/model/step_up_token_response.dart';
+import 'package:mopro_api/src/model/suggest_response.dart';
 import 'package:mopro_api/src/model/token_pair.dart';
 import 'package:mopro_api/src/model/update_me_request.dart';
 import 'package:mopro_api/src/model/user.dart';
@@ -91,6 +92,8 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return AddressInput.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Banner':
           return Banner.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'BrandSuggestion':
+          return BrandSuggestion.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Cart':
           return Cart.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'CartItem':
@@ -185,8 +188,6 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return ReturnRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ReturnRequestItemsInner':
           return ReturnRequestItemsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
-        case 'SearchSuggest200Response':
-          return SearchSuggest200Response.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'SearchTrending200Response':
           return SearchTrending200Response.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'SellerBinding':
@@ -201,6 +202,8 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return StepUpRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'StepUpTokenResponse':
           return StepUpTokenResponse.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'SuggestResponse':
+          return SuggestResponse.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'TokenPair':
           return TokenPair.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'UpdateMeRequest':
