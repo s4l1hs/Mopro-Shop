@@ -143,6 +143,8 @@
     "all_categories": "Tüm Kategoriler"
   },
   "plp": {
+    "breadcrumb_home": "Anasayfa",
+    "result_count": "{} ürün",
     "filter_category": "Kategori",
     "filter_brand": "Marka",
     "filter_price": "Fiyat",

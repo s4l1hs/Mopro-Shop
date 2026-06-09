@@ -145,7 +145,12 @@ void main() {
     // Mobile uses infinite scroll — the explicit button is gone.
     expect(find.text('catalog.load_more'), findsNothing);
 
-    final scrollable = find.byType(Scrollable).first;
+    // Target the grid's vertical scroller specifically — the breadcrumb adds a
+    // horizontal SingleChildScrollView, so `Scrollable.first` is ambiguous.
+    final scrollable = find.descendant(
+      of: find.byType(CustomScrollView),
+      matching: find.byType(Scrollable),
+    );
     await tester.drag(scrollable, const Offset(0, -4000));
     await tester.pumpAndSettle();
 

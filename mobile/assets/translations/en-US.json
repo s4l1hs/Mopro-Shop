@@ -143,6 +143,8 @@
     "all_categories": "All Categories"
   },
   "plp": {
+    "breadcrumb_home": "Home",
+    "result_count": "{} products",
     "filter_category": "Category",
     "filter_brand": "Brand",
     "filter_price": "Price",
