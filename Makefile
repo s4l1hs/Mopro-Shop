@@ -391,8 +391,8 @@ api-gen-dart:
 
 api-gen: api-gen-models api-gen-core api-gen-fin api-gen-dart ## Regenerate all OpenAPI models + clients.
 
-contract-test: ## Run API contract tests.
-	go test -tags=contract -v ./internal/api/...
+contract-test: ## Run API contract tests (spec fixtures + live-handler conformance).
+	go test -tags=contract -v -run TestContract ./internal/api/... ./cmd/core-svc/...
 
 # ── Diff enforcement (called by CI) ────────────────────────────────────────────
 

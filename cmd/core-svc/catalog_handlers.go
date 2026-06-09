@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/mopro/platform/internal/analytics"
 	"github.com/mopro/platform/internal/catalog"
@@ -231,7 +232,7 @@ type deliveryEstimator interface {
 	EstimateETA(ctx context.Context, market, originCity string, destCity *string) (shipping.ETAResult, error)
 }
 
-func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSvc deliveryEstimator, defaultMarket, cashbackCurrency string) http.HandlerFunc {
+func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSvc deliveryEstimator, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
@@ -271,36 +272,35 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 			}
 		}
 
-		// Enrich variants with CDN image URLs.
-		type variantOut struct {
-			catalog.Variant
-			CoverImageURL string `json:"cover_image_url,omitempty"`
-		}
-		variantsOut := make([]variantOut, len(variants))
+		// Variants: emit the spec Variant shape — image_urls is the CDN-resolved
+		// gallery (mediaurl.CDNUrl over every image_key), NOT raw image_keys (PD-06).
+		variantsOut := make([]variantDetailJSON, len(variants))
 		for i, v := range variants {
-			vo := variantOut{Variant: v}
-			if len(v.ImageKeys) > 0 {
-				vo.CoverImageURL = mediaurl.CDNUrl(v.ImageKeys[0])
+			variantsOut[i] = variantDetailJSON{
+				ID:                  v.ID,
+				SKU:                 v.SKU,
+				Color:               v.Color,
+				Size:                v.Size,
+				PriceMinor:          v.PriceMinor,
+				PriceCurrency:       v.PriceCurrency,
+				Stock:               v.Stock,
+				ImageURLs:           cdnURLs(v.ImageKeys),
+				OriginalPriceMinor:  v.OriginalPriceMinor,
+				Lowest30dPriceMinor: v.Lowest30dPriceMinor,
 			}
-			variantsOut[i] = vo
 		}
 
 		// Resolve the seller for storefront deep-linking. seller_name is required
-		// by the Product schema; seller_slug is nullable — both null/empty when
-		// the product's seller_id doesn't resolve to an active seller (pre-5a
-		// data or a suspended seller). Embedding promotes catalog.Product's
-		// fields to the top level alongside the two seller fields.
-		type productOut struct {
-			catalog.Product
-			SellerName string  `json:"seller_name"`
-			SellerSlug *string `json:"seller_slug"`
-		}
-		out := productOut{Product: p}
+		// by the Product schema; seller_slug is nullable — both empty/null when the
+		// product's seller_id doesn't resolve to an active seller (pre-5a data or a
+		// suspended seller).
+		var sellerName string
+		var sellerSlug *string
 		var originCity string
 		if s, sErr := sellerSvc.GetByID(r.Context(), p.SellerID); sErr == nil {
-			out.SellerName = s.DisplayName
+			sellerName = s.DisplayName
 			slug := s.Slug
-			out.SellerSlug = &slug
+			sellerSlug = &slug
 			if s.DispatchCity != nil {
 				originCity = *s.DispatchCity
 			}
@@ -332,14 +332,98 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 			}
 		}
 
-		jsonOK(w, http.StatusOK, map[string]any{
-			"product":          out,
-			"variants":         variantsOut,
-			"translations":     translations,
-			"cashback_preview": cashbackPreview,
-			"delivery_eta":     deliveryETA,
+		// title/description are locale-resolved server-side (the Product schema's
+		// contract) from the product translations; the legacy response leaked the
+		// raw translations array, which the spec + mobile client do not carry.
+		title, description := resolveTranslation(translations, parseLocale(r, defaultLocale), defaultLocale)
+
+		// Flat, spec-conformant Product (PD-06): the previous {product, variants,
+		// translations, …} envelope did not match the OpenAPI Product schema (nor
+		// the generated mobile client), so the PDP could not parse it.
+		jsonOK(w, http.StatusOK, productDetailJSON{
+			ID:              p.ID,
+			SellerID:        p.SellerID,
+			SellerName:      sellerName,
+			SellerSlug:      sellerSlug,
+			CategoryID:      p.CategoryID,
+			Brand:           p.Brand,
+			Status:          p.Status,
+			Title:           title,
+			Description:     description,
+			Variants:        variantsOut,
+			CashbackPreview: cashbackPreview,
+			DeliveryEta:     deliveryETA,
+			CreatedAt:       p.CreatedAt.Format(time.RFC3339),
 		})
 	}
+}
+
+// productDetailJSON is the flat, spec-conformant GET /products/{id} 200 body
+// (OpenAPI Product). It replaces the legacy {product, variants, translations, …}
+// envelope (PD-06) that neither the spec nor the generated mobile client matched.
+type productDetailJSON struct {
+	ID              int64                `json:"id"`
+	SellerID        int64                `json:"seller_id"`
+	SellerName      string               `json:"seller_name"`
+	SellerSlug      *string              `json:"seller_slug"`
+	CategoryID      int64                `json:"category_id"`
+	Brand           string               `json:"brand"`
+	Status          string               `json:"status"`
+	Title           string               `json:"title"`
+	Description     string               `json:"description"`
+	Variants        []variantDetailJSON  `json:"variants"`
+	CashbackPreview *cashbackPreviewJSON `json:"cashback_preview"`
+	DeliveryEta     *deliveryEtaJSON     `json:"delivery_eta"`
+	CreatedAt       string               `json:"created_at"`
+}
+
+// variantDetailJSON is the spec Variant: image_urls is the CDN-resolved gallery
+// (never raw storage keys). color/size are emitted as-is (spec nullable string).
+type variantDetailJSON struct {
+	ID                  int64    `json:"id"`
+	SKU                 string   `json:"sku"`
+	Color               string   `json:"color"`
+	Size                string   `json:"size"`
+	PriceMinor          int64    `json:"price_minor"`
+	PriceCurrency       string   `json:"price_currency"`
+	Stock               int      `json:"stock"`
+	ImageURLs           []string `json:"image_urls"`
+	OriginalPriceMinor  *int64   `json:"original_price_minor,omitempty"`
+	Lowest30dPriceMinor *int64   `json:"lowest_30d_price_minor,omitempty"`
+}
+
+// cdnURLs maps raw storage keys to CDN-resolved URLs (mediaurl.CDNUrl), always
+// returning a non-nil slice so the spec-required image_urls array is present.
+func cdnURLs(keys []string) []string {
+	out := make([]string, 0, len(keys))
+	for _, k := range keys {
+		if k != "" {
+			out = append(out, mediaurl.CDNUrl(k))
+		}
+	}
+	return out
+}
+
+// resolveTranslation picks a product's title/description for the requested
+// locale, falling back to the default locale, then the first available — so the
+// spec-required title/description are always populated when any translation exists.
+func resolveTranslation(translations []catalog.ProductTranslation, locale, fallback string) (title, description string) {
+	var fb *catalog.ProductTranslation
+	for i := range translations {
+		if translations[i].Locale == locale {
+			return translations[i].Title, translations[i].Description
+		}
+		if translations[i].Locale == fallback {
+			fb = &translations[i]
+		}
+	}
+	if fb != nil {
+		return fb.Title, fb.Description
+	}
+	if len(translations) > 0 {
+		return translations[0].Title, translations[0].Description
+	}
+	return "", ""
 }
 
 // handleListBanners is a 200-empty stub. GET /banners
