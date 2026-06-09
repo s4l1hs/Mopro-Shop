@@ -134,7 +134,7 @@ class _CategoryProductsScreenState
       onSort: context.isMobile ? _showSortSheet : null,
       onFilter: context.isMobile ? _showFilterSheet : null,
       activeFilterCount: filters.activeChipCount,
-      gridCrossAxisCount: context.isMobile ? 2 : (context.isDesktop ? 5 : 3),
+      gridCrossAxisCount: _gridColumns(context),
       // PLP-03: mobile auto-loads the next page on scroll. PLP-15: desktop uses
       // numbered pages instead.
       infiniteScroll: context.isMobile,
@@ -179,6 +179,18 @@ class _CategoryProductsScreenState
     );
   }
 
+  // PLP-19: smooth grid breakpoints — 2 (mobile) / 3 (tablet) / 4 (desktop
+  // <1440) / 5 (ultra-wide ≥1440).
+  int _gridColumns(BuildContext context) {
+    if (context.isMobile) return 2;
+    if (!context.isDesktop) return 3;
+    return MediaQuery.sizeOf(context).width >= 1440 ? 5 : 4;
+  }
+
+  // PLP-19: widen the desktop content clamp on ultra-wide screens so the grid
+  // uses more of the viewport (less outer-margin whitespace).
+  double _contentMaxWidth(double available) => available >= 1440 ? 1600 : 1240;
+
   // Mobile: breadcrumb + result count (PLP-05 / PLP-04) above the scroller.
   Widget _buildMobile(BuildContext context, Widget shell) {
     return Column(
@@ -213,7 +225,7 @@ class _CategoryProductsScreenState
       builder: (ctx, c) {
         return Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1240),
+            constraints: BoxConstraints(maxWidth: _contentMaxWidth(c.maxWidth)),
             child: SizedBox(
               height: c.maxHeight,
               child: Padding(
