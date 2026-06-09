@@ -20,9 +20,10 @@ import '../_support/test_harness.dart';
 
 // ── Flow M — adaptive desktop home composition ──────────────────────────────
 // At a desktop width the same widgets compose into desktop containers: rails
-// render as grids (GridView), the banner shows prev/next chevrons, and the
-// thin desktop-only footer is mounted. Mobile composition is asserted absent
-// (no footer, no chevrons) at a phone width to prove the breakpoint switch.
+// render as horizontal carousels (ListView, no GridView — Sprint B), the banner
+// shows prev/next chevrons, and the thin desktop-only footer is mounted. Mobile
+// composition is asserted absent (no footer, no banner chevrons) at a phone
+// width to prove the breakpoint switch.
 
 ProductSummary _p(int id) => ProductSummary(
       id: id,
@@ -113,13 +114,17 @@ Future<void> _pump(WidgetTester tester, Size size) async {
 void main() {
   setUpAll(initTestEnv);
 
-  testWidgets('Flow M: desktop composes grids, chevrons and the footer',
+  testWidgets('Flow M: desktop composes carousels, chevrons and the footer',
       (tester) async {
     await _pump(tester, const Size(1440, 1400));
 
-    // Rails render as a grid on desktop.
-    expect(find.byType(GridView), findsWidgets);
-    // Banner prev/next chevrons are present on desktop.
+    // Rails render as a horizontal carousel on desktop (Sprint B) — a
+    // ListView, no GridView.
+    expect(find.byType(GridView), findsNothing);
+    expect(find.byType(ListView), findsWidgets);
+    // Banner prev/next chevrons are present on desktop (non-rounded glyphs; the
+    // rail's own hover chevrons use the *_rounded variants and stay at opacity 0
+    // at rest, so they don't collide here).
     expect(find.byIcon(Icons.chevron_left), findsOneWidget);
     expect(find.byIcon(Icons.chevron_right), findsOneWidget);
     // The thin desktop-only footer is mounted (scroll to it — the editor's
