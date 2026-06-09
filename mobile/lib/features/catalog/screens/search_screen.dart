@@ -9,6 +9,8 @@ import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
 import 'package:mopro/features/catalog/plp/widgets/filter_panel.dart';
 import 'package:mopro/features/catalog/plp/widgets/plp_filter_chips.dart';
 import 'package:mopro/features/catalog/providers/categories_provider.dart';
+import 'package:mopro/features/catalog/providers/home_provider.dart'
+    show trendingSearchesProvider;
 import 'package:mopro/features/catalog/providers/recent_searches_provider.dart';
 import 'package:mopro/features/catalog/providers/search_provider.dart';
 import 'package:mopro/features/catalog/widgets/filter_sheet.dart';
@@ -69,16 +71,22 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         titleSpacing: 0,
       ),
       body: state.isEmpty
-          ? _EmptySearchBody(
-              recent: recent,
-              onSelectRecent: (q) {
-                _searchController.text = q;
-                ref.read(searchProvider.notifier).setQuery(q);
-              },
-            )
-          : _results(context, state, query, plpKey),
+          ? _EmptySearchBody(recent: recent, onSelectQuery: _applyQuery)
+          // SE-07: a query that returned nothing gets a recovery body (trending +
+          // categories) instead of a bare empty state.
+          : _isNoResults(state)
+              ? _NoResultsBody(query: query, onSelectQuery: _applyQuery)
+              : _results(context, state, query, plpKey),
     );
   }
+
+  void _applyQuery(String q) {
+    _searchController.text = q;
+    ref.read(searchProvider.notifier).setQuery(q);
+  }
+
+  bool _isNoResults(SearchState state) =>
+      state.results.maybeWhen(data: (r) => r.isEmpty, orElse: () => false);
 
   Widget _shell(SearchState state, String plpKey, {bool wide = false}) =>
       CatalogShell(
@@ -234,11 +242,11 @@ class _ResultCount extends StatelessWidget {
 class _EmptySearchBody extends ConsumerWidget {
   const _EmptySearchBody({
     required this.recent,
-    required this.onSelectRecent,
+    required this.onSelectQuery,
   });
 
   final List<String> recent;
-  final ValueChanged<String> onSelectRecent;
+  final ValueChanged<String> onSelectQuery;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -272,7 +280,7 @@ class _EmptySearchBody extends ConsumerWidget {
                   .map(
                     (q) => InputChip(
                       label: Text(q),
-                      onPressed: () => onSelectRecent(q),
+                      onPressed: () => onSelectQuery(q),
                       onDeleted: () =>
                           ref.read(recentSearchesProvider.notifier).remove(q),
                       deleteIcon: const Icon(Icons.close, size: 14),
@@ -282,6 +290,89 @@ class _EmptySearchBody extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
           ],
+          // SE-09: trending on the mobile empty state (parity with the desktop
+          // dropdown, which already shows trending).
+          _TrendingChips(onSelectQuery: onSelectQuery),
+          const _CategorySuggestions(),
+        ],
+      ),
+    );
+  }
+}
+
+/// Trending searches as tappable chips (SE-09 / SE-07). Renders nothing until
+/// `trendingSearchesProvider` has data.
+class _TrendingChips extends ConsumerWidget {
+  const _TrendingChips({required this.onSelectQuery});
+
+  final ValueChanged<String> onSelectQuery;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final trending = ref.watch(trendingSearchesProvider);
+    final terms = trending.valueOrNull ?? const <String>[];
+    if (terms.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('search.trending'.tr(), style: theme.textTheme.titleSmall),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: terms
+              .map(
+                (q) => ActionChip(
+                  avatar: const Icon(Icons.trending_up, size: 16),
+                  label: Text(q),
+                  onPressed: () => onSelectQuery(q),
+                ),
+              )
+              .toList(),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+}
+
+/// SE-07: no-results recovery — the query echo + trending + category shortcuts so
+/// a dead-end query still offers a way forward. "Did you mean"/spelling
+/// correction is NOT built here — it needs a backend suggest-correction surface
+/// (flagged for Session 2 / DEFER).
+class _NoResultsBody extends StatelessWidget {
+  const _NoResultsBody({required this.query, required this.onSelectQuery});
+
+  final String query;
+  final ValueChanged<String> onSelectQuery;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.search_off,
+            size: 48,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 8),
+          // Query echo + the shared empty message (reuses existing keys — no new
+          // i18n). A query-specific "X için sonuç yok" string + "did you mean"
+          // are deferred (the latter needs a backend correction surface).
+          Text('"$query"', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            'empty_state.empty_message'.tr(),
+            style: theme.textTheme.bodyMedium
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 24),
+          _TrendingChips(onSelectQuery: onSelectQuery),
           const _CategorySuggestions(),
         ],
       ),
