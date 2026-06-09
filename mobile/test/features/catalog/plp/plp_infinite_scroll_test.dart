@@ -163,8 +163,10 @@ void main() {
     expect(api.pagesRequested, [1, 2]);
   });
 
-  testWidgets('desktop: keeps the explicit load-more button', (tester) async {
-    await _pump(tester, width: 1440);
-    expect(find.text('catalog.load_more'), findsOneWidget);
+  testWidgets('desktop: no infinite scroll — numbered pages instead (PLP-15)',
+      (tester) async {
+    await _pump(tester, width: 1440); // fixture has 2 pages
+    expect(find.text('catalog.load_more'), findsNothing);
+    expect(find.byKey(const ValueKey('plp-page-2')), findsOneWidget);
   });
 }
