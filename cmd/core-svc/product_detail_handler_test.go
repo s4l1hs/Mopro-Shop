@@ -57,13 +57,13 @@ func newProductDetailRequest(productID string) *http.Request {
 }
 
 // productDetailBody is the seller-relevant slice of the product-detail response.
+// PD-06: the response is the flat, spec-conformant Product — id/seller_* are at
+// the top level (no longer nested under a "product" envelope).
 type productDetailBody struct {
-	Product struct {
-		ID         int64   `json:"id"`
-		SellerID   int64   `json:"seller_id"`
-		SellerName string  `json:"seller_name"`
-		SellerSlug *string `json:"seller_slug"`
-	} `json:"product"`
+	ID         int64   `json:"id"`
+	SellerID   int64   `json:"seller_id"`
+	SellerName string  `json:"seller_name"`
+	SellerSlug *string `json:"seller_slug"`
 	DeliveryEta *struct {
 		MinDays      int     `json:"min_days"`
 		MaxDays      int     `json:"max_days"`
@@ -88,7 +88,7 @@ func TestProductDetail_ResolvesSellerSlugAndName(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
@@ -97,15 +97,15 @@ func TestProductDetail_ResolvesSellerSlugAndName(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v (%s)", err, rec.Body.String())
 	}
-	if body.Product.SellerName != "Acme Store" {
-		t.Errorf("seller_name: want %q got %q", "Acme Store", body.Product.SellerName)
+	if body.SellerName != "Acme Store" {
+		t.Errorf("seller_name: want %q got %q", "Acme Store", body.SellerName)
 	}
-	if body.Product.SellerSlug == nil || *body.Product.SellerSlug != "acme-store" {
-		t.Errorf("seller_slug: want %q got %v", "acme-store", body.Product.SellerSlug)
+	if body.SellerSlug == nil || *body.SellerSlug != "acme-store" {
+		t.Errorf("seller_slug: want %q got %v", "acme-store", body.SellerSlug)
 	}
 	// The embedded product fields are still present at the top level.
-	if body.Product.ID != 7 || body.Product.SellerID != 1 {
-		t.Errorf("embedded product fields wrong: id=%d seller_id=%d", body.Product.ID, body.Product.SellerID)
+	if body.ID != 7 || body.SellerID != 1 {
+		t.Errorf("embedded product fields wrong: id=%d seller_id=%d", body.ID, body.SellerID)
 	}
 }
 
@@ -119,7 +119,7 @@ func TestProductDetail_UnresolvedSellerYieldsNullSlug(t *testing.T) {
 	sellerSvc := &stubSellerSvc{} // GetByID → ErrSellerNotFound
 
 	rec := httptest.NewRecorder()
-	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
@@ -128,11 +128,11 @@ func TestProductDetail_UnresolvedSellerYieldsNullSlug(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v (%s)", err, rec.Body.String())
 	}
-	if body.Product.SellerSlug != nil {
-		t.Errorf("seller_slug: want null got %q", *body.Product.SellerSlug)
+	if body.SellerSlug != nil {
+		t.Errorf("seller_slug: want null got %q", *body.SellerSlug)
 	}
-	if body.Product.SellerName != "" {
-		t.Errorf("seller_name: want empty got %q", body.Product.SellerName)
+	if body.SellerName != "" {
+		t.Errorf("seller_name: want empty got %q", body.SellerName)
 	}
 }
 
@@ -166,7 +166,7 @@ func TestProductDetail_IncludesDeliveryEta(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/products/7?dest_city=ankara", nil)
 	req.SetPathValue("id", "7")
-	handleGetProductDetail(catalogSvc, sellerSvc, etaSvc, "TR", "TRY_COIN")(rec, req)
+	handleGetProductDetail(catalogSvc, sellerSvc, etaSvc, "tr-TR", "TR", "TRY_COIN")(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
@@ -202,7 +202,7 @@ func TestProductDetail_OmitsDeliveryEtaWhenNoData(t *testing.T) {
 	etaSvc := &stubETASvc{} // returns ETAResult{} → MaxDays 0
 
 	rec := httptest.NewRecorder()
-	handleGetProductDetail(catalogSvc, sellerSvc, etaSvc, "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+	handleGetProductDetail(catalogSvc, sellerSvc, etaSvc, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
 
 	var body productDetailBody
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
