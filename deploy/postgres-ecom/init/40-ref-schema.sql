@@ -38,6 +38,11 @@ CREATE TABLE IF NOT EXISTS ref_schema.categories (
   UNIQUE (slug)
 );
 
+-- Backs the PLP-12 subtree-rollup recursive CTE (parent_id → children). Mirrors
+-- migration 0088 so fresh provisions match the migrated path.
+CREATE INDEX IF NOT EXISTS categories_parent_id_idx
+  ON ref_schema.categories (parent_id);
+
 CREATE TABLE IF NOT EXISTS ref_schema.commission_rules (
   id                   BIGSERIAL   NOT NULL,
   market               TEXT        NOT NULL,
