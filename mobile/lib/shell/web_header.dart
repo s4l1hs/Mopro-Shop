@@ -9,7 +9,7 @@ import 'package:mopro/design/responsive/responsive.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/cart/application/cart_count_provider.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
-import 'package:mopro/features/notifications/widgets/notification_badge.dart';
+import 'package:mopro/features/notifications/widgets/notification_bell.dart';
 import 'package:mopro/shell/account_hover_menu.dart';
 import 'package:mopro/shell/web_search_pill.dart';
 
@@ -93,6 +93,14 @@ class WebHeader extends ConsumerWidget implements PreferredSizeWidget {
                 tooltip: 'nav.cart',
                 onTap: () => context.go('/cart'),
                 primary: MoproTokens.primaryLight,
+              ),
+              const SizedBox(width: 4),
+
+              // ── Notification bell (HP-06) — adjacent to cart/favorites; the
+              //    live unread badge lives here (moved off the avatar). Always
+              //    visible, badge auto-hidden for guests (count 0).
+              NotificationBell(
+                onTap: () => context.go('/account/notifications'),
               ),
               const SizedBox(width: 8),
 
@@ -248,22 +256,22 @@ class _AccountAvatar extends StatelessWidget {
         width: 44,
         height: 44,
         child: Center(
-          child: NotificationBadge(
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: MoproTokens.primaryLight,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'M',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                ),
+          // The unread badge moved to the NotificationBell (HP-06); the avatar
+          // is now just the initial.
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: MoproTokens.primaryLight,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const Text(
+              'M',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
               ),
             ),
           ),
