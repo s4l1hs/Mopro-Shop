@@ -15,6 +15,8 @@ class SearchState {
     this.loadMoreError,
     this.hasMore = false,
     this.page = 1,
+    this.total,
+    this.totalPages = 1,
   });
 
   final String query;
@@ -23,6 +25,14 @@ class SearchState {
   final AppError? loadMoreError;
   final bool hasMore;
   final int page;
+
+  /// Total matching products (`pagination.total`), or null until the first page
+  /// lands. Drives the result count (SE-03); rendered only when non-null so the
+  /// UI compiles independently of any backend total work.
+  final int? total;
+
+  /// Total pages (`pagination.total_pages`) — drives desktop numbered pages (SE-04).
+  final int totalPages;
 
   bool get isEmpty => query.isEmpty;
 
@@ -34,6 +44,8 @@ class SearchState {
     bool clearLoadMoreError = false,
     bool? hasMore,
     int? page,
+    int? total,
+    int? totalPages,
   }) =>
       SearchState(
         query: query ?? this.query,
@@ -43,6 +55,8 @@ class SearchState {
             clearLoadMoreError ? null : loadMoreError ?? this.loadMoreError,
         hasMore: hasMore ?? this.hasMore,
         page: page ?? this.page,
+        total: total ?? this.total,
+        totalPages: totalPages ?? this.totalPages,
       );
 }
 
@@ -78,6 +92,14 @@ class SearchNotifier extends Notifier<SearchState> {
     await _load(state.page + 1);
   }
 
+  /// Jump to a specific page, replacing the results with just that page (desktop
+  /// numbered pages, SE-04). No-op for the current page.
+  Future<void> goToPage(int page) async {
+    if (state.query.isEmpty || page == state.page || page < 1) return;
+    state = state.copyWith(results: const AsyncLoading(), page: page);
+    await _load(page, replace: true);
+  }
+
   /// Re-runs the search from page 1 with the current filter state for the active
   /// query. SearchScreen calls this when `plpFiltersProvider(plpKeyForSearch(query))`
   /// changes — this singleton provider doesn't watch the query-keyed filter, so
@@ -92,7 +114,7 @@ class SearchNotifier extends Notifier<SearchState> {
     _load(1);
   }
 
-  Future<void> _load(int page) async {
+  Future<void> _load(int page, {bool replace = false}) async {
     final query = state.query;
     if (query.isEmpty) return;
     try {
@@ -111,13 +133,17 @@ class SearchNotifier extends Notifier<SearchState> {
       );
       final incoming = resp.data?.data ?? [];
       final meta = resp.data?.pagination;
-      final existing =
-          page == 1 ? <ProductSummary>[] : state.results.valueOrNull ?? [];
+      // page 1 or an explicit page-jump replaces; loadMore appends.
+      final existing = (page == 1 || replace)
+          ? <ProductSummary>[]
+          : state.results.valueOrNull ?? [];
       state = state.copyWith(
         results: AsyncData([...existing, ...incoming]),
         loadingMore: false,
         hasMore: meta != null && page < meta.totalPages,
         page: page,
+        total: meta?.total,
+        totalPages: meta?.totalPages,
         clearLoadMoreError: true,
       );
     } on DioException catch (e, st) {
