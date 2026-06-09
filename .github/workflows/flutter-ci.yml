@@ -29,7 +29,11 @@ jobs:
           flutter-version: '3.x'
           channel: stable
       - run: flutter pub get
-      - run: flutter analyze
+      # Errors + warnings stay fatal (a non-compiling PR fails here); the 199
+      # pre-existing very_good_analysis infos are tolerated so this job is
+      # green-on-compile and can be a required check (F-022b). Clearing the
+      # infos is a separate DEFER'd task.
+      - run: flutter analyze --no-fatal-infos
 
   codegen:
     name: build_runner (verify generated files up-to-date)
