@@ -22,6 +22,7 @@ import 'package:mopro/features/home/providers/flash_deals_provider.dart';
 import 'package:mopro/features/home/providers/home_wallet_summary_provider.dart';
 import 'package:mopro/features/home/recently_viewed_provider.dart';
 import 'package:mopro/features/home/widgets/flash_deals_rail.dart';
+import 'package:mopro/features/notifications/widgets/notification_bell.dart';
 import 'package:mopro/features/wallet/widgets/coin_balance_pill.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
@@ -221,8 +222,14 @@ class _HomeTopBar extends ConsumerWidget {
         children: [
           // Animated search pill
           Expanded(child: _AnimatedSearchPill()),
+          // Notification bell (HP-06) — always visible, badge auto-hidden for
+          // guests. Mirrors cart/favorites; taps through to the inbox.
+          const SizedBox(width: 4),
+          NotificationBell(
+            onTap: () => context.push('/account/notifications'),
+          ),
           if (isAuthed) ...[
-            const SizedBox(width: 8),
+            const SizedBox(width: 4),
             const _CoinBalanceAction(),
           ],
         ],
