@@ -11,6 +11,7 @@ import 'package:mopro/features/catalog/plp/widgets/plp_filter_chips.dart';
 import 'package:mopro/features/catalog/providers/categories_provider.dart';
 import 'package:mopro/features/catalog/providers/recent_searches_provider.dart';
 import 'package:mopro/features/catalog/providers/search_provider.dart';
+import 'package:mopro/features/catalog/widgets/filter_sheet.dart';
 import 'package:mopro/features/catalog/widgets/search_input.dart';
 import 'package:mopro/features/catalog/widgets/sort_sheet.dart';
 import 'package:mopro/widgets/catalog/catalog_shell.dart';
@@ -89,8 +90,33 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         onLoadMore: () => ref.read(searchProvider.notifier).loadMore(),
         currentSort: ref.watch(plpFiltersProvider(plpKey)).sort.token,
         onSort: wide ? null : () => _showSortSheet(plpKey),
-        gridCrossAxisCount: wide ? (context.isDesktop ? 5 : 3) : 2,
+        // SE-02: mobile gets the filter sheet (was sort-only).
+        onFilter: wide ? null : () => _showFilterSheet(plpKey, state),
+        activeFilterCount: ref.watch(plpFiltersProvider(plpKey)).activeChipCount,
+        // SE-05: responsive 2/3/4/5 grid. SE-04: mobile infinite scroll, desktop
+        // numbered pages (CatalogShell already supports these).
+        gridCrossAxisCount: _gridColumns(context),
+        infiniteScroll: !wide,
+        currentPage: state.page,
+        totalPages: state.totalPages,
+        onGoToPage:
+            wide ? (p) => ref.read(searchProvider.notifier).goToPage(p) : null,
       );
+
+  // SE-05: mirror the PLP breakpoints — 2 (mobile) / 3 (tablet) / 4 (desktop
+  // <1440) / 5 (ultra-wide).
+  int _gridColumns(BuildContext context) {
+    if (context.isMobile) return 2;
+    if (!context.isDesktop) return 3;
+    return MediaQuery.sizeOf(context).width >= 1440 ? 5 : 4;
+  }
+
+  // SE-02: brands are the distinct brands of the loaded results (mirrors PLP).
+  Future<void> _showFilterSheet(String plpKey, SearchState state) async {
+    final products = state.results.valueOrNull ?? [];
+    final brands = products.map((p) => p.brand).toSet().toList()..sort();
+    await showPlpFilterSheet(context, plpKey: plpKey, brands: brands);
+  }
 
   Widget _results(
     BuildContext context,
@@ -98,7 +124,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     String query,
     String plpKey,
   ) {
-    if (context.isMobile) return _shell(state, plpKey);
+    if (context.isMobile) {
+      // SE-03: result count above the grid (rendered only when total lands).
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (state.total != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+              child: _ResultCount(total: state.total!),
+            ),
+          Expanded(child: _shell(state, plpKey)),
+        ],
+      );
+    }
 
     // Tablet/desktop: FilterPanel sidebar (no category tree) + a query chip +
     // filter chips + the results grid. Filters write plpFiltersProvider keyed by
@@ -141,6 +180,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                 label: Text('"$query"'),
                               ),
                             ),
+                            // SE-03: result count next to the query chip.
+                            if (state.total != null)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: _ResultCount(total: state.total!),
+                              ),
                             Expanded(child: PlpFilterChips(plpKey: plpKey)),
                           ],
                         ),
@@ -165,6 +210,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           .read(plpFiltersProvider(plpKey).notifier)
           .setSort(PlpSort.fromToken(selected));
     }
+  }
+}
+
+/// Search result count (SE-03) — "N ürün". Reuses the PLP `plp.result_count`
+/// key. Rendered only when `SearchState.total` is present.
+class _ResultCount extends StatelessWidget {
+  const _ResultCount({required this.total});
+
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'plp.result_count'.tr(args: ['$total']),
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+    );
   }
 }
 
