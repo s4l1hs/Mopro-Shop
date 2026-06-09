@@ -87,12 +87,21 @@ apply needed) · **URL-synced** filter state.
   (max 3: `spor-fitness`, `moda-ayakkabi`, `kozmetik-cilt`, `elektr-kea`). Within
   one leaf category the searchable brand list (designed for >8 brands), the price
   RangeSlider, and the rating buckets have **almost nothing to act on**.
-- **Flag (don't build here):** to walk the filters meaningfully, either (a)
-  confirm the backend **rolls subcategory products up under a parent category**
-  (then walk a parent `categoryId`), or (b) a **small seed concentration** of
-  ~20–30 brand/price/rating-varied products into **one** leaf category. Recommend
-  option (b) as a tiny `products.json` extension if (a) isn't supported — its own
-  task, not this audit.
+- **RESOLVED (PLP-SEED, `chore/plp-seed-density`):** the PLP scopes by **exact
+  `category_id` — no subtree rollup** (`repository.go:373`), so option (a) is out
+  (and is itself a finding → **PLP-12**). Shipped option (b) as a dev-only
+  idempotent `scripts/seed/data/plp-density-extras.sql` that concentrates **~28
+  existing SKUs into `elektr-kea` ("Küçük Ev Aletleri")** + spreads ratings + sets
+  free-shipping. **Walk category: `elektr-kea`** — verified **28 products / 23
+  brands / rating buckets 2+/3+/4+ distinct / ₺89–₺89,999 / free-ship populated**.
+  Apply: `psql … < scripts/seed/data/plp-density-extras.sql` after `make seed`.
+  See `docs/internal/plp-seed-density.md`.
+
+- **PLP-12 (new finding — no subtree rollup):** because product scoping is exact
+  `category_id`, **parent/root category PLPs are empty** (the 6 roots
+  `root-elektronik` … have zero direct products — products live on leaves).
+  Trendyol rolls a category's whole subtree into the PLP. **PROBABLE** (MED?) —
+  confirm in the walk; **not built here** (would be a backend change).
 
 ---
 
@@ -127,7 +136,10 @@ apply needed) · **URL-synced** filter state.
 <!-- PLP-11 — in-stock toggle is on mobile sheet but missing from the desktop sidebar. -->
 
 <!-- ── New findings from the walk (PLP-12+) ──────────────────────────────── -->
-<!-- PLP-12 … -->
+<!-- PLP-12 — no subtree rollup: PLP scopes by exact category_id
+     (repository.go:373) → parent/root category PLPs are empty. PROBABLE; confirm
+     in the walk. Surfaced by PLP-SEED (docs/internal/plp-seed-density.md). -->
+<!-- PLP-13 … -->
 
 ---
 

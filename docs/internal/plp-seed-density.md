@@ -25,10 +25,13 @@
   ₺89,999**) but **per leaf category there's almost nothing to filter**.
 - Two more facet gaps in the base seed (independent of density):
   - **All ratings are 3.9–4.9** → the rating buckets (2+/3+/4+) can't distinguish.
-  - **`free_shipping` is never set TRUE** (migration 0081 default FALSE; no seed
-    flips it) → the free-shipping filter is vacuous.
-  - (`is_bestseller` / `basket_discount_pct` ARE flipped on a few SKUs by
-    `merch-extras.sql` — those two facets work once that's applied.)
+  - **The seed code never sets `free_shipping`** (migration 0081 default FALSE;
+    `ProductSeed` has no such field) → after a fresh `make seed` the free-shipping
+    filter is vacuous. (A long-lived dev DB may already have it set out-of-band;
+    step 3 below makes the facet deterministic regardless.)
+  - **`is_bestseller` / `basket_discount_pct` are card signals, NOT PLP filters**
+    (there is no bestseller/basket filter) — out of scope for the filter walk;
+    they also need migration 0087 (absent on some local DBs).
 
 ## Seed mechanism (how extras are applied)
 
@@ -48,8 +51,7 @@ New dev-only idempotent `scripts/seed/data/plp-density-extras.sql` mirroring
 
 1. **Re-point ~28 existing SKUs** into **`elektr-kea`** ("Küçük Ev Aletleri") —
    spanning **~23 brands** (exercises the searchable list + show-more >8), the
-   full **₺89–₺89,999** price spread, several discounts, and the bestseller /
-   basket-discount SKUs already flagged by `merch-extras.sql`.
+   full **₺89–₺89,999** price spread, and several discounts (strikethrough).
 2. **Spread 5 ratings** down to 2.4–3.6 so the **2+/3+/4+ buckets** each select a
    distinct subset.
 3. **Set `free_shipping = TRUE`** on 8 of them so that filter has options.
@@ -61,3 +63,12 @@ New dev-only idempotent `scripts/seed/data/plp-density-extras.sql` mirroring
 **Apply (after `make seed` + `merch-extras.sql`):**
 `docker exec -i postgres-ecom psql -v ON_ERROR_STOP=1 -U ecom_admin -d mopro_ecom < scripts/seed/data/plp-density-extras.sql`
 then walk **`/categories/<elektr-kea id>`** — ~28 products, every facet populated.
+
+## Verified (applied to local postgres-ecom)
+
+`UPDATE 25 / 5 / 8`, then `elektr-kea` =
+**28 products · 23 distinct brands · ratings 2–3:2 / 3–4:3 / 4+:23 · price
+₺89–₺89,999 · free-shipping populated**. Every PLP filter facet (brand search +
+show-more, price range, the three rating buckets, free-shipping) now has
+selectable options. (This local DB lacks migration 0087, so the card's
+bestseller/basket signals aren't shown — irrelevant to the filter walk.)
