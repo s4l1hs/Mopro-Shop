@@ -17,6 +17,14 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.ref }}
+          # Check out (and persist credentials) as GOLDEN_REBASELINE_PAT so the
+          # re-baseline commit's push is authenticated as the PAT, not the default
+          # GITHUB_TOKEN. Pushes made with GITHUB_TOKEN do NOT trigger workflows
+          # (GitHub's recursion guard), which left golden PRs hanging on the
+          # required checks (CUTOVER_LEDGER §5). A PAT push fires CI normally.
+          # One-time setup (fine-grained PAT, repo contents:write):
+          #   gh secret set GOLDEN_REBASELINE_PAT --repo s4l1hs/Mopro-Shop --body '<PAT>'
+          token: ${{ secrets.GOLDEN_REBASELINE_PAT }}
 
       - uses: subosito/flutter-action@v2
         with:

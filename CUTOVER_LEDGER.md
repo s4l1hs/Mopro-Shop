@@ -79,7 +79,9 @@
 
 - **F-022b (#138)** made `flutter analyze` green-on-compile (`--no-fatal-infos`; errors/warnings still fatal).
 - **Branch-protection PATCH** — the actual gate-close. Required contexts: `verify`, `flutter analyze`, `flutter test`, `build_runner (verify generated files up-to-date)`, `i18n completeness (extras gate)`, `i18n dead-key gate`, `riverpod inference gate`, `dart analyze (mopro_api generated client)`. Status: **[ ] apply** (or **[x] applied <date>**).
-- **Rebaseline bot quirk:** `golden-rebaseline.yml` commits with `GITHUB_TOKEN` → won't trigger the now-required checks → PRs ending on a rebaseline commit hang "waiting for status." Mitigation: close/reopen, or switch that workflow to a PAT. **[ ] PAT fix (low priority, more relevant once checks are required).**
+- **Rebaseline bot quirk — ✅ FIXED (`chore/ci-cleanup`):** `golden-rebaseline.yml` now checks out with `token: ${{ secrets.GOLDEN_REBASELINE_PAT }}`, so its re-baseline push is authenticated as the PAT and **fires the required checks** (a `GITHUB_TOKEN` push does not — GitHub's recursion guard — which is what hung golden PRs). **One-time secret setup for Salih** (fine-grained PAT, repo `contents:write`): `gh secret set GOLDEN_REBASELINE_PAT --repo s4l1hs/Mopro-Shop --body '<PAT>'`. Until the secret is added the workflow has no token to push with.
+- **Vuln scanner consolidated — ✅ (`chore/ci-cleanup`):** `govulncheck.yml` and `security-scan.yml` ran the identical `govulncheck ./...` scan. Merged to one canonical scanner: `govulncheck.yml` now triggers on **push:[main] + path-filtered PR + weekly + dispatch** (fail-on-vuln exit-3 unchanged); `security-scan.yml` deleted. Required context `govulncheck ./...` unchanged.
+- **Stale PLP-14 toggle goldens — ✅ re-baselined (`chore/ci-cleanup`):** the `golden-rebaseline` workflow regenerated the 9 `*_sidebar_*` baselines (#153 added the price-drop toggle row but left them un-rebaselined). Only `*_sidebar_*` flipped. (Also unblocked a main red: 2 search-UI test fakes missing the `priceDropped` param — `search_ports_test`/`search_recovery_test` — threaded through.)
 
 ---
 
