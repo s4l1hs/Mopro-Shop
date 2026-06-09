@@ -50,6 +50,20 @@ jobs:
         run: |
           git diff --exit-code || \
             (echo "Generated files are out of date. Run build_runner locally." && exit 1)
+      # GEN-SYNC: build_runner only processes the package it runs in, so the app
+      # step above never regenerated the mopro_api path-dependency package — its
+      # .g.dart silently drifted (the merch deserializer bug). Regenerate the
+      # package too and fail on any drift.
+      - name: build_runner — mopro_api package
+        working-directory: mobile/packages/mopro_api
+        run: |
+          dart pub get
+          dart run build_runner build --delete-conflicting-outputs
+      - name: Fail if mopro_api generated files changed
+        working-directory: mobile/packages/mopro_api
+        run: |
+          git diff --exit-code . || \
+            (echo "mopro_api generated files are out of date. Run build_runner in mobile/packages/mopro_api." && exit 1)
 
   test:
     name: flutter test

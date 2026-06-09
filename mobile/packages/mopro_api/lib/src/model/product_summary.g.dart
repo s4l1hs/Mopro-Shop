@@ -61,6 +61,14 @@ ProductSummary _$ProductSummaryFromJson(
         'favorites_count',
         (v) => (v as num?)?.toInt() ?? 0,
       ),
+      isBestseller: $checkedConvert(
+        'is_bestseller',
+        (v) => v as bool? ?? false,
+      ),
+      basketDiscountPct: $checkedConvert(
+        'basket_discount_pct',
+        (v) => (v as num?)?.toInt(),
+      ),
       lowest30dPriceMinor: $checkedConvert(
         'lowest_30d_price_minor',
         (v) => (v as num?)?.toInt(),
@@ -85,6 +93,8 @@ ProductSummary _$ProductSummaryFromJson(
     'flashPriceMinor': 'flash_price_minor',
     'freeShipping': 'free_shipping',
     'favoritesCount': 'favorites_count',
+    'isBestseller': 'is_bestseller',
+    'basketDiscountPct': 'basket_discount_pct',
     'lowest30dPriceMinor': 'lowest_30d_price_minor',
     'cashbackPreview': 'cashback_preview',
   },
@@ -108,6 +118,8 @@ Map<String, dynamic> _$ProductSummaryToJson(ProductSummary instance) =>
       'flash_price_minor': ?instance.flashPriceMinor,
       'free_shipping': ?instance.freeShipping,
       'favorites_count': ?instance.favoritesCount,
+      'is_bestseller': ?instance.isBestseller,
+      'basket_discount_pct': ?instance.basketDiscountPct,
       'lowest_30d_price_minor': ?instance.lowest30dPriceMinor,
       'cashback_preview': instance.cashbackPreview.toJson(),
     };
