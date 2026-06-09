@@ -127,11 +127,13 @@ class _CategoryPuck extends StatelessWidget {
               height: 52,
               decoration: BoxDecoration(
                 color: colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(14),
+                // Trendyol-style circular category puck (G-4): a perfect circle,
+                // not the old rounded-square. The image clip is an ClipOval so a
+                // remote category icon also fills the circle edge-to-edge.
+                shape: BoxShape.circle,
               ),
               child: iconUrl != null && iconUrl!.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
+                  ? ClipOval(
                       child: CachedNetworkImage(
                         imageUrl: iconUrl!,
                         fit: BoxFit.cover,
