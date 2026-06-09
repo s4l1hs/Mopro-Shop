@@ -42,6 +42,7 @@ class _PagedSearchApi extends SearchApi {
     int? rating,
     bool? freeShipping,
     bool? inStock,
+    bool? priceDropped,
     String? xTraceId,
     int? categoryId,
     int? minPrice,
