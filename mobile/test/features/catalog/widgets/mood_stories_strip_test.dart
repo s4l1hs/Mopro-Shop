@@ -87,5 +87,56 @@ void main() {
       expect(find.text('İndirimler'), findsOneWidget);
       expect(find.byType(ListView), findsOneWidget);
     });
+
+    // G-2: the gradient ring is exactly 72dp (Trendyol spec), not the legacy
+    // 64+6 = 70dp.
+    testWidgets('avatar ring is exactly 72dp', (tester) async {
+      await _pump(
+        tester,
+        state: const AsyncValue.data([
+          HomeMoodStory(
+            id: 1,
+            title: 'Yeni Sezon',
+            imageUrl: 'https://example.test/a.png',
+            deepLink: '/categories?mood=new_season',
+          ),
+        ]),
+      );
+      await tester.pump();
+      final ring = find.byWidgetPredicate(
+        (w) =>
+            w is Container &&
+            w.decoration is BoxDecoration &&
+            (w.decoration! as BoxDecoration).shape == BoxShape.circle &&
+            (w.decoration! as BoxDecoration).gradient != null,
+      );
+      expect(ring, findsOneWidget);
+      expect(tester.getSize(ring), const Size(72, 72));
+    });
+
+    // G-2: a horizontal edge-fade ShaderMask wraps the scroller (mirrors the
+    // mega-menu bar).
+    testWidgets('edge-fade ShaderMask wraps the horizontal scroller',
+        (tester) async {
+      await _pump(
+        tester,
+        state: const AsyncValue.data([
+          HomeMoodStory(
+            id: 1,
+            title: 'Yeni Sezon',
+            imageUrl: 'https://example.test/a.png',
+            deepLink: '/categories?mood=new_season',
+          ),
+        ]),
+      );
+      await tester.pump();
+      expect(
+        find.ancestor(
+          of: find.byType(ListView),
+          matching: find.byType(ShaderMask),
+        ),
+        findsOneWidget,
+      );
+    });
   });
 }
