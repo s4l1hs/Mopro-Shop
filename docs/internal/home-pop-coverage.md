@@ -54,8 +54,26 @@ All use the global platform-guarded comparator (`test/flutter_test_config.dart`)
 baselines — the new tests render new widgets the current goldens never captured. Reconciled after
 the Linux regen.
 
-## 4. Split note (§1.3 / §5)
+## 4. Split note (§1.3 / §5) — mood-strip golden DEFER'd
 
-§3.1 (the seed) is the walk-enabler and ships first/standalone. §3.2 (component goldens) is the
-bulk; if the regen surfaces unexpected plumbing, §3.2 splits to a follow-up and the seed still
-unblocks the walk.
+§3.1 (the seed) is the walk-enabler and ships first/standalone. §3.2 ships the two **deterministic,
+network-free** component goldens:
+
+- **`product_card_merch_light`** — bestseller stamp + basket pill + free-shipping + strikethrough,
+  on a null-cover card (placeholder, no network).
+- **`home_category_rail`** — circular pucks via material-icon fallback (`iconUrl: null`), 4 roots +
+  the "Tüm Kategoriler" entry (all fit at 375 so the lazy `ListView` builds them).
+
+**DEFER'd: the mood-strip golden.** Unlike the product card (which guards `imageUrl == null/empty →
+placeholder`, so a null cover never instantiates `CachedNetworkImage`), `MoodStoriesStrip`'s avatar
+**always** instantiates `CachedNetworkImage` (`_MoodTile → ResponsiveNetworkImage`). A network URL
+fires a real `HttpClient` in `flutter test` (non-deterministic + noisy unhandled-async errors that
+can fail the regen). A clean mood golden needs an `HttpOverrides`/mock-image harness — fixture
+plumbing beyond this PR (§5). The strip is **not coverage-naked**: its #131 widget tests already
+assert the **72dp ring size** (`getSize == 72×72`) and the **edge-fade `ShaderMask`** presence.
+Follow-up: add a shared golden network-image mock, then the mood (and any future image-bearing)
+golden.
+
+**Predicted baselines (additive, zero flips):** `product_card_merch_light.png(.meta)` +
+`home_category_rail.png(.meta)`. No existing baseline changes (new widgets/states the current
+goldens never captured). Reconciled after the Linux regen.

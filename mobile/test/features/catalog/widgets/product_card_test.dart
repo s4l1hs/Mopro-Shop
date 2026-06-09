@@ -239,5 +239,31 @@ void main() {
         matchesGoldenFile('goldens/product_card_dark.png'),
       );
     });
+
+    // HOME-POP-01 §3.2: golden coverage for the G-3 merch states — the
+    // "Çok Satan" stamp + "Sepette %X İndirim" pill (+ free-shipping badge +
+    // strikethrough discount) rendered together. Previously ∅ coverage.
+    testWidgets('merch (bestseller + basket pill + discount)', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(220, 380));
+      await pumpTrendyolApp(
+        tester,
+        Padding(
+          padding: const EdgeInsets.all(8),
+          child: _card(
+            isBestseller: true,
+            basketDiscountPct: 15,
+            freeShipping: true,
+            originalPriceMinor: 39999,
+            discountPct: 25,
+            height: 380,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await expectLater(
+        find.byType(ProductCard),
+        matchesGoldenFile('goldens/product_card_merch_light.png'),
+      );
+    });
   });
 }
