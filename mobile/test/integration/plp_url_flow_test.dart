@@ -8,6 +8,7 @@ import 'package:mopro/design/theme.dart';
 import 'package:mopro/design/theme_controller.dart';
 import 'package:mopro/features/catalog/plp/plp_filters.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
+import 'package:mopro/features/catalog/providers/categories_provider.dart';
 import 'package:mopro/features/catalog/screens/category_products_screen.dart';
 import 'package:mopro_api/mopro_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,6 +70,11 @@ class _FakeCatalogApi extends CatalogApi {
   }
 }
 
+class _EmptyCats extends CategoriesNotifier {
+  @override
+  CategoriesState build() => const CategoriesState(categories: AsyncData([]));
+}
+
 late GoRouter _router;
 
 GoRouter _build(String initial) => GoRouter(
@@ -127,6 +133,9 @@ Future<void> _pump(
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
         catalogApiProvider.overrideWithValue(_FakeCatalogApi()),
+        // The breadcrumb (PLP-05) reads categoriesProvider; stub it empty so it
+        // doesn't fire a real listCategories fetch (this flow is URL-state only).
+        categoriesProvider.overrideWith(_EmptyCats.new),
       ],
       child: MaterialApp.router(theme: buildLightTheme(), routerConfig: _router),
     ),
