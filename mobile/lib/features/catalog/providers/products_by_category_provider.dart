@@ -11,6 +11,7 @@ class ProductsState {
     this.loadMoreError,
     this.hasMore = false,
     this.page = 1,
+    this.total,
   });
 
   final AsyncValue<List<ProductSummary>> products;
@@ -19,6 +20,10 @@ class ProductsState {
   final bool hasMore;
   final int page;
 
+  /// Total matching products for the active filter (`pagination.total`), or null
+  /// until the first page lands. Surfaced for the PLP result count (PLP-04).
+  final int? total;
+
   ProductsState copyWith({
     AsyncValue<List<ProductSummary>>? products,
     bool? loadingMore,
@@ -26,6 +31,7 @@ class ProductsState {
     bool clearLoadMoreError = false,
     bool? hasMore,
     int? page,
+    int? total,
   }) =>
       ProductsState(
         products: products ?? this.products,
@@ -34,6 +40,7 @@ class ProductsState {
             clearLoadMoreError ? null : loadMoreError ?? this.loadMoreError,
         hasMore: hasMore ?? this.hasMore,
         page: page ?? this.page,
+        total: total ?? this.total,
       );
 }
 

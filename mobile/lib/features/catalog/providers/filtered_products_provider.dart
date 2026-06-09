@@ -67,6 +67,7 @@ class FilteredProductsNotifier
         loadingMore: false,
         hasMore: meta != null && page < meta.totalPages,
         page: page,
+        total: meta?.total,
         clearLoadMoreError: true,
       );
     } on DioException catch (e, st) {

@@ -14,6 +14,7 @@ import 'package:mopro/features/catalog/plp/plp_filters.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_codec.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
 import 'package:mopro/features/catalog/plp/widgets/filter_panel.dart';
+import 'package:mopro/features/catalog/plp/widgets/plp_breadcrumb.dart';
 import 'package:mopro/features/catalog/plp/widgets/plp_filter_chips.dart';
 import 'package:mopro/features/catalog/providers/filtered_products_provider.dart';
 import 'package:mopro/features/catalog/widgets/filter_sheet.dart';
@@ -166,8 +167,28 @@ class _CategoryProductsScreenState
             ),
           ],
         ),
-        body: context.isMobile ? shell : _buildWide(context, products, shell),
+        body: context.isMobile
+            ? _buildMobile(context, shell)
+            : _buildWide(context, products, shell),
       ),
+    );
+  }
+
+  // Mobile: breadcrumb + result count (PLP-05 / PLP-04) above the scroller.
+  Widget _buildMobile(BuildContext context, Widget shell) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
+          child: PlpBreadcrumb(categoryId: widget.categoryId),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+          child: PlpResultCount(plpKey: _key),
+        ),
+        Expanded(child: shell),
+      ],
     );
   }
 
@@ -206,7 +227,17 @@ class _CategoryProductsScreenState
                     const VerticalDivider(width: 1),
                     Expanded(
                       child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Breadcrumb + result count (PLP-05 / PLP-04).
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                            child: PlpBreadcrumb(categoryId: widget.categoryId),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                            child: PlpResultCount(plpKey: _key),
+                          ),
                           Row(
                             children: [
                               Expanded(child: PlpFilterChips(plpKey: _key)),
