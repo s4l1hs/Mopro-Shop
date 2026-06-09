@@ -27,12 +27,13 @@
 
 ## §1 — Summary
 
-- **RESOLVED: 2** — PLP-01 (mobile brand/rating facets), PLP-03 (mobile infinite
-  scroll). Shipped in PR #142.
-- **CONFIRMED (structural, markup/walk): 7** — PLP-04 (result count), PLP-05
-  (breadcrumb), PLP-12 (subtree rollup, **HIGH**, backend), PLP-13 (attribute
-  facets, **HIGH**), PLP-14 (price-history filter), PLP-15 (desktop numbered
-  pages), PLP-09 (fast-delivery).
+- **RESOLVED: 4** — PLP-01 (mobile brand/rating facets), PLP-03 (mobile infinite
+  scroll) [#142]; **PLP-04 (result count), PLP-05 (breadcrumb)** [this batch].
+- **DEFER'd (backend track): 1** — PLP-13 (attribute facets, Outcome C — no
+  attribute/facet model; ledger §4b).
+- **CONFIRMED open (structural): 4** — PLP-12 (subtree rollup, **HIGH**, backend),
+  PLP-14 (price-history filter), PLP-15 (desktop numbered pages), PLP-09
+  (fast-delivery).
 - **PROBABLE (await visual walk): 8** — PLP-02, PLP-06, PLP-07 (softened), PLP-08,
   PLP-10, PLP-18, PLP-19, PLP-20, + the unnumbered visual bucket (§9).
 - **NEW from markup: 5** — PLP-13, PLP-14, PLP-15, PLP-16, PLP-17.
@@ -75,8 +76,8 @@ IDs PR #142 shipped against). New findings take **PLP-13…PLP-20**. Aliases:
 |---|---|---|---|---|
 | **PLP-01** | ~~mobile sheet had no brand/rating~~ → searchable Brand + Rating accordions added | src+walk | **RESOLVED** (#142) | HIGH |
 | **PLP-03** | ~~mobile load-more button~~ → infinite scroll (150px, gated) | walk | **RESOLVED** (#142) | HIGH |
-| **PLP-04** | `pagination.total` returned but **not shown** → Trendyol shows a prominent count (e.g. "3966+ Ürün") | markup | **CONFIRMED** | MED |
-| **PLP-05** | breadcrumb is **JSON-LD only** → Trendyol shows a visible trail (`Trendyol › Elektronik › … › Cep Telefonu`) | markup | **CONFIRMED** | MED |
+| **PLP-04** | ~~`pagination.total` not shown~~ → **RESOLVED**: `PlpResultCount` renders "N ürün" live (mobile + desktop) from the now-surfaced `ProductsState.total`. | markup | **RESOLVED** | MED |
+| **PLP-05** | ~~breadcrumb JSON-LD only~~ → **RESOLVED**: `PlpBreadcrumb` renders the category ancestry (client-side from `Category.parentId`), tappable, mobile + desktop. | markup | **RESOLVED** | MED |
 | **PLP-06** | no predefined quick-filter pills above the grid | src | **PROBABLE** | LOW |
 | **PLP-07** | brand facet has no counts + derived from the loaded page | src; markup **inconclusive** (counts not in SSR) | **PROBABLE** (softened) | LOW |
 | **PLP-08** | no-results state (`EmptyState.empty()`) has no clear-filters CTA | src | **PROBABLE** | LOW |
@@ -84,7 +85,7 @@ IDs PR #142 shipped against). New findings take **PLP-13…PLP-20**. Aliases:
 | **PLP-10** | no search bar in the PLP header (title + share only) | src | **PROBABLE** | LOW |
 | **PLP-11** | in-stock toggle on mobile sheet but missing from the desktop sidebar (Mopro-internal) | src | **PROBABLE** | LOW |
 | **PLP-12** | exact-`category_id` scoping (`repository.go:373`) → parent/root PLPs empty; **Trendyol rolls the subtree up** (multi-brand under one category, subcats as filters) | markup | **CONFIRMED** | **HIGH** (backend — ledger §4) |
-| **PLP-13** 🆕 | **no attribute/variant facets** → Trendyol has a deep stack (storage, RAM, screen, colour, NFC, camera, condition/refurb, campaign, seller-type…) | markup | **CONFIRMED** | **HIGH** |
+| **PLP-13** 🆕 | **no attribute/variant facets** → Trendyol's deep stack. **DEFER'd (Outcome C)**: only `variants.color/size` are structured (unfiltered + sparse); `products.specs` is opaque per-category JSONB; **no normalized attribute/facet model or aggregation** → a backend data-modeling track (ledger §4b), not a UI add. See `docs/internal/plp-batch.md`. | markup | **CONFIRMED → DEFER** | **HIGH** (backend) |
 | **PLP-14** 🆕 | **no price-history *filter*** → Trendyol "Fiyat Geçmişi" (last 10/14/30 days). *Distinct from Mopro's on-card lowest-30d.* | markup | **CONFIRMED** | MED |
 | **PLP-15** 🆕 | desktop pagination = **numbered pages** on Trendyol (`1 [2] … [121]`), Mopro uses a load-more button. *Split from PLP-03 (mobile).* | markup | **CONFIRMED** | MED |
 | **PLP-16** 🆕 | **ranked** bestseller / most-visited badge ("En Çok Satan 1. Ürün") — Mopro has an unranked bestseller stamp | markup | markup-observed | MED |
@@ -152,21 +153,18 @@ distinct / free-ship populated**. **Walk category: `elektr-kea`.** Apply
 
 ## §8 — CONFIRMED-HIGH fix queue (the next fix prompts draw from here)
 
-Ordered; severities firmed by markup/walk. PLP-01/03 already shipped (#142).
+Ordered; severities firmed by markup/walk. **Shipped:** PLP-01/03 (#142),
+**PLP-04 + PLP-05** (count + breadcrumb). **DEFER'd:** PLP-13 (backend track).
 
-1. **PLP-13 — attribute/variant facets** (CONFIRMED, **HIGH**). The big one:
-   needs a backend facet-aggregation surface (values + counts per category) + the
-   sidebar/sheet UI. Likely the largest remaining PLP item.
-2. **PLP-12 — subtree rollup** (CONFIRMED, **HIGH**, backend; recursive CTE in
-   `repository.go`). Tracked in `CUTOVER_LEDGER.md §4`; needs a backend PR.
-3. **PLP-04 — visible result count** (CONFIRMED, MED). Data exists
-   (`pagination.total`) — pure surfacing.
-4. **PLP-05 — visible breadcrumb** (CONFIRMED, MED). Data exists (the JSON-LD
-   trail) — pure surfacing.
-5. **PLP-15 — desktop numbered pages** (CONFIRMED, MED). Desktop-only; pairs
-   naturally with #3/#4 (a PLP-chrome batch).
-6. **PLP-14 — price-history filter** (CONFIRMED, MED). Backend filter param +
-   sidebar control.
+1. ~~**PLP-04** result count~~ — ✅ shipped (`PlpResultCount`).
+2. ~~**PLP-05** breadcrumb~~ — ✅ shipped (`PlpBreadcrumb`).
+3. **PLP-13 — attribute/variant facets** → **DEFER (Outcome C)**: no normalized
+   attribute/facet model (only opaque `specs` JSONB + unfiltered color/size) →
+   backend data-modeling track, see `CUTOVER_LEDGER.md §4b`. **Not a UI add.**
+4. **PLP-12 — subtree rollup** (CONFIRMED, **HIGH**, backend; recursive CTE in
+   `repository.go`). `CUTOVER_LEDGER.md §4`; backend PR.
+5. **PLP-15 — desktop numbered pages** (CONFIRMED, MED). Desktop-only.
+6. **PLP-14 — price-history filter** (CONFIRMED, MED). Backend param + control.
 7. **MED/LOW batch:** PLP-09 (fast-delivery), PLP-16 (ranked badge), PLP-18/19/20
    (sticky sidebar / ultra-wide grid / sticky mobile bar), PLP-02 (mobile chips),
    PLP-06/07/08/10/11/17.
