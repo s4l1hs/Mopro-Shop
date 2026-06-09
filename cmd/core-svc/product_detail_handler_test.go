@@ -60,10 +60,10 @@ func newProductDetailRequest(productID string) *http.Request {
 // PD-06: the response is the flat, spec-conformant Product — id/seller_* are at
 // the top level (no longer nested under a "product" envelope).
 type productDetailBody struct {
-	ID         int64   `json:"id"`
-	SellerID   int64   `json:"seller_id"`
-	SellerName string  `json:"seller_name"`
-	SellerSlug *string `json:"seller_slug"`
+	ID          int64   `json:"id"`
+	SellerID    int64   `json:"seller_id"`
+	SellerName  string  `json:"seller_name"`
+	SellerSlug  *string `json:"seller_slug"`
 	DeliveryEta *struct {
 		MinDays      int     `json:"min_days"`
 		MaxDays      int     `json:"max_days"`
