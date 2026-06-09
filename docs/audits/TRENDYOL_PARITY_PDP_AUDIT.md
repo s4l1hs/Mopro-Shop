@@ -40,9 +40,11 @@
   sticky buy-box.
 - **NOT-ACTIONABLE: 3** — coin/cashback card, brand tokens, trust badges vs a
   detailed cargo/return block.
-- **🚩 SEED IS INADEQUATE FOR THE WALK (§6)** — 1 image/variant, 0 multi-variant
-  products, 0 reviews → gallery, variant selection, and reviews are **not
-  exercisable**. A **seed extension is a prerequisite** (its own task).
+- **✅ SEED WALK-FIXTURE ADDED (§6)** — `chore/pdp-seed` (`pdp-walk-extras.sql`)
+  enriches MP-S001: 5 variants (incl. OOS) + 3–6-image galleries + 7 varied
+  reviews. **Variant selector + reviews now exercisable** (live-verified).
+  **Gallery render still gated on PD-06** — the server emits variant `image_keys`,
+  not the required `image_urls` (a read-path fix, not seed data).
 
 ---
 
@@ -100,21 +102,27 @@ helpful + write) · Q&A · trust badges · SEO/JSON-LD/OpenGraph.
 
 ---
 
-## §6 — 🚩 Seed adequacy (BLOCKS the walk — prerequisite task)
+## §6 — Seed adequacy — ✅ ADDRESSED (`chore/pdp-seed`, `pdp-walk-extras.sql`)
 
-The seed cannot exercise the three heaviest PDP areas:
+The walk fixture now lives in `scripts/seed/data/pdp-walk-extras.sql` (dev-only,
+idempotent; apply after `make seed`). It enriches **MP-S001** (Nike Dri-FIT,
+product 15):
 
-| Area | Seed reality (live DB) | Walk impact |
+| Area | Seeded reality (live-verified via core-svc) | Walk status |
 |---|---|---|
-| **Gallery** | `max images/variant = 1`; **0** variants with ≥2 images | carousel / thumbnails / zoom **can't be walked** |
-| **Variants** | **0** products with >1 variant (`PdpVariantSelector` only renders at >1) | variant selection **never shows** |
-| **Reviews** | tables exist (`product_reviews`, `review_helpful_votes`, `product_review_revisions`) but **0 rows** | reviews tab / histogram / helpful / sort **empty** |
+| **Gallery** | 5 variants carry **3–6 `image_keys`** each (full placehold.co URLs) | data ready; **render still gated on PD-06** ↓ |
+| **Variants** | **5** variants (Siyah S/M/L + Beyaz M + Lacivert M) → `PdpVariantSelector` renders; **Siyah/L `stock=0`** = OOS (P-015); Siyah carry a strikethrough (`original_price_minor`) | **exercisable** ✅ |
+| **Reviews** | **7** reviews, ratings **5/5/5/4/4/3/2** (histogram `{2:1,3:1,4:2,5:3}`, avg 4.0), varied `helpful_count`; `products.rating_avg/rating_count` matched | **exercisable** ✅ (sort/histogram/helpful) |
 
-> **A PDP seed extension is a prerequisite** for a meaningful walk: ≥1 product with
-> a **multi-image** gallery, **multiple variants** (colour/size, incl. an OOS one),
-> and a handful of **reviews** (varied ratings, ideally one with a photo). **Its
-> own task — not built here.** (Colours exist — 42 variants carry `color` — but
-> one-variant-per-product hides the selector.)
+> **⚠ Gallery render is blocked by a read-path gap, not by data (PD-06).**
+> `GET /products/{id}` emits each variant's **`image_keys`** + **`cover_image_url`**
+> but **not** the OpenAPI-required **`Variant.image_urls`** the mobile gallery reads
+> (`selectedVariant.imageUrls`, `required: true`) — live response confirms
+> `image_urls` is absent. The multi-image gallery (and likely the whole strict
+> `getProduct` parse) needs the **server to emit `image_urls`** (map `image_keys`
+> → CDN). This seed makes the `image_keys` walk-ready for the moment that fix
+> lands. **Review photos (PD-07) similarly not surfaced** by `ListReviews` →
+> not seeded. Both are post-walk read-path fixes. Discovery: `docs/internal/pdp-seed.md`.
 
 ---
 
