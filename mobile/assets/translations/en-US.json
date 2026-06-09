@@ -279,6 +279,8 @@
     "go_to_store": "Go to store",
     "go_to_store_a11y": "View seller's store",
     "lowest_30d": "Lowest price in 30 days: {price}",
+    "basket_discount": "{pct}% off at basket",
+    "bestseller": "Bestseller",
     "delivery_eta_confident": "Ships in {min}-{max} business days",
     "delivery_eta_estimate": "Est. ships in {min}-{max} business days",
     "delivery_eta_from": "Ships from {city}",

@@ -39,6 +39,8 @@ Widget _card({
   int? originalPriceMinor,
   int? discountPct,
   int? lowest30dPriceMinor,
+  int? basketDiscountPct,
+  bool isBestseller = false,
   double height = 320,
 }) =>
     SizedBox(
@@ -53,6 +55,8 @@ Widget _card({
         onTap: onTap ?? () {},
         originalPriceMinor: originalPriceMinor,
         discountPct: discountPct,
+        basketDiscountPct: basketDiscountPct,
+        isBestseller: isBestseller,
       ),
     );
 
@@ -164,6 +168,47 @@ void main() {
         ),
       );
       expect(find.textContaining('product.lowest_30d'), findsOneWidget);
+    });
+  });
+
+  group('ProductCard merchant pills (G-3)', () {
+    // Tests don't load the i18n bundle, so .tr() returns the KEY.
+    testWidgets('basket-discount pill renders when pct is set', (tester) async {
+      await pumpTrendyolApp(tester, _card(basketDiscountPct: 15, height: 420));
+      expect(find.text('product.basket_discount'), findsOneWidget);
+    });
+
+    testWidgets('basket-discount pill hidden when pct is null', (tester) async {
+      await pumpTrendyolApp(tester, _card(height: 420));
+      expect(find.text('product.basket_discount'), findsNothing);
+    });
+
+    testWidgets('bestseller badge renders when isBestseller is true',
+        (tester) async {
+      await pumpTrendyolApp(tester, _card(isBestseller: true));
+      expect(find.text('product.bestseller'), findsOneWidget);
+      expect(find.byIcon(Icons.local_fire_department), findsOneWidget);
+    });
+
+    testWidgets('bestseller badge hidden by default', (tester) async {
+      await pumpTrendyolApp(tester, _card());
+      expect(find.byIcon(Icons.local_fire_department), findsNothing);
+    });
+
+    testWidgets('bestseller + free-shipping stack without overflow at 375dp',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(180, 360));
+      await pumpTrendyolApp(
+        tester,
+        _card(isBestseller: true, freeShipping: true, basketDiscountPct: 20),
+      );
+      await tester.pump();
+      // Both image badges present, basket pill present, and no overflow thrown.
+      expect(find.text('product.bestseller'), findsOneWidget);
+      expect(find.text('plp.free_shipping'), findsOneWidget);
+      expect(find.text('product.basket_discount'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
     });
   });
 
