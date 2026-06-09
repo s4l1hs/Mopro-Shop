@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/features/catalog/plp/plp_filters.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
+import 'package:mopro/features/catalog/plp/widgets/plp_facets.dart';
 import 'package:mopro/features/catalog/providers/categories_provider.dart';
 
 /// Desktop/tablet PLP sidebar filter panel (§2.2). Consumes the 5a substrate:
@@ -35,10 +36,8 @@ class FilterPanel extends ConsumerStatefulWidget {
 }
 
 class _FilterPanelState extends ConsumerState<FilterPanel> {
-  final _brandQuery = TextEditingController();
   final _minCtrl = TextEditingController();
   final _maxCtrl = TextEditingController();
-  bool _showAllBrands = false;
   RangeValues? _draftPrice;
 
   PlpFiltersNotifier get _notifier =>
@@ -46,7 +45,6 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
 
   @override
   void dispose() {
-    _brandQuery.dispose();
     _minCtrl.dispose();
     _maxCtrl.dispose();
     super.dispose();
@@ -68,11 +66,14 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
                 _section('plp.filter_category', _categoryTree(cs)),
                 const Divider(height: 1),
               ],
-              _section('plp.filter_brand', _brandList(filters)),
+              _section(
+                'plp.filter_brand',
+                PlpBrandFacet(plpKey: widget.plpKey, brands: widget.brands),
+              ),
               const Divider(height: 1),
               _section('plp.filter_price', _priceRange(filters)),
               const Divider(height: 1),
-              _section('plp.filter_rating', _ratingGroup(filters, cs)),
+              _section('plp.filter_rating', PlpRatingFacet(plpKey: widget.plpKey)),
               const Divider(height: 1),
               _section('plp.filter_shipping', _freeShipping(filters)),
             ],
@@ -86,7 +87,6 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
               Expanded(
                 child: OutlinedButton(
                   onPressed: () {
-                    _brandQuery.clear();
                     _minCtrl.clear();
                     _maxCtrl.clear();
                     setState(() => _draftPrice = null);
@@ -169,52 +169,6 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
     );
   }
 
-  // ── Brand list ────────────────────────────────────────────────────────────
-  Widget _brandList(PlpFilters filters) {
-    final q = _brandQuery.text.trim().toLowerCase();
-    final all = widget.brands.where((b) => b.toLowerCase().contains(q)).toList();
-    final visible = (_showAllBrands || q.isNotEmpty) ? all : all.take(8).toList();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: 32,
-          child: TextField(
-            controller: _brandQuery,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              isDense: true,
-              prefixIcon: const Icon(Icons.search, size: 16),
-              hintText: 'plp.brand_search'.tr(),
-              border: const OutlineInputBorder(),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-            ),
-          ),
-        ),
-        for (final b in visible)
-          _DenseCheckbox(
-            label: b,
-            value: filters.brands.contains(b),
-            onChanged: (checked) {
-              final next = [...filters.brands];
-              if (checked) {
-                next.add(b);
-              } else {
-                next.remove(b);
-              }
-              next.sort(); // alphabetical for URL determinism
-              _notifier.update((f) => f.copyWith(brands: next, page: 1));
-            },
-          ),
-        if (!_showAllBrands && q.isEmpty && all.length > 8)
-          TextButton(
-            onPressed: () => setState(() => _showAllBrands = true),
-            child: Text('plp.show_more'.tr()),
-          ),
-      ],
-    );
-  }
-
   // ── Price range ───────────────────────────────────────────────────────────
   Widget _priceRange(PlpFilters filters) {
     const ceil = FilterPanel.priceCeilingMinor;
@@ -287,49 +241,6 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
     );
   }
 
-  // ── Rating ────────────────────────────────────────────────────────────────
-  Widget _ratingGroup(PlpFilters filters, ColorScheme cs) {
-    // Custom radio (Icon) to avoid the deprecated Radio.groupValue/onChanged
-    // API — the project-wide Radio→RadioGroup migration is a separate backlog.
-    Widget tile(int? rating, String label) {
-      final selected = filters.ratingMin == rating;
-      return InkWell(
-        onTap: () => _notifier.update((f) => f.copyWith(ratingMin: rating)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Row(
-            children: [
-              Icon(
-                selected
-                    ? Icons.radio_button_checked
-                    : Icons.radio_button_off,
-                size: 20,
-                color: selected ? cs.primary : cs.outline,
-              ),
-              const SizedBox(width: 8),
-              if (rating != null) ...[
-                Icon(Icons.star_rounded, size: 16, color: cs.primary),
-                const SizedBox(width: 2),
-                Text('$rating'),
-                const SizedBox(width: 4),
-                Text('plp.and_up'.tr()),
-              ] else
-                Text(label),
-            ],
-          ),
-        ),
-      );
-    }
-    return Column(
-      children: [
-        tile(null, 'plp.rating_all'.tr()),
-        tile(4, ''),
-        tile(3, ''),
-        tile(2, ''),
-      ],
-    );
-  }
-
   // ── Free shipping ─────────────────────────────────────────────────────────
   Widget _freeShipping(PlpFilters filters) {
     return SwitchListTile(
@@ -338,40 +249,6 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
       title: Text('plp.free_shipping'.tr()),
       value: filters.freeShippingOnly,
       onChanged: (v) => _notifier.update((f) => f.copyWith(freeShippingOnly: v)),
-    );
-  }
-}
-
-class _DenseCheckbox extends StatelessWidget {
-  const _DenseCheckbox({
-    required this.label,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String label;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => onChanged(!value),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 32,
-            height: 32,
-            child: Checkbox(
-              value: value,
-              onChanged: (v) => onChanged(v ?? false),
-            ),
-          ),
-          Expanded(
-            child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
-        ],
-      ),
     );
   }
 }
