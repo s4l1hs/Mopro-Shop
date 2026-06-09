@@ -66,6 +66,12 @@
 
 - **Feasible** — `catalog_schema.variant_price_history` (0083, indexed) supports a §5-safe `price_dropped` predicate (`EXISTS … vph.price_minor > current`). The P-028 `free_shipping`/`in_stock` params prove the full path.
 - **Deferred** as its own **OpenAPI-codegen vertical** (spec `price_dropped` param → `make api-gen` Go+Dart regen → backend WHERE → `PlpFilters`/codec + toggle UI on both surfaces + chip → i18n → tests → 8 `plp_sidebar_*` golden flips). Ready-to-build; not bundled into the multi-track batch to avoid a noisy/partial codegen landing. Design: `docs/internal/plp-14-price-history.md`.
+- **BUILD (PR 2, `feat/catalog-backend-vertical`):** in progress — the codegen vertical above, sequenced after the SE-08 PR.
+
+## 4d. SE-08 / SE-03 — search relevance + result count — ✅ RESOLVED (`feat/catalog-backend-vertical`, PR 1)
+
+- **SE-08** — `SearchProductsSummary` now ranks by `ts_rank(search_vector, plainto_tsquery('simple', q))` for the default (`recommended`) sort via `appendSearchOrderBy`; explicit sort tokens (price/newest/cashback) and bestseller `PopularIDs` still win. Backend-only — relevance is the implicit default, so **no contract/token change, no codegen**. Reuses the 0057 GIN `search_vector` + the already-bound `$1` query (no new index/placeholder). Integration test `TestIntegration_SearchRelevance`. Discovery: `docs/internal/be-vert.md`.
+- **SE-03** — already satisfied: the `Search` 200 envelope returns `pagination.total` (required `PaginationMeta`, populated by `handleSearch`→`buildProductListResponse`). No backend change; the search UI (Session 1) reads it.
 
 ---
 

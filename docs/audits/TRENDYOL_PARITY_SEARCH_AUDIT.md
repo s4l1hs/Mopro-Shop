@@ -76,12 +76,12 @@ wiring → it did **not** pick up the recent per-screen PLP fixes:
 |---|---|---|---|---|
 | **SE-01** | PLP-inheritance is **partial** (shared widgets only; screen-level wiring not ported) — see §2 | src | **CONFIRMED** | — |
 | **SE-02** | **Mobile search has no filter affordance** (`onFilter` unset) → can only sort, not filter, on a phone | src | **CONFIRMED** | **MED** |
-| **SE-03** | No **result count** on the results page ("X ürün") — `SearchState` has no `total` | src | **CONFIRMED** | MED |
+| **SE-03** | No **result count** on the results page ("X ürün") — `SearchState` has no `total` | src | **RESOLVED (backend)** — the `Search` 200 envelope already returns `pagination.total` (required `PaginationMeta`, populated by `handleSearch`→`buildProductListResponse`); the search UI reads it (Session 1). No backend change. | MED |
 | **SE-04** | Pagination = **load-more button on both** breakpoints (no mobile infinite scroll, no desktop numbered pages) | src | **CONFIRMED** | MED |
 | **SE-05** | Grid uses **flat breakpoints** (`wide ? 5/3 : 2`), not the PLP-19 2/3/4/5 + ultra-wide clamp | src | **CONFIRMED** | LOW |
 | **SE-06** | Suggestions dropdown = recent + trending + **category** shortcuts; **no brand**, **no product (as-you-type)** suggestions | src | **CONFIRMED** (Trendyol-side PROBABLE) | MED |
 | **SE-07** | No-results = generic `EmptyState.empty()`; **no "did you mean"/spelling correction**, no suggested alternatives | src | **CONFIRMED** (Trendyol-side PROBABLE) | MED |
-| **SE-08** | Results order by the `PlpSort` token (default `recommended`), **not ts_rank relevance** → no relevance ranking | src | **PROBABLE** (backend; confirm) | MED |
+| **SE-08** | Results order by the `PlpSort` token (default `recommended`), **not ts_rank relevance** → no relevance ranking | src | **RESOLVED** — `SearchProductsSummary` now ranks by `ts_rank(search_vector, plainto_tsquery)` for the default sort (`appendSearchOrderBy`); explicit sort tokens + bestseller still win. Backend-only (relevance is the implicit `recommended` default → no contract/token change). | MED |
 | **SE-09** | Mobile empty-search shows recent + categories but **not trending** (the desktop dropdown has trending) | src | **CONFIRMED** | LOW |
 | **SE-10** | No "search within results" refine box; no sponsored results | src | **PROBABLE** | LOW |
 
