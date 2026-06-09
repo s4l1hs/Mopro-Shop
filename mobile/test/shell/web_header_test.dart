@@ -57,6 +57,11 @@ GoRouter _stubRouter() => GoRouter(
           builder: (_, __) =>
               const Scaffold(body: Center(child: Text('SEARCH_PAGE'))),
         ),
+        GoRoute(
+          path: '/account/notifications',
+          builder: (_, __) =>
+              const Scaffold(body: Center(child: Text('INBOX_PAGE'))),
+        ),
       ],
     );
 
@@ -101,6 +106,8 @@ void main() {
       // Two action icons (favorites + cart) when both have zero counts.
       expect(find.byIcon(Icons.favorite_border_rounded), findsOneWidget);
       expect(find.byIcon(Icons.shopping_bag_outlined), findsOneWidget);
+      // Notification bell (HP-06) mounts adjacent to cart/favorites.
+      expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
     });
 
     testWidgets('guest variant shows "Giriş Yap" pill', (tester) async {
@@ -166,6 +173,14 @@ void main() {
       await tester.tap(find.byIcon(Icons.favorite_border_rounded));
       await tester.pumpAndSettle();
       expect(find.text('FAV_PAGE'), findsOneWidget);
+    });
+
+    testWidgets('notification bell routes to /account/notifications',
+        (tester) async {
+      await _pump(tester);
+      await tester.tap(find.byIcon(Icons.notifications_none_rounded));
+      await tester.pumpAndSettle();
+      expect(find.text('INBOX_PAGE'), findsOneWidget);
     });
 
     // Note: in Session 4a the login pill and account avatar no longer

@@ -690,6 +690,7 @@
   },
   "notifications": {
     "title": "Bildirimler",
+    "bell_tooltip": "Bildirimler",
     "unread_badge": "{} okunmamış bildirim",
     "filter_all": "Tümü",
     "filter_unread": "Okunmamış",

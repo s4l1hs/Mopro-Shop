@@ -110,7 +110,7 @@ Suggested severity is a *hint for the walk*, not a commitment.
 | **HP-03** | Category pucks are **rounded-square 52×52 (radius 14)**, not circular (`home_category_rail.dart:125`) | Trendyol category pucks are **circular** | LOW | `_CategoryPuck` shape only (golden-flip) |
 | **HP-04** | Search pill has search + **mic** icon, **no camera/visual-search icon** (`home_screen.dart:322`) | Trendyol search bar has a **camera** (visual search) icon | LOW | top-bar icon (+ visual-search route, likely DEFER) |
 | **HP-05** | **No location/address selector** in the Home header (`_HomeTopBar` = search + coin only) | Trendyol header has a location/address selector | LOW | header chrome (needs address model — likely DEFER) |
-| **HP-06** | **No notification bell** in the Home header | Trendyol header has a notifications bell | LOW | header chrome (notif center exists elsewhere?) |
+| **HP-06** | ~~**No notification bell** in the Home header~~ → **RESOLVED** (Sprint A): `NotificationBell` mounted in `_HomeTopBar` (mobile) + `WebHeader` (desktop), reusing the Tranche-2a `unreadNotificationCountProvider` + `NotificationBadge`; taps to `/account/notifications`. Always-visible, badge auto-hidden for guests. See `docs/internal/hp06-notification-bell.md`. | Trendyol header has a notifications bell | LOW | **DONE** — header chrome (reused the shipped inbox stack) |
 
 > **Walk note:** HP-04/05/06 may be **NOT-ACTIONABLE** if Salih decides Mopro's mobile-first
 > bottom-nav IA deliberately omits header chrome — record that call in §6 and reclassify.
@@ -140,7 +140,10 @@ Suggested severity is a *hint for the walk*, not a commitment.
 <!-- HP-03 … paste here -->
 <!-- HP-04 … paste here -->
 <!-- HP-05 … paste here -->
-<!-- HP-06 … paste here -->
+<!-- HP-06 — RESOLVED in Sprint A (feat/notification-bell-hp06). NotificationBell
+     in both headers, wired to unreadNotificationCountProvider, routing to
+     /account/notifications; gated like cart/favorites (always-visible, badge
+     hidden at count 0). Discovery: docs/internal/hp06-notification-bell.md -->
 
 <!-- ── New findings from the walk (HP-07+) ───────────────────────────────── -->
 <!-- HP-07 … -->
