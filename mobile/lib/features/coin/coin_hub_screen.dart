@@ -8,6 +8,8 @@ import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/utils/coin_formatter.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/core/widgets/loading_spinner.dart';
+import 'package:mopro/design/responsive/responsive.dart';
+import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
 import 'package:mopro/features/wallet/providers/wallet_provider.dart';
 import 'package:mopro/features/wallet/widgets/transaction_tile.dart';
 import 'package:mopro_api/mopro_api.dart';
@@ -28,8 +30,15 @@ class CoinHubScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authed = ref.watch(authNotifierProvider).valueOrNull is AuthAuthenticated;
 
+    // Suppress the screen's own AppBar when a responsive shell already supplies
+    // top chrome: the AccountShell two-pane (scope) OR the desktop/tablet
+    // `_WebShell` (WebHeader + MegaMenuBar, mounted whenever we're not mobile).
+    // On mobile (`_MobileShell` — bottom nav, no top bar) the AppBar stays.
+    final suppressBar =
+        AccountChromeScope.suppressed(context) || !context.isMobile;
+
     return Scaffold(
-      appBar: AppBar(title: Text('coin.hub_title'.tr())),
+      appBar: suppressBar ? null : AppBar(title: Text('coin.hub_title'.tr())),
       body: authed ? _Hub() : const _GuestGate(),
     );
   }
@@ -39,18 +48,27 @@ class _Hub extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final wallet = ref.watch(walletProvider);
+    // Mobile: full-width (unchanged). Tablet/desktop: clamp + center each
+    // section so the hub reads like a premier sub-domain, not a full-bleed log
+    // — same pattern as the Home screen's `wrap()`.
+    final isMobile = context.isMobile;
+    Widget wrap(Widget child) =>
+        isMobile ? child : CenteredContentColumn(child: child);
+
     return RefreshIndicator(
       onRefresh: () => ref.read(walletProvider.notifier).refresh(),
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          SliverToBoxAdapter(child: _BalanceHeader(balance: wallet.balance)),
-          const SliverToBoxAdapter(child: _WaysToEarnSection()),
-          const SliverToBoxAdapter(child: _RedeemSection()),
           SliverToBoxAdapter(
-            child: _SectionHeader(title: 'coin.recent_activity'.tr()),
+            child: wrap(_BalanceHeader(balance: wallet.balance)),
           ),
-          ..._activitySlivers(context, ref, wallet),
+          SliverToBoxAdapter(child: wrap(const _WaysToEarnSection())),
+          SliverToBoxAdapter(child: wrap(const _RedeemSection())),
+          SliverToBoxAdapter(
+            child: wrap(_SectionHeader(title: 'coin.recent_activity'.tr())),
+          ),
+          ..._activitySlivers(context, ref, wallet, wrap),
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
@@ -61,9 +79,10 @@ class _Hub extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     WalletState state,
+    Widget Function(Widget) wrap,
   ) {
     if (state.transactions.isLoading) {
-      return [const SliverToBoxAdapter(child: LoadingSpinner())];
+      return [SliverToBoxAdapter(child: wrap(const LoadingSpinner()))];
     }
     if (state.transactions.hasError) {
       final err = state.transactions.error;
@@ -72,11 +91,13 @@ class _Hub extends ConsumerWidget {
           : UnknownError(statusCode: 0, message: err.toString());
       return [
         SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: ErrorBanner(
-              error: appError,
-              onRetry: () => ref.read(walletProvider.notifier).refresh(),
+          child: wrap(
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: ErrorBanner(
+                error: appError,
+                onRetry: () => ref.read(walletProvider.notifier).refresh(),
+              ),
             ),
           ),
         ),
@@ -85,10 +106,12 @@ class _Hub extends ConsumerWidget {
     final txns = state.transactions.valueOrNull ?? [];
     if (txns.isEmpty) {
       return [
-        const SliverToBoxAdapter(
-          child: _EmptyState(
-            icon: Icons.receipt_long_outlined,
-            messageKey: 'wallet.no_transactions',
+        SliverToBoxAdapter(
+          child: wrap(
+            const _EmptyState(
+              icon: Icons.receipt_long_outlined,
+              messageKey: 'wallet.no_transactions',
+            ),
           ),
         ),
       ];
@@ -96,16 +119,18 @@ class _Hub extends ConsumerWidget {
     return [
       SliverList.builder(
         itemCount: txns.length,
-        itemBuilder: (_, i) => TransactionTile(transaction: txns[i]),
+        itemBuilder: (_, i) => wrap(TransactionTile(transaction: txns[i])),
       ),
       // Full history + cashback plans live on the existing wallet screen.
       SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Center(
-            child: OutlinedButton(
-              onPressed: () => context.push('/wallet'),
-              child: Text('coin.see_all'.tr()),
+        child: wrap(
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Center(
+              child: OutlinedButton(
+                onPressed: () => context.push('/wallet'),
+                child: Text('coin.see_all'.tr()),
+              ),
             ),
           ),
         ),
