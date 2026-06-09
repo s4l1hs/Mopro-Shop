@@ -61,12 +61,16 @@ class CatalogShell extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
         if (onSort != null || onFilter != null)
-          SliverToBoxAdapter(
-            child: _FilterSortBar(
-              currentSort: currentSort,
-              activeFilterCount: activeFilterCount,
-              onSort: onSort,
-              onFilter: onFilter,
+          // PLP-20: pin the mobile sort/filter bar so it stays in reach on scroll.
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _PinnedBarDelegate(
+              _FilterSortBar(
+                currentSort: currentSort,
+                activeFilterCount: activeFilterCount,
+                onSort: onSort,
+                onFilter: onFilter,
+              ),
             ),
           ),
         if (isLoading)
@@ -157,6 +161,8 @@ class _FilterSortBar extends StatelessWidget {
       height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
+        // Opaque so scrolled content doesn't show through when pinned (PLP-20).
+        color: colorScheme.surface,
         border: Border(
           bottom: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
         ),
@@ -440,4 +446,25 @@ class _PageButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Pins the mobile sort/filter bar at the top of the scroll view (PLP-20). Fixed
+/// 48dp; rebuilds when the (already-rebuilt) [child] changes (sort/count).
+class _PinnedBarDelegate extends SliverPersistentHeaderDelegate {
+  _PinnedBarDelegate(this.child);
+
+  final Widget child;
+
+  @override
+  double get minExtent => 48;
+
+  @override
+  double get maxExtent => 48;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) =>
+      child;
+
+  @override
+  bool shouldRebuild(_PinnedBarDelegate oldDelegate) => oldDelegate.child != child;
 }
