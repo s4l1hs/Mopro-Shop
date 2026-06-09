@@ -129,6 +129,8 @@ class _Body extends StatelessWidget {
               final p = products[i];
               return ProductCard(
                 product: p,
+                isBestseller: p.isBestseller ?? false,
+                basketDiscountPct: p.basketDiscountPct,
                 onTap: () => ctx.push('/products/${p.id}'),
               );
             },

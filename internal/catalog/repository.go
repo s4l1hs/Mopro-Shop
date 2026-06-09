@@ -342,7 +342,7 @@ const productSummarySelect = `SELECT p.id, p.seller_id, p.category_id, p.brand, 
 	        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
 	        v.original_price_minor,
 	        p.rating_avg, p.rating_count,
-	        p.free_shipping,
+	        p.free_shipping, p.is_bestseller, p.basket_discount_pct,
 	        (SELECT count(*) FROM catalog_schema.user_favorites uf
 	         WHERE uf.product_id = p.id) AS favorites_count,
 	        (SELECT min(vph.price_minor) FROM catalog_schema.variant_price_history vph
@@ -450,7 +450,8 @@ func scanProductSummaries(rows pgx.Rows, label string) ([]ProductSummaryRow, int
 			&s.Title, &s.PriceMinor, &s.PriceCurrency,
 			&s.CoverImageKey, &s.CommissionPctBps,
 			&s.OriginalPriceMinor, &s.RatingAvg, &s.RatingCount,
-			&s.FreeShipping, &s.FavoritesCount, &s.Lowest30dPriceMinor, &total,
+			&s.FreeShipping, &s.IsBestseller, &s.BasketDiscountPct,
+			&s.FavoritesCount, &s.Lowest30dPriceMinor, &total,
 		); err != nil {
 			return nil, 0, fmt.Errorf("catalog.repo: scan %s: %w", label, err)
 		}
@@ -602,7 +603,7 @@ func (r *pgxRepository) ListProductsByIDs(ctx context.Context, ids []int64, loca
 		        COALESCE(cr.commission_pct_bps, 0) AS commission_pct_bps,
 		        v.original_price_minor,
 		        p.rating_avg, p.rating_count,
-		        p.free_shipping,
+		        p.free_shipping, p.is_bestseller, p.basket_discount_pct,
 		        (SELECT count(*) FROM catalog_schema.user_favorites uf
 		         WHERE uf.product_id = p.id) AS favorites_count,
 		        (SELECT min(vph.price_minor) FROM catalog_schema.variant_price_history vph
@@ -638,7 +639,8 @@ func (r *pgxRepository) ListProductsByIDs(ctx context.Context, ids []int64, loca
 			&s.Title, &s.PriceMinor, &s.PriceCurrency,
 			&s.CoverImageKey, &s.CommissionPctBps,
 			&s.OriginalPriceMinor, &s.RatingAvg, &s.RatingCount,
-			&s.FreeShipping, &s.FavoritesCount, &s.Lowest30dPriceMinor,
+			&s.FreeShipping, &s.IsBestseller, &s.BasketDiscountPct,
+			&s.FavoritesCount, &s.Lowest30dPriceMinor,
 		); err != nil {
 			return nil, fmt.Errorf("catalog.repo: scan product: %w", err)
 		}

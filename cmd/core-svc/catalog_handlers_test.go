@@ -390,3 +390,50 @@ func TestF021_ProductListResponse_SpecKeys(t *testing.T) {
 		}
 	}
 }
+
+// TestProductSummaryJSON_MerchSignals locks the G-3 merch fields onto the wire
+// DTO: is_bestseller is always emitted (false default), basket_discount_pct is
+// emitted when set and omitted (omitempty) when nil.
+func TestProductSummaryJSON_MerchSignals(t *testing.T) {
+	pct := 15
+	base := catalog.ProductSummaryRow{
+		ID: 1, Brand: "B", Status: "active", Title: "T",
+		PriceMinor: 1000, PriceCurrency: "TRY", CommissionPctBps: 1000,
+	}
+
+	// Set: both surface.
+	set := base
+	set.IsBestseller = true
+	set.BasketDiscountPct = &pct
+	m := marshalToMap(t, buildProductSummaryJSON(set, "TRY_COIN"))
+	if m["is_bestseller"] != true {
+		t.Errorf("is_bestseller = %v, want true", m["is_bestseller"])
+	}
+	got, ok := m["basket_discount_pct"]
+	f, isNum := got.(float64)
+	if !ok || !isNum || f != 15 {
+		t.Errorf("basket_discount_pct = %v (ok=%v), want 15", got, ok)
+	}
+
+	// Unset: is_bestseller present (false), basket_discount_pct omitted.
+	m = marshalToMap(t, buildProductSummaryJSON(base, "TRY_COIN"))
+	if m["is_bestseller"] != false {
+		t.Errorf("is_bestseller = %v, want false", m["is_bestseller"])
+	}
+	if _, ok := m["basket_discount_pct"]; ok {
+		t.Error("basket_discount_pct present when nil; want omitted")
+	}
+}
+
+func marshalToMap(t *testing.T, v any) map[string]any {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	return m
+}

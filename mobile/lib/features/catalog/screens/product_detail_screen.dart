@@ -841,6 +841,8 @@ class _DescriptionTab extends ConsumerWidget {
                       width: 152,
                       child: ProductCard(
                         product: p,
+                        isBestseller: p.isBestseller ?? false,
+                        basketDiscountPct: p.basketDiscountPct,
                         onTap: () => context.push('/products/${p.id}'),
                       ),
                     );
