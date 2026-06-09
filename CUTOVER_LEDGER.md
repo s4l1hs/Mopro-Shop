@@ -73,6 +73,12 @@
 - **SE-08** — `SearchProductsSummary` now ranks by `ts_rank(search_vector, plainto_tsquery('simple', q))` for the default (`recommended`) sort via `appendSearchOrderBy`; explicit sort tokens (price/newest/cashback) and bestseller `PopularIDs` still win. Backend-only — relevance is the implicit default, so **no contract/token change, no codegen**. Reuses the 0057 GIN `search_vector` + the already-bound `$1` query (no new index/placeholder). Integration test `TestIntegration_SearchRelevance`. Discovery: `docs/internal/be-vert.md`.
 - **SE-03** — already satisfied: the `Search` 200 envelope returns `pagination.total` (required `PaginationMeta`, populated by `handleSearch`→`buildProductListResponse`). No backend change; the search UI (Session 1) reads it.
 
+## 4e. PD-06 — PDP read-path conformance + contract guard — ✅ RESOLVED (`fix/pdp-readpath-contract`)
+
+- **PD-06** — `GET /products/{id}` returned a legacy `{product, variants, translations, cashback_preview, delivery_eta}` envelope with variant `image_keys`/`cover_image_url`, matching neither the OpenAPI flat `Product` (variants[] = `Variant`, `image_urls` required) nor the generated mobile client (also flat) — so the strict parse failed and the PDP never rendered end-to-end (the walk was blocked). The handler now emits the flat spec `Product`: top-level `id/seller_*/category_id/brand/status/created_at`, locale-resolved `title`/`description` (drops the unused `translations` array), and each `Variant` with **`image_urls`** = `image_keys` mapped through `mediaurl.CDNUrl`. **No codegen** (spec + client already flat).
+- **Contract guard (the systemic catch):** the F-021 test (`internal/api`) is fixture-only and never calls a handler — which is why PD-06 shipped. Added a **live-handler conformance test** (`cmd/core-svc/contract_test.go`, `//go:build contract`): calls the real handler, `VisitJSON`s the response against the `Product` schema (+ guards `image_urls` present / no envelope leak). Extended `make contract-test` + `openapi-ci.yml` to run it. Discovery: `docs/internal/pdp-readpath.md`.
+- **PD-07 (DEFER → scoped follow-up):** reviews return no reviewer name or photos. Plan: add `reviewer_name` (`identity.Service.GetUser`, masked) + `photos` (`attachments.Service.ListByEntity`, CDN-mapped) to the reviews response — spec + codegen, §5-safe (in-process service calls, no cross-schema JOIN) — render in `PdpReviewsTab`, + a reviews conformance test. Its own codegen+UI vertical (per §5 split-bailout: PD-06 first, PD-07 second).
+
 ---
 
 ## 5. CI / branch-protection

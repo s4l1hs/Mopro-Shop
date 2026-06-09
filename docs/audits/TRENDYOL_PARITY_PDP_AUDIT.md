@@ -43,8 +43,13 @@
 - **✅ SEED WALK-FIXTURE ADDED (§6)** — `chore/pdp-seed` (`pdp-walk-extras.sql`)
   enriches MP-S001: 5 variants (incl. OOS) + 3–6-image galleries + 7 varied
   reviews. **Variant selector + reviews now exercisable** (live-verified).
-  **Gallery render still gated on PD-06** — the server emits variant `image_keys`,
-  not the required `image_urls` (a read-path fix, not seed data).
+- **✅ PD-06 RESOLVED (`fix/pdp-readpath-contract`)** — `GET /products/{id}` now
+  emits the flat, spec-conformant `Product` with variant **`image_urls`**
+  (CDN-mapped from `image_keys`), replacing the legacy `{product, variants,
+  translations,…}`/`image_keys` envelope that matched neither the spec nor the
+  mobile client. **Gallery (+ the whole PDP parse) now unblocked.** A new
+  **live-handler contract test** guards the response shape (the F-021 fixture test
+  couldn't). **PD-07** (reviewer name + photos) is the scoped follow-up.
 
 ---
 
@@ -60,7 +65,7 @@
 | — | Delivery: ETA + cargo + return | `PdpDeliveryInfo(eta)` (**P-007**) + `_TrustBadges` (secure / return / free-ship) | trust badges, not a **detailed cargo/return policy** block | **NOT-ACTIONABLE** (D3) | — |
 | — | Seller: name + rating + official badge | `PdpSellerCard(name, →storefront)` | **no seller rating, no official badge** (ties **PLP-17**) | **PD-04** | LOW–MED |
 | — | Specs: key-spec attribute table | **tab present but a STUB** (`_StubTab` mobile / `'common.loading'` desktop) | **specs/attributes NOT built** (ties **PLP-13** attribute model) | **PD-01** | **HIGH** |
-| — | Reviews: breakdown + photos + sort/filter + helpful | `PdpReviewsTab` — `RatingDistributionHistogram` + sort menu + paginated list + **helpful votes** + write-review (window-gated) | **no photo reviews**; sort only (no filter-by-rating) | **PD-07** | MED |
+| — | Reviews: breakdown + photos + sort/filter + helpful | `PdpReviewsTab` — `RatingDistributionHistogram` + sort menu + paginated list + **helpful votes** + write-review (window-gated) | **no photo reviews**; **no reviewer name**; sort only (no filter-by-rating). **PD-07 scoped follow-up:** add `reviewer_name` (`identity.Service.GetUser`, masked) + `photos` (`attachments.Service.ListByEntity`, CDN-mapped) to the reviews response (spec+codegen, §5-safe), render in `PdpReviewsTab` + reviews conformance test | **PD-07** | MED |
 | — | Similar / recommended + recently-viewed + Q&A | `_SimilarProductsRail` + mobile related rail (co-view) + **`PdpQaTab`** | **no recently-viewed on PDP** (it's a home rail) | **PD-10** | LOW |
 
 ---
@@ -110,18 +115,19 @@ product 15):
 
 | Area | Seeded reality (live-verified via core-svc) | Walk status |
 |---|---|---|
-| **Gallery** | 5 variants carry **3–6 `image_keys`** each (full placehold.co URLs) | data ready; **render still gated on PD-06** ↓ |
+| **Gallery** | 5 variants carry **3–6** images each | **exercisable** ✅ — **PD-06 resolved**: the server now emits `Variant.image_urls` (CDN-mapped) ↓ |
 | **Variants** | **5** variants (Siyah S/M/L + Beyaz M + Lacivert M) → `PdpVariantSelector` renders; **Siyah/L `stock=0`** = OOS (P-015); Siyah carry a strikethrough (`original_price_minor`) | **exercisable** ✅ |
 | **Reviews** | **7** reviews, ratings **5/5/5/4/4/3/2** (histogram `{2:1,3:1,4:2,5:3}`, avg 4.0), varied `helpful_count`; `products.rating_avg/rating_count` matched | **exercisable** ✅ (sort/histogram/helpful) |
 
-> **⚠ Gallery render is blocked by a read-path gap, not by data (PD-06).**
-> `GET /products/{id}` emits each variant's **`image_keys`** + **`cover_image_url`**
-> but **not** the OpenAPI-required **`Variant.image_urls`** the mobile gallery reads
-> (`selectedVariant.imageUrls`, `required: true`) — live response confirms
-> `image_urls` is absent. The multi-image gallery (and likely the whole strict
-> `getProduct` parse) needs the **server to emit `image_urls`** (map `image_keys`
-> → CDN). This seed makes the `image_keys` walk-ready for the moment that fix
-> lands. **Review photos (PD-07) similarly not surfaced** by `ListReviews` →
+> **✅ PD-06 RESOLVED — gallery unblocked (`fix/pdp-readpath-contract`).**
+> `GET /products/{id}` was a legacy `{product, variants, translations,…}` envelope
+> with variant `image_keys`/`cover_image_url` — matching neither the OpenAPI flat
+> `Product` nor the generated mobile client (both flat, `Variant.image_urls`
+> required), so the strict parse failed and the PDP never rendered end-to-end. The
+> handler now emits the flat spec `Product` with **`image_urls`** (CDN-mapped from
+> `image_keys`), title/description locale-resolved. A **live-handler contract test**
+> guards it (the fixture-only F-021 test could not). **Review photos (PD-07) are
+> still not surfaced** by `ListReviews` →
 > not seeded. Both are post-walk read-path fixes. Discovery: `docs/internal/pdp-seed.md`.
 
 ---
