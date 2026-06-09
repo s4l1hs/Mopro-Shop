@@ -64,6 +64,7 @@ class FilteredProductsNotifier
         rating: f.ratingMin,
         freeShipping: f.freeShippingOnly ? true : null,
         inStock: f.inStock ? true : null,
+        priceDropped: f.priceDropped ? true : null,
       );
       final incoming = resp.data?.data ?? [];
       final meta = resp.data?.pagination;

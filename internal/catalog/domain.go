@@ -153,6 +153,7 @@ type ProductFilter struct {
 	MinRating     *int     // p.rating_avg >= MinRating (1..5)
 	FreeShipping  *bool    // true => only free-shipping products
 	InStock       *bool    // true => only products with an in-stock variant
+	PriceDropped  *bool    // true => only products whose price dropped in the last 30d (PLP-14)
 	Sort          string   // PlpSort token; "" or unknown => recommended
 	// PopularIDs, when non-empty (bestseller sort), orders results by these IDs
 	// first via array_position — the global popularity ranking the handler reads

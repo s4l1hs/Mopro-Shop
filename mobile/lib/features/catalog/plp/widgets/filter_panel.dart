@@ -76,6 +76,8 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
               _section('plp.filter_rating', PlpRatingFacet(plpKey: widget.plpKey)),
               const Divider(height: 1),
               _section('plp.filter_shipping', _freeShipping(filters)),
+              const Divider(height: 1),
+              _section('plp.filter_price_history', _priceDropped(filters)),
             ],
           ),
         ),
@@ -249,6 +251,17 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
       title: Text('plp.free_shipping'.tr()),
       value: filters.freeShippingOnly,
       onChanged: (v) => _notifier.update((f) => f.copyWith(freeShippingOnly: v)),
+    );
+  }
+
+  // ── Price dropped (PLP-14) ────────────────────────────────────────────────
+  Widget _priceDropped(PlpFilters filters) {
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Text('plp.filter_price_dropped'.tr()),
+      value: filters.priceDropped,
+      onChanged: (v) => _notifier.update((f) => f.copyWith(priceDropped: v)),
     );
   }
 }

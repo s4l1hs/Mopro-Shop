@@ -32,6 +32,9 @@ void main() {
       );
       // sort + page are not "chips".
       expect(const PlpFilters(sort: PlpSort.newest, page: 3).activeChipCount, 0);
+      // price-dropped (PLP-14) counts once.
+      expect(const PlpFilters(priceDropped: true).activeChipCount, 1);
+      expect(const PlpFilters(priceDropped: true).isEmpty, isFalse);
     });
 
     test('equality + hashCode account for brand list', () {
@@ -69,9 +72,18 @@ void main() {
         brands: ['foo', 'bar'],
         ratingMin: 4,
         freeShippingOnly: true,
+        inStock: true,
+        priceDropped: true,
         page: 3,
       );
       expect(codec.decode(codec.encode(f)), f);
+    });
+
+    test('price-dropped round-trips via the drop=down key (PLP-14)', () {
+      expect(codec.encode(const PlpFilters(priceDropped: true)), {'drop': 'down'});
+      expect(codec.decode({'drop': 'down'}).priceDropped, isTrue);
+      expect(codec.decode(const {}).priceDropped, isFalse);
+      expect(codec.decode({'drop': 'nope'}).priceDropped, isFalse);
     });
 
     test('decodes the §3.8 sample URL params', () {

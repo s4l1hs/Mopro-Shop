@@ -64,6 +64,10 @@ class PlpFilterChips extends ConsumerWidget {
     if (f.inStock) {
       chip('catalog.filter_in_stock'.tr(), (x) => x.copyWith(inStock: false));
     }
+    if (f.priceDropped) {
+      chip('plp.filter_price_dropped'.tr(),
+          (x) => x.copyWith(priceDropped: false));
+    }
 
     final visible = chips.isNotEmpty;
     return AnimatedSwitcher(

@@ -42,6 +42,7 @@ class PlpFilters {
     this.ratingMin,
     this.freeShippingOnly = false,
     this.inStock = false,
+    this.priceDropped = false,
     this.page = 1,
   });
 
@@ -52,6 +53,7 @@ class PlpFilters {
   final int? ratingMin; // 1..5 inclusive when set
   final bool freeShippingOnly;
   final bool inStock;
+  final bool priceDropped; // PLP-14: only products whose price dropped in 30d
   final int page;
 
   PlpFilters copyWith({
@@ -62,6 +64,7 @@ class PlpFilters {
     Object? ratingMin = _unset,
     bool? freeShippingOnly,
     bool? inStock,
+    bool? priceDropped,
     int? page,
   }) {
     return PlpFilters(
@@ -74,6 +77,7 @@ class PlpFilters {
       ratingMin: identical(ratingMin, _unset) ? this.ratingMin : ratingMin as int?,
       freeShippingOnly: freeShippingOnly ?? this.freeShippingOnly,
       inStock: inStock ?? this.inStock,
+      priceDropped: priceDropped ?? this.priceDropped,
       page: page ?? this.page,
     );
   }
@@ -87,11 +91,12 @@ class PlpFilters {
       ratingMin == null &&
       !freeShippingOnly &&
       !inStock &&
+      !priceDropped &&
       page == 1;
 
   /// Count of active *filters* (not sort, not page) for the sidebar's chip row:
   /// price range counts once, each brand counts, rating once, free-shipping once,
-  /// in-stock once.
+  /// in-stock once, price-dropped once.
   int get activeChipCount {
     var n = 0;
     if (priceMinMinor != null || priceMaxMinor != null) n++;
@@ -99,6 +104,7 @@ class PlpFilters {
     if (ratingMin != null) n++;
     if (freeShippingOnly) n++;
     if (inStock) n++;
+    if (priceDropped) n++;
     return n;
   }
 
@@ -113,6 +119,7 @@ class PlpFilters {
           other.ratingMin == ratingMin &&
           other.freeShippingOnly == freeShippingOnly &&
           other.inStock == inStock &&
+          other.priceDropped == priceDropped &&
           other.page == page);
 
   @override
@@ -124,6 +131,7 @@ class PlpFilters {
         ratingMin,
         freeShippingOnly,
         inStock,
+        priceDropped,
         page,
       );
 }

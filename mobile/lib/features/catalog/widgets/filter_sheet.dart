@@ -161,6 +161,13 @@ class _PlpFilterSheetState extends ConsumerState<PlpFilterSheet> {
                     onChanged: (v) =>
                         _notifier.update((f) => f.copyWith(inStock: v)),
                   ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('plp.filter_price_dropped'.tr()),
+                    value: filters.priceDropped,
+                    onChanged: (v) =>
+                        _notifier.update((f) => f.copyWith(priceDropped: v)),
+                  ),
                 ],
               ),
             ),

@@ -402,6 +402,16 @@ func appendProductFilters(sb *strings.Builder, args []any, f ProductFilter, argN
 		sb.WriteString(" AND EXISTS (SELECT 1 FROM catalog_schema.variants vs" +
 			" WHERE vs.product_id = p.id AND vs.stock > 0)")
 	}
+	if f.PriceDropped != nil && *f.PriceDropped {
+		// PLP-14: a genuine price drop — the cheapest live variant (v, the LATERAL
+		// alias) is below some price the product carried within the last 30 days.
+		// Single-schema (catalog) + index-served (vph_product_effective_idx). The
+		// clause is token-free; no value is interpolated (the flag gates it only).
+		sb.WriteString(" AND EXISTS (SELECT 1 FROM catalog_schema.variant_price_history vph" +
+			" WHERE vph.product_id = p.id" +
+			" AND vph.effective_at >= now() - INTERVAL '30 days'" +
+			" AND vph.price_minor > v.price_minor)")
+	}
 	return args, argN
 }
 

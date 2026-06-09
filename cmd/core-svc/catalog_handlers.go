@@ -215,6 +215,10 @@ func parseProductFilter(q url.Values, includeCategory bool) catalog.ProductFilte
 		t := true
 		f.InStock = &t
 	}
+	if q.Get("price_dropped") == "true" {
+		t := true
+		f.PriceDropped = &t
+	}
 	return f
 }
 

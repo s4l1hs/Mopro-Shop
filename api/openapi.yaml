@@ -726,6 +726,7 @@ paths:
         - $ref: '#/components/parameters/FilterRating'
         - $ref: '#/components/parameters/FilterFreeShipping'
         - $ref: '#/components/parameters/FilterInStock'
+        - $ref: '#/components/parameters/FilterPriceDropped'
         - $ref: '#/components/parameters/FilterSort'
       responses:
         '200':
@@ -934,6 +935,7 @@ paths:
         - $ref: '#/components/parameters/FilterRating'
         - $ref: '#/components/parameters/FilterFreeShipping'
         - $ref: '#/components/parameters/FilterInStock'
+        - $ref: '#/components/parameters/FilterPriceDropped'
         - $ref: '#/components/parameters/FilterSort'
       responses:
         '200':
@@ -1849,6 +1851,16 @@ components:
       in: query
       required: false
       description: When true, only products with at least one in-stock variant.
+      schema:
+        type: boolean
+    FilterPriceDropped:
+      name: price_dropped
+      in: query
+      required: false
+      description: >
+        When true, only products whose current (cheapest live) price is below a
+        price they carried earlier in the last 30 days — a genuine price drop
+        (PLP-14, "Fiyatı düşenler"). Served from catalog_schema.variant_price_history.
       schema:
         type: boolean
     FilterSort:

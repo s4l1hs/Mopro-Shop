@@ -34,6 +34,7 @@ class _CapturingCatalogApi extends CatalogApi {
   int? rating;
   bool? freeShipping;
   bool? inStock;
+  bool? priceDropped;
 
   @override
   Future<Response<ListProducts200Response>> listProducts({
@@ -47,6 +48,7 @@ class _CapturingCatalogApi extends CatalogApi {
     int? rating,
     bool? freeShipping,
     bool? inStock,
+    bool? priceDropped,
     String? sort = 'recommended',
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -64,6 +66,7 @@ class _CapturingCatalogApi extends CatalogApi {
     this.rating = rating;
     this.freeShipping = freeShipping;
     this.inStock = inStock;
+    this.priceDropped = priceDropped;
     return _emptyPage(page ?? 1);
   }
 }
@@ -75,6 +78,7 @@ class _CapturingSearchApi extends SearchApi {
   String? sort;
   int? rating;
   bool? freeShipping;
+  bool? priceDropped;
   int? minPrice;
 
   @override
@@ -84,6 +88,7 @@ class _CapturingSearchApi extends SearchApi {
     int? rating,
     bool? freeShipping,
     bool? inStock,
+    bool? priceDropped,
     String? xTraceId,
     int? categoryId,
     int? minPrice,
@@ -102,6 +107,7 @@ class _CapturingSearchApi extends SearchApi {
     this.sort = sort;
     this.rating = rating;
     this.freeShipping = freeShipping;
+    this.priceDropped = priceDropped;
     this.minPrice = minPrice;
     return _emptyPage(page ?? 1);
   }
@@ -125,6 +131,7 @@ void main() {
               ratingMin: 4,
               freeShippingOnly: true,
               inStock: true,
+              priceDropped: true,
             ),
           );
       // build() captures the filter; refresh() awaits the load deterministically.
@@ -139,6 +146,7 @@ void main() {
       expect(api.rating, 4);
       expect(api.freeShipping, isTrue);
       expect(api.inStock, isTrue);
+      expect(api.priceDropped, isTrue);
     });
 
     test('omits unset filters (empty/false -> null, default sort)', () async {
@@ -158,6 +166,7 @@ void main() {
       expect(api.rating, isNull);
       expect(api.freeShipping, isNull);
       expect(api.inStock, isNull);
+      expect(api.priceDropped, isNull);
     });
 
     test('refetches when a filter changes', () async {
@@ -195,6 +204,7 @@ void main() {
               sort: PlpSort.newest,
               ratingMin: 5,
               freeShippingOnly: true,
+              priceDropped: true,
               priceMinMinor: 2000,
             ),
           );
@@ -206,6 +216,7 @@ void main() {
       expect(api.sort, 'newest');
       expect(api.rating, 5);
       expect(api.freeShipping, isTrue);
+      expect(api.priceDropped, isTrue);
       expect(api.minPrice, 2000);
     });
   });
