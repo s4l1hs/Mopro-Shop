@@ -175,7 +175,3 @@ lib/src/model/variant.dart
 lib/src/model/verify_otp_request.dart
 lib/src/model/wallet_balance.dart
 lib/src/model/wallet_transaction.dart
-test/facet_test.dart
-test/facet_value_test.dart
-test/get_category_facets200_response_test.dart
-test/product_attribute_test.dart
