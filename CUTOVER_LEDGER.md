@@ -97,6 +97,15 @@
 
 ---
 
+## 4g. FAV-02/03/04 — favorites down-sync + polish — ✅ RESOLVED (`feat/favorites-downsync`)
+
+- **FAV-02** (the substantive favorites gap, from the Favorites parity audit) — favorites were **local-first, sync-up-only**: `POST /favorites/sync` pushed local→server on login, but there was **no read-back**, so the mobile list read `SharedPreferences` only and the server `user_favorites` rows fed just the P-004 count → **no cross-device favorites**. Added **`GET /favorites`** (requireAuth → `{product_ids}`) + mobile **server→local hydration** (`hydrateFavoritesFromServer` → `FavoritesNotifier.mergeServer`, a union), triggered after the up-sync on login **and** fire-and-forget on launch when authed. Sync is now **two-way** → cross-device.
+- **§5-safe + testable:** `GET /favorites` is a single `catalog_schema.user_favorites` query behind a narrow `favoritesReader` seam (`pgFavoritesReader{pool}`), so the live-handler **contract test** can stub it (favorites aren't in the OpenAPI spec — hand-written like reviews/PD-07, so **no codegen**; the contract test asserts the shape + empty→`[]`). The up-sync (`mergeGuestFavorites`, in `features/cart/**`) was left untouched.
+- **FAV-03** hardcoded `'Temizle'` → `favorites.clear_all`.tr(); **FAV-04** error→infinite-skeleton → a real `_ErrorState` (message + retry). Discovery: `docs/internal/fav-downsync.md`.
+- **Still open:** FAV-01 collections (= flagship **P-013**, separate); FAV-05/06/07 await Salih's walk.
+
+---
+
 ## 5. CI / branch-protection
 
 - **F-022b (#138)** made `flutter analyze` green-on-compile (`--no-fatal-infos`; errors/warnings still fatal).

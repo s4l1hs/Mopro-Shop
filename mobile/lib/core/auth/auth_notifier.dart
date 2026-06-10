@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/auth/auth_state.dart';
 import 'package:mopro/core/di/providers.dart';
@@ -20,6 +22,9 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
       // the next real request, but route guard should send user to auth flow.
       return const AuthUnauthenticated();
     }
+    // Already authed on launch → pull server favorites into the local set
+    // (FAV-02 down-sync) without blocking auth resolution.
+    unawaited(hydrateFavoritesFromServer(ref));
     return const AuthAuthenticated();
   }
 
@@ -40,10 +45,13 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
           ? const AuthAuthenticated()
           : const AuthProfileIncomplete(),
     );
-    // Merge guest cart and favorites into server state on login.
+    // Merge guest cart and favorites into server state on login, then pull the
+    // server's favorites back down so the local set is the union (FAV-02
+    // down-sync → cross-device). Order matters: push up first, then hydrate.
     final guestFavIds = ref.read(favoritesProvider);
     await mergeGuestCart(ref);
     await mergeGuestFavorites(ref, guestFavIds);
+    await hydrateFavoritesFromServer(ref);
   }
 
   Future<void> setLoggedOut() async {

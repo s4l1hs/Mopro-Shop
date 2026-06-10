@@ -41,9 +41,11 @@
   free-shipping + bestseller + **official-seller** (PLP-17) badges, favorites-count
   overlay, and the heart toggle all inherit. No favorites-specific card gaps.
 - **Favorites-specific findings: 7** —
-  - **CONFIRMED (src), actionable: 4** — **FAV-02** one-way sync / no cross-device
-    (MED–HIGH), **FAV-03** hardcoded "Temizle" (LOW), **FAV-04** error → infinite
-    skeleton (LOW), **FAV-01** flat list / no collections (MED, = main-audit P-013).
+  - **✅ RESOLVED (`feat/favorites-downsync`): 3** — **FAV-02** server→local
+    down-sync (cross-device; `GET /favorites` + hydration), **FAV-03** i18n
+    clear-all, **FAV-04** error-retry state.
+  - **CONFIRMED (src), still open: 1** — **FAV-01** flat list / no collections
+    (MED, = main-audit **P-013**, a separate flagship feature).
   - **PROBABLE (await walk): 3** — **FAV-05** no add-to-cart on the card (LOW–MED),
     **FAV-06** no sort/filter (LOW), **FAV-07** no "fiyatı düştü since favorited"
     indicator (LOW–MED).
@@ -73,9 +75,9 @@ FAV-02/04/05/06/07 are **new** (favorites-specific, not in the flagship audit).
 | ID | Finding (Mopro current → Trendyol) | Source | Confidence | Sev |
 |---|---|---|---|---|
 | **FAV-01** | Favorites is a **flat set** — no collections/named lists/folders ("Listelerim"). Trendyol lets users organize favorites into lists. | src | **CONFIRMED** (Mopro); Trendyol PROBABLE | MED |
-| **FAV-02** | **One-way sync only.** `POST /favorites/sync` upserts local→server on login; there is **no `GET /favorites`** / server→local hydration. The mobile list reads SharedPreferences only; `user_favorites` server rows feed **just the aggregate favorites-count** (P-004), never the user's own list. → **a new-device login shows empty favorites; favorites don't sync across devices**, and a cleared app loses them. | src | **CONFIRMED** | **MED–HIGH** |
-| **FAV-03** | The app-bar **clear-all button label is a hardcoded `'Temizle'`** (favorites_screen.dart) — not `.tr()`, breaks non-TR locales + the no-hardcoded-strings rule. (Everything else on the screen is i18n'd.) | src | **CONFIRMED** | LOW |
-| **FAV-04** | **Error state → infinite skeleton.** Both `error:` and a successfully-fetched-but-empty `data:` fall back to `_SkeletonGrid()`, so a `/products/batch` failure renders as **perpetual loading** with no error/retry affordance. | src | **CONFIRMED** | LOW |
+| **FAV-02** | ~~One-way sync only~~ → **✅ RESOLVED** (`feat/favorites-downsync`): added **`GET /favorites`** (requireAuth → `{product_ids}`, §5-safe single-schema query via a `favoritesReader` seam) + mobile **server→local hydration** (`hydrateFavoritesFromServer` → `FavoritesNotifier.mergeServer` union), triggered after the up-sync on login **and** fire-and-forget on launch when authed. Favorites are now **cross-device**. | src | **RESOLVED** | **MED–HIGH** |
+| **FAV-03** | ~~hardcoded `'Temizle'` clear-all~~ → **✅ RESOLVED**: `favorites.clear_all`.tr() (en/tr). | src | **RESOLVED** | LOW |
+| **FAV-04** | ~~error → infinite skeleton~~ → **✅ RESOLVED**: a `/products/batch` failure now renders `_ErrorState` (icon + message + **retry**), distinct from the empty/loading states. | src | **RESOLVED** | LOW |
 | **FAV-05** | **No add-to-cart from the favorites card** — the card offers heart (remove) + tap→PDP only; no "Sepete Ekle". Trendyol's favorites cards have a direct add-to-cart. | src | **PROBABLE** (Trendyol) | LOW–MED |
 | **FAV-06** | **No sort/filter** of favorites (insertion-order `Set`). Trendyol favorites can sort (price/discount) + filter. | src | **PROBABLE** | LOW |
 | **FAV-07** | **No favorites-specific price-drop indicator** ("fiyatı düştü" since you favorited). Favorites store only IDs — no price-at-favorite snapshot — so the only price signal is the card's generic lowest-30d strikethrough, not a "dropped since you saved it" cue. | src | **PROBABLE** | LOW–MED |
@@ -144,16 +146,17 @@ favorites grid is visually at parity wherever the card is.
 
 ---
 
-## §8 — Fix queue (when actioned — small, given card inheritance)
+## §8 — Fix queue
 
-1. **FAV-03** (trivial) — i18n the "Temizle" label (`favorites.clear_all`).
-2. **FAV-04** (trivial) — a real error state (message + retry) instead of the
-   infinite skeleton; distinguish error from empty-data.
-3. **FAV-02** (substantive) — add `GET /favorites` + hydrate the local set from the
-   server on login (two-way sync) for cross-device favorites. Backend + mobile.
+1. ~~**FAV-03** — i18n the "Temizle" label~~ **✅ DONE** (`favorites.clear_all`).
+2. ~~**FAV-04** — real error/retry state~~ **✅ DONE** (`_ErrorState`).
+3. ~~**FAV-02** — `GET /favorites` + server→local hydration (cross-device)~~
+   **✅ DONE** (`feat/favorites-downsync`): `GET /favorites` + `hydrateFavoritesFromServer`
+   (login + launch), §5-safe, contract-tested. *(Two-way sync now: up via
+   `/favorites/sync`, down via `/favorites`.)*
 4. **FAV-05 / FAV-06 / FAV-07 / FAV-01** — await the walk to confirm the Trendyol
    side before sizing (add-to-cart on card; sort/filter; price-drop-since-favorited;
    collections/lists). FAV-01 = the flagship audit's P-013.
 
-> **Status: SEEDED — awaiting Salih's walk.** Trendyol-side confidences (PROBABLE)
-> firm up once Salih audits his own logged-in favorites.
+> **Status:** the substantive gap (FAV-02 cross-device) + the two polish items are
+> **shipped**; FAV-05/06/07 + FAV-01 (collections) remain **awaiting Salih's walk**.

@@ -130,6 +130,50 @@ func TestContract_GetProductDetail_LiveHandler(t *testing.T) {
 	}
 }
 
+type stubFavoritesReader struct {
+	ids []int64
+	err error
+}
+
+func (s stubFavoritesReader) ListFavoriteProductIDs(context.Context, int64) ([]int64, error) {
+	return s.ids, s.err
+}
+
+// TestContract_GetFavorites_LiveHandler proves FAV-02: GET /favorites emits the
+// down-sync payload `{product_ids:[…]}` the mobile merges into its local set.
+// Hand-written endpoint (favorites aren't in the OpenAPI spec — like reviews,
+// PD-07), so the shape is asserted directly.
+func TestContract_GetFavorites_LiveHandler(t *testing.T) {
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/favorites", nil)
+	handleFavoritesList(stubFavoritesReader{ids: []int64{7, 42, 100}})(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		ProductIDs []int64 `json:"product_ids"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(body.ProductIDs) != 3 || body.ProductIDs[0] != 7 {
+		t.Errorf("product_ids mismatch: %v", body.ProductIDs)
+	}
+
+	// Empty favorites → a JSON empty array (never null — the client maps it).
+	rec2 := httptest.NewRecorder()
+	handleFavoritesList(stubFavoritesReader{ids: nil})(rec2, httptest.NewRequest(http.MethodGet, "/favorites", nil))
+	var body2 struct {
+		ProductIDs []int64 `json:"product_ids"`
+	}
+	if err := json.Unmarshal(rec2.Body.Bytes(), &body2); err != nil {
+		t.Fatalf("empty decode: %v (%s)", err, rec2.Body.String())
+	}
+	if body2.ProductIDs == nil {
+		t.Errorf("empty favorites must emit product_ids:[] not null: %s", rec2.Body.String())
+	}
+}
+
 // TestContract_GetProductDetail_SellerOfficial proves PD-04: an official seller
 // surfaces as Product.seller_official=true on the flat detail response (from
 // seller.IsOfficial via the in-process GetByID carrier — no cross-schema JOIN).

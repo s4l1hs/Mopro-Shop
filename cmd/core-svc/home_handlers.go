@@ -449,3 +449,52 @@ func handleFavoritesSync(pool *pgxpool.Pool) http.HandlerFunc {
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
+
+// favoritesReader reads a user's server-side favorite product IDs (FAV-02). A
+// narrow seam so handleFavoritesList is stub-testable without a live pool.
+type favoritesReader interface {
+	ListFavoriteProductIDs(ctx context.Context, userID int64) ([]int64, error)
+}
+
+// pgFavoritesReader is the pool-backed favoritesReader — a single
+// catalog_schema.user_favorites query (§5-safe, no cross-schema JOIN).
+type pgFavoritesReader struct{ pool *pgxpool.Pool }
+
+func (r pgFavoritesReader) ListFavoriteProductIDs(ctx context.Context, userID int64) ([]int64, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT product_id FROM catalog_schema.user_favorites WHERE user_id = $1 ORDER BY product_id`,
+		userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []int64{}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// handleFavoritesList GET /favorites (requireAuth) → the user's server-side
+// favorite product IDs (FAV-02 down-sync source). The mobile merges these into
+// its local set; the existing POST /products/batch path renders them. Returning
+// IDs (not summaries) reuses the list's existing render path.
+func handleFavoritesList(reader favoritesReader) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := middleware.UserIDFromCtx(r.Context())
+		ids, err := reader.ListFavoriteProductIDs(r.Context(), userID)
+		if err != nil {
+			slog.Error("favorites: list", "user_id", userID, "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if ids == nil {
+			ids = []int64{}
+		}
+		jsonOK(w, http.StatusOK, map[string]any{"product_ids": ids})
+	}
+}
