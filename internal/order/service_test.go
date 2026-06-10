@@ -71,6 +71,14 @@ func (m *mockCatalogSvc) SearchSummary(_ context.Context, _, _, _ string, _ cata
 	return nil, 0, nil
 }
 
+func (m *mockCatalogSvc) FacetsByCategory(_ context.Context, _ int64, _ string) ([]catalog.Facet, error) {
+	return nil, nil
+}
+
+func (m *mockCatalogSvc) ProductAttributes(_ context.Context, _ int64, _ string) ([]catalog.ProductAttribute, error) {
+	return nil, nil
+}
+
 // ── cart mock ─────────────────────────────────────────────────────────────────
 
 type mockCartSvc struct {
