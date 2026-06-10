@@ -34,7 +34,7 @@ func TestHandleProductReviews_ShapeAndSummary(t *testing.T) {
 		},
 	}
 	rec := httptest.NewRecorder()
-	handleProductReviews(stub)(rec, newReviewsGetRequest("123", "sort=newest&page=1&pageSize=10"))
+	handleProductReviews(stub, nil, nil)(rec, newReviewsGetRequest("123", "sort=newest&page=1&pageSize=10"))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
@@ -85,7 +85,7 @@ func TestHandleProductReviews_BadParams(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			handleProductReviews(stub)(rec, newReviewsGetRequest("123", tc.query))
+			handleProductReviews(stub, nil, nil)(rec, newReviewsGetRequest("123", tc.query))
 			if rec.Code != http.StatusBadRequest {
 				t.Errorf("want 400 got %d (%s)", rec.Code, rec.Body.String())
 			}
@@ -98,7 +98,7 @@ func TestHandleProductReviews_DefaultsSortAndPageSize(t *testing.T) {
 		listReviewsFn: func() ([]catalog.ProductReviewRow, int, error) { return []catalog.ProductReviewRow{}, 0, nil },
 	}
 	rec := httptest.NewRecorder()
-	handleProductReviews(stub)(rec, newReviewsGetRequest("123", ""))
+	handleProductReviews(stub, nil, nil)(rec, newReviewsGetRequest("123", ""))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("want 200 got %d (%s)", rec.Code, rec.Body.String())
 	}
