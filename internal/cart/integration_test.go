@@ -282,3 +282,11 @@ func (alwaysValidCatalog) ListProducts(_ context.Context, _, _ string, _ catalog
 func (alwaysValidCatalog) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
+
+func (alwaysValidCatalog) FacetsByCategory(_ context.Context, _ int64, _ string) ([]catalog.Facet, error) {
+	return nil, nil
+}
+
+func (alwaysValidCatalog) ProductAttributes(_ context.Context, _ int64, _ string) ([]catalog.ProductAttribute, error) {
+	return nil, nil
+}
