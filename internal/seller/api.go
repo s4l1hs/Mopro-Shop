@@ -15,6 +15,10 @@ type Service interface {
 	// active sellers, as a set (PLP-17). §5-safe: a single seller_schema query —
 	// the catalog handler app-merges this onto the page's product summaries.
 	OfficialSellerIDs(ctx context.Context, ids []int64) (map[int64]bool, error)
+	// SellerNamesByIDs returns display names for the given active seller ids
+	// (cart read-path enrichment, CT-01). §5-safe: a single seller_schema query —
+	// the cart handler app-merges this onto the cart's seller groups.
+	SellerNamesByIDs(ctx context.Context, ids []int64) (map[int64]string, error)
 	// ResolveSellerForUser returns the seller id a user owns/staffs, if any.
 	ResolveSellerForUser(ctx context.Context, userID int64) (sellerID int64, isSeller bool, err error)
 	// GetBindingForUser returns the user's seller binding (id+slug+name+role) for
@@ -27,6 +31,7 @@ type Repository interface {
 	GetBySlug(ctx context.Context, slug string) (Seller, error)
 	GetByID(ctx context.Context, id int64) (Seller, error)
 	OfficialSellerIDs(ctx context.Context, ids []int64) (map[int64]bool, error)
+	SellerNamesByIDs(ctx context.Context, ids []int64) (map[int64]string, error)
 	SellerIDForUser(ctx context.Context, userID int64) (int64, bool, error)
 	BindingForUser(ctx context.Context, userID int64) (Binding, bool, error)
 }
