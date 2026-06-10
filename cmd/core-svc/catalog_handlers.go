@@ -113,8 +113,40 @@ func applyBestsellerOrder(ctx context.Context, analyticsSvc analytics.Service, c
 	filter.PopularIDs = ids
 }
 
+// officialSellerResolver is the narrow slice of seller.Service the PLP card
+// app-merge needs (PLP-17) — resolve which seller IDs are official.
+type officialSellerResolver interface {
+	OfficialSellerIDs(ctx context.Context, ids []int64) (map[int64]bool, error)
+}
+
+// applyOfficialSellerBadge sets IsOfficialSeller on each summary by resolving the
+// page's distinct seller IDs via the seller module (PLP-17). §5-safe: an
+// in-process seller.Service call + app-merge — never a catalog↔seller SQL JOIN.
+// A failure never fails the listing (logged; badges left false).
+func applyOfficialSellerBadge(ctx context.Context, resolver officialSellerResolver, rows []catalog.ProductSummaryRow) {
+	if resolver == nil || len(rows) == 0 {
+		return
+	}
+	seen := make(map[int64]struct{}, len(rows))
+	ids := make([]int64, 0, len(rows))
+	for _, r := range rows {
+		if _, ok := seen[r.SellerID]; !ok {
+			seen[r.SellerID] = struct{}{}
+			ids = append(ids, r.SellerID)
+		}
+	}
+	official, err := resolver.OfficialSellerIDs(ctx, ids)
+	if err != nil {
+		slog.Error("catalog: official-seller badge merge", "err", err)
+		return
+	}
+	for i := range rows {
+		rows[i].IsOfficialSeller = official[rows[i].SellerID]
+	}
+}
+
 // handleListProducts handles GET /products?category_id=X&page=1&per_page=20
-func handleListProducts(analyticsSvc analytics.Service, svc catalog.Service, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
+func handleListProducts(analyticsSvc analytics.Service, svc catalog.Service, sellerSvc officialSellerResolver, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 
@@ -165,13 +197,14 @@ func handleListProducts(analyticsSvc analytics.Service, svc catalog.Service, def
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		applyOfficialSellerBadge(r.Context(), sellerSvc, rows)
 
 		jsonOK(w, http.StatusOK, buildProductListResponse(rows, total, page, perPage, cashbackCurrency))
 	}
 }
 
 // handleSearch handles GET /search?q=...&page=1&per_page=20
-func handleSearch(analyticsSvc analytics.Service, svc catalog.Service, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
+func handleSearch(analyticsSvc analytics.Service, svc catalog.Service, sellerSvc officialSellerResolver, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		query := q.Get("q")
@@ -200,6 +233,7 @@ func handleSearch(analyticsSvc analytics.Service, svc catalog.Service, defaultLo
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		applyOfficialSellerBadge(r.Context(), sellerSvc, rows)
 
 		jsonOK(w, http.StatusOK, buildProductListResponse(rows, total, page, perPage, cashbackCurrency))
 	}
@@ -375,11 +409,13 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 		// suspended seller).
 		var sellerName string
 		var sellerSlug *string
+		var sellerOfficial bool
 		var originCity string
 		if s, sErr := sellerSvc.GetByID(r.Context(), p.SellerID); sErr == nil {
 			sellerName = s.DisplayName
 			slug := s.Slug
 			sellerSlug = &slug
+			sellerOfficial = s.IsOfficial
 			if s.DispatchCity != nil {
 				originCity = *s.DispatchCity
 			}
@@ -434,6 +470,7 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 			SellerID:        p.SellerID,
 			SellerName:      sellerName,
 			SellerSlug:      sellerSlug,
+			SellerOfficial:  sellerOfficial,
 			CategoryID:      p.CategoryID,
 			Brand:           p.Brand,
 			Status:          p.Status,
@@ -456,6 +493,7 @@ type productDetailJSON struct {
 	SellerID        int64                      `json:"seller_id"`
 	SellerName      string                     `json:"seller_name"`
 	SellerSlug      *string                    `json:"seller_slug"`
+	SellerOfficial  bool                       `json:"seller_official"`
 	CategoryID      int64                      `json:"category_id"`
 	Brand           string                     `json:"brand"`
 	Status          string                     `json:"status"`
@@ -591,6 +629,10 @@ type productSummaryJSON struct {
 	IsBestseller      bool `json:"is_bestseller"`
 	BasketDiscountPct *int `json:"basket_discount_pct,omitempty"`
 
+	// IsOfficialSeller drives the "Resmi Satıcı" card badge (PLP-17). Always
+	// emitted; app-merged from the seller module per page (§5-safe, no JOIN).
+	IsOfficialSeller bool `json:"is_official_seller"`
+
 	// Lowest30dPriceMinor is the lowest price in the last 30 days (P-030, TR 6502 /
 	// EU Omnibus). The frontend shows "30 günün en düşük fiyatı" only when it is
 	// below PriceMinor — today it equals PriceMinor for every product (prices are
@@ -632,6 +674,7 @@ func buildProductSummaryJSON(r catalog.ProductSummaryRow, cashbackCurrency strin
 		FavoritesCount:      r.FavoritesCount,
 		IsBestseller:        r.IsBestseller,
 		BasketDiscountPct:   r.BasketDiscountPct,
+		IsOfficialSeller:    r.IsOfficialSeller,
 		Lowest30dPriceMinor: r.Lowest30dPriceMinor,
 		CashbackPreview: cashbackPreviewJSON{
 			MonthlyCoinMinor: monthlyMinor,

@@ -460,7 +460,7 @@ func main() {
 		httpTrace(http.HandlerFunc(handleCreateProduct(catalogSvc, defaultCurrency, defaultLocale))),
 	)
 	mux.Handle("GET /products",
-		httpTrace(http.HandlerFunc(handleListProducts(analyticsSvc, catalogSvc, defaultLocale, market, cashbackCurrency))),
+		httpTrace(http.HandlerFunc(handleListProducts(analyticsSvc, catalogSvc, sellerSvc, defaultLocale, market, cashbackCurrency))),
 	)
 	mux.Handle("GET /products/{id}",
 		httpTrace(http.HandlerFunc(handleGetProductDetail(catalogSvc, sellerSvc, shippingSvc, defaultLocale, market, cashbackCurrency))),
@@ -481,7 +481,7 @@ func main() {
 		httpTrace(http.HandlerFunc(handleCategoryFacets(catalogSvc, defaultLocale))),
 	)
 	mux.Handle("GET /search",
-		httpTrace(http.HandlerFunc(handleSearch(analyticsSvc, catalogSvc, defaultLocale, market, cashbackCurrency))),
+		httpTrace(http.HandlerFunc(handleSearch(analyticsSvc, catalogSvc, sellerSvc, defaultLocale, market, cashbackCurrency))),
 	)
 	mux.Handle("GET /search/suggest",
 		httpTrace(http.HandlerFunc(handleSearchSuggest(catalogSvc, defaultLocale, cashbackCurrency))),
