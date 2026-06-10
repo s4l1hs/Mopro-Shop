@@ -15,6 +15,10 @@ func (s *service) GetByID(ctx context.Context, id int64) (Seller, error) {
 	return s.repo.GetByID(ctx, id)
 }
 
+func (s *service) OfficialSellerIDs(ctx context.Context, ids []int64) (map[int64]bool, error) {
+	return s.repo.OfficialSellerIDs(ctx, ids)
+}
+
 func (s *service) ResolveSellerForUser(ctx context.Context, userID int64) (int64, bool, error) {
 	return s.repo.SellerIDForUser(ctx, userID)
 }

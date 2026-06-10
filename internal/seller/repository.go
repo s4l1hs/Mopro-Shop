@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,13 +16,13 @@ type pgxRepository struct{ pool *pgxpool.Pool }
 func NewRepository(pool *pgxpool.Pool) Repository { return &pgxRepository{pool: pool} }
 
 const sellerCols = `id, slug, display_name, bio_translations, logo_image_url,
-	banner_image_url, contact_email, dispatch_city, status, created_at`
+	banner_image_url, contact_email, dispatch_city, status, created_at, is_official`
 
 func scanSeller(row pgx.Row) (Seller, error) {
 	var s Seller
 	var bio []byte
 	if err := row.Scan(&s.ID, &s.Slug, &s.DisplayName, &bio, &s.LogoImageURL,
-		&s.BannerImageURL, &s.ContactEmail, &s.DispatchCity, &s.Status, &s.CreatedAt); err != nil {
+		&s.BannerImageURL, &s.ContactEmail, &s.DispatchCity, &s.Status, &s.CreatedAt, &s.IsOfficial); err != nil {
 		return Seller{}, err
 	}
 	if len(bio) > 0 {
@@ -46,6 +47,28 @@ func (r *pgxRepository) GetByID(ctx context.Context, id int64) (Seller, error) {
 		return Seller{}, ErrSellerNotFound
 	}
 	return s, err
+}
+
+func (r *pgxRepository) OfficialSellerIDs(ctx context.Context, ids []int64) (map[int64]bool, error) {
+	out := make(map[int64]bool, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := r.pool.Query(ctx,
+		`SELECT id FROM seller_schema.sellers
+		  WHERE id = ANY($1) AND status = 'active' AND is_official = TRUE`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("seller.repo: OfficialSellerIDs: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("seller.repo: OfficialSellerIDs scan: %w", err)
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
 }
 
 func (r *pgxRepository) BindingForUser(ctx context.Context, userID int64) (Binding, bool, error) {

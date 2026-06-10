@@ -33,4 +33,7 @@ type Seller struct {
 	DispatchCity *string   `json:"dispatch_city,omitempty"`
 	Status       string    `json:"status"`
 	CreatedAt    time.Time `json:"created_at"`
+	// IsOfficial backs the "Resmi Satıcı" (official/verified-seller) badge on the
+	// PLP card + PDP seller card (PLP-17 / PD-04).
+	IsOfficial bool `json:"is_official"`
 }
