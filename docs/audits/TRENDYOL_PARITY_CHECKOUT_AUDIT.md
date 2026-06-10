@@ -52,8 +52,8 @@
 | — | Address: select saved + add + default | `CheckoutAddressScreen` — radio-select `addressesProvider`, `isDefault` badge, "add new" → `/profile/addresses/new`; empty-state CTA | — | **MATCHED** | — |
 | — | Delivery options/slots per seller + cargo | — (no delivery step; shipping auto-computed in totals) | **no delivery slot/option selection** | **CHK-03** | MED |
 | — | Payment: card + **saved cards** + **installments** + coin/wallet | `card` (→ **3DS Sipay webview**, PSP-hosted) · `bank_transfer` · `cashback` (**disabled**) | **no saved cards / no installments** (PSP-hosted; cashback is the Mopro analog) | **CHK-07** | PROBABLE |
-| — | Order summary: lines + subtotal/shipping/coupon/basket-disc/KDV/cashback/**total** | `CheckoutReviewScreen`: line list (`qty × price`) + **`total` only** | **no subtotal/shipping/KDV/cashback breakdown** (🔗 Cart's `totalsBySeller` unused here) | **CHK-01** 🔗 | MED |
-| — | Per-seller grouping carried from cart | review `...lines.map` — **flat, not grouped** | **per-seller grouping not carried** | **CHK-02** 🔗 | MED |
+| — | Order summary: lines + subtotal/shipping/coupon/basket-disc/KDV/cashback/**total** | `CheckoutReviewScreen` reads `cart.lines` + `grandTotalMinor` (flat lines + total) | **CHK-01 DATA-UNBLOCKED** (`feat/cart-readpath-enrichment` PR 1) — the review now renders **real lines + real total** (was empty); rendering the full subtotal/KDV breakdown in the review UI is a **fast-follow** (data all present: `totals_by_seller` + `kdv_included_minor`) | **CHK-01 (UI fast-follow)** 🔗 | MED |
+| — | Per-seller grouping carried from cart | review `...lines.map` — flat (lines now carry `seller_id` + `seller_name`) | **CHK-02 DATA-UNBLOCKED** — the grouping data is now in the enriched cart; grouping the review's lines by seller is a **fast-follow** UI change | **CHK-02 (UI fast-follow)** 🔗 | MED |
 | — | Coupon/promo entry | — | absent (**= CT-03**) | **CHK-04** 🧩 | MED |
 | — | "Sepette indirim" basket-discount line | — | absent (**= CT-09**) | **CHK-05** 🧩 | MED |
 | — | Free-shipping threshold/progress | — | absent (**= CT-02**) | **CHK-06** 🧩 | LOW–MED |

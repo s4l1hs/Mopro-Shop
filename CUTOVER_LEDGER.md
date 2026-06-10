@@ -114,6 +114,15 @@
 
 ---
 
+## 4i. Cart read-path enrichment — ✅ RESOLVED (`feat/cart-readpath-enrichment` PR 1)
+
+- **The §4h fix, shipped.** `handleGetCart` now enriches the raw cart into the rich `CartDto` the mobile expects — **the authed cart (and the checkout review) render live** (they were empty). `enrichCart` (`cmd/core-svc/cart_enrich.go`) resolves each item §5-safely: `catalog.GetVariantByID` (variant_label colour/size + price + seller_id + product_id + image), `catalog.ListProductsByIDs` (title/cover), the new **`seller.SellerNamesByIDs`** carrier (seller_name, CT-01), `catalog.GetCommissionForCategory` (KDV). Groups by seller → `totals_by_seller` (items/shipping=0/total) + `grand_total_minor` + `kdv_included_minor`.
+- **§5 + boundary:** the merge lives in `cmd/core-svc` behind narrow `cartCatalogResolver`/`cartSellerNamer` interfaces; **`internal/cart` imports neither catalog nor seller** → boundary checker green, no JOIN. No codegen (cart hand-written); unit-tested (`enrichCart` incl. JSON-key contract + empty→`[]`). **Guest path untouched.**
+- **Closes:** **CT-01** (seller name + subtotal), **CT-04** (breakdown), **CT-05** (variant label) — live; **CHK-01/CHK-02 data-unblocked** (the review renders real lines + total; the full breakdown + per-seller grouping in the *review UI* is a fast-follow — data all present).
+- **Still open (PR 2):** CT-02 free-shipping progress + CT-09 basket-discount (the shared discount cluster); CT-03/CHK-04 coupon (PR 3 if it balloons). Discovery: `docs/internal/cart-readpath.md`.
+
+---
+
 ## 5. CI / branch-protection
 
 - **F-022b (#138)** made `flutter analyze` green-on-compile (`--no-fatal-infos`; errors/warnings still fatal).
