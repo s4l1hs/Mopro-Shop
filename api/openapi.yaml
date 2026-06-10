@@ -2459,6 +2459,13 @@ components:
           format: int64
         seller_name:
           type: string
+        seller_official:
+          type: boolean
+          default: false
+          description: |
+            When true, the seller is an official/verified storefront — render the
+            "Resmi Satıcı" badge on the PDP seller card (PD-04). From
+            seller_schema.sellers.is_official, resolved in-process (no JOIN, §5).
         seller_slug:
           type: string
           nullable: true
@@ -2650,6 +2657,13 @@ components:
           description: |
             When true, render the "Çok Satan" bestseller stamp on the card (G-3).
             Sourced from the products.is_bestseller flag.
+        is_official_seller:
+          type: boolean
+          default: false
+          description: |
+            When true, the product's seller is official/verified — render the
+            "Resmi Satıcı" badge on the card (PLP-17). App-merged per page from
+            seller_schema (no cross-schema JOIN, §5).
         basket_discount_pct:
           type: integer
           nullable: true

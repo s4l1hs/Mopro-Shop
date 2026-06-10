@@ -324,7 +324,9 @@ func TestHandleListProducts_CategoryOptional(t *testing.T) {
 			return []catalog.ProductSummaryRow{}, 0, nil
 		},
 	}
-	h := handleListProducts(&fakeRecsSvc{}, svc, "tr-TR", "TR", "TRY_COIN")
+	// nil seller resolver — this routing unit test returns no rows, so the
+	// official-seller app-merge is a no-op (handled defensively in the helper).
+	h := handleListProducts(&fakeRecsSvc{}, svc, nil, "tr-TR", "TR", "TRY_COIN")
 
 	t.Run("no category_id serves the global list", func(t *testing.T) {
 		globalHit = false

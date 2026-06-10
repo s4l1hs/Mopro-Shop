@@ -53,6 +53,8 @@ class ProductSummary {
 
      this.isBestseller = false,
 
+     this.isOfficialSeller = false,
+
      this.basketDiscountPct,
 
      this.lowest30dPriceMinor,
@@ -275,6 +277,19 @@ class ProductSummary {
 
 
 
+      /// When true, the product's seller is official/verified — render the \"Resmi Satıcı\" badge on the card (PLP-17). App-merged per page from seller_schema (no cross-schema JOIN, §5). 
+  @JsonKey(
+    defaultValue: false,
+    name: r'is_official_seller',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final bool? isOfficialSeller;
+
+
+
       /// Extra discount percentage applied at the basket — renders the \"Sepette %X İndirim\" pill (G-3). Omitted when null (no pill). Sourced from the products.basket_discount_pct column. 
   @JsonKey(
     
@@ -334,6 +349,7 @@ class ProductSummary {
       other.freeShipping == freeShipping &&
       other.favoritesCount == favoritesCount &&
       other.isBestseller == isBestseller &&
+      other.isOfficialSeller == isOfficialSeller &&
       other.basketDiscountPct == basketDiscountPct &&
       other.lowest30dPriceMinor == lowest30dPriceMinor &&
       other.cashbackPreview == cashbackPreview;
@@ -357,6 +373,7 @@ class ProductSummary {
         freeShipping.hashCode +
         favoritesCount.hashCode +
         isBestseller.hashCode +
+        isOfficialSeller.hashCode +
         basketDiscountPct.hashCode +
         lowest30dPriceMinor.hashCode +
         cashbackPreview.hashCode;
