@@ -126,3 +126,78 @@ func TestContract_GetProductDetail_LiveHandler(t *testing.T) {
 		t.Errorf("legacy image_keys leaked into the variant: %s", rec.Body.String())
 	}
 }
+
+// TestContract_GetCategoryFacets_LiveHandler validates the PLP-13 facet
+// aggregation response against the Facet schema (each bucket has value+count).
+func TestContract_GetCategoryFacets_LiveHandler(t *testing.T) {
+	doc := loadSpec(t)
+
+	catalogSvc := &stubCatalogSvc{
+		facetsFn: func() ([]catalog.Facet, error) {
+			return []catalog.Facet{{
+				Slug: "renk", Name: "Renk",
+				Values: []catalog.FacetValue{{Value: "Siyah", Count: 5}, {Value: "Beyaz", Count: 4}},
+			}}, nil
+		},
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/categories/31/facets", nil)
+	req.SetPathValue("id", "31")
+	handleCategoryFacets(catalogSvc, "tr-TR")(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var body struct {
+		Facets []json.RawMessage `json:"facets"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v\nbody: %s", err, rec.Body.String())
+	}
+	if len(body.Facets) != 1 {
+		t.Fatalf("want 1 facet, got %d: %s", len(body.Facets), rec.Body.String())
+	}
+	assertConformsToSchema(t, doc, "Facet", body.Facets[0])
+}
+
+// TestContract_GetProductDetail_AttributesArray guards that the detail response
+// carries the spec-required `attributes` array (PLP-13 / PD-01) — never null.
+func TestContract_GetProductDetail_AttributesArray(t *testing.T) {
+	catalogSvc := &stubCatalogSvc{
+		getByIDFn: func(id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error) {
+			return catalog.Product{ID: id, SellerID: 1, CategoryID: 30, Brand: "Nike", Status: "active"},
+				[]catalog.Variant{{ID: 1, SKU: "V", PriceMinor: 100, PriceCurrency: "TRY", Stock: 1, ImageKeys: []string{"k"}}},
+				[]catalog.ProductTranslation{{ProductID: id, Locale: "tr-TR", Title: "T", Description: "D"}}, nil
+		},
+		productAttributesFn: func() ([]catalog.ProductAttribute, error) {
+			return []catalog.ProductAttribute{{Slug: "renk", Name: "Renk", Values: []string{"Siyah", "Beyaz"}}}, nil
+		},
+	}
+	sellerSvc := &stubSellerSvc{getByIDFn: func(int64) (seller.Seller, error) {
+		return seller.Seller{ID: 1, Slug: "s", DisplayName: "S"}, nil
+	}}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/products/7", nil)
+	req.SetPathValue("id", "7")
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: want 200 got %d", rec.Code)
+	}
+	var flat struct {
+		Attributes []struct {
+			Slug   string   `json:"slug"`
+			Name   string   `json:"name"`
+			Values []string `json:"values"`
+		} `json:"attributes"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &flat); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(flat.Attributes) != 1 || flat.Attributes[0].Slug != "renk" || len(flat.Attributes[0].Values) != 2 {
+		t.Fatalf("attributes not surfaced: %s", rec.Body.String())
+	}
+}

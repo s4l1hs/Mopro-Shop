@@ -429,3 +429,11 @@ func (m *mockRepo) SearchProductsSummary(_ context.Context, query, _ string, _ c
 	}
 	return []catalog.ProductSummaryRow{}, 0, nil
 }
+
+func (m *mockRepo) FacetsByCategory(_ context.Context, _ int64, _ string) ([]catalog.Facet, error) {
+	return nil, nil
+}
+
+func (m *mockRepo) ProductAttributes(_ context.Context, _ int64, _ string) ([]catalog.ProductAttribute, error) {
+	return nil, nil
+}

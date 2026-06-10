@@ -30,6 +30,7 @@ Product _product() => Product(
       categoryId: 5,
       brand: 'Acme',
       status: ProductStatusEnum.active,
+      attributes: const [],
       title: 'Test Ürünü',
       description: 'Kısa açıklama.',
       variants: [

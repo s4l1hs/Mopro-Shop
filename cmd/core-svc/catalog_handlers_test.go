@@ -13,16 +13,18 @@ import (
 // stubCatalogSvc is a minimal catalog.Service implementation that records the
 // arguments handler tests need to verify. Other methods are no-op stubs.
 type stubCatalogSvc struct {
-	listCategoriesFn  func(ctx context.Context, locale string, maxDepth int) ([]catalog.CategoryRow, error)
-	homeFlashDealsFn  func(ctx context.Context, locale string, collectionID *int64) (*catalog.FlashDealsResult, error)
-	homeRailsRows     []catalog.HomeRailRow
-	listReviewsFn     func() ([]catalog.ProductReviewRow, int, error)
-	reviewsSummaryFn  func() (catalog.ReviewsSummary, error)
-	reviewProductIDFn func(reviewID int64) (int64, error)
-	toggleHelpfulFn   func() (catalog.HelpfulVoteResult, error)
-	getByIDFn         func(id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error)
-	listByIDsFn       func(ids []int64) ([]catalog.ProductSummaryRow, error)
-	listProductsFn    func(filter catalog.ProductFilter) ([]catalog.ProductSummaryRow, int, error)
+	listCategoriesFn    func(ctx context.Context, locale string, maxDepth int) ([]catalog.CategoryRow, error)
+	homeFlashDealsFn    func(ctx context.Context, locale string, collectionID *int64) (*catalog.FlashDealsResult, error)
+	homeRailsRows       []catalog.HomeRailRow
+	listReviewsFn       func() ([]catalog.ProductReviewRow, int, error)
+	reviewsSummaryFn    func() (catalog.ReviewsSummary, error)
+	reviewProductIDFn   func(reviewID int64) (int64, error)
+	toggleHelpfulFn     func() (catalog.HelpfulVoteResult, error)
+	getByIDFn           func(id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error)
+	listByIDsFn         func(ids []int64) ([]catalog.ProductSummaryRow, error)
+	listProductsFn      func(filter catalog.ProductFilter) ([]catalog.ProductSummaryRow, int, error)
+	facetsFn            func() ([]catalog.Facet, error)
+	productAttributesFn func() ([]catalog.ProductAttribute, error)
 }
 
 func (s *stubCatalogSvc) CreateProduct(_ context.Context, _ catalog.CreateProductRequest) (catalog.Product, error) {
@@ -70,6 +72,18 @@ func (s *stubCatalogSvc) ListProducts(_ context.Context, _, _ string, filter cat
 }
 func (s *stubCatalogSvc) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
+}
+func (s *stubCatalogSvc) FacetsByCategory(_ context.Context, _ int64, _ string) ([]catalog.Facet, error) {
+	if s.facetsFn != nil {
+		return s.facetsFn()
+	}
+	return nil, nil
+}
+func (s *stubCatalogSvc) ProductAttributes(_ context.Context, _ int64, _ string) ([]catalog.ProductAttribute, error) {
+	if s.productAttributesFn != nil {
+		return s.productAttributesFn()
+	}
+	return nil, nil
 }
 func (s *stubCatalogSvc) ListProductsByIDs(_ context.Context, ids []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {
 	if s.listByIDsFn != nil {

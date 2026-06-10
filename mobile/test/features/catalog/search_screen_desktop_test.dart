@@ -35,6 +35,7 @@ class _FakeSearchApi extends SearchApi {
     bool? freeShipping,
     bool? inStock,
     bool? priceDropped,
+    List<String>? attr,
     String? xTraceId,
     int? categoryId,
     int? minPrice,
