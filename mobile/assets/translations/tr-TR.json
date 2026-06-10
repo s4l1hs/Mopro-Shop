@@ -295,6 +295,7 @@
     "low_stock": "Son {count} adet",
     "description_tab": "Açıklama",
     "specs_tab": "Özellikler",
+    "specs_empty": "Bu ürün için özellik bilgisi bulunmuyor.",
     "reviews_tab": "Değerlendirmeler",
     "qa_tab": "Soru & Cevap",
     "related_title": "Benzer Ürünler",
