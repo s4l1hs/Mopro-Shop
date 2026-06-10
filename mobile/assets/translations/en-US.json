@@ -285,6 +285,7 @@
     "lowest_30d": "Lowest price in 30 days: {price}",
     "basket_discount": "{pct}% off at basket",
     "bestseller": "Bestseller",
+    "official_seller": "Official Seller",
     "delivery_eta_confident": "Ships in {min}-{max} business days",
     "delivery_eta_estimate": "Est. ships in {min}-{max} business days",
     "delivery_eta_from": "Ships from {city}",

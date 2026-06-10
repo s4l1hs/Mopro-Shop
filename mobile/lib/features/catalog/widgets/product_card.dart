@@ -32,6 +32,7 @@ class ProductCard extends ConsumerWidget {
     this.priceOverride,
     this.basketDiscountPct,
     this.isBestseller = false,
+    this.isOfficialSeller = false,
   });
 
   final ProductSummary product;
@@ -47,6 +48,9 @@ class ProductCard extends ConsumerWidget {
 
   /// When true, stamps a "Çok Satan" ribbon over the image (Trendyol-style).
   final bool isBestseller;
+
+  /// When true, stamps a "Resmi Satıcı" official/verified-seller badge (PLP-17).
+  final bool isOfficialSeller;
 
   /// Flash-deal override: when set, this is shown as the (brand-orange) price
   /// and the product's regular `priceMinor` becomes the strikethrough original
@@ -132,7 +136,9 @@ class ProductCard extends ConsumerWidget {
                   // Top-left badge stack (off the text column so they can't
                   // overflow tight cells): the "Çok Satan" bestseller stamp
                   // (G-3) above the free-shipping ("Kargo Bedava") badge (P-009).
-                  if (isBestseller || (product.freeShipping ?? false))
+                  if (isOfficialSeller ||
+                      isBestseller ||
+                      (product.freeShipping ?? false))
                     Positioned(
                       top: 6,
                       left: 6,
@@ -140,6 +146,10 @@ class ProductCard extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (isOfficialSeller) const _OfficialSellerBadge(),
+                          if (isOfficialSeller &&
+                              (isBestseller || (product.freeShipping ?? false)))
+                            const SizedBox(height: 4),
                           if (isBestseller) const _BestsellerBadge(),
                           if (isBestseller && (product.freeShipping ?? false))
                             const SizedBox(height: 4),
@@ -337,6 +347,41 @@ class _BestsellerBadge extends StatelessWidget {
           const SizedBox(width: 3),
           Text(
             'product.bestseller'.tr(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Resmi Satıcı" official/verified-seller badge — a compact solid blue ribbon
+/// with a verified check (PLP-17). Fixed blue + white reads over any product
+/// photo in both themes (same rationale as the other image badges).
+class _OfficialSellerBadge extends StatelessWidget {
+  const _OfficialSellerBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1565C0),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.verified, size: 11, color: Colors.white),
+          const SizedBox(width: 3),
+          Text(
+            'product.official_seller'.tr(),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(

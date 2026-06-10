@@ -10,11 +10,16 @@ import 'package:flutter/material.dart';
 class PdpSellerCard extends StatelessWidget {
   const PdpSellerCard({
     required this.sellerName,
+    this.isOfficial = false,
     this.onTap,
     super.key,
   });
 
   final String sellerName;
+
+  /// When true, renders the "Resmi Satıcı" official/verified-seller check next
+  /// to the store name (PD-04).
+  final bool isOfficial;
   final VoidCallback? onTap;
 
   @override
@@ -33,12 +38,29 @@ class PdpSellerCard extends StatelessWidget {
           Icon(Icons.storefront_outlined, size: 20, color: cs.onSurfaceVariant),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              sellerName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(fontWeight: FontWeight.w600),
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    sellerName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                if (isOfficial) ...[
+                  const SizedBox(width: 4),
+                  Tooltip(
+                    message: 'product.official_seller'.tr(),
+                    child: const Icon(
+                      Icons.verified,
+                      size: 16,
+                      color: Color(0xFF1565C0),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           if (onTap != null)

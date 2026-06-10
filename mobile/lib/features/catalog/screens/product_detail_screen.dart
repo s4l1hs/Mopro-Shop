@@ -484,6 +484,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
         const SizedBox(height: 16),
         PdpSellerCard(
           sellerName: product.sellerName,
+          isOfficial: product.sellerOfficial ?? false,
           // Route to the seller storefront only when the slug resolved; a null
           // slug (legacy/platform-direct or suspended seller) hides the link.
           onTap: (product.sellerSlug != null && product.sellerSlug!.isNotEmpty)
@@ -843,6 +844,7 @@ class _DescriptionTab extends ConsumerWidget {
                       child: ProductCard(
                         product: p,
                         isBestseller: p.isBestseller ?? false,
+                        isOfficialSeller: p.isOfficialSeller ?? false,
                         basketDiscountPct: p.basketDiscountPct,
                         onTap: () => context.push('/products/${p.id}'),
                       ),

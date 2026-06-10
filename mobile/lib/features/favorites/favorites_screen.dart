@@ -91,6 +91,7 @@ class FavoritesScreen extends ConsumerWidget {
                             return ProductCard(
                               product: p,
                               isBestseller: p.isBestseller ?? false,
+                              isOfficialSeller: p.isOfficialSeller ?? false,
                               basketDiscountPct: p.basketDiscountPct,
                               onTap: () => ctx.push('/products/${p.id}'),
                             );

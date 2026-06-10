@@ -94,6 +94,7 @@ class ProductRail extends ConsumerWidget {
                     child: ProductCard(
                       product: p,
                       isBestseller: p.isBestseller ?? false,
+                      isOfficialSeller: p.isOfficialSeller ?? false,
                       basketDiscountPct: p.basketDiscountPct,
                       onTap: () => context.push('/products/${p.id}'),
                     ),
@@ -197,6 +198,7 @@ class _RailCarouselState extends State<_RailCarousel> {
               child: ProductCard(
                 product: p,
                 isBestseller: p.isBestseller ?? false,
+                isOfficialSeller: p.isOfficialSeller ?? false,
                 basketDiscountPct: p.basketDiscountPct,
                 onTap: () => context.push('/products/${p.id}'),
               ),
