@@ -65,6 +65,7 @@ class ProductListRail extends StatelessWidget {
                 child: ProductCard(
                   product: p,
                   isBestseller: p.isBestseller ?? false,
+                  isOfficialSeller: p.isOfficialSeller ?? false,
                   basketDiscountPct: p.basketDiscountPct,
                   onTap: () => context.push('/products/${p.id}'),
                 ),

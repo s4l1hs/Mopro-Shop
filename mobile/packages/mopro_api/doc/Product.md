@@ -11,6 +11,7 @@ Name | Type | Description | Notes
 **id** | **int** |  | 
 **sellerId** | **int** |  | 
 **sellerName** | **String** |  | 
+**sellerOfficial** | **bool** | When true, the seller is an official/verified storefront — render the \"Resmi Satıcı\" badge on the PDP seller card (PD-04). From seller_schema.sellers.is_official, resolved in-process (no JOIN, §5).  | [optional] [default to false]
 **sellerSlug** | **String** | URL-safe identifier for the seller; used to deep-link to the seller storefront at /sellers/:slug. Null when the product's seller_id does not resolve to an active seller (legacy/platform-direct or suspended).  | [optional] 
 **categoryId** | **int** |  | 
 **brand** | **String** |  | 

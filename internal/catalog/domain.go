@@ -133,6 +133,11 @@ type ProductSummaryRow struct {
 	// unset → no pill.
 	IsBestseller      bool
 	BasketDiscountPct *int
+	// IsOfficialSeller backs the "Resmi Satıcı" card badge (PLP-17). NOT from the
+	// summary SQL — the catalog handler app-merges it per page from the seller
+	// module (seller.Service.OfficialSellerIDs), keeping catalog_schema ↔
+	// seller_schema §5-safe (no cross-schema JOIN).
+	IsOfficialSeller bool
 	// Lowest30dPriceMinor is MIN(variant price) over the product's price history
 	// in the last 30 days (P-030, TR 6502 / EU Omnibus). Nil when no history rows
 	// in window. Today it equals PriceMinor for every product (prices are immutable

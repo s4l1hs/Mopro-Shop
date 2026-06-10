@@ -288,6 +288,7 @@
     "lowest_30d": "Son 30 günün en düşük fiyatı: {price}",
     "basket_discount": "Sepette %{pct} İndirim",
     "bestseller": "Çok Satan",
+    "official_seller": "Resmi Satıcı",
     "delivery_eta_confident": "{min}-{max} iş gününde kargoda",
     "delivery_eta_estimate": "Tahmini {min}-{max} iş günü içinde kargoda",
     "delivery_eta_from": "{city} çıkışlı",

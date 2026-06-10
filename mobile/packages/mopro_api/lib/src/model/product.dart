@@ -28,6 +28,8 @@ class Product {
 
     required  this.sellerName,
 
+     this.sellerOfficial = false,
+
      this.sellerSlug,
 
     required  this.categoryId,
@@ -84,6 +86,19 @@ class Product {
 
 
   final String sellerName;
+
+
+
+      /// When true, the seller is an official/verified storefront — render the \"Resmi Satıcı\" badge on the PDP seller card (PD-04). From seller_schema.sellers.is_official, resolved in-process (no JOIN, §5). 
+  @JsonKey(
+    defaultValue: false,
+    name: r'seller_official',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final bool? sellerOfficial;
 
 
 
@@ -231,6 +246,7 @@ class Product {
       other.id == id &&
       other.sellerId == sellerId &&
       other.sellerName == sellerName &&
+      other.sellerOfficial == sellerOfficial &&
       other.sellerSlug == sellerSlug &&
       other.categoryId == categoryId &&
       other.brand == brand &&
@@ -248,6 +264,7 @@ class Product {
         id.hashCode +
         sellerId.hashCode +
         sellerName.hashCode +
+        sellerOfficial.hashCode +
         sellerSlug.hashCode +
         categoryId.hashCode +
         brand.hashCode +

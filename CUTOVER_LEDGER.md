@@ -88,6 +88,13 @@
 - **Contract guard (the systemic catch):** the F-021 test (`internal/api`) is fixture-only and never calls a handler — which is why PD-06 shipped. Added a **live-handler conformance test** (`cmd/core-svc/contract_test.go`, `//go:build contract`): calls the real handler, `VisitJSON`s the response against the `Product` schema (+ guards `image_urls` present / no envelope leak). Extended `make contract-test` + `openapi-ci.yml` to run it. Discovery: `docs/internal/pdp-readpath.md`.
 - **PD-07 — ✅ RESOLVED (`feat/pd-07-review-metadata`):** reviews now return `reviewerName` (masked `identity.Service.GetMe` → `maskReviewerName`, "A** Y**") + `photoUrls` (`attachments.Service.ListByEntity('review', id)` → `mediaurl.CDNUrl`) — §5-safe in-process service calls via narrow handler interfaces, no cross-schema JOIN; a lookup failure never fails the page. PDP renders a reviewer header + photo-thumbnail strip. **Discovery shift: no codegen** — the reviews endpoint is hand-written (raw-Dio mobile client, not in the OpenAPI spec); the live-handler contract test asserts the fields directly. Remaining review nuance: rating-filter (sort only today).
 
+## 4f. PLP-17 / PD-04 — official-seller badge — ✅ RESOLVED (`feat/plp-17-official-seller`)
+
+- **PLP-17 + PD-04** — Trendyol's "Resmi Satıcı" badge, absent on both the PLP card and the PDP seller card; gated on a non-existent seller flag. Migration **0090** adds `seller_schema.sellers.is_official` (sellers 1,3 seeded official — content data for the walk; 2 stays plain so the difference shows). `Seller.IsOfficial` + `seller.Service.OfficialSellerIDs(ids)` (a single-schema batch lookup).
+- **The §5 crux (no cross-schema JOIN).** The flag is `seller_schema`; the card/product is `catalog`. Two §5-safe carriers, both in-process: **PDP (PD-04)** reuses the existing `sellerSvc.GetByID` in `handleGetProductDetail` → `Product.seller_official`. **PLP card (PLP-17)** app-merges in the handler — `handleListProducts`/`handleSearch` collect the page's distinct `SellerID`s, call `OfficialSellerIDs`, and set `ProductSummary.is_official_seller`. The merge lives in `cmd/core-svc` (legally uses both `catalog` + `seller` Services); **`internal/catalog` never imports `seller`** — boundary checker green, no JOIN. Mirrors the P-029 bestseller app-merge.
+- **Spec + codegen:** `Product.seller_official` + `ProductSummary.is_official_seller`; Go + Dart regenerated (drift gate green). **Contract test** asserts `seller_official=true` for an official seller; **seller integration test** verifies 0090 + the `OfficialSellerIDs` set (excludes non-official + absent ids). UI: blue "Resmi Satıcı" verified ribbon on the card (top-left stack) + a verified check on `PdpSellerCard`. Discovery: `docs/internal/plp-17.md`.
+- **PD-04 is partial:** the official badge is done; the **seller rating** half stays open (no seller-rating aggregate yet).
+
 ---
 
 ## 5. CI / branch-protection
@@ -114,7 +121,7 @@
 | `local-phaseb.sh` orchestrator | Dev tooling, never merged to main. |
 | PLP-16 bestseller rank (backend-surface) | Rank exists in `analytics_schema.popular_products`; surface as `ProductSummary.bestseller_rank` (handler app-merge, §5-safe) + spec/codegen + ranked card badge ("Çok Satan N"). Own task. |
 | PLP-09 fast-delivery flag (backend) | No `fast_delivery`/delivery-SLA column or API param — add the flag first, then a badge/filter. |
-| PLP-17 official-seller flag (backend) | No seller `is_official`/verified flag — add it, then the "Resmi satıcı" badge. |
+| ~~PLP-17 official-seller flag (backend)~~ | **✅ RESOLVED** (`feat/plp-17-official-seller`, §4f) — `is_official` + §5-safe carriers + badge on PLP card & PDP seller card. |
 
 ---
 

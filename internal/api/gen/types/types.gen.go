@@ -574,6 +574,11 @@ type Product struct {
 	SellerId    int64  `json:"seller_id"`
 	SellerName  string `json:"seller_name"`
 
+	// SellerOfficial When true, the seller is an official/verified storefront — render the
+	// "Resmi Satıcı" badge on the PDP seller card (PD-04). From
+	// seller_schema.sellers.is_official, resolved in-process (no JOIN, §5).
+	SellerOfficial *bool `json:"seller_official,omitempty"`
+
 	// SellerSlug URL-safe identifier for the seller; used to deep-link to the seller
 	// storefront at /sellers/:slug. Null when the product's seller_id does
 	// not resolve to an active seller (legacy/platform-direct or suspended).
@@ -635,6 +640,11 @@ type ProductSummary struct {
 	// IsBestseller When true, render the "Çok Satan" bestseller stamp on the card (G-3).
 	// Sourced from the products.is_bestseller flag.
 	IsBestseller *bool `json:"is_bestseller,omitempty"`
+
+	// IsOfficialSeller When true, the product's seller is official/verified — render the
+	// "Resmi Satıcı" badge on the card (PLP-17). App-merged per page from
+	// seller_schema (no cross-schema JOIN, §5).
+	IsOfficialSeller *bool `json:"is_official_seller,omitempty"`
 
 	// Lowest30dPriceMinor Lowest price (minor units) applied in the last 30 days, for compliant
 	// display of price reductions (TR 6502 / EU Omnibus 2019/2161, P-030).

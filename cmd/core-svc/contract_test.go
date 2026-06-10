@@ -130,6 +130,53 @@ func TestContract_GetProductDetail_LiveHandler(t *testing.T) {
 	}
 }
 
+// TestContract_GetProductDetail_SellerOfficial proves PD-04: an official seller
+// surfaces as Product.seller_official=true on the flat detail response (from
+// seller.IsOfficial via the in-process GetByID carrier — no cross-schema JOIN).
+func TestContract_GetProductDetail_SellerOfficial(t *testing.T) {
+	doc := loadSpec(t)
+
+	catalogSvc := &stubCatalogSvc{
+		getByIDFn: func(id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error) {
+			return catalog.Product{
+					ID: id, SellerID: 1, CategoryID: 30, Brand: "Nike",
+					Status: "active", CreatedAt: time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
+				},
+				[]catalog.Variant{{
+					ID: 101, ProductID: id, SKU: "V-1", PriceMinor: 129900,
+					PriceCurrency: "TRY", Stock: 5, ImageKeys: []string{"products/v1/1.jpg"},
+				}},
+				[]catalog.ProductTranslation{{ProductID: id, Locale: "tr-TR", Title: "Nike"}},
+				nil
+		},
+	}
+	sellerSvc := &stubSellerSvc{
+		getByIDFn: func(int64) (seller.Seller, error) {
+			return seller.Seller{ID: 1, Slug: "acme-store", DisplayName: "Acme Store", IsOfficial: true}, nil
+		},
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/products/7", nil)
+	req.SetPathValue("id", "7")
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
+	}
+	assertConformsToSchema(t, doc, "Product", rec.Body.Bytes())
+
+	var flat struct {
+		SellerOfficial bool `json:"seller_official"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &flat); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !flat.SellerOfficial {
+		t.Errorf("seller_official should be true for an official seller: %s", rec.Body.String())
+	}
+}
+
 // TestContract_GetCategoryFacets_LiveHandler validates the PLP-13 facet
 // aggregation response against the Facet schema (each bucket has value+count).
 func TestContract_GetCategoryFacets_LiveHandler(t *testing.T) {
