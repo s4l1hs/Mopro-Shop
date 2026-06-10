@@ -54,7 +54,13 @@
 - ~~`repository.go` scoped products by exact `category_id`~~ → **`ListProductsByCategory` now scopes via a `WITH RECURSIVE` subtree over `ref_schema.categories`** (parent_id walk): a parent aggregates all descendant products, a leaf resolves to itself. §5-safe (ref_schema is the cross-module-readable exception). Migration **0088** + init snapshot add `categories_parent_id_idx`. Integration test (parent→child→grandchild) + live-verified (root-elektronik 0→31, leaf elektr-kea 28).
 - **Deploy note:** migration 0088 lands at the §1 cutover (`apply-migration.sh --db ecom up`); the index is additive (`IF NOT EXISTS`).
 
-## 4b. PLP-13 — attribute facets (CONFIRMED-HIGH backend debt — DEFER'd)
+## 4b. PLP-13 — attribute facets — 🔨 PHASE 1 IN PROGRESS (`feat/plp-13-attribute-model-p1`)
+
+- **Phase 1, PR 1 (foundation) — landed:** migration **0089** creates the normalized model `attribute_keys` / `category_facets` / `product_attributes` (catalog_schema, §5-safe; aggregation + per-product indexes; fixed `renk` key). The per-product backfill is a **dev seed** `scripts/seed/data/attr-extras.sql` (migrations run pre-seed in dev) — normalizes `variants.color` → `product_attributes(renk)` + enables `category_facets(renk)` wherever colour exists. Migration-safe, idempotent, **live-verified** (product 15 → {Beyaz, Lacivert, Siyah}; category buckets aggregate). In prod the backfill runs as a one-off data step at cutover.
+- **Staged next:** PR 2 = `GET /categories/{id}/facets` (subtree aggregation — the first facet endpoint) + `attr=<slug>:<value>` filter (PLP + search) + `Product.attributes` (for the PDP specs tab) + Go/Dart codegen + integration/contract tests. PR 3 = `FilterPanel`/`PlpFilterSheet` `renk` accordion (search inherits) + PDP specs tab (closes **PD-01** for the slice) + i18n + goldens. `depolama`/other attrs + Phase 2/3 deferred per #149. Phase-1 plan: `docs/internal/plp-13-p1.md`.
+- Protected by the gen-sync drift gate (§5) + the #158 live-handler contract test.
+
+### (original design context — retained)
 
 - Trendyol's deep, **category-aware** attribute stack (storage/RAM/screen/colour/condition/camera…). Mopro has **no normalized attribute/facet model**: only `catalog_schema.variants.color/size` (structured but **not** filter params + sparse) and `catalog_schema.products.specs` (**opaque per-category JSONB**, no facet schema/index). No facet-aggregation (values+counts) surface.
 - **Verdict: Outcome C — DEFER** (per the batch discovery). Building JSONB-key faceting on opaque `specs` = a fragile attribute store (anti-goal). The real fix is a **schema/data-modeling track**: a normalized product-attribute model + per-category facet config + an aggregation endpoint (mirror brand/rating) + filter params + accordion UI.
