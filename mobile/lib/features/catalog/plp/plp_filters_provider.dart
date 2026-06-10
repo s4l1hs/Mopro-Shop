@@ -22,6 +22,22 @@ class PlpFiltersNotifier extends FamilyNotifier<PlpFilters, String> {
 
   /// Convenience for the sort sheet.
   void setSort(PlpSort sort) => state = state.copyWith(sort: sort, page: 1);
+
+  /// PLP-13: toggle a value within an attribute slug (e.g. `renk` / `Siyah`).
+  /// Copies the map (immutable state) and removes a slug once empty. Resets page.
+  void toggleAttr(String slug, String value) {
+    final next = <String, List<String>>{
+      for (final e in state.attrs.entries) e.key: List<String>.from(e.value),
+    };
+    final list = next.putIfAbsent(slug, () => <String>[]);
+    if (list.contains(value)) {
+      list.remove(value);
+    } else {
+      list.add(value);
+    }
+    if (list.isEmpty) next.remove(slug);
+    state = state.copyWith(attrs: next, page: 1);
+  }
 }
 
 final plpFiltersProvider =

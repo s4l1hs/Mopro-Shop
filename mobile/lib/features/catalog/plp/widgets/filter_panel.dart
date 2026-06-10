@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/features/catalog/plp/attribute_facets_provider.dart';
 import 'package:mopro/features/catalog/plp/plp_filters.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
 import 'package:mopro/features/catalog/plp/widgets/plp_facets.dart';
@@ -74,6 +75,9 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
               _section('plp.filter_price', _priceRange(filters)),
               const Divider(height: 1),
               _section('plp.filter_rating', PlpRatingFacet(plpKey: widget.plpKey)),
+              // PLP-13: server-driven attribute facets (renk, …). Each adds its
+              // own divider + section; empty (no facets / search's -1 category).
+              _attributeFacets(),
               const Divider(height: 1),
               _section('plp.filter_shipping', _freeShipping(filters)),
               const Divider(height: 1),
@@ -117,19 +121,42 @@ class _FilterPanelState extends ConsumerState<FilterPanel> {
     );
   }
 
-  Widget _section(String titleKey, Widget body) {
+  Widget _section(String titleKey, Widget body) =>
+      _sectionRaw(titleKey.tr(), body);
+
+  // Same layout as [_section] but with a pre-resolved title (PLP-13 facet names
+  // are already localized server-side, so they aren't i18n keys).
+  Widget _sectionRaw(String title, Widget body) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.only(top: 12, bottom: 4),
           child: Text(
-            titleKey.tr(),
+            title,
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
         ),
         body,
         const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  // ── Attribute facets (PLP-13) ─────────────────────────────────────────────
+  Widget _attributeFacets() {
+    if (widget.currentCategoryId <= 0) return const SizedBox.shrink();
+    final facets =
+        ref.watch(attributeFacetsProvider(widget.currentCategoryId)).valueOrNull ??
+            const [];
+    if (facets.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final f in facets) ...[
+          const Divider(height: 1),
+          _sectionRaw(f.name, PlpAttributeFacet(plpKey: widget.plpKey, facet: f)),
+        ],
       ],
     );
   }
