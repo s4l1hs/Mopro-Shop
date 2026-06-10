@@ -151,9 +151,14 @@ class CartScreen extends ConsumerWidget {
     return grouped.entries.expand((entry) {
       final sellerId = entry.key;
       final sellerLines = entry.value;
+      // CT-01: real seller name from the enriched line; fall back to `#id` when
+      // the name didn't resolve (e.g. a suspended seller).
+      final sellerName = sellerLines.first.sellerName.isNotEmpty
+          ? sellerLines.first.sellerName
+          : '#$sellerId';
       return [
         _SellerGroupHeader(
-          label: 'cart.seller_section'.tr(namedArgs: {'seller': '#$sellerId'}),
+          label: 'cart.seller_section'.tr(namedArgs: {'seller': sellerName}),
           subtotalMinor: subtotalFor(sellerId),
         ),
         ...sellerLines.map(
