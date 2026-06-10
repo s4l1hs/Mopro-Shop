@@ -211,7 +211,10 @@
   "favorites": {
     "empty_title": "Henüz favori yok",
     "empty_subtitle": "Beğendiğin ürünleri favorilere ekle",
-    "explore": "Keşfet"
+    "explore": "Keşfet",
+    "clear_all": "Temizle",
+    "load_error": "Favorilerin yüklenemedi.",
+    "retry": "Tekrar dene"
   },
   "account": {
     "title": "Hesabım",

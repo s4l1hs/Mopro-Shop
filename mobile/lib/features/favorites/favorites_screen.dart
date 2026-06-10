@@ -61,7 +61,7 @@ class FavoritesScreen extends ConsumerWidget {
                   ref.read(favoritesProvider.notifier).toggle(id);
                 }
               },
-              child: const Text('Temizle'),
+              child: Text('favorites.clear_all'.tr()),
             ),
         ],
       ),
@@ -69,7 +69,9 @@ class FavoritesScreen extends ConsumerWidget {
           ? const _EmptyState()
           : productsAsync.when(
               loading: () => const _SkeletonGrid(),
-              error: (_, __) => const _SkeletonGrid(),
+              error: (_, __) => _ErrorState(
+                onRetry: () => ref.invalidate(_favProductsProvider),
+              ),
               data: (products) => products.isEmpty
                   ? const _SkeletonGrid()
                   : RefreshIndicator(
@@ -122,6 +124,39 @@ class _SkeletonGrid extends StatelessWidget {
         ),
         itemCount: cols * 3,
         itemBuilder: (_, __) => const SkeletonProductCard(),
+      ),
+    );
+  }
+}
+
+/// FAV-04: a real error state (message + retry) — replaces the old infinite
+/// skeleton that a `/products/batch` failure used to fall through to.
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.cloud_off_rounded, size: 48, color: cs.onSurfaceVariant),
+          const SizedBox(height: 16),
+          Text(
+            'favorites.load_error'.tr(),
+            style: Theme.of(context).textTheme.bodyMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text('favorites.retry'.tr()),
+          ),
+        ],
       ),
     );
   }

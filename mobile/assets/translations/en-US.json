@@ -211,7 +211,10 @@
   "favorites": {
     "empty_title": "No favourites yet",
     "empty_subtitle": "Add products you like to your favourites",
-    "explore": "Explore"
+    "explore": "Explore",
+    "clear_all": "Clear all",
+    "load_error": "Couldn't load your favourites.",
+    "retry": "Try again"
   },
   "account": {
     "title": "My Account",
