@@ -34,7 +34,8 @@
 - **CONFIRMED gaps (src): 1 open** — PD-03 no basket-discount on the PDP price
   block. (**PD-01** specs ✅ resolved for the renk slice; **PD-07** reviewer name +
   photos ✅ resolved — both below.)
-- **CONFIRMED-src deltas: 1** — PD-04 seller card has no rating / official badge
+- **CONFIRMED-src deltas: 1** — PD-04 seller card: official badge **✅ RESOLVED**
+  (`feat/plp-17-official-seller`); **seller rating** still missing (open)
   (ties PLP-17).
 - **PROBABLE (await walk): 4** — PD-02 variant pickers (text chips vs swatches),
   PD-05 installments, PD-06 gallery (video / mobile thumbnails), PD-09 desktop
@@ -64,7 +65,7 @@
 | — | Variants: colour swatches + size pickers + OOS | `PdpVariantSelector` — one `FilterChip` per variant ("colour / size" label), OOS struck-through + disabled (**P-015**); only renders when `variants.length > 1` | **text chips, not swatch/size pickers**; flat variant list, not attribute groups (ties **PLP-13**) | **PD-02** | MED |
 | — | Buy box: ATC (sticky) + qty + installments | mobile `PdpStickyCta` (bottom bar); desktop ATC + favorite + `_QuantityStepper`; **desktop gallery** sticky-translates | **desktop buy-box itself not pinned**; **no installments** | **PD-09 / PD-05** | MED |
 | — | Delivery: ETA + cargo + return | `PdpDeliveryInfo(eta)` (**P-007**) + `_TrustBadges` (secure / return / free-ship) | trust badges, not a **detailed cargo/return policy** block | **NOT-ACTIONABLE** (D3) | — |
-| — | Seller: name + rating + official badge | `PdpSellerCard(name, →storefront)` | **no seller rating, no official badge** (ties **PLP-17**) | **PD-04** | LOW–MED |
+| — | Seller: name + rating + official badge | `PdpSellerCard(name, official✓, →storefront)` | official badge **✅ RESOLVED** (`feat/plp-17-official-seller`: `Product.seller_official` → verified check on `PdpSellerCard`, ties **PLP-17**); **seller rating still open** | **PD-04** (partial) | LOW–MED |
 | — | Specs: key-spec attribute table | **RESOLVED for the PLP-13 `renk` slice** (`feat/plp-13-pdp-specs`): the specs tab now renders `Product.attributes` (`_SpecsTab` — name/value table + empty-state) on mobile + desktop; `_StubTab` removed. Backed by the normalized attribute model (0089) + the facet read-path. More attribute types arrive with PLP-13 Phase 2. | **PD-01** | **HIGH → resolved (renk)** |
 | — | Reviews: breakdown + photos + sort/filter + helpful | `PdpReviewsTab` — `RatingDistributionHistogram` + sort menu + paginated list + **helpful votes** + write-review (window-gated) + **reviewer name + photos (PD-07)** | **PD-07 RESOLVED** (`feat/pd-07-review-metadata`): reviews now return `reviewerName` (masked `identity.Service.GetMe`) + `photoUrls` (`attachments.Service.ListByEntity`, CDN-mapped) — §5-safe in-process calls, **no codegen** (the reviews endpoint is hand-written/not in the spec) — rendered as a name header + photo strip; live-handler contract test guards both. Remaining: rating-filter (sort only) | **PD-07 → resolved** | MED |
 | — | Similar / recommended + recently-viewed + Q&A | `_SimilarProductsRail` + mobile related rail (co-view) + **`PdpQaTab`** | **no recently-viewed on PDP** (it's a home rail) | **PD-10** | LOW |
