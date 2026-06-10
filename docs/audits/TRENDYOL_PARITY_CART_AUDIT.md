@@ -28,10 +28,24 @@
 
 ## §1 — Summary
 
-- **Cart is well-built:** per-seller grouping, qty stepper, swipe+button remove,
+> ### ⚠ Correction (2026-06-10, `feat/cart-line-metadata` discovery) — the cart read-path is a backend STUB
+> The "well-built" claims below describe the **mobile UI code**, which is built
+> against a fully-enriched cart response that the **backend does not serve**.
+> `GET /cart` returns only raw `{user_id, items:[{variant_id, qty}]}` —
+> `internal/cart` never emits `lines`, `seller_id`, `seller_name`, `title`,
+> `price_minor`, `totals_by_seller`, `grand_total_minor`, or `kdv_included_minor`,
+> and `cart_provider._load` does no client-side enrichment. So against the live
+> backend the authed cart's `lines` parse to `[]` → it **renders empty**, and the
+> per-seller subtotal / seller name / variant label all have no data. **CT-01,
+> CT-04 (the "RESOLVED" subtotal), and CT-05 are all gated on building the cart
+> read-path enrichment** (which must include the totals cluster). Full analysis +
+> the correctly-scoped next lane: **`docs/internal/cart-line-metadata.md`**.
+
+- **Cart is well-built (UI):** per-seller grouping, qty stepper, swipe+button remove,
   desktop price summary (subtotal/shipping/cashback/total + KDV-included), coin
   cashback line, auth-gated checkout CTA, empty state, clear-all, **guest cart +
-  guest→auth merge**, stock reservation (`reservedUntil`).
+  guest→auth merge**, stock reservation (`reservedUntil`) — *all built UI-side,
+  awaiting the backend enrichment above.*
 - **CONFIRMED gaps (src): 10** — CT-01 seller group shows `#id` not name + no
   per-seller subtotal; CT-02 no free-shipping progress; CT-03 coupon is a
   desktop-only placeholder (no backend); CT-04 mobile summary lacks the
@@ -50,9 +64,9 @@
 
 | ID | Baseline (Trendyol) | Mopro current (`src`) | Delta | Status | Sev |
 |---|---|---|---|---|---|
-| — | Line: image, title, variant, unit price, qty stepper, remove, **save-for-later/move-to-fav** | `CartLineCard` + **move-to-favorites** action (heart → favorite + remove) | **CT-05 UI ✅** move-to-favorites shipped; **variant label** (DTO has `variantId` only) + **save-for-later** (no saved list) **flagged backend** | **CT-05 (UI done)** | MED |
-| — | Per-seller grouping w/ per-seller subtotal + cargo | `_SellerGroupHeader`: label + **per-seller subtotal** (from `totalsBySeller`) | **CT-01 UI ✅** per-seller subtotal shipped; seller **name** (only `sellerId` in response) **flagged backend** | **CT-01 (subtotal done)** | MED |
-| — | Summary: subtotal, cargo, coupon, "Sepette indirim", coin, **total** | desktop `OrderSummaryCard`; mobile `CartTotalsSummary` **now has the subtotal/shipping breakdown** | **CT-04 ✅ RESOLVED**; **CT-09** basket-discount still absent | **CT-04 RESOLVED / CT-09** | MED |
+| — | Line: image, title, variant, unit price, qty stepper, remove, **save-for-later/move-to-fav** | `CartLineCard` + **move-to-favorites** action (heart → favorite + remove) | **CT-05** move-to-favorites UI shipped; **variant label** ⚠ **BLOCKED (deeper than flagged)** — the enriched cart line itself isn't served (`GET /cart` returns raw `{variant_id,qty}`; see the ⚠ correction above) — needs the cart read-path enrichment + variant colour/size; **save-for-later** (no saved list) separate | **CT-05 BLOCKED-BACKEND** | MED |
+| — | Per-seller grouping w/ per-seller subtotal + cargo | `_SellerGroupHeader`: label + per-seller subtotal **(UI code from `totalsBySeller`)** | **CT-01** ⚠ **BLOCKED (deeper than flagged)** — the backend emits **no** `totals_by_seller` / `seller_name` / enriched `lines`, so the subtotal **and** name both render empty/`#id`; needs the cart read-path enrichment (see the ⚠ correction above) | **CT-01 BLOCKED-BACKEND** | MED |
+| — | Summary: subtotal, cargo, coupon, "Sepette indirim", coin, **total** | desktop `OrderSummaryCard`; mobile `CartTotalsSummary` **UI has the subtotal/shipping breakdown** | **CT-04 UI built** but ⚠ **renders empty** — backend serves no `totals_by_seller`/`grand_total` (see ⚠ correction); **CT-09** basket-discount absent | **CT-04 BLOCKED-BACKEND / CT-09** | MED |
 | — | Coupon/promo field | desktop coupon `TextField` — **placeholder, no coupon backend** ("Coupon application is a placeholder"); mobile has none | non-functional + desktop-only | **CT-03** | MED |
 | — | Free-shipping progress ("X TL daha ekle") | — | **absent** (no threshold/progress in totals) | **CT-02** | MED |
 | — | Sticky checkout CTA with total | `CartTotalsSummary`/`OrderSummaryCard` checkout button → `requireAuth` → `/checkout` | — (**auth-gated**, intentional) | **MATCHED** | — |
@@ -134,11 +148,19 @@ shared backend prerequisites for both surfaces.
 
 ## §8 — Prioritized fix list (after the walk)
 
-1. **CT-01 / CT-04** — seller **name** + per-seller subtotal in the group; full
-   **mobile** summary breakdown (cheap; data already in `totalsBySeller`). *Pays
-   forward to Checkout.*
-2. **CT-05** — variant label on the line (needs colour/size on `CartLineDto`) +
-   save-for-later / move-to-favorites.
+> **PREREQUISITE (discovered 2026-06-10):** CT-01/CT-04/CT-05 are **not** "cheap"
+> and the data is **not** already in `totalsBySeller` — the backend serves none of
+> the enriched cart response. They all sit behind **one backend lane: the cart
+> read-path enrichment** (`GET /cart` → rich `CartDto` incl. lines w/
+> seller_name + variant_label + `totals_by_seller` + `grand_total`). §5-safe via
+> catalog + a new seller-name batch carrier; hand-written (cart isn't in the spec)
+> + a live-handler contract test. Spec'd in `docs/internal/cart-line-metadata.md`.
+
+1. **Cart read-path enrichment (NEW, prerequisite)** — build the enriched
+   `GET /cart`. Unblocks CT-01 (seller name + subtotal), CT-04 (mobile breakdown),
+   CT-05 (variant label). Necessarily includes the totals cluster.
+2. **CT-05 extras** — save-for-later / move-to-favorites (move-to-fav UI shipped;
+   save-for-later needs a saved-items store, separate).
 3. **CT-06** — stock (out/low) + price-changed-since-added warnings (surface
    `reservedUntil`; add price-at-add).
 4. **CT-02 / CT-09 / CT-03** — free-shipping progress; basket-discount line;
