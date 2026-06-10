@@ -157,7 +157,7 @@ Class | Method | HTTP request | Description
 [*OrdersApi*](doc/OrdersApi.md) | [**listReturns**](doc/OrdersApi.md#listreturns) | **GET** /orders/{id}/returns | List return requests for an order
 [*OrdersApi*](doc/OrdersApi.md) | [**refundOrder**](doc/OrdersApi.md#refundorder) | **POST** /orders/{id}/refund | Trigger a full refund for a delivered order (admin only)
 [*SearchApi*](doc/SearchApi.md) | [**search**](doc/SearchApi.md#search) | **GET** /search | Full-text product search with filters
-[*SearchApi*](doc/SearchApi.md) | [**searchSuggest**](doc/SearchApi.md#searchsuggest) | **GET** /search/suggest | Autocomplete suggestions (debounce 250 ms on client)
+[*SearchApi*](doc/SearchApi.md) | [**searchSuggest**](doc/SearchApi.md#searchsuggest) | **GET** /search/suggest | Structured autocomplete suggestions (debounce 300 ms on client)
 [*SearchApi*](doc/SearchApi.md) | [**searchTrending**](doc/SearchApi.md#searchtrending) | **GET** /search/trending | Current trending search terms
 [*SellerApi*](doc/SellerApi.md) | [**getSellerOrderBreakdown**](doc/SellerApi.md#getsellerorderbreakdown) | **GET** /seller/orders/{id}/breakdown | Seller transparency breakdown for a specific order
 [*WalletApi*](doc/WalletApi.md) | [**getWalletBalance**](doc/WalletApi.md#getwalletbalance) | **GET** /wallet/balance | Get the authenticated user&#39;s coin wallet balance
@@ -170,6 +170,7 @@ Class | Method | HTTP request | Description
  - [Address](doc/Address.md)
  - [AddressInput](doc/AddressInput.md)
  - [Banner](doc/Banner.md)
+ - [BrandSuggestion](doc/BrandSuggestion.md)
  - [Cart](doc/Cart.md)
  - [CartItem](doc/CartItem.md)
  - [CashbackPayment](doc/CashbackPayment.md)
@@ -221,7 +222,6 @@ Class | Method | HTTP request | Description
  - [Reservation](doc/Reservation.md)
  - [ReturnRequest](doc/ReturnRequest.md)
  - [ReturnRequestItemsInner](doc/ReturnRequestItemsInner.md)
- - [SearchSuggest200Response](doc/SearchSuggest200Response.md)
  - [SearchTrending200Response](doc/SearchTrending200Response.md)
  - [SellerBinding](doc/SellerBinding.md)
  - [SellerOrderBreakdown](doc/SellerOrderBreakdown.md)
@@ -229,6 +229,7 @@ Class | Method | HTTP request | Description
  - [SellerOrderBreakdownTotals](doc/SellerOrderBreakdownTotals.md)
  - [StepUpRequest](doc/StepUpRequest.md)
  - [StepUpTokenResponse](doc/StepUpTokenResponse.md)
+ - [SuggestResponse](doc/SuggestResponse.md)
  - [TokenPair](doc/TokenPair.md)
  - [UpdateMeRequest](doc/UpdateMeRequest.md)
  - [User](doc/User.md)

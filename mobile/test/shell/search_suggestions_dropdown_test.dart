@@ -31,6 +31,19 @@ Category _cat(int id, String name) => Category(
       commissionPctBps: 1000,
     );
 
+ProductSummary _product(int id, String title) => ProductSummary(
+      id: id,
+      sellerId: 1,
+      categoryId: 1,
+      brand: 'Acme',
+      status: ProductSummaryStatusEnum.active,
+      title: title,
+      priceMinor: 20000,
+      priceCurrency: 'TRY',
+      cashbackPreview:
+          CashbackPreview(monthlyCoinMinor: 100, currency: 'TRY_COIN'),
+    );
+
 void main() {
   setUpAll(initTestEnv);
 
@@ -201,8 +214,128 @@ void main() {
     });
   });
 
+  group('SearchSuggestionsDropdown — SE-06 brand + product suggestions', () {
+    testWidgets(
+        'shows brand + product rows and hides recent/trending when active',
+        (tester) async {
+      await _pump(
+        tester,
+        child: SearchSuggestionsDropdown(
+          // Recent/trending present, but an active query replaces them.
+          recentSearches: const ['eski arama'],
+          trendingSearches: const AsyncSnapshot<List<String>>.withData(
+            ConnectionState.done,
+            ['trend'],
+          ),
+          categories: [_cat(1, 'Giyim')],
+          brandSuggestions: [
+            BrandSuggestion(name: 'Nike', productCount: 12),
+          ],
+          productSuggestions: [_product(7, 'Nike Air Max')],
+          onSelectRecent: (_) {},
+          onSelectTrending: (_) {},
+          onSelectCategory: (_) {},
+          onSelectBrand: (_) {},
+          onSelectProduct: (_) {},
+          onRemoveRecent: (_) {},
+        ),
+      );
+      expect(find.text('Nike'), findsOneWidget);
+      expect(find.text('Nike Air Max'), findsOneWidget);
+      // Active-query mode owns the dropdown: the static sections are hidden.
+      expect(find.text('eski arama'), findsNothing);
+      expect(find.text('trend'), findsNothing);
+      expect(find.text('Giyim'), findsNothing);
+    });
+
+    testWidgets('tapping a brand row invokes onSelectBrand with name',
+        (tester) async {
+      String? picked;
+      await _pump(
+        tester,
+        child: SearchSuggestionsDropdown(
+          recentSearches: const [],
+          trendingSearches: const AsyncSnapshot<List<String>>.withData(
+            ConnectionState.done,
+            [],
+          ),
+          categories: const [],
+          brandSuggestions: [
+            BrandSuggestion(name: 'Adidas', productCount: 5),
+          ],
+          onSelectRecent: (_) {},
+          onSelectTrending: (_) {},
+          onSelectCategory: (_) {},
+          onSelectBrand: (b) => picked = b,
+          onRemoveRecent: (_) {},
+        ),
+      );
+      await tester.tap(find.text('Adidas'));
+      await tester.pump();
+      expect(picked, 'Adidas');
+    });
+
+    testWidgets('tapping a product row invokes onSelectProduct with id',
+        (tester) async {
+      int? id;
+      await _pump(
+        tester,
+        child: SearchSuggestionsDropdown(
+          recentSearches: const [],
+          trendingSearches: const AsyncSnapshot<List<String>>.withData(
+            ConnectionState.done,
+            [],
+          ),
+          categories: const [],
+          productSuggestions: [_product(99, 'Air Force 1')],
+          onSelectRecent: (_) {},
+          onSelectTrending: (_) {},
+          onSelectCategory: (_) {},
+          onSelectProduct: (i) => id = i,
+          onRemoveRecent: (_) {},
+        ),
+      );
+      await tester.tap(find.text('Air Force 1'));
+      await tester.pump();
+      expect(id, 99);
+    });
+
+    testWidgets('shows skeletons while suggestions loading with no data yet',
+        (tester) async {
+      await _pump(
+        tester,
+        child: SearchSuggestionsDropdown(
+          recentSearches: const ['eski'],
+          trendingSearches: const AsyncSnapshot<List<String>>.withData(
+            ConnectionState.done,
+            [],
+          ),
+          categories: const [],
+          suggestionsLoading: true,
+          onSelectRecent: (_) {},
+          onSelectTrending: (_) {},
+          onSelectCategory: (_) {},
+          onSelectBrand: (_) {},
+          onSelectProduct: (_) {},
+          onRemoveRecent: (_) {},
+        ),
+      );
+      // Loading owns the dropdown: recent is suppressed, skeletons render.
+      expect(find.text('eski'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(SearchSuggestionsDropdown),
+          matching: find.byType(Material),
+        ),
+        findsOneWidget,
+      );
+    });
+  });
+
+  // Tagged `golden` so it runs only in the informational CI job (never blocks a
+  // merge) — consistent with the gate-finalize policy for pixel tests.
   group('SearchSuggestionsDropdown — goldens', () {
-    testWidgets('populated three-section view', (tester) async {
+    testWidgets('populated three-section view', tags: 'golden', (tester) async {
       await _pump(
         tester,
         child: SearchSuggestionsDropdown(

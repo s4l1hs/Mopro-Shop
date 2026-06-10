@@ -253,6 +253,17 @@ type Banner struct {
 // BannerActionType defines model for Banner.ActionType.
 type BannerActionType string
 
+// BrandSuggestion A single brand autocomplete row (SE-06). Brand is a plain product
+// attribute (no brand entity); a tapped suggestion routes to the
+// brand-filtered listing.
+type BrandSuggestion struct {
+	// Name Brand name
+	Name string `json:"name"`
+
+	// ProductCount Number of active products carrying this brand
+	ProductCount int `json:"product_count"`
+}
+
 // Cart defines model for Cart.
 type Cart struct {
 	CoinCurrency     string     `json:"coin_currency"`
@@ -748,6 +759,15 @@ type StepUpTokenResponse struct {
 
 	// StepUpToken Bearer token with scope=high_sensitivity. Use as Authorization header.
 	StepUpToken string `json:"step_up_token"`
+}
+
+// SuggestResponse Structured search autocomplete payload (SE-06).
+type SuggestResponse struct {
+	// Brands Matching brands, ordered by active-product count desc
+	Brands []BrandSuggestion `json:"brands"`
+
+	// Products Top matching product summaries (route to PDP)
+	Products []ProductSummary `json:"products"`
 }
 
 // TokenPair defines model for TokenPair.

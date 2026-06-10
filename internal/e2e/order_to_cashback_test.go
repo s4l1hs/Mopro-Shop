@@ -402,6 +402,9 @@ func (m *catalogMock) ListProducts(_ context.Context, _, _ string, _ catalog.Pro
 func (m *catalogMock) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
+func (m *catalogMock) Suggest(_ context.Context, _, _ string, _, _ int) (catalog.SuggestResult, error) {
+	return catalog.SuggestResult{}, nil
+}
 
 func (m *catalogMock) FacetsByCategory(_ context.Context, _ int64, _ string) ([]catalog.Facet, error) {
 	return nil, nil

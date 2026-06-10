@@ -2,13 +2,16 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:mopro/design/tokens.dart';
+import 'package:mopro/utils/money.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 /// Web-only suggestions surface shown beneath the header search pill.
 ///
-/// Pure presentation: caller passes data + callbacks; this widget renders three
-/// optional sections — recent searches, trending queries, category shortcuts.
-/// Empty sections collapse (their header is hidden). Trending shows a skeleton
+/// Pure presentation: caller passes data + callbacks; this widget renders the
+/// sections. While the user is typing (a non-empty query) it shows structured
+/// brand + product suggestions (SE-06); otherwise it shows recent searches,
+/// trending queries, and category shortcuts. Empty sections collapse (their
+/// header is hidden). Trending and the active-query suggestions show a skeleton
 /// while loading; recent/categories render synchronously from the caller.
 ///
 /// Keyboard nav is handled by the host (WebSearchPill): each row is wrapped in
@@ -23,6 +26,11 @@ class SearchSuggestionsDropdown extends StatelessWidget {
     required this.onSelectCategory,
     required this.onRemoveRecent,
     super.key,
+    this.brandSuggestions = const [],
+    this.productSuggestions = const [],
+    this.suggestionsLoading = false,
+    this.onSelectBrand,
+    this.onSelectProduct,
     this.maxHeight = 480,
   });
 
@@ -30,10 +38,22 @@ class SearchSuggestionsDropdown extends StatelessWidget {
   final AsyncSnapshot<List<String>> trendingSearches;
   final List<Category> categories;
 
+  /// SE-06: structured brand + product suggestions for the active query. When
+  /// either is non-empty (or [suggestionsLoading] is true) these replace the
+  /// recent/trending/category sections — mirroring Trendyol's autocomplete.
+  final List<BrandSuggestion> brandSuggestions;
+  final List<ProductSummary> productSuggestions;
+  final bool suggestionsLoading;
+
   final ValueChanged<String> onSelectRecent;
   final ValueChanged<String> onSelectTrending;
   final ValueChanged<int> onSelectCategory;
   final ValueChanged<String> onRemoveRecent;
+
+  /// Brand tap → brand-filtered listing (host routes by name). Product tap →
+  /// PDP (host routes by id). Null disables the section.
+  final ValueChanged<String>? onSelectBrand;
+  final ValueChanged<int>? onSelectProduct;
 
   final double maxHeight;
 
@@ -46,6 +66,13 @@ class SearchSuggestionsDropdown extends StatelessWidget {
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
+    final hasBrands = brandSuggestions.isNotEmpty && onSelectBrand != null;
+    final hasProducts =
+        productSuggestions.isNotEmpty && onSelectProduct != null;
+    // The active-query mode owns the dropdown the moment a fetch is in flight or
+    // returns anything, so stale recent/trending rows don't flash beneath it.
+    final showSuggestions = suggestionsLoading || hasBrands || hasProducts;
+
     final hasRecent = recentSearches.isNotEmpty;
     final hasTrendingData = trendingSearches.data?.isNotEmpty ?? false;
     final hasTrendingLoading = trendingSearches.connectionState ==
@@ -53,8 +80,50 @@ class SearchSuggestionsDropdown extends StatelessWidget {
     final showTrendingSection = hasTrendingData || hasTrendingLoading;
     final hasCategories = categories.isNotEmpty;
 
-    if (!hasRecent && !showTrendingSection && !hasCategories) {
+    if (!showSuggestions &&
+        !hasRecent &&
+        !showTrendingSection &&
+        !hasCategories) {
       return const SizedBox.shrink();
+    }
+
+    final List<Widget> children;
+    if (showSuggestions) {
+      children = [
+        if (hasBrands)
+          _BrandsSection(
+            brands: brandSuggestions,
+            onSelect: onSelectBrand!,
+          ),
+        if (hasProducts)
+          _ProductsSection(
+            products: productSuggestions,
+            onSelect: onSelectProduct!,
+          ),
+        // No brands and no products yet, but a fetch is in flight → skeletons.
+        if (!hasBrands && !hasProducts && suggestionsLoading)
+          ...List.generate(4, (_) => const _SkeletonRow()),
+      ];
+    } else {
+      children = [
+        if (hasRecent)
+          _RecentSection(
+            queries: recentSearches,
+            onSelect: onSelectRecent,
+            onRemove: onRemoveRecent,
+          ),
+        if (showTrendingSection)
+          _TrendingSection(
+            snapshot: trendingSearches,
+            onSelect: onSelectTrending,
+            limit: _trendingMax,
+          ),
+        if (hasCategories)
+          _CategoriesSection(
+            categories: categories.take(_categoryShortcutMax).toList(),
+            onSelect: onSelectCategory,
+          ),
+      ];
     }
 
     return Material(
@@ -74,22 +143,7 @@ class SearchSuggestionsDropdown extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (hasRecent) _RecentSection(
-                queries: recentSearches,
-                onSelect: onSelectRecent,
-                onRemove: onRemoveRecent,
-              ),
-              if (showTrendingSection) _TrendingSection(
-                snapshot: trendingSearches,
-                onSelect: onSelectTrending,
-                limit: _trendingMax,
-              ),
-              if (hasCategories) _CategoriesSection(
-                categories: categories.take(_categoryShortcutMax).toList(),
-                onSelect: onSelectCategory,
-              ),
-            ],
+            children: children,
           ),
         ),
       ),
@@ -202,6 +256,48 @@ class _CategoriesSection extends StatelessWidget {
   }
 }
 
+class _BrandsSection extends StatelessWidget {
+  const _BrandsSection({required this.brands, required this.onSelect});
+
+  final List<BrandSuggestion> brands;
+  final ValueChanged<String> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHeader('search.brands'.tr()),
+        for (final b in brands)
+          _SuggestionRow(
+            icon: Icons.sell_outlined,
+            label: b.name,
+            onTap: () => onSelect(b.name),
+          ),
+      ],
+    );
+  }
+}
+
+class _ProductsSection extends StatelessWidget {
+  const _ProductsSection({required this.products, required this.onSelect});
+
+  final List<ProductSummary> products;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SectionHeader('search.products'.tr()),
+        for (final p in products)
+          _ProductRow(product: p, onTap: () => onSelect(p.id)),
+      ],
+    );
+  }
+}
+
 // ── Row primitives ──────────────────────────────────────────────────────────
 
 class _SuggestionRow extends StatelessWidget {
@@ -289,6 +385,91 @@ class _CategoryRow extends StatelessWidget {
               ),
             ),
             Icon(Icons.arrow_forward, size: 14, color: cs.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProductRow extends StatelessWidget {
+  const _ProductRow({required this.product, required this.onTap});
+
+  final ProductSummary product;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final image = product.coverImageUrl;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: SizedBox(
+                width: 36,
+                height: 36,
+                child: image == null || image.isEmpty
+                    ? ColoredBox(
+                        color: cs.surfaceContainerHighest,
+                        child: Icon(
+                          Icons.image_outlined,
+                          size: 18,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: image,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => ColoredBox(
+                          color: cs.surfaceContainerHighest,
+                          child: Icon(
+                            Icons.image_outlined,
+                            size: 18,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    product.title,
+                    style: const TextStyle(fontSize: 14),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (product.brand.isNotEmpty)
+                    Text(
+                      product.brand,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              MoneyUtils.formatMinor(
+                product.priceMinor,
+                currency: product.priceCurrency,
+              ),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
           ],
         ),
       ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,7 @@ import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/catalog/providers/categories_provider.dart';
 import 'package:mopro/features/catalog/providers/home_provider.dart';
 import 'package:mopro/features/catalog/providers/recent_searches_provider.dart';
+import 'package:mopro/features/catalog/providers/search_suggestions_provider.dart';
 import 'package:mopro/shell/search_suggestions_dropdown.dart';
 
 /// Real-text-input search pill used by `WebHeader` at `>=600` widths.
@@ -31,12 +34,33 @@ class WebSearchPill extends ConsumerStatefulWidget {
 class _WebSearchPillState extends ConsumerState<WebSearchPill> {
   final _controller = TextEditingController();
   final _textFocusNode = FocusNode();
+  Timer? _debounce;
+
+  // Matches the rest of the app's 300 ms search debounce (SearchNotifier).
+  static const _debounceMs = 300;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     _textFocusNode.dispose();
     super.dispose();
+  }
+
+  /// Debounce the typed text into `searchSuggestQueryProvider` so the dropdown
+  /// fetches brand/product suggestions only after the user pauses (SE-06). An
+  /// empty field resets immediately so the recent/trending sections return.
+  void _onChanged(String value) {
+    _debounce?.cancel();
+    final q = value.trim();
+    if (q.isEmpty) {
+      ref.read(searchSuggestQueryProvider.notifier).state = '';
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: _debounceMs), () {
+      if (!mounted) return;
+      ref.read(searchSuggestQueryProvider.notifier).state = q;
+    });
   }
 
   void _submit(String query) {
@@ -65,8 +89,28 @@ class _WebSearchPillState extends ConsumerState<WebSearchPill> {
     context.go('/categories/$categoryId');
   }
 
+  // SE-06: a brand suggestion lands on the brand-filtered listing (a search for
+  // the brand name); a product suggestion goes straight to its PDP.
+  void _selectBrand(String name, VoidCallback close) {
+    _controller.text = name;
+    close();
+    _submit(name);
+  }
+
+  void _selectProduct(int productId, VoidCallback close) {
+    close();
+    _textFocusNode.unfocus();
+    context.push('/products/$productId');
+  }
+
   void _removeRecent(String q) {
     ref.read(recentSearchesProvider.notifier).remove(q);
+  }
+
+  void _clear() {
+    setState(_controller.clear);
+    _debounce?.cancel();
+    ref.read(searchSuggestQueryProvider.notifier).state = '';
   }
 
   @override
@@ -83,7 +127,8 @@ class _WebSearchPillState extends ConsumerState<WebSearchPill> {
         controller: _controller,
         focusNode: _textFocusNode,
         onSubmitted: _submit,
-        onClear: () => setState(_controller.clear),
+        onChanged: _onChanged,
+        onClear: _clear,
         colorScheme: cs,
       ),
       panelBuilder: (panelContext, close) {
@@ -92,14 +137,27 @@ class _WebSearchPillState extends ConsumerState<WebSearchPill> {
             final recent = ref.watch(recentSearchesProvider);
             final trending = ref.watch(trendingSearchesProvider);
             final categoriesState = ref.watch(categoriesProvider);
+
+            // SE-06: structured suggestions for the active (debounced) query.
+            final query = ref.watch(searchSuggestQueryProvider);
+            final suggestions = query.isEmpty
+                ? null
+                : ref.watch(searchSuggestionsProvider(query));
             return SearchSuggestionsDropdown(
               recentSearches: recent,
               trendingSearches: _asSnapshot(trending),
               categories:
                   categoriesState.categories.valueOrNull ?? const [],
+              brandSuggestions:
+                  suggestions?.valueOrNull?.brands ?? const [],
+              productSuggestions:
+                  suggestions?.valueOrNull?.products ?? const [],
+              suggestionsLoading: suggestions?.isLoading ?? false,
               onSelectRecent: (q) => _selectRecent(q, close),
               onSelectTrending: (q) => _selectTrending(q, close),
               onSelectCategory: (id) => _selectCategory(id, close),
+              onSelectBrand: (name) => _selectBrand(name, close),
+              onSelectProduct: (id) => _selectProduct(id, close),
               onRemoveRecent: _removeRecent,
             );
           },
@@ -114,6 +172,7 @@ class _PillBody extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.onSubmitted,
+    required this.onChanged,
     required this.onClear,
     required this.colorScheme,
   });
@@ -121,6 +180,7 @@ class _PillBody extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final ValueChanged<String> onSubmitted;
+  final ValueChanged<String> onChanged;
   final VoidCallback onClear;
   final ColorScheme colorScheme;
 
@@ -143,6 +203,7 @@ class _PillBody extends StatelessWidget {
               controller: controller,
               focusNode: focusNode,
               onSubmitted: onSubmitted,
+              onChanged: onChanged,
               textInputAction: TextInputAction.search,
               style: const TextStyle(fontSize: 14),
               decoration: InputDecoration(

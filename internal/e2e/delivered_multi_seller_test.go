@@ -85,6 +85,9 @@ func (m *multiVariantCatalogMock) SearchSummary(_ context.Context, _, _, _ strin
 	return nil, 0, nil
 }
 
+func (m *multiVariantCatalogMock) Suggest(_ context.Context, _, _ string, _, _ int) (catalog.SuggestResult, error) {
+	return catalog.SuggestResult{}, nil
+}
 func (m *multiVariantCatalogMock) FacetsByCategory(_ context.Context, _ int64, _ string) ([]catalog.Facet, error) {
 	return nil, nil
 }

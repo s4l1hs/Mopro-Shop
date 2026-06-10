@@ -61,6 +61,9 @@ func (m *mockCatalogSvc) SearchSummary(_ context.Context, _, _, _ string, _ cata
 	return nil, 0, nil
 }
 
+func (m *mockCatalogSvc) Suggest(_ context.Context, _, _ string, _, _ int) (catalog.SuggestResult, error) {
+	return catalog.SuggestResult{}, nil
+}
 func (m *mockCatalogSvc) FacetsByCategory(_ context.Context, _ int64, _ string) ([]catalog.Facet, error) {
 	return nil, nil
 }

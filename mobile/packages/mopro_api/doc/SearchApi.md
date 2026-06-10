@@ -10,7 +10,7 @@ All URIs are relative to *https://api.moproshop.com*
 Method | HTTP request | Description
 ------------- | ------------- | -------------
 [**search**](SearchApi.md#search) | **GET** /search | Full-text product search with filters
-[**searchSuggest**](SearchApi.md#searchsuggest) | **GET** /search/suggest | Autocomplete suggestions (debounce 250 ms on client)
+[**searchSuggest**](SearchApi.md#searchsuggest) | **GET** /search/suggest | Structured autocomplete suggestions (debounce 300 ms on client)
 [**searchTrending**](SearchApi.md#searchtrending) | **GET** /search/trending | Current trending search terms
 
 
@@ -82,9 +82,11 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **searchSuggest**
-> SearchSuggest200Response searchSuggest(q, xTraceId)
+> SuggestResponse searchSuggest(q, xTraceId)
 
-Autocomplete suggestions (debounce 250 ms on client)
+Structured autocomplete suggestions (debounce 300 ms on client)
+
+Returns structured brand + product suggestions for the search dropdown (SE-06). Brands route to the brand-filtered listing; products route to the PDP. Both are sourced from the catalog alone. 
 
 ### Example
 ```dart
@@ -111,7 +113,7 @@ Name | Type | Description  | Notes
 
 ### Return type
 
-[**SearchSuggest200Response**](SearchSuggest200Response.md)
+[**SuggestResponse**](SuggestResponse.md)
 
 ### Authorization
 

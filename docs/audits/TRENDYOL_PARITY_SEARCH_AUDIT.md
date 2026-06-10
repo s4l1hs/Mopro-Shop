@@ -32,8 +32,11 @@
   reimplements the results wiring separately from `CategoryProductsScreen`.
 - **CONFIRMED search-specific deltas (src): 7** — SE-02 (mobile search has **no
   filter** affordance), SE-03 (no result count), SE-04 (load-more, no infinite-
-  scroll/numbered-pages), SE-05 (flat breakpoints), SE-06 (no brand/product
-  autocomplete), SE-07 (no "did you mean"/no-results recovery), SE-09 (mobile
+  scroll/numbered-pages), SE-05 (flat breakpoints), **~~SE-06~~ ✅ RESOLVED**
+  (`feat/search-suggestions-se06`): `/search/suggest` now returns structured
+  `SuggestResponse{brands, products}` (`catalog.Suggest` → `SuggestBrands` +
+  `SearchProductsSummary`, §5-safe) and the dropdown renders brand + product
+  (as-you-type) rows, SE-07 (no "did you mean"/no-results recovery), SE-09 (mobile
   empty lacks trending).
 - **PROBABLE (await walk): 2** — SE-08 (relevance ranking), SE-10 (search-within /
   sponsored).
@@ -138,7 +141,7 @@ can drive real queries. (Note: results aren't relevance-ranked — SE-08.)
    fixes already shipped for the PLP: **mobile filter sheet** (SE-02, the real
    gap), **result count**, **infinite-scroll/numbered-pages**, **2/3/4/5
    breakpoints**. *Cheapest path: extract a shared results body.*
-2. **SE-06** — brand + product (as-you-type) suggestions in the dropdown.
+2. ~~**SE-06** — brand + product (as-you-type) suggestions in the dropdown.~~ **✅ SHIPPED (`feat/search-suggestions-se06`):** `/search/suggest` → `SuggestResponse{brands, products}` + the dropdown brand/product rows.
 3. **SE-07** — no-results recovery ("did you mean" + popular alternatives).
 4. **SE-08** — relevance default sort (backend ts_rank) — confirm + backend track.
 5. **SE-09 / SE-10** — trending on mobile empty; refine box. LOW.
