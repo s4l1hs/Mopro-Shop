@@ -106,6 +106,14 @@
 
 ---
 
+## 4h. Cart read-path enrichment — 🚩 DISCOVERED + DEFERRED (`feat/cart-line-metadata`, docs-only)
+
+- A "cart line metadata" lane (add CT-01 seller name + CT-05 variant label) opened against a **false premise**: the enriched cart line doesn't exist server-side. **`GET /cart` returns raw `{user_id, items:[{variant_id, qty}]}`** (`handleGetCart` → `cart.Service.GetCart`; `cart.CartItem` = `{VariantID, Qty}` only); the backend never emits `lines`/`seller_id`/`seller_name`/`title`/`price_minor`/`totals_by_seller`/`grand_total_minor`/`kdv_included_minor`. The mobile's `CartDto`/`CartLineDto`/`totalsBySeller` layer is **client-anticipated but backend-unfulfilled** (and `cart_provider._load` does no client enrichment) → **the authed cart renders empty today.**
+- So **CT-01, CT-04 (the audit's "RESOLVED" subtotal), and CT-05 are all gated on one backend lane — the cart read-path enrichment** — which *must* include the totals cluster the metadata lane deferred. **User decision: document + defer** (no half-built code). Discovery + the correctly-scoped next lane: `docs/internal/cart-line-metadata.md`; `TRENDYOL_PARITY_CART_AUDIT.md` §1 carries a ⚠ correction + the rows/fix-list re-framed.
+- **Next lane (scoped):** enrich `GET /cart` §5-safe (variant→product→seller via catalog `GetVariantByID` + a new `seller.Service.SellerNamesByIDs` batch carrier, mirroring PLP-17's app-merge in `cmd/core-svc`; never `internal/catalog`-imports-seller). Cart isn't in the OpenAPI spec (hand-written, like favorites/reviews) → no codegen; live-handler contract test. Save-for-later/coupon/basket-discount remain separate.
+
+---
+
 ## 5. CI / branch-protection
 
 - **F-022b (#138)** made `flutter analyze` green-on-compile (`--no-fatal-infos`; errors/warnings still fatal).
