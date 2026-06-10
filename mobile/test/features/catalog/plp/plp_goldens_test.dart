@@ -11,6 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:mopro/api/client.dart';
 import 'package:mopro/design/theme.dart';
 import 'package:mopro/design/theme_controller.dart';
+import 'package:mopro/features/catalog/plp/attribute_facets_provider.dart';
 import 'package:mopro/features/catalog/providers/categories_provider.dart';
 import 'package:mopro/features/catalog/screens/category_products_screen.dart';
 import 'package:mopro_api/mopro_api.dart';
@@ -133,6 +134,10 @@ Future<void> _pump(
           sharedPreferencesProvider.overrideWithValue(prefs),
           catalogApiProvider.overrideWithValue(_FakeCatalogApi()),
           categoriesProvider.overrideWith(_SeededCategories.new),
+          // PLP-13: the renk facet section is data-driven; keep it empty here so
+          // the sidebar goldens are stable (the accordion has its own widget
+          // test) and no real facets fetch fires against the fake API.
+          attributeFacetsProvider.overrideWith((ref, id) async => const <Facet>[]),
         ],
         child: MaterialApp.router(
           theme: brightness == Brightness.dark
