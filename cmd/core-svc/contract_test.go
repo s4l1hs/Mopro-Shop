@@ -22,8 +22,11 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/mopro/platform/internal/attachments"
 	"github.com/mopro/platform/internal/catalog"
+	"github.com/mopro/platform/internal/identity"
 	"github.com/mopro/platform/internal/seller"
+	"github.com/mopro/platform/pkg/mediaurl"
 )
 
 // loadSpec loads + validates api/openapi.yaml (../../api relative to this file).
@@ -199,5 +202,74 @@ func TestContract_GetProductDetail_AttributesArray(t *testing.T) {
 	}
 	if len(flat.Attributes) != 1 || flat.Attributes[0].Slug != "renk" || len(flat.Attributes[0].Values) != 2 {
 		t.Fatalf("attributes not surfaced: %s", rec.Body.String())
+	}
+}
+
+// ── PD-07: reviews reviewer-name + photos (live-handler) ──────────────────────
+// The reviews endpoint is hand-written (raw-Dio mobile client, not in the
+// OpenAPI spec), so this asserts the handler output directly rather than via a
+// schema — the same approach #158 used to guard image_urls.
+
+type stubReviewNamer struct{ name string }
+
+func (s stubReviewNamer) GetMe(context.Context, int64) (identity.User, error) {
+	return identity.User{Name: s.name}, nil
+}
+
+type stubReviewPhotos struct{ keys []string }
+
+func (s stubReviewPhotos) ListByEntity(context.Context, string, int64) ([]attachments.PhotoAttachment, error) {
+	out := make([]attachments.PhotoAttachment, len(s.keys))
+	for i, k := range s.keys {
+		out[i] = attachments.PhotoAttachment{StorageKey: k}
+	}
+	return out, nil
+}
+
+func TestContract_ProductReviews_NameAndPhotos(t *testing.T) {
+	catalogSvc := &stubCatalogSvc{
+		listReviewsFn: func() ([]catalog.ProductReviewRow, int, error) {
+			return []catalog.ProductReviewRow{{
+				ID: 9, UserID: 1, Rating: 5, Title: "Harika", Body: "Çok iyi",
+				HelpfulCount: 2, CreatedAt: "2026-01-01T00:00:00Z",
+			}}, 1, nil
+		},
+		reviewsSummaryFn: func() (catalog.ReviewsSummary, error) {
+			return catalog.ReviewsSummary{
+				Distribution: map[int]int{1: 0, 2: 0, 3: 0, 4: 0, 5: 1},
+				Average:      5, TotalCount: 1,
+			}, nil
+		},
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/products/7/reviews", nil)
+	req.SetPathValue("id", "7")
+	handleProductReviews(catalogSvc,
+		stubReviewNamer{name: "Ahmet Yılmaz"},
+		stubReviewPhotos{keys: []string{"reviews/9/a.jpg", "reviews/9/b.jpg"}},
+	)(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Items []struct {
+			ReviewerName string   `json:"reviewerName"`
+			PhotoURLs    []string `json:"photoUrls"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v\nbody: %s", err, rec.Body.String())
+	}
+	if len(body.Items) != 1 {
+		t.Fatalf("want 1 item, got %d: %s", len(body.Items), rec.Body.String())
+	}
+	if body.Items[0].ReviewerName != "A** Y**" {
+		t.Errorf("reviewerName: want masked 'A** Y**', got %q", body.Items[0].ReviewerName)
+	}
+	want := []string{mediaurl.CDNUrl("reviews/9/a.jpg"), mediaurl.CDNUrl("reviews/9/b.jpg")}
+	if len(body.Items[0].PhotoURLs) != 2 || body.Items[0].PhotoURLs[0] != want[0] || body.Items[0].PhotoURLs[1] != want[1] {
+		t.Errorf("photoUrls: want CDN-mapped %v, got %v", want, body.Items[0].PhotoURLs)
 	}
 }
