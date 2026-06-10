@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
+import 'package:mopro_api/mopro_api.dart';
 
 /// Shared PLP filter facets, wired to `plpFiltersProvider(plpKey)`. Extracted
 /// from the desktop `FilterPanel` so the mobile filter sheet (PLP-01) renders
@@ -127,6 +128,35 @@ class PlpRatingFacet extends ConsumerWidget {
         tile(4, ''),
         tile(3, ''),
         tile(2, ''),
+      ],
+    );
+  }
+}
+
+/// PLP-13: one attribute facet (e.g. `renk`) as dense checkboxes with each
+/// value's product count, bound to `plpFiltersProvider(plpKey).attrs[facet.slug]`.
+/// Mirrors [PlpBrandFacet]; values + counts come from the #160 facets endpoint
+/// (the facet's `name` is already server-localized, so no client i18n).
+class PlpAttributeFacet extends ConsumerWidget {
+  const PlpAttributeFacet({required this.plpKey, required this.facet, super.key});
+
+  final String plpKey;
+  final Facet facet;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final filters = ref.watch(plpFiltersProvider(plpKey));
+    final notifier = ref.read(plpFiltersProvider(plpKey).notifier);
+    final selected = filters.attrs[facet.slug] ?? const <String>[];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final fv in facet.values)
+          _DenseCheckbox(
+            label: '${fv.value} (${fv.count})',
+            value: selected.contains(fv.value),
+            onChanged: (_) => notifier.toggleAttr(facet.slug, fv.value),
+          ),
       ],
     );
   }
