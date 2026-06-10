@@ -477,6 +477,9 @@ func main() {
 	mux.Handle("GET /categories/{id}/commission",
 		httpTrace(http.HandlerFunc(handleGetCommission(catalogSvc, market))),
 	)
+	mux.Handle("GET /categories/{id}/facets",
+		httpTrace(http.HandlerFunc(handleCategoryFacets(catalogSvc, defaultLocale))),
+	)
 	mux.Handle("GET /search",
 		httpTrace(http.HandlerFunc(handleSearch(analyticsSvc, catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)

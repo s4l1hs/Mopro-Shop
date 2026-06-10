@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -412,6 +413,34 @@ func appendProductFilters(sb *strings.Builder, args []any, f ProductFilter, argN
 			" AND vph.effective_at >= now() - INTERVAL '30 days'" +
 			" AND vph.price_minor > v.price_minor)")
 	}
+	return appendAttrFilters(sb, args, f.Attrs, argN)
+}
+
+// appendAttrFilters appends the PLP-13 attribute predicates: each slug → an
+// EXISTS over product_attributes (AND across slugs); values within a slug are
+// ANY (OR). Single-schema, served by product_attributes_key_value_idx. Slugs are
+// bound (never interpolated) and sorted so the generated SQL + arg layout are
+// deterministic. Split out of appendProductFilters to keep its complexity low.
+func appendAttrFilters(sb *strings.Builder, args []any, attrs map[string][]string, argN int) ([]any, int) {
+	if len(attrs) == 0 {
+		return args, argN
+	}
+	slugs := make([]string, 0, len(attrs))
+	for s := range attrs {
+		slugs = append(slugs, s)
+	}
+	sort.Strings(slugs)
+	for _, slug := range slugs {
+		vals := attrs[slug]
+		if len(vals) == 0 {
+			continue
+		}
+		fmt.Fprintf(sb, " AND EXISTS (SELECT 1 FROM catalog_schema.product_attributes pa"+
+			" JOIN catalog_schema.attribute_keys ak ON ak.id = pa.attribute_key_id"+
+			" WHERE pa.product_id = p.id AND ak.slug = $%d AND pa.value_text = ANY($%d))", argN, argN+1)
+		args = append(args, slug, vals)
+		argN += 2
+	}
 	return args, argN
 }
 
@@ -578,6 +607,105 @@ func (r *pgxRepository) SearchProductsSummary(ctx context.Context, query, locale
 	}
 	defer rows.Close()
 	return scanProductSummaries(rows, "search summary")
+}
+
+// attrNameCol returns the trusted (non-interpolated-user-input) attribute_keys
+// name column for the locale — mirrors ListCategories' name resolution.
+func attrNameCol(locale string) string {
+	if locale == "tr-TR" || locale == "tr" {
+		return "name_tr"
+	}
+	return "name_en"
+}
+
+// FacetsByCategory aggregates the facetable attributes (category_facets) over a
+// category's PLP-12 subtree into (value, count) buckets — the first real facet
+// aggregation surface (PLP-13). §5-safe: catalog_schema only; ref_schema.categories
+// is the allowed cross-module read. Counts are DISTINCT products among the
+// subtree's active products. Rows arrive grouped by (display_order, slug) so the
+// scan folds consecutive same-slug rows into one Facet.
+func (r *pgxRepository) FacetsByCategory(ctx context.Context, categoryID int64, locale string) ([]Facet, error) {
+	//nolint:gosec // attrNameCol is a fixed whitelist (name_tr|name_en), not user input.
+	q := `WITH RECURSIVE subtree AS (
+		SELECT id FROM ref_schema.categories WHERE id = $1
+		UNION ALL
+		SELECT c.id FROM ref_schema.categories c JOIN subtree s ON c.parent_id = s.id
+	),
+	facet_keys AS (
+		SELECT cf.attribute_key_id, MIN(cf.display_order) AS display_order
+		FROM catalog_schema.category_facets cf
+		WHERE cf.category_id IN (SELECT id FROM subtree)
+		GROUP BY cf.attribute_key_id
+	)
+	SELECT ak.slug, ak.` + attrNameCol(locale) + ` AS name, pa.value_text,
+	       count(DISTINCT pa.product_id) AS cnt
+	FROM facet_keys fk
+	JOIN catalog_schema.attribute_keys ak ON ak.id = fk.attribute_key_id
+	JOIN catalog_schema.product_attributes pa ON pa.attribute_key_id = fk.attribute_key_id
+	JOIN catalog_schema.products p ON p.id = pa.product_id
+	WHERE p.status = 'active' AND p.category_id IN (SELECT id FROM subtree)
+	  AND pa.value_text IS NOT NULL
+	GROUP BY ak.slug, name, fk.display_order, pa.value_text
+	ORDER BY fk.display_order, ak.slug, cnt DESC, pa.value_text`
+
+	rows, err := r.pool.Query(ctx, q, categoryID)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: FacetsByCategory: %w", err)
+	}
+	defer rows.Close()
+
+	var facets []Facet
+	for rows.Next() {
+		var slug, name, value string
+		var count int
+		if err := rows.Scan(&slug, &name, &value, &count); err != nil {
+			return nil, fmt.Errorf("catalog.repo: scan facet: %w", err)
+		}
+		if n := len(facets); n > 0 && facets[n-1].Slug == slug {
+			facets[n-1].Values = append(facets[n-1].Values, FacetValue{Value: value, Count: count})
+			continue
+		}
+		facets = append(facets, Facet{Slug: slug, Name: name, Values: []FacetValue{{Value: value, Count: count}}})
+	}
+	if facets == nil {
+		facets = []Facet{}
+	}
+	return facets, rows.Err()
+}
+
+// ProductAttributes returns a product's normalized attributes (PLP-13) for the
+// PDP specs tab — slug + locale-resolved name + its value(s). Rows arrive grouped
+// by slug so the scan folds them into one ProductAttribute per key.
+func (r *pgxRepository) ProductAttributes(ctx context.Context, productID int64, locale string) ([]ProductAttribute, error) {
+	//nolint:gosec // attrNameCol is a fixed whitelist (name_tr|name_en), not user input.
+	q := `SELECT ak.slug, ak.` + attrNameCol(locale) + ` AS name, pa.value_text
+	FROM catalog_schema.product_attributes pa
+	JOIN catalog_schema.attribute_keys ak ON ak.id = pa.attribute_key_id
+	WHERE pa.product_id = $1 AND pa.value_text IS NOT NULL
+	ORDER BY ak.slug, pa.value_text`
+
+	rows, err := r.pool.Query(ctx, q, productID)
+	if err != nil {
+		return nil, fmt.Errorf("catalog.repo: ProductAttributes: %w", err)
+	}
+	defer rows.Close()
+
+	var attrs []ProductAttribute
+	for rows.Next() {
+		var slug, name, value string
+		if err := rows.Scan(&slug, &name, &value); err != nil {
+			return nil, fmt.Errorf("catalog.repo: scan product attribute: %w", err)
+		}
+		if n := len(attrs); n > 0 && attrs[n-1].Slug == slug {
+			attrs[n-1].Values = append(attrs[n-1].Values, value)
+			continue
+		}
+		attrs = append(attrs, ProductAttribute{Slug: slug, Name: name, Values: []string{value}})
+	}
+	if attrs == nil {
+		attrs = []ProductAttribute{}
+	}
+	return attrs, rows.Err()
 }
 
 func (r *pgxRepository) GetVariantByID(ctx context.Context, variantID int64) (Variant, error) {

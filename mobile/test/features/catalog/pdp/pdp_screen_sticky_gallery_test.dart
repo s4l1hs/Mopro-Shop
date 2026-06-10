@@ -30,6 +30,7 @@ Product _product() => Product(
       categoryId: 5,
       brand: 'Acme',
       status: ProductStatusEnum.active,
+      attributes: const [],
       title: 'Test Ürünü',
       // Long description → tall below-the-fold content so the page can scroll
       // *past* the pin window and the gallery actually releases.
@@ -73,6 +74,7 @@ class _FakeCatalogApi extends CatalogApi {
     bool? freeShipping,
     bool? inStock,
     bool? priceDropped,
+    List<String>? attr,
     String? xTraceId,
     int? categoryId,
     int? page = 1,

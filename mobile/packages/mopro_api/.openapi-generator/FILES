@@ -33,7 +33,10 @@ doc/Device.md
 doc/DiscoveryApi.md
 doc/ErrorEnvelope.md
 doc/ErrorEnvelopeError.md
+doc/Facet.md
+doc/FacetValue.md
 doc/FieldError.md
+doc/GetCategoryFacets200Response.md
 doc/HealthApi.md
 doc/ListAddresses200Response.md
 doc/ListBanners200Response.md
@@ -52,6 +55,7 @@ doc/OrderItem.md
 doc/OrdersApi.md
 doc/PaginationMeta.md
 doc/Product.md
+doc/ProductAttribute.md
 doc/ProductSummary.md
 doc/Recommendation.md
 doc/RefreshTokenRequest.md
@@ -126,7 +130,10 @@ lib/src/model/delivery_eta.dart
 lib/src/model/device.dart
 lib/src/model/error_envelope.dart
 lib/src/model/error_envelope_error.dart
+lib/src/model/facet.dart
+lib/src/model/facet_value.dart
 lib/src/model/field_error.dart
+lib/src/model/get_category_facets200_response.dart
 lib/src/model/list_addresses200_response.dart
 lib/src/model/list_banners200_response.dart
 lib/src/model/list_cashback_payments200_response.dart
@@ -142,6 +149,7 @@ lib/src/model/order.dart
 lib/src/model/order_item.dart
 lib/src/model/pagination_meta.dart
 lib/src/model/product.dart
+lib/src/model/product_attribute.dart
 lib/src/model/product_summary.dart
 lib/src/model/recommendation.dart
 lib/src/model/refresh_token_request.dart

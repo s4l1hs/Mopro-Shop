@@ -182,6 +182,20 @@ func (s *catalogService) SearchSummary(ctx context.Context, query, locale, marke
 	return s.repo.SearchProductsSummary(ctx, query, locale, filter, offset, perPage)
 }
 
+func (s *catalogService) FacetsByCategory(ctx context.Context, categoryID int64, locale string) ([]Facet, error) {
+	if locale == "" {
+		locale = s.defaultLocale
+	}
+	return s.repo.FacetsByCategory(ctx, categoryID, locale)
+}
+
+func (s *catalogService) ProductAttributes(ctx context.Context, productID int64, locale string) ([]ProductAttribute, error) {
+	if locale == "" {
+		locale = s.defaultLocale
+	}
+	return s.repo.ProductAttributes(ctx, productID, locale)
+}
+
 func (s *catalogService) ListAllVariantStocks(ctx context.Context) ([]VariantStock, error) {
 	return s.repo.ListAllVariantStocks(ctx)
 }

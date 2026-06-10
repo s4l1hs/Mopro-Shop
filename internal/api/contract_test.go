@@ -105,6 +105,13 @@ func TestContract_GetProduct_ProductSchema(t *testing.T) {
 				"image_urls":     []interface{}{imageURL},
 			},
 		},
+		"attributes": []interface{}{
+			map[string]interface{}{
+				"slug":   "renk",
+				"name":   "Renk",
+				"values": []interface{}{"Siyah"},
+			},
+		},
 	}
 
 	validateFixture(t, doc, "Product", fixture)

@@ -391,6 +391,22 @@ type ErrorEnvelope struct {
 	} `json:"error"`
 }
 
+// Facet A facetable attribute for a category with its value buckets (PLP-13),
+// ordered by display_order then descending count. Drives the filter accordions.
+type Facet struct {
+	// Name Locale-resolved attribute name (name_tr/name_en).
+	Name   string       `json:"name"`
+	Slug   string       `json:"slug"`
+	Values []FacetValue `json:"values"`
+}
+
+// FacetValue One (value, count) bucket within a facet (PLP-13).
+type FacetValue struct {
+	// Count Distinct products in the category subtree carrying this value.
+	Count int    `json:"count"`
+	Value string `json:"value"`
+}
+
 // FieldError A field-level validation error within an ErrorEnvelope
 type FieldError struct {
 	Message string `json:"message"`
@@ -446,7 +462,11 @@ type PaginationMeta struct {
 // cashback_preview uses the lowest-priced active variant.
 // seller_name is joined from the seller module (in-process, core-svc only).
 type Product struct {
-	Brand string `json:"brand"`
+	// Attributes Normalized product attributes (PLP-13) for the specs tab (PD-01) —
+	// slug + locale-resolved name + value(s). Empty array when the product
+	// has no attributes.
+	Attributes []ProductAttribute `json:"attributes"`
+	Brand      string             `json:"brand"`
 
 	// CashbackPreview Preview of the perpetual monthly cashback amount for a product.
 	// Computed handler-layer using the formula:
@@ -480,6 +500,14 @@ type Product struct {
 
 // ProductStatus defines model for Product.Status.
 type ProductStatus string
+
+// ProductAttribute One attribute of a product (PLP-13) — slug + locale-resolved name + its
+// value(s). Feeds the PDP specs tab (PD-01). Per-product, no counts.
+type ProductAttribute struct {
+	Name   string   `json:"name"`
+	Slug   string   `json:"slug"`
+	Values []string `json:"values"`
+}
 
 // ProductSummary Lightweight product representation for list / search results
 type ProductSummary struct {
@@ -703,6 +731,9 @@ type Variant struct {
 	Sku        string  `json:"sku"`
 	Stock      int     `json:"stock"`
 }
+
+// FilterAttr defines model for FilterAttr.
+type FilterAttr = []string
 
 // FilterBrand defines model for FilterBrand.
 type FilterBrand = []string
@@ -1020,6 +1051,14 @@ type GetCategoryCommissionParams struct {
 	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
 }
 
+// GetCategoryFacetsParams defines parameters for GetCategoryFacets.
+type GetCategoryFacetsParams struct {
+	// XTraceId Client-generated trace identifier (UUID or opaque string).
+	// Echoed in error responses as `error.trace_id`.
+	// Falls back to a server-generated UUID if absent.
+	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
+}
+
 // HealthzParams defines parameters for Healthz.
 type HealthzParams struct {
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
@@ -1268,6 +1307,9 @@ type ListProductsParams struct {
 	// PriceDropped When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, "Fiyatı düşenler"). Served from catalog_schema.variant_price_history.
 	PriceDropped *FilterPriceDropped `form:"price_dropped,omitempty" json:"price_dropped,omitempty"`
 
+	// Attr Attribute facet filter (PLP-13). Repeated `<slug>:<value>` entries, e.g. `attr=renk:Siyah&attr=renk:Beyaz`. Values within a slug are OR; distinct slugs are AND. Backed by catalog_schema.product_attributes.
+	Attr *FilterAttr `form:"attr,omitempty" json:"attr,omitempty"`
+
 	// Sort Sort order. Unknown/unsupported tokens fall back to `recommended`.
 	// `bestseller` orders by global popularity (P-029); it degrades to
 	// `recommended` until the analytics popularity projection has data.
@@ -1355,6 +1397,9 @@ type SearchParams struct {
 
 	// PriceDropped When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, "Fiyatı düşenler"). Served from catalog_schema.variant_price_history.
 	PriceDropped *FilterPriceDropped `form:"price_dropped,omitempty" json:"price_dropped,omitempty"`
+
+	// Attr Attribute facet filter (PLP-13). Repeated `<slug>:<value>` entries, e.g. `attr=renk:Siyah&attr=renk:Beyaz`. Values within a slug are OR; distinct slugs are AND. Backed by catalog_schema.product_attributes.
+	Attr *FilterAttr `form:"attr,omitempty" json:"attr,omitempty"`
 
 	// Sort Sort order. Unknown/unsupported tokens fall back to `recommended`.
 	// `bestseller` orders by global popularity (P-029); it degrades to
@@ -1506,6 +1551,9 @@ type ServerInterface interface {
 	// Get live commission and KDV rates for a category + market pair
 	// (GET /categories/{id}/commission)
 	GetCategoryCommission(w http.ResponseWriter, r *http.Request, id int64, params GetCategoryCommissionParams)
+	// Faceted attribute aggregation for a category (PLP-13)
+	// (GET /categories/{id}/facets)
+	GetCategoryFacets(w http.ResponseWriter, r *http.Request, id int64, params GetCategoryFacetsParams)
 	// Health check (liveness probe)
 	// (GET /healthz)
 	Healthz(w http.ResponseWriter, r *http.Request, params HealthzParams)
@@ -2663,6 +2711,61 @@ func (siw *ServerInterfaceWrapper) GetCategoryCommission(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// GetCategoryFacets operation middleware
+func (siw *ServerInterfaceWrapper) GetCategoryFacets(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCategoryFacetsParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Trace-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Trace-Id")]; found {
+		var XTraceId TraceId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Trace-Id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Trace-Id", valueList[0], &XTraceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Trace-Id", Err: err})
+			return
+		}
+
+		params.XTraceId = &XTraceId
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCategoryFacets(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // Healthz operation middleware
 func (siw *ServerInterfaceWrapper) Healthz(w http.ResponseWriter, r *http.Request) {
 
@@ -3749,6 +3852,14 @@ func (siw *ServerInterfaceWrapper) ListProducts(w http.ResponseWriter, r *http.R
 		return
 	}
 
+	// ------------- Optional query parameter "attr" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "attr", r.URL.Query(), &params.Attr)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "attr", Err: err})
+		return
+	}
+
 	// ------------- Optional query parameter "sort" -------------
 
 	err = runtime.BindQueryParameter("form", true, false, "sort", r.URL.Query(), &params.Sort)
@@ -4073,6 +4184,14 @@ func (siw *ServerInterfaceWrapper) Search(w http.ResponseWriter, r *http.Request
 	err = runtime.BindQueryParameter("form", true, false, "price_dropped", r.URL.Query(), &params.PriceDropped)
 	if err != nil {
 		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "price_dropped", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "attr" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "attr", r.URL.Query(), &params.Attr)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "attr", Err: err})
 		return
 	}
 
@@ -4438,6 +4557,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("POST "+options.BaseURL+"/cart/reserve", wrapper.ReserveCart)
 	m.HandleFunc("GET "+options.BaseURL+"/categories", wrapper.ListCategories)
 	m.HandleFunc("GET "+options.BaseURL+"/categories/{id}/commission", wrapper.GetCategoryCommission)
+	m.HandleFunc("GET "+options.BaseURL+"/categories/{id}/facets", wrapper.GetCategoryFacets)
 	m.HandleFunc("GET "+options.BaseURL+"/healthz", wrapper.Healthz)
 	m.HandleFunc("DELETE "+options.BaseURL+"/me", wrapper.DeleteMe)
 	m.HandleFunc("GET "+options.BaseURL+"/me", wrapper.GetMe)
@@ -5326,6 +5446,44 @@ func (response GetCategoryCommission404JSONResponse) VisitGetCategoryCommissionR
 type GetCategoryCommission500JSONResponse struct{ InternalErrorJSONResponse }
 
 func (response GetCategoryCommission500JSONResponse) VisitGetCategoryCommissionResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetCategoryFacetsRequestObject struct {
+	Id     int64 `json:"id"`
+	Params GetCategoryFacetsParams
+}
+
+type GetCategoryFacetsResponseObject interface {
+	VisitGetCategoryFacetsResponse(w http.ResponseWriter) error
+}
+
+type GetCategoryFacets200JSONResponse struct {
+	Facets []Facet `json:"facets"`
+}
+
+func (response GetCategoryFacets200JSONResponse) VisitGetCategoryFacetsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetCategoryFacets400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetCategoryFacets400JSONResponse) VisitGetCategoryFacetsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetCategoryFacets500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetCategoryFacets500JSONResponse) VisitGetCategoryFacetsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -6479,6 +6637,9 @@ type StrictServerInterface interface {
 	// Get live commission and KDV rates for a category + market pair
 	// (GET /categories/{id}/commission)
 	GetCategoryCommission(ctx context.Context, request GetCategoryCommissionRequestObject) (GetCategoryCommissionResponseObject, error)
+	// Faceted attribute aggregation for a category (PLP-13)
+	// (GET /categories/{id}/facets)
+	GetCategoryFacets(ctx context.Context, request GetCategoryFacetsRequestObject) (GetCategoryFacetsResponseObject, error)
 	// Health check (liveness probe)
 	// (GET /healthz)
 	Healthz(ctx context.Context, request HealthzRequestObject) (HealthzResponseObject, error)
@@ -7081,6 +7242,33 @@ func (sh *strictHandler) GetCategoryCommission(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetCategoryCommissionResponseObject); ok {
 		if err := validResponse.VisitGetCategoryCommissionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCategoryFacets operation middleware
+func (sh *strictHandler) GetCategoryFacets(w http.ResponseWriter, r *http.Request, id int64, params GetCategoryFacetsParams) {
+	var request GetCategoryFacetsRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCategoryFacets(ctx, request.(GetCategoryFacetsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCategoryFacets")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCategoryFacetsResponseObject); ok {
+		if err := validResponse.VisitGetCategoryFacetsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

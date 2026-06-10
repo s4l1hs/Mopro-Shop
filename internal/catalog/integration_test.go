@@ -229,6 +229,33 @@ CREATE TRIGGER variants_price_history_trg
     AFTER INSERT OR UPDATE OF price_minor, original_price_minor
     ON catalog_schema.variants
     FOR EACH ROW EXECUTE FUNCTION catalog_schema.track_variant_price();
+
+-- PLP-13 attribute model (mirrors migration 0089).
+CREATE TABLE IF NOT EXISTS catalog_schema.attribute_keys (
+    id        BIGSERIAL PRIMARY KEY,
+    slug      TEXT NOT NULL UNIQUE,
+    name_tr   TEXT NOT NULL,
+    name_en   TEXT NOT NULL,
+    data_type TEXT NOT NULL DEFAULT 'text',
+    unit_slug TEXT
+);
+CREATE TABLE IF NOT EXISTS catalog_schema.category_facets (
+    category_id      BIGINT NOT NULL,
+    attribute_key_id BIGINT NOT NULL REFERENCES catalog_schema.attribute_keys(id) ON DELETE CASCADE,
+    display_order    INT NOT NULL DEFAULT 0,
+    searchable       BOOLEAN NOT NULL DEFAULT TRUE,
+    PRIMARY KEY (category_id, attribute_key_id)
+);
+CREATE TABLE IF NOT EXISTS catalog_schema.product_attributes (
+    id               BIGSERIAL PRIMARY KEY,
+    product_id       BIGINT NOT NULL,
+    attribute_key_id BIGINT NOT NULL REFERENCES catalog_schema.attribute_keys(id) ON DELETE CASCADE,
+    value_text       TEXT,
+    value_num        NUMERIC,
+    UNIQUE (product_id, attribute_key_id, value_text)
+);
+INSERT INTO catalog_schema.attribute_keys (slug, name_tr, name_en, data_type)
+    VALUES ('renk', 'Renk', 'Colour', 'text') ON CONFLICT (slug) DO NOTHING;
 `
 	_, err := pool.Exec(ctx, ddl)
 	return err

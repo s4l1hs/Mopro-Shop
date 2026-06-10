@@ -155,10 +155,36 @@ type ProductFilter struct {
 	InStock       *bool    // true => only products with an in-stock variant
 	PriceDropped  *bool    // true => only products whose price dropped in the last 30d (PLP-14)
 	Sort          string   // PlpSort token; "" or unknown => recommended
+	// Attrs maps an attribute slug to its selected values (PLP-13). Each slug is a
+	// product_attributes EXISTS predicate; multiple values within a slug are OR
+	// (ANY), distinct slugs are AND. Empty => no attribute constraint.
+	Attrs map[string][]string
 	// PopularIDs, when non-empty (bestseller sort), orders results by these IDs
 	// first via array_position — the global popularity ranking the handler reads
 	// from analytics.Service.PopularProductIDs (P-029). Empty => normal sort.
 	PopularIDs []int64
+}
+
+// FacetValue is one (value, count) bucket within a facet (PLP-13).
+type FacetValue struct {
+	Value string `json:"value"`
+	Count int    `json:"count"`
+}
+
+// Facet is a facetable attribute for a category with its value buckets, ordered
+// by display_order then descending count (PLP-13 aggregation, mirrors brand/rating).
+type Facet struct {
+	Slug   string       `json:"slug"`
+	Name   string       `json:"name"` // locale-resolved (name_tr/name_en)
+	Values []FacetValue `json:"values"`
+}
+
+// ProductAttribute is one attribute of a product (slug + locale-resolved name +
+// its value(s)) — feeds the PDP specs tab (PD-01). Per-product, no counts.
+type ProductAttribute struct {
+	Slug   string   `json:"slug"`
+	Name   string   `json:"name"`
+	Values []string `json:"values"`
 }
 
 // CategoryCommission holds the currently active commission + KDV rates for a

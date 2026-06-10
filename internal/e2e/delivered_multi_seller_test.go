@@ -84,6 +84,14 @@ func (m *multiVariantCatalogMock) ListProducts(_ context.Context, _, _ string, _
 func (m *multiVariantCatalogMock) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
+
+func (m *multiVariantCatalogMock) FacetsByCategory(_ context.Context, _ int64, _ string) ([]catalog.Facet, error) {
+	return nil, nil
+}
+
+func (m *multiVariantCatalogMock) ProductAttributes(_ context.Context, _ int64, _ string) ([]catalog.ProductAttribute, error) {
+	return nil, nil
+}
 func (m *multiVariantCatalogMock) ListProductsByIDs(_ context.Context, _ []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {
 	return nil, nil
 }

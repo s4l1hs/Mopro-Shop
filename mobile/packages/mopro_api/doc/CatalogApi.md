@@ -11,6 +11,7 @@ Method | HTTP request | Description
 ------------- | ------------- | -------------
 [**createProduct**](CatalogApi.md#createproduct) | **POST** /products | Create a new product listing (admin / seller onboarding)
 [**getCategoryCommission**](CatalogApi.md#getcategorycommission) | **GET** /categories/{id}/commission | Get live commission and KDV rates for a category + market pair
+[**getCategoryFacets**](CatalogApi.md#getcategoryfacets) | **GET** /categories/{id}/facets | Faceted attribute aggregation for a category (PLP-13)
 [**getProduct**](CatalogApi.md#getproduct) | **GET** /products/{id} | Get full product detail including variants and cashback preview
 [**listCategories**](CatalogApi.md#listcategories) | **GET** /categories | List all 42 product categories (locale-resolved names)
 [**listProducts**](CatalogApi.md#listproducts) | **GET** /products | List products with category filter, price/brand/rating/shipping filters, pagination, and sort
@@ -98,6 +99,51 @@ Name | Type | Description  | Notes
 ### Authorization
 
 [adminAuth](../README.md#adminAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getCategoryFacets**
+> GetCategoryFacets200Response getCategoryFacets(id, xTraceId)
+
+Faceted attribute aggregation for a category (PLP-13)
+
+For each facetable attribute of the category (and its subtree, PLP-12), returns the (value, count) buckets — the buyer-facing filter facets (mirrors the brand/rating facets). Driven by `category_facets` + `product_attributes`; counts are DISTINCT products. Names are resolved from `Accept-Language`. 
+
+### Example
+```dart
+import 'package:mopro_api/api.dart';
+
+final api = MoproApi().getCatalogApi();
+final int id = 789; // int | 
+final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+
+try {
+    final response = api.getCategoryFacets(id, xTraceId);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling CatalogApi->getCategoryFacets: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **id** | **int**|  | 
+ **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+
+### Return type
+
+[**GetCategoryFacets200Response**](GetCategoryFacets200Response.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
 
 ### HTTP request headers
 
@@ -199,7 +245,7 @@ Name | Type | Description  | Notes
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 # **listProducts**
-> ListProducts200Response listProducts(xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, priceDropped, sort)
+> ListProducts200Response listProducts(xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, priceDropped, attr, sort)
 
 List products with category filter, price/brand/rating/shipping filters, pagination, and sort
 
@@ -219,10 +265,11 @@ final int rating = 56; // int | Minimum average rating (products with rating_avg
 final bool freeShipping = true; // bool | When true, only products flagged free-shipping.
 final bool inStock = true; // bool | When true, only products with at least one in-stock variant.
 final bool priceDropped = true; // bool | When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, \"Fiyatı düşenler\"). Served from catalog_schema.variant_price_history. 
+final List<String> attr = ; // List<String> | Attribute facet filter (PLP-13). Repeated `<slug>:<value>` entries, e.g. `attr=renk:Siyah&attr=renk:Beyaz`. Values within a slug are OR; distinct slugs are AND. Backed by catalog_schema.product_attributes. 
 final String sort = sort_example; // String | Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` orders by global popularity (P-029); it degrades to `recommended` until the analytics popularity projection has data. 
 
 try {
-    final response = api.listProducts(xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, priceDropped, sort);
+    final response = api.listProducts(xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, priceDropped, attr, sort);
     print(response);
 } catch on DioException (e) {
     print('Exception when calling CatalogApi->listProducts: $e\n');
@@ -244,6 +291,7 @@ Name | Type | Description  | Notes
  **freeShipping** | **bool**| When true, only products flagged free-shipping. | [optional] 
  **inStock** | **bool**| When true, only products with at least one in-stock variant. | [optional] 
  **priceDropped** | **bool**| When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, \"Fiyatı düşenler\"). Served from catalog_schema.variant_price_history.  | [optional] 
+ **attr** | [**List&lt;String&gt;**](String.md)| Attribute facet filter (PLP-13). Repeated `<slug>:<value>` entries, e.g. `attr=renk:Siyah&attr=renk:Beyaz`. Values within a slug are OR; distinct slugs are AND. Backed by catalog_schema.product_attributes.  | [optional] 
  **sort** | **String**| Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` orders by global popularity (P-029); it degrades to `recommended` until the analytics popularity projection has data.  | [optional] [default to 'recommended']
 
 ### Return type

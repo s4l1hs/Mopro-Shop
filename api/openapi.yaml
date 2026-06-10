@@ -697,6 +697,43 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /categories/{id}/facets:
+    get:
+      operationId: GetCategoryFacets
+      tags: [catalog]
+      summary: Faceted attribute aggregation for a category (PLP-13)
+      description: |
+        For each facetable attribute of the category (and its subtree, PLP-12),
+        returns the (value, count) buckets — the buyer-facing filter facets
+        (mirrors the brand/rating facets). Driven by `category_facets` +
+        `product_attributes`; counts are DISTINCT products. Names are resolved
+        from `Accept-Language`.
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Facet buckets for the category
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [facets]
+                properties:
+                  facets:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Facet'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /products:
     get:
       operationId: ListProducts
@@ -727,6 +764,7 @@ paths:
         - $ref: '#/components/parameters/FilterFreeShipping'
         - $ref: '#/components/parameters/FilterInStock'
         - $ref: '#/components/parameters/FilterPriceDropped'
+        - $ref: '#/components/parameters/FilterAttr'
         - $ref: '#/components/parameters/FilterSort'
       responses:
         '200':
@@ -936,6 +974,7 @@ paths:
         - $ref: '#/components/parameters/FilterFreeShipping'
         - $ref: '#/components/parameters/FilterInStock'
         - $ref: '#/components/parameters/FilterPriceDropped'
+        - $ref: '#/components/parameters/FilterAttr'
         - $ref: '#/components/parameters/FilterSort'
       responses:
         '200':
@@ -1863,6 +1902,21 @@ components:
         (PLP-14, "Fiyatı düşenler"). Served from catalog_schema.variant_price_history.
       schema:
         type: boolean
+    FilterAttr:
+      name: attr
+      in: query
+      required: false
+      description: >
+        Attribute facet filter (PLP-13). Repeated `<slug>:<value>` entries, e.g.
+        `attr=renk:Siyah&attr=renk:Beyaz`. Values within a slug are OR; distinct
+        slugs are AND. Backed by catalog_schema.product_attributes.
+      style: form
+      explode: true
+      schema:
+        type: array
+        items:
+          type: string
+          example: renk:Siyah
     FilterSort:
       name: sort
       in: query
@@ -2290,6 +2344,56 @@ components:
           type: string
           example: TRY_COIN
 
+    FacetValue:
+      type: object
+      description: One (value, count) bucket within a facet (PLP-13).
+      required: [value, count]
+      properties:
+        value:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+          description: Distinct products in the category subtree carrying this value.
+
+    Facet:
+      type: object
+      description: |
+        A facetable attribute for a category with its value buckets (PLP-13),
+        ordered by display_order then descending count. Drives the filter accordions.
+      required: [slug, name, values]
+      properties:
+        slug:
+          type: string
+          example: renk
+        name:
+          type: string
+          description: Locale-resolved attribute name (name_tr/name_en).
+          example: Renk
+        values:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacetValue'
+
+    ProductAttribute:
+      type: object
+      description: |
+        One attribute of a product (PLP-13) — slug + locale-resolved name + its
+        value(s). Feeds the PDP specs tab (PD-01). Per-product, no counts.
+      required: [slug, name, values]
+      properties:
+        slug:
+          type: string
+          example: renk
+        name:
+          type: string
+          example: Renk
+        values:
+          type: array
+          items:
+            type: string
+          example: [Siyah, Beyaz]
+
     Variant:
       type: object
       required: [id, sku, price_minor, price_currency, stock, image_urls]
@@ -2347,7 +2451,7 @@ components:
         cashback_preview uses the lowest-priced active variant.
         seller_name is joined from the seller module (in-process, core-svc only).
       required: [id, seller_id, seller_name, category_id, brand, status, title,
-                 description, variants, cashback_preview, created_at]
+                 description, variants, attributes, cashback_preview, created_at]
       properties:
         id:
           type: integer
@@ -2382,6 +2486,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Variant'
+        attributes:
+          type: array
+          description: |
+            Normalized product attributes (PLP-13) for the specs tab (PD-01) —
+            slug + locale-resolved name + value(s). Empty array when the product
+            has no attributes.
+          items:
+            $ref: '#/components/schemas/ProductAttribute'
         cashback_preview:
           $ref: '#/components/schemas/CashbackPreview'
         delivery_eta:

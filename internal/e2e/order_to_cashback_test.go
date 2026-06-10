@@ -402,6 +402,14 @@ func (m *catalogMock) ListProducts(_ context.Context, _, _ string, _ catalog.Pro
 func (m *catalogMock) SearchSummary(_ context.Context, _, _, _ string, _ catalog.ProductFilter, _, _ int) ([]catalog.ProductSummaryRow, int, error) {
 	return nil, 0, nil
 }
+
+func (m *catalogMock) FacetsByCategory(_ context.Context, _ int64, _ string) ([]catalog.Facet, error) {
+	return nil, nil
+}
+
+func (m *catalogMock) ProductAttributes(_ context.Context, _ int64, _ string) ([]catalog.ProductAttribute, error) {
+	return nil, nil
+}
 func (m *catalogMock) ListProductsByIDs(_ context.Context, _ []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {
 	return nil, nil
 }

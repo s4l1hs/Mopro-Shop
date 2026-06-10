@@ -135,6 +135,7 @@ Class | Method | HTTP request | Description
 [*CashbackApi*](doc/CashbackApi.md) | [**listCashbackPlans**](doc/CashbackApi.md#listcashbackplans) | **GET** /cashback/plans | List the authenticated user&#39;s perpetual cashback plans
 [*CatalogApi*](doc/CatalogApi.md) | [**createProduct**](doc/CatalogApi.md#createproduct) | **POST** /products | Create a new product listing (admin / seller onboarding)
 [*CatalogApi*](doc/CatalogApi.md) | [**getCategoryCommission**](doc/CatalogApi.md#getcategorycommission) | **GET** /categories/{id}/commission | Get live commission and KDV rates for a category + market pair
+[*CatalogApi*](doc/CatalogApi.md) | [**getCategoryFacets**](doc/CatalogApi.md#getcategoryfacets) | **GET** /categories/{id}/facets | Faceted attribute aggregation for a category (PLP-13)
 [*CatalogApi*](doc/CatalogApi.md) | [**getProduct**](doc/CatalogApi.md#getproduct) | **GET** /products/{id} | Get full product detail including variants and cashback preview
 [*CatalogApi*](doc/CatalogApi.md) | [**listCategories**](doc/CatalogApi.md#listcategories) | **GET** /categories | List all 42 product categories (locale-resolved names)
 [*CatalogApi*](doc/CatalogApi.md) | [**listProducts**](doc/CatalogApi.md#listproducts) | **GET** /products | List products with category filter, price/brand/rating/shipping filters, pagination, and sort
@@ -190,7 +191,10 @@ Class | Method | HTTP request | Description
  - [Device](doc/Device.md)
  - [ErrorEnvelope](doc/ErrorEnvelope.md)
  - [ErrorEnvelopeError](doc/ErrorEnvelopeError.md)
+ - [Facet](doc/Facet.md)
+ - [FacetValue](doc/FacetValue.md)
  - [FieldError](doc/FieldError.md)
+ - [GetCategoryFacets200Response](doc/GetCategoryFacets200Response.md)
  - [ListAddresses200Response](doc/ListAddresses200Response.md)
  - [ListBanners200Response](doc/ListBanners200Response.md)
  - [ListCashbackPayments200Response](doc/ListCashbackPayments200Response.md)
@@ -206,6 +210,7 @@ Class | Method | HTTP request | Description
  - [OrderItem](doc/OrderItem.md)
  - [PaginationMeta](doc/PaginationMeta.md)
  - [Product](doc/Product.md)
+ - [ProductAttribute](doc/ProductAttribute.md)
  - [ProductSummary](doc/ProductSummary.md)
  - [Recommendation](doc/Recommendation.md)
  - [RefreshTokenRequest](doc/RefreshTokenRequest.md)

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mopro/platform/internal/analytics"
@@ -51,6 +52,27 @@ func handleListCategories(svc catalog.Service, defaultLocale string) http.Handle
 			return
 		}
 		jsonOK(w, http.StatusOK, buildCategoryListResponse(cats))
+	}
+}
+
+// handleCategoryFacets serves GET /categories/{id}/facets — the PLP-13 facet
+// aggregation: for each facetable attribute of the category (+ its PLP-12
+// subtree), the (value, count) buckets. The first real facet-aggregation surface
+// (brands are derived from the result set; this is server-computed).
+func handleCategoryFacets(svc catalog.Service, defaultLocale string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		if err != nil || id <= 0 {
+			jsonError(w, "invalid category id", http.StatusBadRequest)
+			return
+		}
+		facets, err := svc.FacetsByCategory(r.Context(), id, parseLocale(r, defaultLocale))
+		if err != nil {
+			slog.Error("catalog: FacetsByCategory", "category_id", id, "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		jsonOK(w, http.StatusOK, map[string]any{"facets": facets})
 	}
 }
 
@@ -220,6 +242,22 @@ func parseProductFilter(q url.Values, includeCategory bool) catalog.ProductFilte
 		t := true
 		f.PriceDropped = &t
 	}
+	// PLP-13 attribute filter: repeated ?attr=<slug>:<value> (e.g. attr=renk:Siyah
+	// &attr=renk:Beyaz) → map[slug][]values. Malformed entries (no ':' or empty
+	// slug/value) are skipped.
+	if raw := q["attr"]; len(raw) > 0 {
+		attrs := make(map[string][]string)
+		for _, e := range raw {
+			slug, val, ok := strings.Cut(e, ":")
+			if !ok || slug == "" || val == "" {
+				continue
+			}
+			attrs[slug] = append(attrs[slug], val)
+		}
+		if len(attrs) > 0 {
+			f.Attrs = attrs
+		}
+	}
 	return f
 }
 
@@ -337,6 +375,16 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 		// raw translations array, which the spec + mobile client do not carry.
 		title, description := resolveTranslation(translations, parseLocale(r, defaultLocale), defaultLocale)
 
+		// Normalized attributes for the PDP specs tab (PLP-13 / PD-01). A failure
+		// here never fails the PDP — log and return an empty list.
+		attributes, attrErr := svc.ProductAttributes(r.Context(), id, parseLocale(r, defaultLocale))
+		if attrErr != nil {
+			slog.Error("catalog: ProductAttributes", "id", id, "err", attrErr)
+		}
+		if attributes == nil {
+			attributes = []catalog.ProductAttribute{} // spec-required array — never null
+		}
+
 		// Flat, spec-conformant Product (PD-06): the previous {product, variants,
 		// translations, …} envelope did not match the OpenAPI Product schema (nor
 		// the generated mobile client), so the PDP could not parse it.
@@ -351,6 +399,7 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 			Title:           title,
 			Description:     description,
 			Variants:        variantsOut,
+			Attributes:      attributes,
 			CashbackPreview: cashbackPreview,
 			DeliveryEta:     deliveryETA,
 			CreatedAt:       p.CreatedAt.Format(time.RFC3339),
@@ -362,19 +411,20 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 // (OpenAPI Product). It replaces the legacy {product, variants, translations, …}
 // envelope (PD-06) that neither the spec nor the generated mobile client matched.
 type productDetailJSON struct {
-	ID              int64                `json:"id"`
-	SellerID        int64                `json:"seller_id"`
-	SellerName      string               `json:"seller_name"`
-	SellerSlug      *string              `json:"seller_slug"`
-	CategoryID      int64                `json:"category_id"`
-	Brand           string               `json:"brand"`
-	Status          string               `json:"status"`
-	Title           string               `json:"title"`
-	Description     string               `json:"description"`
-	Variants        []variantDetailJSON  `json:"variants"`
-	CashbackPreview *cashbackPreviewJSON `json:"cashback_preview"`
-	DeliveryEta     *deliveryEtaJSON     `json:"delivery_eta"`
-	CreatedAt       string               `json:"created_at"`
+	ID              int64                      `json:"id"`
+	SellerID        int64                      `json:"seller_id"`
+	SellerName      string                     `json:"seller_name"`
+	SellerSlug      *string                    `json:"seller_slug"`
+	CategoryID      int64                      `json:"category_id"`
+	Brand           string                     `json:"brand"`
+	Status          string                     `json:"status"`
+	Title           string                     `json:"title"`
+	Description     string                     `json:"description"`
+	Variants        []variantDetailJSON        `json:"variants"`
+	Attributes      []catalog.ProductAttribute `json:"attributes"`
+	CashbackPreview *cashbackPreviewJSON       `json:"cashback_preview"`
+	DeliveryEta     *deliveryEtaJSON           `json:"delivery_eta"`
+	CreatedAt       string                     `json:"created_at"`
 }
 
 // variantDetailJSON is the spec Variant: image_urls is the CDN-resolved gallery
