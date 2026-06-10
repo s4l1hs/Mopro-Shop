@@ -515,7 +515,7 @@ func main() {
 	)
 	// Reviews list: public read, but OptionalAuth personalizes votedByCurrentUser.
 	mux.Handle("GET /products/{id}/reviews",
-		httpTrace(optionalAuth(http.HandlerFunc(handleProductReviews(catalogSvc)))),
+		httpTrace(optionalAuth(http.HandlerFunc(handleProductReviews(catalogSvc, identitySvc, attachmentsSvc)))),
 	)
 	// Helpful-vote toggle: auth required (401 for guests).
 	mux.Handle("POST /products/{id}/reviews/{reviewId}/helpful",

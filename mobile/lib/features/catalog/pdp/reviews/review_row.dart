@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -74,6 +75,27 @@ class ReviewRow extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Reviewer (masked name; PD-07). Falls back to a generic label when the
+        // server couldn't resolve a name.
+        Row(
+          children: [
+            CircleAvatar(
+              radius: 12,
+              backgroundColor: cs.surfaceContainerHighest,
+              child: Icon(Icons.person_outline,
+                  size: 14, color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              review.reviewerName.isEmpty
+                  ? 'reviews.anonymous'.tr()
+                  : review.reviewerName,
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
         Row(
           children: [
             for (var i = 0; i < 5; i++)
@@ -123,6 +145,34 @@ class ReviewRow extends ConsumerWidget {
         if (review.body.isNotEmpty) ...[
           const SizedBox(height: 4),
           Text(review.body, style: theme.textTheme.bodyMedium),
+        ],
+        // Review photos (PD-07) — a horizontal thumbnail strip.
+        if (review.photoUrls.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 64,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: review.photoUrls.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) => ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: CachedNetworkImage(
+                  imageUrl: review.photoUrls[i],
+                  width: 64,
+                  height: 64,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => Container(
+                    width: 64,
+                    height: 64,
+                    color: cs.surfaceContainerHighest,
+                    child: Icon(Icons.broken_image_outlined,
+                        size: 24, color: cs.onSurfaceVariant),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
         const SizedBox(height: 8),
         Align(

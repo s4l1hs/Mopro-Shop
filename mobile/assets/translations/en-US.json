@@ -302,6 +302,7 @@
     "not_found": "Product not found."
   },
   "reviews": {
+    "anonymous": "Mopro Customer",
     "header": "Reviews ({count})",
     "helpful_count": "Helpful ({count})",
     "load_more": "Load more reviews",

@@ -21,9 +21,11 @@ class Review {
   const Review({
     required this.id,
     required this.userId,
+    required this.reviewerName,
     required this.rating,
     required this.title,
     required this.body,
+    required this.photoUrls,
     required this.helpfulCount,
     required this.votedByCurrentUser,
     required this.createdAt,
@@ -32,9 +34,13 @@ class Review {
   factory Review.fromJson(Map<String, dynamic> j) => Review(
         id: (j['id'] as num).toInt(),
         userId: (j['userId'] as num?)?.toInt() ?? 0,
+        reviewerName: (j['reviewerName'] as String?) ?? '',
         rating: (j['rating'] as num?)?.toInt() ?? 0,
         title: (j['title'] as String?) ?? '',
         body: (j['body'] as String?) ?? '',
+        photoUrls: ((j['photoUrls'] as List?) ?? const [])
+            .map((e) => e as String)
+            .toList(),
         helpfulCount: (j['helpfulCount'] as num?)?.toInt() ?? 0,
         votedByCurrentUser: (j['votedByCurrentUser'] as bool?) ?? false,
         createdAt: (j['createdAt'] as String?) ?? '',
@@ -42,9 +48,11 @@ class Review {
 
   final int id;
   final int userId;
+  final String reviewerName; // masked, e.g. "A** Y**"; empty → UI fallback
   final int rating;
   final String title;
   final String body;
+  final List<String> photoUrls; // CDN-resolved review photos (PD-07)
   final int helpfulCount;
   final bool votedByCurrentUser;
   final String createdAt;
@@ -52,9 +60,11 @@ class Review {
   Review copyWith({int? helpfulCount, bool? votedByCurrentUser}) => Review(
         id: id,
         userId: userId,
+        reviewerName: reviewerName,
         rating: rating,
         title: title,
         body: body,
+        photoUrls: photoUrls,
         helpfulCount: helpfulCount ?? this.helpfulCount,
         votedByCurrentUser: votedByCurrentUser ?? this.votedByCurrentUser,
         createdAt: createdAt,
