@@ -110,6 +110,39 @@ func TestIntegration_GetBySlug(t *testing.T) {
 	}
 }
 
+// TestIntegration_OfficialSellerIDs proves the PLP-17 §5-safe carrier: the
+// is_official flag (migration 0090 marks sellers 1,3 official) surfaces via
+// GetByID and the batch OfficialSellerIDs set used by the catalog app-merge.
+func TestIntegration_OfficialSellerIDs(t *testing.T) {
+	ctx := context.Background()
+	repo := seller.NewRepository(integPool)
+	svc := seller.NewService(repo)
+
+	if s, err := svc.GetByID(ctx, 1); err != nil || !s.IsOfficial {
+		t.Fatalf("seller 1 should be official: official=%v err=%v", s.IsOfficial, err)
+	}
+	if s, err := svc.GetByID(ctx, 2); err != nil || s.IsOfficial {
+		t.Fatalf("seller 2 should NOT be official: official=%v err=%v", s.IsOfficial, err)
+	}
+
+	official, err := svc.OfficialSellerIDs(ctx, []int64{1, 2, 3, 999})
+	if err != nil {
+		t.Fatalf("OfficialSellerIDs: %v", err)
+	}
+	if !official[1] || !official[3] {
+		t.Errorf("want 1 and 3 official, got %#v", official)
+	}
+	if official[2] || official[999] {
+		t.Errorf("2 (non-official) and 999 (absent) must not be in the set: %#v", official)
+	}
+
+	// Empty input is a no-op (no query, empty set) — the handler passes [] when a
+	// page has no rows.
+	if m, err := svc.OfficialSellerIDs(ctx, nil); err != nil || len(m) != 0 {
+		t.Errorf("empty ids: want empty set no error, got %#v err=%v", m, err)
+	}
+}
+
 func TestIntegration_SuspendedSellerHidden(t *testing.T) {
 	ctx := context.Background()
 	repo := seller.NewRepository(integPool)
