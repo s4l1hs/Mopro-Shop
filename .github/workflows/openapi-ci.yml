@@ -14,15 +14,10 @@ on:
       - "go.mod"
       - "go.sum"
       - ".github/workflows/openapi-ci.yml"
+  # No PR path filter: "Go build + contract tests" + "Generated files in sync" are
+  # REQUIRED gates, so they must post a status on every PR (a required check that
+  # never runs blocks the merge). They validate the merged result.
   pull_request:
-    paths:
-      - "api/**"
-      - "internal/api/**"
-      - "cmd/core-svc/**"
-      - "mobile/packages/mopro_api/**"
-      - "go.mod"
-      - "go.sum"
-      - ".github/workflows/openapi-ci.yml"
 
 jobs:
   lint-spec:

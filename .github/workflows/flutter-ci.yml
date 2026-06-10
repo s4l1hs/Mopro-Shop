@@ -1,18 +1,12 @@
 name: Flutter CI
 
+# No path filter: these jobs are REQUIRED branch-protection gates, so they must
+# post a status on EVERY PR (a required check that never runs blocks the merge).
+# They validate the merged result and pass on unrelated PRs.
 on:
   push:
-    paths:
-      - 'mobile/**'
-      - 'tool/audit/**'
-      - 'Makefile'
-      - '.github/workflows/flutter-ci.yml'
+    branches: [main]
   pull_request:
-    paths:
-      - 'mobile/**'
-      - 'tool/audit/**'
-      - 'Makefile'
-      - '.github/workflows/flutter-ci.yml'
 
 defaults:
   run:

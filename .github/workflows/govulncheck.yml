@@ -9,12 +9,9 @@ name: govulncheck
 on:
   push:
     branches: [main]
+  # No PR path filter: `govulncheck ./...` is a REQUIRED gate, so it must post a
+  # status on every PR (a required check that never runs blocks the merge).
   pull_request:
-    paths:
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - '.github/workflows/govulncheck.yml'
   schedule:
     - cron: '17 6 * * 1'   # Mondays 06:17 UTC
   workflow_dispatch:
