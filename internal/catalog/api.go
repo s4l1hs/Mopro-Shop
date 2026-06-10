@@ -42,6 +42,13 @@ type Service interface {
 	// catalog_schema (§5-safe). An empty/blank query yields an empty result.
 	Suggest(ctx context.Context, query, locale string, brandLimit, productLimit int) (SuggestResult, error)
 
+	// FacetsByCategory aggregates the facetable attributes over a category's
+	// subtree into (value, count) buckets (PLP-13).
+	FacetsByCategory(ctx context.Context, categoryID int64, locale string) ([]Facet, error)
+	// ProductAttributes returns a product's normalized attributes for the PDP
+	// specs tab (PLP-13 / PD-01).
+	ProductAttributes(ctx context.Context, productID int64, locale string) ([]ProductAttribute, error)
+
 	// ListProductsByIDs fetches product summaries for the given IDs (guest favorites, batch hydration).
 	ListProductsByIDs(ctx context.Context, ids []int64, locale, market string) ([]ProductSummaryRow, error)
 
@@ -105,6 +112,9 @@ type Repository interface {
 	// prefix-matches query (case-insensitive), ordered by product count desc.
 	// Single-schema (catalog_schema.products) — §5-safe.
 	SuggestBrands(ctx context.Context, query string, limit int) ([]BrandSuggestion, error)
+
+	FacetsByCategory(ctx context.Context, categoryID int64, locale string) ([]Facet, error)
+	ProductAttributes(ctx context.Context, productID int64, locale string) ([]ProductAttribute, error)
 
 	ListProductsByIDs(ctx context.Context, ids []int64, locale string) ([]ProductSummaryRow, error)
 	HomeRails(ctx context.Context) ([]HomeRailRow, error)

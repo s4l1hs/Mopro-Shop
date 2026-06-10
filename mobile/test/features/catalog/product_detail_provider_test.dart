@@ -13,6 +13,7 @@ Product _product(int id) => Product(
       categoryId: 10,
       brand: 'Brand X',
       status: ProductStatusEnum.active,
+      attributes: const [],
       title: 'Test Product',
       description: 'A product',
       variants: [

@@ -1,16 +1,21 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/mopro/platform/internal/attachments"
 	"github.com/mopro/platform/internal/catalog"
+	"github.com/mopro/platform/internal/identity"
 	"github.com/mopro/platform/internal/identity/middleware"
+	"github.com/mopro/platform/pkg/mediaurl"
 )
 
 // ── GET /home/banners ─────────────────────────────────────────────────────────
@@ -190,20 +195,51 @@ func handleProductsBatch(svc catalog.Service, defaultLocale, defaultMarket, cash
 // denormalized cache; votedByCurrentUser is true only for the viewing user's own
 // helpful votes (always false for guests).
 type reviewJSON struct {
-	ID                 int64  `json:"id"`
-	UserID             int64  `json:"userId"`
-	Rating             int    `json:"rating"`
-	Title              string `json:"title"`
-	Body               string `json:"body"`
-	HelpfulCount       int    `json:"helpfulCount"`
-	VotedByCurrentUser bool   `json:"votedByCurrentUser"`
-	CreatedAt          string `json:"createdAt"`
+	ID                 int64    `json:"id"`
+	UserID             int64    `json:"userId"`
+	ReviewerName       string   `json:"reviewerName"`
+	Rating             int      `json:"rating"`
+	Title              string   `json:"title"`
+	Body               string   `json:"body"`
+	PhotoURLs          []string `json:"photoUrls"`
+	HelpfulCount       int      `json:"helpfulCount"`
+	VotedByCurrentUser bool     `json:"votedByCurrentUser"`
+	CreatedAt          string   `json:"createdAt"`
+}
+
+// reviewUserNamer is the narrow slice of identity.Service the reviews handler
+// needs — the reviewer's display name (masked before it leaves the server).
+// GetMe(userID) is the established user-by-id fetch (see ugc displayName); the
+// "Me" naming is historical — it takes any userID.
+type reviewUserNamer interface {
+	GetMe(ctx context.Context, userID int64) (identity.User, error)
+}
+
+// reviewPhotoLister is the narrow slice of attachments.Service the reviews
+// handler needs — a review's attached photos, in display order.
+type reviewPhotoLister interface {
+	ListByEntity(ctx context.Context, entityType string, entityID int64) ([]attachments.PhotoAttachment, error)
+}
+
+// maskReviewerName renders a display name Trendyol-style ("Ahmet Yılmaz" →
+// "A** Y**") so the reviewer is identifiable but not fully exposed. Empty input
+// (or a name with no letters) yields "" — the UI shows a generic fallback.
+func maskReviewerName(name string) string {
+	var parts []string
+	for _, w := range strings.Fields(name) {
+		r := []rune(w)
+		if len(r) == 0 {
+			continue
+		}
+		parts = append(parts, string(r[0])+"**")
+	}
+	return strings.Join(parts, " ")
 }
 
 // handleProductReviews serves GET /products/{id}/reviews with sort + pagination +
 // a product-level summary (identical across pages). No auth required, but
 // OptionalAuth lets it personalize votedByCurrentUser for signed-in viewers.
-func handleProductReviews(svc catalog.Service) http.HandlerFunc {
+func handleProductReviews(svc catalog.Service, namer reviewUserNamer, photos reviewPhotoLister) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		productID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil || productID <= 0 {
@@ -265,9 +301,33 @@ func handleProductReviews(svc catalog.Service) http.HandlerFunc {
 
 		items := make([]reviewJSON, len(reviews))
 		for i, rv := range reviews {
+			// Reviewer name (PD-07) — masked; §5-safe identity lookup, never a
+			// cross-schema JOIN. A failure never fails the page: log + leave blank.
+			var reviewerName string
+			if namer != nil {
+				if u, uErr := namer.GetMe(r.Context(), rv.UserID); uErr != nil {
+					slog.Error("catalog: reviewer name lookup", "user_id", rv.UserID, "err", uErr)
+				} else {
+					reviewerName = maskReviewerName(u.Name)
+				}
+			}
+			// Review photos (PD-07) — CDN-mapped; §5-safe attachments lookup. Always
+			// a non-nil array. A failure never fails the page.
+			photoURLs := []string{}
+			if photos != nil {
+				if atts, pErr := photos.ListByEntity(r.Context(), "review", rv.ID); pErr != nil {
+					slog.Error("catalog: review photos lookup", "review_id", rv.ID, "err", pErr)
+				} else {
+					for _, a := range atts {
+						if a.StorageKey != "" {
+							photoURLs = append(photoURLs, mediaurl.CDNUrl(a.StorageKey))
+						}
+					}
+				}
+			}
 			items[i] = reviewJSON{
-				ID: rv.ID, UserID: rv.UserID, Rating: rv.Rating,
-				Title: rv.Title, Body: rv.Body,
+				ID: rv.ID, UserID: rv.UserID, ReviewerName: reviewerName, Rating: rv.Rating,
+				Title: rv.Title, Body: rv.Body, PhotoURLs: photoURLs,
 				HelpfulCount: rv.HelpfulCount, VotedByCurrentUser: rv.VotedByCurrentUser,
 				CreatedAt: rv.CreatedAt,
 			}

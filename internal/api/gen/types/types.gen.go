@@ -478,6 +478,22 @@ type ErrorEnvelope struct {
 	} `json:"error"`
 }
 
+// Facet A facetable attribute for a category with its value buckets (PLP-13),
+// ordered by display_order then descending count. Drives the filter accordions.
+type Facet struct {
+	// Name Locale-resolved attribute name (name_tr/name_en).
+	Name   string       `json:"name"`
+	Slug   string       `json:"slug"`
+	Values []FacetValue `json:"values"`
+}
+
+// FacetValue One (value, count) bucket within a facet (PLP-13).
+type FacetValue struct {
+	// Count Distinct products in the category subtree carrying this value.
+	Count int    `json:"count"`
+	Value string `json:"value"`
+}
+
 // FieldError A field-level validation error within an ErrorEnvelope
 type FieldError struct {
 	Message string `json:"message"`
@@ -533,7 +549,11 @@ type PaginationMeta struct {
 // cashback_preview uses the lowest-priced active variant.
 // seller_name is joined from the seller module (in-process, core-svc only).
 type Product struct {
-	Brand string `json:"brand"`
+	// Attributes Normalized product attributes (PLP-13) for the specs tab (PD-01) —
+	// slug + locale-resolved name + value(s). Empty array when the product
+	// has no attributes.
+	Attributes []ProductAttribute `json:"attributes"`
+	Brand      string             `json:"brand"`
 
 	// CashbackPreview Preview of the perpetual monthly cashback amount for a product.
 	// Computed handler-layer using the formula:
@@ -567,6 +587,14 @@ type Product struct {
 
 // ProductStatus defines model for Product.Status.
 type ProductStatus string
+
+// ProductAttribute One attribute of a product (PLP-13) — slug + locale-resolved name + its
+// value(s). Feeds the PDP specs tab (PD-01). Per-product, no counts.
+type ProductAttribute struct {
+	Name   string   `json:"name"`
+	Slug   string   `json:"slug"`
+	Values []string `json:"values"`
+}
 
 // ProductSummary Lightweight product representation for list / search results
 type ProductSummary struct {
@@ -826,6 +854,9 @@ type WalletTransactionReferenceType string
 
 // WalletTransactionType defines model for WalletTransaction.Type.
 type WalletTransactionType string
+
+// FilterAttr defines model for FilterAttr.
+type FilterAttr = []string
 
 // FilterBrand defines model for FilterBrand.
 type FilterBrand = []string
@@ -1177,6 +1208,14 @@ type GetCategoryCommissionParams struct {
 	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
 }
 
+// GetCategoryFacetsParams defines parameters for GetCategoryFacets.
+type GetCategoryFacetsParams struct {
+	// XTraceId Client-generated trace identifier (UUID or opaque string).
+	// Echoed in error responses as `error.trace_id`.
+	// Falls back to a server-generated UUID if absent.
+	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
+}
+
 // HealthzParams defines parameters for Healthz.
 type HealthzParams struct {
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
@@ -1425,6 +1464,9 @@ type ListProductsParams struct {
 	// PriceDropped When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, "Fiyatı düşenler"). Served from catalog_schema.variant_price_history.
 	PriceDropped *FilterPriceDropped `form:"price_dropped,omitempty" json:"price_dropped,omitempty"`
 
+	// Attr Attribute facet filter (PLP-13). Repeated `<slug>:<value>` entries, e.g. `attr=renk:Siyah&attr=renk:Beyaz`. Values within a slug are OR; distinct slugs are AND. Backed by catalog_schema.product_attributes.
+	Attr *FilterAttr `form:"attr,omitempty" json:"attr,omitempty"`
+
 	// Sort Sort order. Unknown/unsupported tokens fall back to `recommended`.
 	// `bestseller` orders by global popularity (P-029); it degrades to
 	// `recommended` until the analytics popularity projection has data.
@@ -1512,6 +1554,9 @@ type SearchParams struct {
 
 	// PriceDropped When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, "Fiyatı düşenler"). Served from catalog_schema.variant_price_history.
 	PriceDropped *FilterPriceDropped `form:"price_dropped,omitempty" json:"price_dropped,omitempty"`
+
+	// Attr Attribute facet filter (PLP-13). Repeated `<slug>:<value>` entries, e.g. `attr=renk:Siyah&attr=renk:Beyaz`. Values within a slug are OR; distinct slugs are AND. Backed by catalog_schema.product_attributes.
+	Attr *FilterAttr `form:"attr,omitempty" json:"attr,omitempty"`
 
 	// Sort Sort order. Unknown/unsupported tokens fall back to `recommended`.
 	// `bestseller` orders by global popularity (P-029); it degrades to

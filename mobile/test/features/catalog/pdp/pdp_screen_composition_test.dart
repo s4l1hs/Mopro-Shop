@@ -33,6 +33,9 @@ Product _product() => Product(
       categoryId: 5,
       brand: 'Acme',
       status: ProductStatusEnum.active,
+      attributes: [
+        ProductAttribute(slug: 'renk', name: 'Renk', values: const ['Siyah', 'Beyaz']),
+      ],
       title: 'Test Ürünü',
       description: 'Açıklama',
       variants: [_v(1), _v(2, color: 'Mavi', size: 'L')],
@@ -66,6 +69,7 @@ class _FakeCatalogApi extends CatalogApi {
     bool? freeShipping,
     bool? inStock,
     bool? priceDropped,
+    List<String>? attr,
     String? xTraceId,
     int? categoryId,
     int? page = 1,
@@ -143,6 +147,17 @@ void main() {
     await _pump(tester, const Size(375, 900));
     expect(find.byType(PdpStickyCta), findsOneWidget);
     expect(find.byType(PdpImagePager), findsNothing);
+  });
+
+  testWidgets('specs tab renders Product.attributes (PD-01 / PLP-13)',
+      (tester) async {
+    await _pump(tester, const Size(390, 1400));
+    // Switch to the specs tab (i18n returns the key in tests).
+    await tester.tap(find.text('product.specs_tab').first);
+    await tester.pumpAndSettle();
+    // Attribute name + comma-joined values are real data (not i18n keys).
+    expect(find.text('Renk'), findsOneWidget);
+    expect(find.text('Siyah, Beyaz'), findsOneWidget);
   });
 
   testWidgets('PDP emits product_view with the product categoryId (P-033)',

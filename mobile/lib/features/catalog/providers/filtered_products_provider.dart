@@ -54,6 +54,10 @@ class FilteredProductsNotifier
     try {
       final api = ref.read(catalogApiProvider);
       final f = _filters;
+      // PLP-13: flatten attrs (slug → values) into the wire `<slug>:<value>` list.
+      final attr = f.attrs.entries
+          .expand((e) => e.value.map((v) => '${e.key}:$v'))
+          .toList();
       final resp = await api.listProducts(
         categoryId: _categoryId,
         page: page,
@@ -65,6 +69,7 @@ class FilteredProductsNotifier
         freeShipping: f.freeShippingOnly ? true : null,
         inStock: f.inStock ? true : null,
         priceDropped: f.priceDropped ? true : null,
+        attr: attr.isEmpty ? null : attr,
       );
       final incoming = resp.data?.data ?? [];
       final meta = resp.data?.pagination;

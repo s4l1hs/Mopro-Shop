@@ -17,6 +17,13 @@ jobs:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.ref }}
+          # Default GITHUB_TOKEN — no PAT needed. Golden tests are now an
+          # INFORMATIONAL check (flutter-ci.yml `golden` job), so the re-baseline
+          # commit never has to re-trigger a *required* gate (the old recursion-guard
+          # reason for a PAT, CUTOVER_LEDGER §5). A GITHUB_TOKEN push lands the
+          # re-baselined goldens fine — on a branch or directly on `main`. A PAT
+          # remains an optional nice-to-have (auto-retrigger checks on PR branches);
+          # nothing depends on it.
 
       - uses: subosito/flutter-action@v2
         with:

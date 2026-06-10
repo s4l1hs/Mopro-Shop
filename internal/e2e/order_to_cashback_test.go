@@ -405,6 +405,14 @@ func (m *catalogMock) SearchSummary(_ context.Context, _, _, _ string, _ catalog
 func (m *catalogMock) Suggest(_ context.Context, _, _ string, _, _ int) (catalog.SuggestResult, error) {
 	return catalog.SuggestResult{}, nil
 }
+
+func (m *catalogMock) FacetsByCategory(_ context.Context, _ int64, _ string) ([]catalog.Facet, error) {
+	return nil, nil
+}
+
+func (m *catalogMock) ProductAttributes(_ context.Context, _ int64, _ string) ([]catalog.ProductAttribute, error) {
+	return nil, nil
+}
 func (m *catalogMock) ListProductsByIDs(_ context.Context, _ []int64, _, _ string) ([]catalog.ProductSummaryRow, error) {
 	return nil, nil
 }

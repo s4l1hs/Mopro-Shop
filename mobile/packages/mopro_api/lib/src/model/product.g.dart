@@ -22,6 +22,7 @@ Product _$ProductFromJson(Map<String, dynamic> json) => $checkedCreate(
         'title',
         'description',
         'variants',
+        'attributes',
         'cashback_preview',
         'created_at',
       ],
@@ -43,6 +44,12 @@ Product _$ProductFromJson(Map<String, dynamic> json) => $checkedCreate(
         'variants',
         (v) => (v as List<dynamic>)
             .map((e) => Variant.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      ),
+      attributes: $checkedConvert(
+        'attributes',
+        (v) => (v as List<dynamic>)
+            .map((e) => ProductAttribute.fromJson(e as Map<String, dynamic>))
             .toList(),
       ),
       cashbackPreview: $checkedConvert(
@@ -83,6 +90,7 @@ Map<String, dynamic> _$ProductToJson(Product instance) => <String, dynamic>{
   'title': instance.title,
   'description': instance.description,
   'variants': instance.variants.map((e) => e.toJson()).toList(),
+  'attributes': instance.attributes.map((e) => e.toJson()).toList(),
   'cashback_preview': instance.cashbackPreview.toJson(),
   'delivery_eta': ?instance.deliveryEta?.toJson(),
   'created_at': instance.createdAt.toIso8601String(),

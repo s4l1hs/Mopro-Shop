@@ -43,6 +43,7 @@ class PlpFilters {
     this.freeShippingOnly = false,
     this.inStock = false,
     this.priceDropped = false,
+    this.attrs = const {},
     this.page = 1,
   });
 
@@ -54,6 +55,10 @@ class PlpFilters {
   final bool freeShippingOnly;
   final bool inStock;
   final bool priceDropped; // PLP-14: only products whose price dropped in 30d
+
+  /// PLP-13 attribute facets: slug → selected values (e.g. `{'renk': ['Siyah']}`).
+  /// Values within a slug are OR; distinct slugs are AND (the `attr` wire param).
+  final Map<String, List<String>> attrs;
   final int page;
 
   PlpFilters copyWith({
@@ -65,6 +70,7 @@ class PlpFilters {
     bool? freeShippingOnly,
     bool? inStock,
     bool? priceDropped,
+    Map<String, List<String>>? attrs,
     int? page,
   }) {
     return PlpFilters(
@@ -78,6 +84,7 @@ class PlpFilters {
       freeShippingOnly: freeShippingOnly ?? this.freeShippingOnly,
       inStock: inStock ?? this.inStock,
       priceDropped: priceDropped ?? this.priceDropped,
+      attrs: attrs ?? this.attrs,
       page: page ?? this.page,
     );
   }
@@ -92,6 +99,7 @@ class PlpFilters {
       !freeShippingOnly &&
       !inStock &&
       !priceDropped &&
+      attrs.isEmpty &&
       page == 1;
 
   /// Count of active *filters* (not sort, not page) for the sidebar's chip row:
@@ -105,7 +113,32 @@ class PlpFilters {
     if (freeShippingOnly) n++;
     if (inStock) n++;
     if (priceDropped) n++;
+    for (final v in attrs.values) {
+      n += v.length;
+    }
     return n;
+  }
+
+  /// Deep equality for the slug → values map (keys + per-key value lists).
+  static bool _attrsEqual(
+    Map<String, List<String>> a,
+    Map<String, List<String>> b,
+  ) {
+    if (a.length != b.length) return false;
+    for (final e in a.entries) {
+      final ob = b[e.key];
+      if (ob == null || !listEquals(e.value, ob)) return false;
+    }
+    return true;
+  }
+
+  /// Order-insensitive hash of the slug → values map.
+  int get _attrsHash {
+    final parts = attrs.entries
+        .map((e) => Object.hash(e.key, Object.hashAll(e.value)))
+        .toList()
+      ..sort();
+    return Object.hashAll(parts);
   }
 
   @override
@@ -120,6 +153,7 @@ class PlpFilters {
           other.freeShippingOnly == freeShippingOnly &&
           other.inStock == inStock &&
           other.priceDropped == priceDropped &&
+          _attrsEqual(other.attrs, attrs) &&
           other.page == page);
 
   @override
@@ -132,6 +166,7 @@ class PlpFilters {
         freeShippingOnly,
         inStock,
         priceDropped,
+        _attrsHash,
         page,
       );
 }

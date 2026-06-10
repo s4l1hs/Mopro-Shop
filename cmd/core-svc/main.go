@@ -463,7 +463,7 @@ func main() {
 		httpTrace(http.HandlerFunc(handleListProducts(analyticsSvc, catalogSvc, defaultLocale, market, cashbackCurrency))),
 	)
 	mux.Handle("GET /products/{id}",
-		httpTrace(http.HandlerFunc(handleGetProductDetail(catalogSvc, sellerSvc, shippingSvc, market, cashbackCurrency))),
+		httpTrace(http.HandlerFunc(handleGetProductDetail(catalogSvc, sellerSvc, shippingSvc, defaultLocale, market, cashbackCurrency))),
 	)
 	mux.Handle("POST /products/{id}/variants",
 		httpTrace(http.HandlerFunc(handleAddVariant(catalogSvc, defaultCurrency))),
@@ -476,6 +476,9 @@ func main() {
 	)
 	mux.Handle("GET /categories/{id}/commission",
 		httpTrace(http.HandlerFunc(handleGetCommission(catalogSvc, market))),
+	)
+	mux.Handle("GET /categories/{id}/facets",
+		httpTrace(http.HandlerFunc(handleCategoryFacets(catalogSvc, defaultLocale))),
 	)
 	mux.Handle("GET /search",
 		httpTrace(http.HandlerFunc(handleSearch(analyticsSvc, catalogSvc, defaultLocale, market, cashbackCurrency))),
@@ -515,7 +518,7 @@ func main() {
 	)
 	// Reviews list: public read, but OptionalAuth personalizes votedByCurrentUser.
 	mux.Handle("GET /products/{id}/reviews",
-		httpTrace(optionalAuth(http.HandlerFunc(handleProductReviews(catalogSvc)))),
+		httpTrace(optionalAuth(http.HandlerFunc(handleProductReviews(catalogSvc, identitySvc, attachmentsSvc)))),
 	)
 	// Helpful-vote toggle: auth required (401 for guests).
 	mux.Handle("POST /products/{id}/reviews/{reviewId}/helpful",

@@ -294,6 +294,7 @@
     "low_stock": "Only {count} left",
     "description_tab": "Description",
     "specs_tab": "Specifications",
+    "specs_empty": "No specification information is available for this product.",
     "reviews_tab": "Reviews",
     "qa_tab": "Q&A",
     "related_title": "Similar Products",
@@ -303,6 +304,7 @@
     "not_found": "Product not found."
   },
   "reviews": {
+    "anonymous": "Mopro Customer",
     "header": "Reviews ({count})",
     "helpful_count": "Helpful ({count})",
     "load_more": "Load more reviews",

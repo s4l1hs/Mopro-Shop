@@ -68,6 +68,24 @@ class PlpFilterChips extends ConsumerWidget {
       chip('plp.filter_price_dropped'.tr(),
           (x) => x.copyWith(priceDropped: false));
     }
+    // PLP-13: one chip per selected attribute value (label is the value itself,
+    // already localized server-side). Removal drops it from attrs[slug].
+    for (final entry in f.attrs.entries) {
+      final slug = entry.key;
+      for (final v in entry.value) {
+        chip(v, (x) {
+          final next = <String, List<String>>{
+            for (final e in x.attrs.entries) e.key: List<String>.from(e.value),
+          };
+          final list = next[slug];
+          if (list != null) {
+            list.remove(v);
+            if (list.isEmpty) next.remove(slug);
+          }
+          return x.copyWith(attrs: next, page: 1);
+        });
+      }
+    }
 
     final visible = chips.isNotEmpty;
     return AnimatedSwitcher(

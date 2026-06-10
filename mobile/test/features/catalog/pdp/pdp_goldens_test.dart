@@ -1,3 +1,6 @@
+@Tags(['golden'])
+library;
+
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -36,6 +39,7 @@ Product _variantsProduct() => Product(
       categoryId: 5,
       brand: 'Acme',
       status: ProductStatusEnum.active,
+      attributes: const [],
       title: 'Çok Seçenekli Ürün',
       description: 'Ürün açıklaması.',
       variants: [
@@ -55,6 +59,7 @@ Product _simpleProduct() => Product(
       categoryId: 5,
       brand: 'Acme',
       status: ProductStatusEnum.active,
+      attributes: const [],
       title: 'Tek Seçenekli Ürün',
       description: 'Ürün açıklaması.',
       variants: [_v(1)],
@@ -89,6 +94,7 @@ class _FakeCatalogApi extends CatalogApi {
     bool? freeShipping,
     bool? inStock,
     bool? priceDropped,
+    List<String>? attr,
     String? xTraceId,
     int? categoryId,
     int? page = 1,

@@ -24,7 +24,10 @@ import 'package:mopro_api/src/model/delivery_eta.dart';
 import 'package:mopro_api/src/model/device.dart';
 import 'package:mopro_api/src/model/error_envelope.dart';
 import 'package:mopro_api/src/model/error_envelope_error.dart';
+import 'package:mopro_api/src/model/facet.dart';
+import 'package:mopro_api/src/model/facet_value.dart';
 import 'package:mopro_api/src/model/field_error.dart';
+import 'package:mopro_api/src/model/get_category_facets200_response.dart';
 import 'package:mopro_api/src/model/list_addresses200_response.dart';
 import 'package:mopro_api/src/model/list_banners200_response.dart';
 import 'package:mopro_api/src/model/list_cashback_payments200_response.dart';
@@ -40,6 +43,7 @@ import 'package:mopro_api/src/model/order.dart';
 import 'package:mopro_api/src/model/order_item.dart';
 import 'package:mopro_api/src/model/pagination_meta.dart';
 import 'package:mopro_api/src/model/product.dart';
+import 'package:mopro_api/src/model/product_attribute.dart';
 import 'package:mopro_api/src/model/product_summary.dart';
 import 'package:mopro_api/src/model/recommendation.dart';
 import 'package:mopro_api/src/model/refresh_token_request.dart';
@@ -136,8 +140,14 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return ErrorEnvelope.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ErrorEnvelopeError':
           return ErrorEnvelopeError.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'Facet':
+          return Facet.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'FacetValue':
+          return FacetValue.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'FieldError':
           return FieldError.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'GetCategoryFacets200Response':
+          return GetCategoryFacets200Response.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ListAddresses200Response':
           return ListAddresses200Response.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ListBanners200Response':
@@ -168,6 +178,8 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return PaginationMeta.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Product':
           return Product.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'ProductAttribute':
+          return ProductAttribute.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ProductSummary':
           return ProductSummary.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Recommendation':

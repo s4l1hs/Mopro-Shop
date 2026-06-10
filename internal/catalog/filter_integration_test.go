@@ -431,3 +431,78 @@ func TestIntegration_ListProductsGlobal(t *testing.T) {
 		pfAssertSet(t, list(t, catalog.ProductFilter{FreeShipping: pfBool(true)}), a, c)
 	})
 }
+
+// TestIntegration_FacetsAndAttrFilter covers PLP-13: facet aggregation
+// (value+count over the category subtree), per-product attributes, and the attr
+// filter threading into the listing.
+func TestIntegration_FacetsAndAttrFilter(t *testing.T) {
+	ctx := context.Background()
+	pfSetupCat(t, ctx)
+	repo := catalog.NewRepository(integPool)
+
+	a := pfSeed(t, ctx, "Apple", "FA Alpha", 10000, nil, 0, false, 5)
+	b := pfSeed(t, ctx, "Apple", "FA Beta", 20000, nil, 0, false, 5)
+	c := pfSeed(t, ctx, "Apple", "FA Gamma", 30000, nil, 0, false, 5)
+
+	mustExec := func(q string, args ...any) {
+		t.Helper()
+		if _, err := integPool.Exec(ctx, q, args...); err != nil {
+			t.Fatalf("exec: %v", err)
+		}
+	}
+	// Enable the renk facet for pfCat; assign colours: a,b=Siyah, c=Beyaz.
+	mustExec(`INSERT INTO catalog_schema.category_facets (category_id, attribute_key_id, display_order)
+		SELECT $1, id, 1 FROM catalog_schema.attribute_keys WHERE slug='renk' ON CONFLICT DO NOTHING`, pfCat)
+	for _, pc := range []struct {
+		pid   int64
+		color string
+	}{{a, "Siyah"}, {b, "Siyah"}, {c, "Beyaz"}} {
+		mustExec(`INSERT INTO catalog_schema.product_attributes (product_id, attribute_key_id, value_text)
+			SELECT $1, id, $2 FROM catalog_schema.attribute_keys WHERE slug='renk'`, pc.pid, pc.color)
+	}
+
+	t.Run("facet aggregation: renk Siyah(2) Beyaz(1)", func(t *testing.T) {
+		facets, err := repo.FacetsByCategory(ctx, pfCat, "tr-TR")
+		if err != nil {
+			t.Fatalf("FacetsByCategory: %v", err)
+		}
+		if len(facets) != 1 || facets[0].Slug != "renk" || facets[0].Name != "Renk" {
+			t.Fatalf("want one renk facet (Renk), got %+v", facets)
+		}
+		got := map[string]int{}
+		for _, v := range facets[0].Values {
+			got[v.Value] = v.Count
+		}
+		if got["Siyah"] != 2 || got["Beyaz"] != 1 {
+			t.Fatalf("buckets: want Siyah=2 Beyaz=1, got %v", got)
+		}
+	})
+
+	t.Run("per-product attributes", func(t *testing.T) {
+		attrs, err := repo.ProductAttributes(ctx, a, "tr-TR")
+		if err != nil {
+			t.Fatalf("ProductAttributes: %v", err)
+		}
+		if len(attrs) != 1 || attrs[0].Slug != "renk" || len(attrs[0].Values) != 1 || attrs[0].Values[0] != "Siyah" {
+			t.Fatalf("want renk=[Siyah], got %+v", attrs)
+		}
+	})
+
+	t.Run("attr filter narrows to matching products", func(t *testing.T) {
+		rows, _, err := repo.ListProductsByCategory(ctx, pfCat, "tr-TR",
+			catalog.ProductFilter{Attrs: map[string][]string{"renk": {"Siyah"}}}, 0, 50)
+		if err != nil {
+			t.Fatalf("ListProductsByCategory: %v", err)
+		}
+		pfAssertSet(t, pfIDs(rows), a, b)
+	})
+
+	t.Run("attr filter threads into search", func(t *testing.T) {
+		rows, _, err := repo.SearchProductsSummary(ctx, "FA", "tr-TR",
+			catalog.ProductFilter{Attrs: map[string][]string{"renk": {"Beyaz"}}}, 0, 50)
+		if err != nil {
+			t.Fatalf("SearchProductsSummary: %v", err)
+		}
+		pfAssertSet(t, pfIDs(rows), c)
+	})
+}

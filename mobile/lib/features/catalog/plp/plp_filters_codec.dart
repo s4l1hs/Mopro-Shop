@@ -22,6 +22,10 @@ class PlpFiltersCodec {
     if (f.freeShippingOnly) out['shipping'] = 'free';
     if (f.inStock) out['stock'] = 'in';
     if (f.priceDropped) out['drop'] = 'down';
+    // PLP-13: one `attr_<slug>=v1,v2` key per selected attribute.
+    for (final e in f.attrs.entries) {
+      if (e.value.isNotEmpty) out['attr_${e.key}'] = e.value.join(',');
+    }
     if (f.page > 1) out['page'] = '${f.page}';
     return out;
   }
@@ -36,8 +40,24 @@ class PlpFiltersCodec {
       freeShippingOnly: q['shipping'] == 'free',
       inStock: q['stock'] == 'in',
       priceDropped: q['drop'] == 'down',
+      attrs: _attrs(q),
       page: _page(q['page']),
     );
+  }
+
+  /// Collects `attr_<slug>=v1,v2` keys into a slug → values map (defensive:
+  /// empty slugs/values dropped).
+  static Map<String, List<String>> _attrs(Map<String, String> q) {
+    final out = <String, List<String>>{};
+    for (final e in q.entries) {
+      if (!e.key.startsWith('attr_')) continue;
+      final slug = e.key.substring(5);
+      if (slug.isEmpty) continue;
+      final vals =
+          e.value.split(',').where((v) => v.trim().isNotEmpty).toList();
+      if (vals.isNotEmpty) out[slug] = vals;
+    }
+    return out;
   }
 
   static int? _positiveInt(String? s) {

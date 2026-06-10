@@ -15,7 +15,7 @@ Method | HTTP request | Description
 
 
 # **search**
-> ListProducts200Response search(q, xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, priceDropped, sort)
+> ListProducts200Response search(q, xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, priceDropped, attr, sort)
 
 Full-text product search with filters
 
@@ -36,10 +36,11 @@ final int rating = 56; // int | Minimum average rating (products with rating_avg
 final bool freeShipping = true; // bool | When true, only products flagged free-shipping.
 final bool inStock = true; // bool | When true, only products with at least one in-stock variant.
 final bool priceDropped = true; // bool | When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, \"Fiyatı düşenler\"). Served from catalog_schema.variant_price_history. 
+final List<String> attr = ; // List<String> | Attribute facet filter (PLP-13). Repeated `<slug>:<value>` entries, e.g. `attr=renk:Siyah&attr=renk:Beyaz`. Values within a slug are OR; distinct slugs are AND. Backed by catalog_schema.product_attributes. 
 final String sort = sort_example; // String | Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` orders by global popularity (P-029); it degrades to `recommended` until the analytics popularity projection has data. 
 
 try {
-    final response = api.search(q, xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, priceDropped, sort);
+    final response = api.search(q, xTraceId, categoryId, page, perPage, minPrice, maxPrice, brand, rating, freeShipping, inStock, priceDropped, attr, sort);
     print(response);
 } catch on DioException (e) {
     print('Exception when calling SearchApi->search: $e\n');
@@ -62,6 +63,7 @@ Name | Type | Description  | Notes
  **freeShipping** | **bool**| When true, only products flagged free-shipping. | [optional] 
  **inStock** | **bool**| When true, only products with at least one in-stock variant. | [optional] 
  **priceDropped** | **bool**| When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, \"Fiyatı düşenler\"). Served from catalog_schema.variant_price_history.  | [optional] 
+ **attr** | [**List&lt;String&gt;**](String.md)| Attribute facet filter (PLP-13). Repeated `<slug>:<value>` entries, e.g. `attr=renk:Siyah&attr=renk:Beyaz`. Values within a slug are OR; distinct slugs are AND. Backed by catalog_schema.product_attributes.  | [optional] 
  **sort** | **String**| Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` orders by global popularity (P-029); it degrades to `recommended` until the analytics popularity projection has data.  | [optional] [default to 'recommended']
 
 ### Return type

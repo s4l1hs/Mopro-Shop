@@ -96,6 +96,7 @@ Product _product() => Product(
       categoryId: 5,
       brand: 'Acme',
       status: ProductStatusEnum.active,
+      attributes: const [],
       title: 'Test Ürünü',
       // Long below-fold content so the page can scroll past the pin window.
       description: List.filled(60, 'Lorem ipsum dolor sit amet.').join('\n\n'),
@@ -135,6 +136,7 @@ class _FakeCatalogApi extends CatalogApi {
     bool? freeShipping,
     bool? inStock,
     bool? priceDropped,
+    List<String>? attr,
     String? xTraceId,
     int? categoryId,
     int? page = 1,

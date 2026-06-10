@@ -2,15 +2,16 @@ name: govulncheck
 
 # Dependency-CVE scanning for the Go module (TOOLING_AUDIT T-003).
 # golangci's gosec lints code patterns; nothing here scanned KNOWN-vulnerable
-# deps/stdlib until now. Runs on Go-affecting PRs and weekly (vulns surface on
-# the DB's schedule, not ours).
+# deps/stdlib until now. Runs on Go-affecting PRs, on every push to main (the
+# security gate — a merge can pull in a vulnerable dep regardless of paths), and
+# weekly (vulns surface on the DB's schedule, not ours). This is the single
+# canonical govulncheck workflow (security-scan.yml was a duplicate, removed).
 on:
+  push:
+    branches: [main]
+  # No PR path filter: `govulncheck ./...` is a REQUIRED gate, so it must post a
+  # status on every PR (a required check that never runs blocks the merge).
   pull_request:
-    paths:
-      - '**.go'
-      - 'go.mod'
-      - 'go.sum'
-      - '.github/workflows/govulncheck.yml'
   schedule:
     - cron: '17 6 * * 1'   # Mondays 06:17 UTC
   workflow_dispatch:
@@ -22,11 +23,13 @@ jobs:
   govulncheck:
     name: govulncheck ./...
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache: true
       - run: go install golang.org/x/vuln/cmd/govulncheck@latest
       # Required gate (TOOLING_AUDIT T-014 resolved): the go directive is 1.25.11
       # (installed here via go-version-file), which fixes the previously-called
