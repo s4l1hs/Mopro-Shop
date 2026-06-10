@@ -305,6 +305,7 @@
     "not_found": "Ürün bulunamadı."
   },
   "reviews": {
+    "anonymous": "Mopro Müşterisi",
     "header": "Yorumlar ({count})",
     "helpful_count": "Faydalı ({count})",
     "load_more": "Daha fazla yorum yükle",
