@@ -52,6 +52,9 @@ func (s *stubSellerSvc) ResolveSellerForUser(_ context.Context, _ int64) (int64,
 func (s *stubSellerSvc) OfficialSellerIDs(_ context.Context, _ []int64) (map[int64]bool, error) {
 	return map[int64]bool{}, nil
 }
+func (s *stubSellerSvc) SellerNamesByIDs(_ context.Context, _ []int64) (map[int64]string, error) {
+	return map[int64]string{}, nil
+}
 
 func newProductDetailRequest(productID string) *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/products/"+productID, nil)

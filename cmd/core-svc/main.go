@@ -584,7 +584,7 @@ func main() {
 		httpTrace(requireAuth(http.HandlerFunc(handleCartRemoveItem(cartSvc)))),
 	)
 	mux.Handle("GET /cart",
-		httpTrace(requireAuth(http.HandlerFunc(handleGetCart(cartSvc)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleGetCart(cartSvc, catalogSvc, sellerSvc, defaultLocale, market)))),
 	)
 	mux.Handle("POST /cart/reserve",
 		httpTrace(requireAuth(http.HandlerFunc(handleCartReserve(cartSvc)))),
@@ -1130,7 +1130,7 @@ func handleCartRemoveItem(svc cart.Service) http.HandlerFunc {
 	}
 }
 
-func handleGetCart(svc cart.Service) http.HandlerFunc {
+func handleGetCart(svc cart.Service, cat cartCatalogResolver, namer cartSellerNamer, defaultLocale, defaultMarket string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := middleware.UserIDFromCtx(r.Context())
 		c, err := svc.GetCart(r.Context(), userID)
@@ -1139,7 +1139,10 @@ func handleGetCart(svc cart.Service) http.HandlerFunc {
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		jsonOK(w, http.StatusOK, c)
+		// Enrich raw {variant_id, qty} into the rich CartDto the mobile expects
+		// (lines + per-seller totals + grand total) §5-safely — no cross-schema JOIN.
+		locale := parseLocale(r, defaultLocale)
+		jsonOK(w, http.StatusOK, enrichCart(r.Context(), c, cat, namer, locale, defaultMarket))
 	}
 }
 
