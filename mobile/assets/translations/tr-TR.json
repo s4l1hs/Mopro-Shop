@@ -7,7 +7,8 @@
     "retry": "Tekrar Dene",
     "loading": "Yükleniyor...",
     "error": "Bir hata oluştu",
-    "yes": "Evet"
+    "yes": "Evet",
+    "undo": "Geri Al"
   },
   "auth": {
     "login_title": "Giriş Yap",
@@ -374,6 +375,7 @@
     "clear_confirm_body": "Tüm ürünler sepetten çıkarılacak. Emin misiniz?",
     "remove_item": "Sepetten Çıkar",
     "remove_item_confirm": "{title} sepetten çıkarıldı",
+    "moved_to_favorites": "{title} favorilere taşındı",
     "seller_section": "{seller} Satıcısı",
     "kdv_included": "Vergiler dahil",
     "item_count": "{count} ürün",

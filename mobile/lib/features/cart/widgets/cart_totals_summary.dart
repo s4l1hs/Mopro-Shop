@@ -27,6 +27,12 @@ class CartTotalsSummary extends StatelessWidget {
 
     final grandTotal = fmt.format(cart.grandTotalMinor / 100.0);
     final itemCount = cart.lines.length;
+    // CT-04: subtotal + shipping breakdown (parity with the desktop summary),
+    // folded from the existing per-seller totals.
+    final subtotalMinor =
+        cart.totalsBySeller.fold<int>(0, (s, t) => s + t.itemsMinor);
+    final shippingMinor =
+        cart.totalsBySeller.fold<int>(0, (s, t) => s + t.shippingMinor);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -57,6 +63,19 @@ class CartTotalsSummary extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
+          _BreakdownRow(
+            label: 'cart.subtotal'.tr(),
+            value: fmt.format(subtotalMinor / 100.0),
+            theme: theme,
+          ),
+          _BreakdownRow(
+            label: 'cart.shipping'.tr(),
+            value: shippingMinor == 0
+                ? 'cart.shipping_free'.tr()
+                : fmt.format(shippingMinor / 100.0),
+            theme: theme,
+          ),
+          const Divider(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -91,6 +110,35 @@ class CartTotalsSummary extends StatelessWidget {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// CT-04: a label/value row for the mobile subtotal + shipping breakdown.
+class _BreakdownRow extends StatelessWidget {
+  const _BreakdownRow({
+    required this.label,
+    required this.value,
+    required this.theme,
+  });
+
+  final String label;
+  final String value;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = theme.textTheme.bodySmall
+        ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: style),
+          Text(value, style: style),
         ],
       ),
     );

@@ -13,7 +13,8 @@ import 'package:mopro/features/cart/widgets/cart_line_card.dart';
 import 'package:mopro/features/cart/widgets/cart_totals_summary.dart';
 import 'package:mopro/features/cart/widgets/empty_cart.dart';
 import 'package:mopro/features/cart/widgets/order_summary_card.dart';
-import 'package:mopro/shared/molecules/section_divider.dart';
+import 'package:mopro/features/favorites/favorites_provider.dart';
+import 'package:mopro/utils/money.dart';
 
 class CartScreen extends ConsumerWidget {
   const CartScreen({super.key});
@@ -61,7 +62,7 @@ class CartScreen extends ConsumerWidget {
                       ref.read(cartProvider.notifier).refresh(),
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    children: _buildGroupedLines(context, ref, cart.lines),
+                    children: _buildGroupedLines(context, ref, cart),
                   ),
                 ),
               ),
@@ -109,7 +110,7 @@ class CartScreen extends ConsumerWidget {
                             ref.read(cartProvider.notifier).refresh(),
                         child: ListView(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          children: _buildGroupedLines(context, ref, cart.lines),
+                          children: _buildGroupedLines(context, ref, cart),
                         ),
                       ),
                     ),
@@ -135,26 +136,32 @@ class CartScreen extends ConsumerWidget {
   List<Widget> _buildGroupedLines(
     BuildContext context,
     WidgetRef ref,
-    List<CartLineDto> lines,
+    CartDto cart,
   ) {
     final grouped = <int, List<CartLineDto>>{};
-    for (final line in lines) {
+    for (final line in cart.lines) {
       grouped.putIfAbsent(line.sellerId, () => []).add(line);
     }
+    // CT-01: per-seller subtotal from the existing totalsBySeller (the seller
+    // *name* isn't in the cart response — flagged for the backend cluster).
+    int subtotalFor(int sellerId) => cart.totalsBySeller
+        .where((t) => t.sellerId == sellerId)
+        .fold<int>(0, (s, t) => s + t.itemsMinor);
 
     return grouped.entries.expand((entry) {
       final sellerId = entry.key;
       final sellerLines = entry.value;
       return [
-        SectionDivider(
-          label: 'cart.seller_section'
-              .tr(namedArgs: {'seller': '#$sellerId'}),
+        _SellerGroupHeader(
+          label: 'cart.seller_section'.tr(namedArgs: {'seller': '#$sellerId'}),
+          subtotalMinor: subtotalFor(sellerId),
         ),
         ...sellerLines.map(
           (line) => CartLineCard(
             key: ValueKey(line.id),
             line: line,
             onRemove: () => _removeWithUndo(context, ref, line),
+            onMoveToFavorites: () => _moveToFavorites(context, ref, line),
             onDecrement: () => ref
                 .read(cartProvider.notifier)
                 .updateQty(lineId: line.id, qty: line.qty - 1),
@@ -167,6 +174,24 @@ class CartScreen extends ConsumerWidget {
     }).toList();
   }
 
+  // CT-05: move a line to favorites — ensure it's favorited (never un-favorite),
+  // then remove it from the cart.
+  void _moveToFavorites(BuildContext context, WidgetRef ref, CartLineDto line) {
+    if (!ref.read(isFavoriteProvider(line.productId))) {
+      ref.read(favoritesProvider.notifier).toggle(line.productId);
+    }
+    ref.read(cartProvider.notifier).removeLine(lineId: line.id);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'cart.moved_to_favorites'.tr(namedArgs: {'title': line.title}),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  // CT-10: real Undo — re-add the removed line (it carries product/variant/qty).
   void _removeWithUndo(
     BuildContext context,
     WidgetRef ref,
@@ -177,10 +202,16 @@ class CartScreen extends ConsumerWidget {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'cart.remove_item_confirm'
-              .tr(namedArgs: {'title': line.title}),
+          'cart.remove_item_confirm'.tr(namedArgs: {'title': line.title}),
         ),
-        duration: const Duration(seconds: 3),
+        action: SnackBarAction(
+          label: 'common.undo'.tr(),
+          onPressed: () => ref.read(cartProvider.notifier).addItem(
+                productId: line.productId,
+                variantId: line.variantId,
+                qty: line.qty,
+              ),
+        ),
       ),
     );
   }
@@ -211,5 +242,59 @@ class CartScreen extends ConsumerWidget {
     if (confirmed ?? false) {
       await ref.read(cartProvider.notifier).clear();
     }
+  }
+}
+
+/// CT-01: seller-group header — seller label + the per-seller subtotal (from
+/// `totalsBySeller`). The seller *name* isn't in the cart response (only
+/// `sellerId`) → flagged for the backend cluster; the label stays `#<id>`.
+class _SellerGroupHeader extends StatelessWidget {
+  const _SellerGroupHeader({
+    required this.label,
+    required this.subtotalMinor,
+  });
+
+  final String label;
+  final int subtotalMinor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      color: cs.surfaceContainerLow,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.storefront_outlined,
+                  size: 16,
+                  color: cs.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '${'cart.subtotal'.tr()}: ${MoneyUtils.formatMinor(subtotalMinor)}',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
   }
 }

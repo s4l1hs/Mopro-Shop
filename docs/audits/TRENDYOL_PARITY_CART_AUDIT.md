@@ -50,16 +50,16 @@
 
 | ID | Baseline (Trendyol) | Mopro current (`src`) | Delta | Status | Sev |
 |---|---|---|---|---|---|
-| — | Line: image, title, variant, unit price, qty stepper, remove, **save-for-later/move-to-fav** | `CartLineCard`: cover image (72px) + title + price + qty stepper + **swipe-to-delete** (Dismissible) + button remove | **no variant label** (`CartLineDto` has `variantId` but no colour/size string), **no save-for-later**, **no move-to-favorites** | **CT-05** | MED |
-| — | Per-seller grouping w/ per-seller subtotal + cargo | `_buildGroupedLines` groups by `sellerId` with a `SectionDivider` | label is **`#<sellerId>`, not the seller name**; **no per-seller subtotal/cargo rendered** (though `totalsBySeller` carries it) | **CT-01** | MED |
-| — | Summary: subtotal, cargo, coupon, "Sepette indirim", coin, **total** | desktop `OrderSummaryCard`: subtotal + shipping (free@0) + cashback + total + **coupon input (placeholder)**; mobile `CartTotalsSummary`: **grand total + cashback + checkout only** | **mobile lacks the subtotal/shipping breakdown** (CT-04); **no basket-discount line** (CT-09) | **CT-04 / CT-09** | MED |
+| — | Line: image, title, variant, unit price, qty stepper, remove, **save-for-later/move-to-fav** | `CartLineCard` + **move-to-favorites** action (heart → favorite + remove) | **CT-05 UI ✅** move-to-favorites shipped; **variant label** (DTO has `variantId` only) + **save-for-later** (no saved list) **flagged backend** | **CT-05 (UI done)** | MED |
+| — | Per-seller grouping w/ per-seller subtotal + cargo | `_SellerGroupHeader`: label + **per-seller subtotal** (from `totalsBySeller`) | **CT-01 UI ✅** per-seller subtotal shipped; seller **name** (only `sellerId` in response) **flagged backend** | **CT-01 (subtotal done)** | MED |
+| — | Summary: subtotal, cargo, coupon, "Sepette indirim", coin, **total** | desktop `OrderSummaryCard`; mobile `CartTotalsSummary` **now has the subtotal/shipping breakdown** | **CT-04 ✅ RESOLVED**; **CT-09** basket-discount still absent | **CT-04 RESOLVED / CT-09** | MED |
 | — | Coupon/promo field | desktop coupon `TextField` — **placeholder, no coupon backend** ("Coupon application is a placeholder"); mobile has none | non-functional + desktop-only | **CT-03** | MED |
 | — | Free-shipping progress ("X TL daha ekle") | — | **absent** (no threshold/progress in totals) | **CT-02** | MED |
 | — | Sticky checkout CTA with total | `CartTotalsSummary`/`OrderSummaryCard` checkout button → `requireAuth` → `/checkout` | — (**auth-gated**, intentional) | **MATCHED** | — |
 | — | Empty cart + suggestions | `EmptyCart`: icon + title + subtitle + one CTA | **no recommendations/popular** | **CT-07** | LOW |
 | — | Warnings: out/low-stock, price-changed-since-added | `isAboveTotalLimit` total cap only; `reservedUntil` held but not surfaced | **no stock / price-change warnings** on lines | **CT-06** | MED |
 | — | Recommendations rail in cart | — | **absent** | **CT-08** | LOW |
-| — | Remove → **Undo** | `_removeWithUndo` removes + shows a snackbar | **snackbar has no Undo action** (says removed; no "Geri Al") | **CT-10** | LOW–MED |
+| — | Remove → **Undo** | `_removeWithUndo` + a **real Undo `SnackBarAction`** (re-adds via `addItem`) | **CT-10 ✅ RESOLVED** | **CT-10 RESOLVED** | LOW–MED |
 
 ---
 

@@ -10,6 +10,7 @@ class CartLineCard extends StatelessWidget {
     required this.onRemove,
     required this.onDecrement,
     required this.onIncrement,
+    this.onMoveToFavorites,
     super.key,
   });
 
@@ -17,6 +18,9 @@ class CartLineCard extends StatelessWidget {
   final VoidCallback onRemove;
   final VoidCallback onDecrement;
   final VoidCallback onIncrement;
+
+  /// CT-05: move-to-favorites action (favorite the product + remove the line).
+  final VoidCallback? onMoveToFavorites;
 
   @override
   Widget build(BuildContext context) {
@@ -97,11 +101,34 @@ class CartLineCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              QtyStepper(
-                qty: line.qty,
-                onDecrement: onDecrement,
-                onIncrement: onIncrement,
-              ),
+              // With the move-to-favorites action, stack the heart above the
+              // stepper; without it, render the stepper exactly as before (so
+              // callers that don't opt in are visually unchanged).
+              if (onMoveToFavorites != null)
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.favorite_border, size: 20),
+                      tooltip: 'product.add_to_favorites'.tr(),
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: onMoveToFavorites,
+                    ),
+                    QtyStepper(
+                      qty: line.qty,
+                      onDecrement: onDecrement,
+                      onIncrement: onIncrement,
+                    ),
+                  ],
+                )
+              else
+                QtyStepper(
+                  qty: line.qty,
+                  onDecrement: onDecrement,
+                  onIncrement: onIncrement,
+                ),
             ],
           ),
         ),

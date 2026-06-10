@@ -7,7 +7,8 @@
     "retry": "Retry",
     "loading": "Loading...",
     "error": "Something went wrong",
-    "yes": "Yes"
+    "yes": "Yes",
+    "undo": "Undo"
   },
   "auth": {
     "login_title": "Sign In",
@@ -370,6 +371,7 @@
     "clear_confirm_body": "All items will be removed. Are you sure?",
     "remove_item": "Remove",
     "remove_item_confirm": "{title} removed from cart",
+    "moved_to_favorites": "{title} moved to favorites",
     "seller_section": "Seller: {seller}",
     "kdv_included": "VAT included",
     "item_count": "{count} items",
