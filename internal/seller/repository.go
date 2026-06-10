@@ -71,6 +71,29 @@ func (r *pgxRepository) OfficialSellerIDs(ctx context.Context, ids []int64) (map
 	return out, rows.Err()
 }
 
+func (r *pgxRepository) SellerNamesByIDs(ctx context.Context, ids []int64) (map[int64]string, error) {
+	out := make(map[int64]string, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := r.pool.Query(ctx,
+		`SELECT id, display_name FROM seller_schema.sellers
+		  WHERE id = ANY($1) AND status = 'active'`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("seller.repo: SellerNamesByIDs: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, fmt.Errorf("seller.repo: SellerNamesByIDs scan: %w", err)
+		}
+		out[id] = name
+	}
+	return out, rows.Err()
+}
+
 func (r *pgxRepository) BindingForUser(ctx context.Context, userID int64) (Binding, bool, error) {
 	var b Binding
 	err := r.pool.QueryRow(ctx,

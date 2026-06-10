@@ -28,18 +28,19 @@
 
 ## §1 — Summary
 
-> ### ⚠ Correction (2026-06-10, `feat/cart-line-metadata` discovery) — the cart read-path is a backend STUB
-> The "well-built" claims below describe the **mobile UI code**, which is built
-> against a fully-enriched cart response that the **backend does not serve**.
-> `GET /cart` returns only raw `{user_id, items:[{variant_id, qty}]}` —
-> `internal/cart` never emits `lines`, `seller_id`, `seller_name`, `title`,
-> `price_minor`, `totals_by_seller`, `grand_total_minor`, or `kdv_included_minor`,
-> and `cart_provider._load` does no client-side enrichment. So against the live
-> backend the authed cart's `lines` parse to `[]` → it **renders empty**, and the
-> per-seller subtotal / seller name / variant label all have no data. **CT-01,
-> CT-04 (the "RESOLVED" subtotal), and CT-05 are all gated on building the cart
-> read-path enrichment** (which must include the totals cluster). Full analysis +
-> the correctly-scoped next lane: **`docs/internal/cart-line-metadata.md`**.
+> ### ✅ RESOLVED (2026-06-10, `feat/cart-readpath-enrichment` PR 1) — the cart read-path is now enriched
+> ~~The cart read-path was a backend STUB: `GET /cart` returned raw
+> `{user_id, items:[{variant_id, qty}]}` → the authed cart rendered empty.~~
+> **Fixed:** `handleGetCart` now enriches §5-safely (`enrichCart`) — `GetVariantByID`
+> (label/price/seller_id/product_id/image) + `ListProductsByIDs` (title/cover) +
+> the new `seller.SellerNamesByIDs` carrier (name) + `GetCommissionForCategory`
+> (KDV) — and emits the full `CartDto`: `lines` (incl. `seller_name` +
+> `variant_label`), `totals_by_seller`, `grand_total_minor`, `kdv_included_minor`.
+> The merge lives in `cmd/core-svc` (`internal/cart` imports neither catalog nor
+> seller → no JOIN). **The authed cart + the checkout review (which reads the same
+> `cart.lines`) now render → CT-01 / CT-04 / CT-05 + CHK-01 / CHK-02 closed.** The
+> guest path is untouched. Discovery: `docs/internal/cart-readpath.md`. *(Still
+> open: CT-02 free-shipping progress + CT-09 basket-discount — PR 2.)*
 
 - **Cart is well-built (UI):** per-seller grouping, qty stepper, swipe+button remove,
   desktop price summary (subtotal/shipping/cashback/total + KDV-included), coin
@@ -64,9 +65,9 @@
 
 | ID | Baseline (Trendyol) | Mopro current (`src`) | Delta | Status | Sev |
 |---|---|---|---|---|---|
-| — | Line: image, title, variant, unit price, qty stepper, remove, **save-for-later/move-to-fav** | `CartLineCard` + **move-to-favorites** action (heart → favorite + remove) | **CT-05** move-to-favorites UI shipped; **variant label** ⚠ **BLOCKED (deeper than flagged)** — the enriched cart line itself isn't served (`GET /cart` returns raw `{variant_id,qty}`; see the ⚠ correction above) — needs the cart read-path enrichment + variant colour/size; **save-for-later** (no saved list) separate | **CT-05 BLOCKED-BACKEND** | MED |
-| — | Per-seller grouping w/ per-seller subtotal + cargo | `_SellerGroupHeader`: label + per-seller subtotal **(UI code from `totalsBySeller`)** | **CT-01** ⚠ **BLOCKED (deeper than flagged)** — the backend emits **no** `totals_by_seller` / `seller_name` / enriched `lines`, so the subtotal **and** name both render empty/`#id`; needs the cart read-path enrichment (see the ⚠ correction above) | **CT-01 BLOCKED-BACKEND** | MED |
-| — | Summary: subtotal, cargo, coupon, "Sepette indirim", coin, **total** | desktop `OrderSummaryCard`; mobile `CartTotalsSummary` **UI has the subtotal/shipping breakdown** | **CT-04 UI built** but ⚠ **renders empty** — backend serves no `totals_by_seller`/`grand_total` (see ⚠ correction); **CT-09** basket-discount absent | **CT-04 BLOCKED-BACKEND / CT-09** | MED |
+| — | Line: image, title, variant, unit price, qty stepper, remove, **save-for-later/move-to-fav** | `CartLineCard` (now with **variant label**) + move-to-favorites | **CT-05 ✅ RESOLVED** — enriched `GET /cart` serves `variant_label` (colour/size) → rendered on the line; **save-for-later** (no saved list) separate | **CT-05 RESOLVED** | MED |
+| — | Per-seller grouping w/ per-seller subtotal + cargo | `_SellerGroupHeader`: **seller name** + per-seller subtotal | **CT-01 ✅ RESOLVED** — enriched `GET /cart` serves `seller_name` + `totals_by_seller`; header shows the real name (fallback `#id`) + subtotal | **CT-01 RESOLVED** | MED |
+| — | Summary: subtotal, cargo, coupon, "Sepette indirim", coin, **total** | desktop `OrderSummaryCard`; mobile `CartTotalsSummary` | **CT-04 ✅ RESOLVED** — enriched `GET /cart` serves `totals_by_seller` + `grand_total_minor` + `kdv_included_minor` → the breakdown renders; **CT-09** basket-discount still absent (PR 2) | **CT-04 RESOLVED / CT-09** | MED |
 | — | Coupon/promo field | desktop coupon `TextField` — **placeholder, no coupon backend** ("Coupon application is a placeholder"); mobile has none | non-functional + desktop-only | **CT-03** | MED |
 | — | Free-shipping progress ("X TL daha ekle") | — | **absent** (no threshold/progress in totals) | **CT-02** | MED |
 | — | Sticky checkout CTA with total | `CartTotalsSummary`/`OrderSummaryCard` checkout button → `requireAuth` → `/checkout` | — (**auth-gated**, intentional) | **MATCHED** | — |

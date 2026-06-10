@@ -7,6 +7,8 @@ class CartLineDto {
     required this.title,
     required this.priceMinor,
     required this.qty,
+    this.sellerName = '',
+    this.variantLabel = '',
     this.coverImageUrl,
     this.reservedUntil,
   });
@@ -19,6 +21,8 @@ class CartLineDto {
         title: json['title'] as String,
         priceMinor: (json['price_minor'] as num).toInt(),
         qty: (json['qty'] as num).toInt(),
+        sellerName: (json['seller_name'] as String?) ?? '',
+        variantLabel: (json['variant_label'] as String?) ?? '',
         coverImageUrl: json['cover_image_url'] as String?,
         reservedUntil: json['reserved_until'] != null
             ? DateTime.tryParse(json['reserved_until'] as String)
@@ -32,6 +36,12 @@ class CartLineDto {
   final String title;
   final int priceMinor;
   final int qty;
+
+  /// CT-01: the seller's display name (group header). Empty → fall back to `#id`.
+  final String sellerName;
+
+  /// CT-05: the variant's colour/size label, e.g. "Siyah, M". Empty when none.
+  final String variantLabel;
   final String? coverImageUrl;
   final DateTime? reservedUntil;
 
@@ -45,6 +55,8 @@ class CartLineDto {
         'title': title,
         'price_minor': priceMinor,
         'qty': qty,
+        'seller_name': sellerName,
+        'variant_label': variantLabel,
         if (coverImageUrl != null) 'cover_image_url': coverImageUrl,
         if (reservedUntil != null)
           'reserved_until': reservedUntil!.toIso8601String(),
@@ -58,6 +70,8 @@ class CartLineDto {
         title: title,
         priceMinor: priceMinor,
         qty: qty ?? this.qty,
+        sellerName: sellerName,
+        variantLabel: variantLabel,
         coverImageUrl: coverImageUrl,
         reservedUntil: reservedUntil,
       );
