@@ -235,7 +235,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
               description: product.description,
               productId: product.id,
             ),
-            const _StubTab(),
+            _SpecsTab(attributes: product.attributes),
             PdpReviewsTab(productId: product.id),
             PdpQaTab(productId: product.id),
           ],
@@ -548,6 +548,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: MarkdownBody(data: product.description),
             ),
+          1 => _SpecsTab(attributes: product.attributes, scrollable: false),
           2 => PdpReviewsTab(productId: product.id, scrollable: false),
           3 => PdpQaTab(productId: product.id, scrollable: false),
           _ => Padding(
@@ -879,19 +880,59 @@ class _SimilarProductsRail extends ConsumerWidget {
   }
 }
 
-class _StubTab extends StatelessWidget {
-  const _StubTab();
+// _SpecsTab renders the product's normalized attributes (PLP-13 / PD-01) as a
+// Trendyol-style two-column spec table (name | value(s)), zebra-striped. Empty
+// state when the product carries no attributes. Replaces the former stub.
+class _SpecsTab extends StatelessWidget {
+  const _SpecsTab({required this.attributes, this.scrollable = true});
+
+  final List<ProductAttribute> attributes;
+  final bool scrollable;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        'common.loading'.tr(),
-        style: Theme.of(context)
-            .textTheme
-            .bodyMedium
-            ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-      ),
+    final cs = Theme.of(context).colorScheme;
+    if (attributes.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'product.specs_empty'.tr(),
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
+    final rows = <Widget>[
+      for (var i = 0; i < attributes.length; i++)
+        Container(
+          color: i.isEven ? cs.surfaceContainerHighest.withValues(alpha: 0.4) : null,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 2,
+                child: Text(
+                  attributes[i].name,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(flex: 3, child: Text(attributes[i].values.join(', '))),
+            ],
+          ),
+        ),
+    ];
+    if (!scrollable) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
+    }
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: rows,
     );
   }
 }
