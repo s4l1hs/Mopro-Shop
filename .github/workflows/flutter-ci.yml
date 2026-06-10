@@ -1,18 +1,12 @@
 name: Flutter CI
 
+# No path filter: these jobs are REQUIRED branch-protection gates, so they must
+# post a status on EVERY PR (a required check that never runs blocks the merge).
+# They validate the merged result and pass on unrelated PRs.
 on:
   push:
-    paths:
-      - 'mobile/**'
-      - 'tool/audit/**'
-      - 'Makefile'
-      - '.github/workflows/flutter-ci.yml'
+    branches: [main]
   pull_request:
-    paths:
-      - 'mobile/**'
-      - 'tool/audit/**'
-      - 'Makefile'
-      - '.github/workflows/flutter-ci.yml'
 
 defaults:
   run:
@@ -65,6 +59,10 @@ jobs:
           git diff --exit-code . || \
             (echo "mopro_api generated files are out of date. Run build_runner in mobile/packages/mopro_api." && exit 1)
 
+  # Logic gate (REQUIRED): everything except golden (pixel) tests. A golden flip
+  # on an intentional UI change must never block a merge — goldens run in the
+  # informational `golden` job below. Keeping this job named "flutter test" lets
+  # it stay the required context under the same name.
   test:
     name: flutter test
     runs-on: ubuntu-latest
@@ -76,7 +74,23 @@ jobs:
           channel: stable
       - run: flutter pub get
       - run: dart run build_runner build
-      - run: flutter test
+      - run: flutter test --exclude-tags golden
+
+  # Golden (pixel) tests — INFORMATIONAL only (never a required check). A golden
+  # flip turns this red without blocking the merge; re-baseline via the
+  # `golden-rebaseline` workflow (no PAT needed). See docs/internal/gate-finalize.md.
+  golden:
+    name: flutter golden (informational)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+      - run: flutter pub get
+      - run: dart run build_runner build
+      - run: flutter test --tags golden
 
   dart-analyze-generated-client:
     name: dart analyze (mopro_api generated client)

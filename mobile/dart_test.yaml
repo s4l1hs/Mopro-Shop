@@ -1,0 +1,7 @@
+# Test tags. `golden` marks pixel-comparison tests (matchesGoldenFile): they are
+# platform-rendered and flip on any intentional UI change, so CI runs them as a
+# separate INFORMATIONAL job (never a required gate) — `flutter test --exclude-tags
+# golden` is the required logic gate; `flutter test --tags golden` is informational.
+tags:
+  golden:
+    description: Golden (pixel) tests — informational, not a required gate.
