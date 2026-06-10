@@ -60,18 +60,33 @@ So add an **`attributes`** array (`[{slug, name, values[]}]`) to the **`Product`
 validates it automatically. The mobile `_StubTab` (`product_detail_screen.dart:882`,
 used at the specs tab) is replaced in the UI PR.
 
-## PR split
+## PR split (staged — phase 1 is three scoped PRs)
 
-- **PR 1 — backend (this):** migration 0089 + `attr-extras.sql` seed + facet
-  endpoint + `attr` filter (PLP + search) + `Product.attributes` + spec + Go/Dart
-  codegen + integration test (facet aggregation + filter) + extend the live-handler
-  contract test (facets endpoint + Product.attributes). Independently verifiable
-  (curl the endpoint; contract test validates schemas).
-- **PR 2 — UI (deferred, scoped):** `FilterPanel`/`PlpFilterSheet` `renk` accordion
-  (mirror `PlpBrandFacet`, driven by the facet buckets) auto-inheriting to search +
+The full phase-1 slice is large (schema + backfill + aggregation endpoint + `attr`
+filter + `Product.attributes` + Go/Dart codegen + two UI surfaces + tests +
+goldens). Per §1.3/§5 it ships as **three reviewable PRs**, foundation-first:
+
+- **PR 1 — schema + backfill (this):** migration 0089 (3 tables + indexes + grants
+  + fixed `renk` key) + `attr-extras.sql` dev seed (backfill `product_attributes`
+  from `variants.color` + `category_facets(renk)`). Migration-safe, idempotent,
+  §5-safe, **live-verified** (product 15 → {Beyaz, Lacivert, Siyah}; category facet
+  buckets aggregate). The normalized model + the `renk` data foundation.
+- **PR 2 — backend read surfaces (next):** `GET /categories/{id}/facets`
+  (subtree aggregation, mirrors brand/rating — the first facet endpoint) + the
+  `attr=<slug>:<value>` filter param threaded into `appendProductFilters` (PLP +
+  search) + **`Product.attributes`** on `GET /products/{id}` (for the specs tab) +
+  spec + Go/Dart codegen + integration test (aggregation + filter) + **extend the
+  #158 live-handler contract test** (facets endpoint + `Product.attributes`).
+  Adds methods to the catalog `Service`/`Repository` → update every Go fake
+  (incl. `//go:build integration`); a Dart codegen pass. Independently verifiable
+  by curl.
+- **PR 3 — UI:** `FilterPanel`/`PlpFilterSheet` `renk` accordion (mirror
+  `PlpBrandFacet`, driven by the facet buckets) auto-inheriting to search +
   `PlpFilters.attrs`/codec/chips/provider wiring; PDP specs tab reading
-  `Product.attributes` (replaces `_StubTab`, closes PD-01 for the slice); i18n;
-  widget tests; goldens (Linux). Per §7.3 the facet + specs ship together in PR 2.
+  `Product.attributes` (replaces `_StubTab`, closes **PD-01** for the slice); i18n;
+  widget tests; goldens (Linux). Per §7.3 the facet + specs ship **together** here.
+
+**This PR (PR 1)** lands the foundation; PR 2/3 are the scoped continuation.
 
 ## Deferred (Phase 2+, per #149): `depolama` + other `specs` attributes, value
 normalization, the seller attribute-write path, numeric/range facets, facet caching.
