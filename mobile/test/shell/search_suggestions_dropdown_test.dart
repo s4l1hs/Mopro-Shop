@@ -332,8 +332,10 @@ void main() {
     });
   });
 
+  // Tagged `golden` so it runs only in the informational CI job (never blocks a
+  // merge) — consistent with the gate-finalize policy for pixel tests.
   group('SearchSuggestionsDropdown — goldens', () {
-    testWidgets('populated three-section view', (tester) async {
+    testWidgets('populated three-section view', tags: 'golden', (tester) async {
       await _pump(
         tester,
         child: SearchSuggestionsDropdown(
