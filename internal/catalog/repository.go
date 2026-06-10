@@ -413,27 +413,33 @@ func appendProductFilters(sb *strings.Builder, args []any, f ProductFilter, argN
 			" AND vph.effective_at >= now() - INTERVAL '30 days'" +
 			" AND vph.price_minor > v.price_minor)")
 	}
-	if len(f.Attrs) > 0 {
-		// PLP-13: each attribute slug → an EXISTS over product_attributes (AND
-		// across slugs); values within a slug are ANY (OR). Single-schema, served
-		// by product_attributes_key_value_idx. Slugs are bound (never interpolated)
-		// and sorted so the generated SQL + arg layout are deterministic.
-		slugs := make([]string, 0, len(f.Attrs))
-		for s := range f.Attrs {
-			slugs = append(slugs, s)
+	return appendAttrFilters(sb, args, f.Attrs, argN)
+}
+
+// appendAttrFilters appends the PLP-13 attribute predicates: each slug → an
+// EXISTS over product_attributes (AND across slugs); values within a slug are
+// ANY (OR). Single-schema, served by product_attributes_key_value_idx. Slugs are
+// bound (never interpolated) and sorted so the generated SQL + arg layout are
+// deterministic. Split out of appendProductFilters to keep its complexity low.
+func appendAttrFilters(sb *strings.Builder, args []any, attrs map[string][]string, argN int) ([]any, int) {
+	if len(attrs) == 0 {
+		return args, argN
+	}
+	slugs := make([]string, 0, len(attrs))
+	for s := range attrs {
+		slugs = append(slugs, s)
+	}
+	sort.Strings(slugs)
+	for _, slug := range slugs {
+		vals := attrs[slug]
+		if len(vals) == 0 {
+			continue
 		}
-		sort.Strings(slugs)
-		for _, slug := range slugs {
-			vals := f.Attrs[slug]
-			if len(vals) == 0 {
-				continue
-			}
-			fmt.Fprintf(sb, " AND EXISTS (SELECT 1 FROM catalog_schema.product_attributes pa"+
-				" JOIN catalog_schema.attribute_keys ak ON ak.id = pa.attribute_key_id"+
-				" WHERE pa.product_id = p.id AND ak.slug = $%d AND pa.value_text = ANY($%d))", argN, argN+1)
-			args = append(args, slug, vals)
-			argN += 2
-		}
+		fmt.Fprintf(sb, " AND EXISTS (SELECT 1 FROM catalog_schema.product_attributes pa"+
+			" JOIN catalog_schema.attribute_keys ak ON ak.id = pa.attribute_key_id"+
+			" WHERE pa.product_id = p.id AND ak.slug = $%d AND pa.value_text = ANY($%d))", argN, argN+1)
+		args = append(args, slug, vals)
+		argN += 2
 	}
 	return args, argN
 }
