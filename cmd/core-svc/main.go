@@ -530,6 +530,9 @@ func main() {
 	mux.Handle("POST /favorites/sync",
 		httpTrace(requireAuth(http.HandlerFunc(handleFavoritesSync(pool)))),
 	)
+	mux.Handle("GET /favorites",
+		httpTrace(requireAuth(http.HandlerFunc(handleFavoritesList(pgFavoritesReader{pool: pool})))),
+	)
 	// Cart merge — guest items added to server cart on login
 	mux.Handle("POST /cart/merge",
 		httpTrace(requireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
