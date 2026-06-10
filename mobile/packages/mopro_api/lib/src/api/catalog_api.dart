@@ -12,6 +12,7 @@ import 'package:dio/dio.dart';
 import 'package:mopro_api/src/model/category_commission.dart';
 import 'package:mopro_api/src/model/create_product_request.dart';
 import 'package:mopro_api/src/model/error_envelope.dart';
+import 'package:mopro_api/src/model/get_category_facets200_response.dart';
 import 'package:mopro_api/src/model/list_categories200_response.dart';
 import 'package:mopro_api/src/model/list_products200_response.dart';
 import 'package:mopro_api/src/model/product.dart';
@@ -210,6 +211,86 @@ _responseData = rawData == null ? null : deserialize<CategoryCommission, Categor
     );
   }
 
+  /// Faceted attribute aggregation for a category (PLP-13)
+  /// For each facetable attribute of the category (and its subtree, PLP-12), returns the (value, count) buckets — the buyer-facing filter facets (mirrors the brand/rating facets). Driven by &#x60;category_facets&#x60; + &#x60;product_attributes&#x60;; counts are DISTINCT products. Names are resolved from &#x60;Accept-Language&#x60;. 
+  ///
+  /// Parameters:
+  /// * [id] 
+  /// * [xTraceId] - Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [GetCategoryFacets200Response] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<GetCategoryFacets200Response>> getCategoryFacets({ 
+    required int id,
+    String? xTraceId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/categories/{id}/facets'.replaceAll('{' r'id' '}', id.toString());
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        if (xTraceId != null) r'X-Trace-Id': xTraceId,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    GetCategoryFacets200Response? _responseData;
+
+    try {
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<GetCategoryFacets200Response, GetCategoryFacets200Response>(rawData, 'GetCategoryFacets200Response', growable: true);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<GetCategoryFacets200Response>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Get full product detail including variants and cashback preview
   /// Server resolves &#x60;title&#x60; and &#x60;description&#x60; from &#x60;Accept-Language&#x60; header. &#x60;cashback_preview.monthly_coin_minor&#x60; is computed handler-layer: &#x60;round(variant.price_minor × commission_pct_bps/10000 × 5000/10000 / 12)&#x60;. Uses the lowest-priced active variant for the preview amount. &#x60;seller_name&#x60; is joined from the seller module (in-process, core-svc only). &#x60;image_urls&#x60; are CDN-resolved (not raw storage keys). &#x60;delivery_eta&#x60; is a cheap, table-driven pre-purchase delivery estimate (P-034) from the seller&#39;s dispatch origin to the optional &#x60;dest_city&#x60;; it makes NO carrier call. Omitted (null) when no estimate is available. 
   ///
@@ -397,6 +478,7 @@ _responseData = rawData == null ? null : deserialize<ListCategories200Response, 
   /// * [freeShipping] - When true, only products flagged free-shipping.
   /// * [inStock] - When true, only products with at least one in-stock variant.
   /// * [priceDropped] - When true, only products whose current (cheapest live) price is below a price they carried earlier in the last 30 days — a genuine price drop (PLP-14, \"Fiyatı düşenler\"). Served from catalog_schema.variant_price_history. 
+  /// * [attr] - Attribute facet filter (PLP-13). Repeated `<slug>:<value>` entries, e.g. `attr=renk:Siyah&attr=renk:Beyaz`. Values within a slug are OR; distinct slugs are AND. Backed by catalog_schema.product_attributes. 
   /// * [sort] - Sort order. Unknown/unsupported tokens fall back to `recommended`. `bestseller` orders by global popularity (P-029); it degrades to `recommended` until the analytics popularity projection has data. 
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -419,6 +501,7 @@ _responseData = rawData == null ? null : deserialize<ListCategories200Response, 
     bool? freeShipping,
     bool? inStock,
     bool? priceDropped,
+    List<String>? attr,
     String? sort = 'recommended',
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -458,6 +541,7 @@ _responseData = rawData == null ? null : deserialize<ListCategories200Response, 
       if (freeShipping != null) r'free_shipping': freeShipping,
       if (inStock != null) r'in_stock': inStock,
       if (priceDropped != null) r'price_dropped': priceDropped,
+      if (attr != null) r'attr': attr,
       if (sort != null) r'sort': sort,
     };
 

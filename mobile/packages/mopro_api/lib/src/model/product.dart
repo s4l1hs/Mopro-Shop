@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:mopro_api/src/model/product_attribute.dart';
 import 'package:mopro_api/src/model/variant.dart';
 import 'package:mopro_api/src/model/delivery_eta.dart';
 import 'package:mopro_api/src/model/cashback_preview.dart';
@@ -40,6 +41,8 @@ class Product {
     required  this.description,
 
     required  this.variants,
+
+    required  this.attributes,
 
     required  this.cashbackPreview,
 
@@ -171,6 +174,19 @@ class Product {
 
 
 
+      /// Normalized product attributes (PLP-13) for the specs tab (PD-01) — slug + locale-resolved name + value(s). Empty array when the product has no attributes. 
+  @JsonKey(
+    
+    name: r'attributes',
+    required: true,
+    includeIfNull: false,
+  )
+
+
+  final List<ProductAttribute> attributes;
+
+
+
   @JsonKey(
     
     name: r'cashback_preview',
@@ -222,6 +238,7 @@ class Product {
       other.title == title &&
       other.description == description &&
       other.variants == variants &&
+      other.attributes == attributes &&
       other.cashbackPreview == cashbackPreview &&
       other.deliveryEta == deliveryEta &&
       other.createdAt == createdAt;
@@ -238,6 +255,7 @@ class Product {
         title.hashCode +
         description.hashCode +
         variants.hashCode +
+        attributes.hashCode +
         cashbackPreview.hashCode +
         deliveryEta.hashCode +
         createdAt.hashCode;

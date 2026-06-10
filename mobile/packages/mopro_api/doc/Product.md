@@ -18,6 +18,7 @@ Name | Type | Description | Notes
 **title** | **String** | Locale-resolved from Accept-Language header | 
 **description** | **String** | Locale-resolved. Falls back to tr-TR if requested locale unavailable. | 
 **variants** | [**List&lt;Variant&gt;**](Variant.md) |  | 
+**attributes** | [**List&lt;ProductAttribute&gt;**](ProductAttribute.md) | Normalized product attributes (PLP-13) for the specs tab (PD-01) — slug + locale-resolved name + value(s). Empty array when the product has no attributes.  | 
 **cashbackPreview** | [**CashbackPreview**](CashbackPreview.md) |  | 
 **deliveryEta** | [**DeliveryEta**](DeliveryEta.md) | Pre-purchase delivery estimate (P-034). Null when no estimate is available. Not a delivery SLA — `confident=false` ranges are fallback estimates the UI hedges as \"tahmini\".  | [optional] 
 **createdAt** | [**DateTime**](DateTime.md) |  | 
