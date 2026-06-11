@@ -28,10 +28,11 @@ class _Repo with OrderReturnsStub implements OrderRepository {
   Future<void> cancelOrder({required int id, String reason = '', String note = ''}) async {}
 }
 
-ReturnListItemDto _item(int id) => ReturnListItemDto(
+ReturnListItemDto _item(int id, {String status = ReturnLifecycle.pending}) =>
+    ReturnListItemDto(
       id: id,
       orderId: 100 + id,
-      status: ReturnLifecycle.pending,
+      status: status,
       reason: ReturnReason.damaged,
       refundAmountMinor: 12500,
       refundCurrency: 'TRY',
@@ -71,5 +72,59 @@ void main() {
     await _pump(tester, _Repo(const []));
     expect(find.textContaining('returns.empty'), findsOneWidget);
     expect(find.textContaining('returns.go_orders'), findsOneWidget);
+  });
+
+  // RT-06 — client-side status filter.
+  testWidgets('single-status list hides the filter bar', (tester) async {
+    await _pump(tester, _Repo([_item(1), _item(2)]));
+    expect(find.byType(ChoiceChip), findsNothing);
+  });
+
+  testWidgets('mixed-status list shows All + per-status filter chips',
+      (tester) async {
+    await _pump(
+      tester,
+      _Repo([
+        _item(1),
+        _item(2, status: ReturnLifecycle.approved),
+      ]),
+    );
+    // "All" + the two present statuses (pending, approved).
+    expect(find.byType(ChoiceChip), findsNWidgets(3));
+    expect(find.text('returns.filter_all'), findsOneWidget);
+  });
+
+  testWidgets('tapping a status chip filters the list to that status',
+      (tester) async {
+    await _pump(
+      tester,
+      _Repo([
+        _item(1),
+        _item(2, status: ReturnLifecycle.approved),
+      ]),
+    );
+    // Two cards before filtering. The card status chip is a ReturnStatusChip;
+    // the filter chips are ChoiceChips — distinct types, so counts don't clash.
+    expect(find.byType(ReturnStatusChip), findsNWidgets(2));
+
+    // Tap the "approved" filter chip (label is the keyed status string in
+    // test). The chip sits in a horizontal bar — ensure it is on-screen first.
+    final approvedChip =
+        find.widgetWithText(ChoiceChip, 'returns.status_approved');
+    await tester.ensureVisible(approvedChip);
+    await tester.pumpAndSettle();
+    await tester.tap(approvedChip);
+    await tester.pumpAndSettle();
+
+    // Only the approved return remains visible.
+    expect(find.byType(ReturnStatusChip), findsOneWidget);
+
+    // Re-selecting "All" restores both.
+    final allChip = find.widgetWithText(ChoiceChip, 'returns.filter_all');
+    await tester.ensureVisible(allChip);
+    await tester.pumpAndSettle();
+    await tester.tap(allChip);
+    await tester.pumpAndSettle();
+    expect(find.byType(ReturnStatusChip), findsNWidgets(2));
   });
 }

@@ -693,6 +693,7 @@
     "status_approved": "Onaylandı",
     "status_rejected": "Reddedildi",
     "status_refunded": "İade edildi",
+    "filter_all": "Tümü",
     "list_title": "İadelerim",
     "empty": "Henüz iaden yok.",
     "go_orders": "Siparişlerime git",

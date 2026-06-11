@@ -162,6 +162,13 @@
 - **OR-02 — delivery address — 🚩 DEFER (deeper than audited).** The order **never captures** an address (no schema column, no domain field, `InitiateCheckoutRequest` has none; mobile selects an `Address` only to derive the PSP buyer name). Nothing to surface → a checkout-capture vertical (snapshot in the initiate body + orders schema + handler + mobile send), out of the variant-carrier scope. Precise plan in the discovery doc.
 - **Gates:** core-svc build + tests green (incl. `enrichOrderItems` contract/degradation); `flutter analyze` 0 (touched); i18n `--strict` OK; §5/boundary clean (catalog Service carrier). Audit OR-05/OR-07 → RESOLVED, OR-02 → DEFER.
 
+## 4n. Returns UI polish — RT-06 ✅ RESOLVED, RT-05 🚩 DEFER (`feat/returns-ui-polish`)
+
+- **No-codegen lane, parallel-safe with OR-02.** Read-path check before building decided ship-vs-defer for each. Discovery: `docs/internal/returns-ui.md`.
+- **RT-06 — consumer status filter — ✅ RESOLVED (pure client).** A horizontal status chip bar on the return-history list (İadelerim). The list is already fetched and each `ReturnListItemDto` carries `status`, so a `returnsStatusFilterProvider` (`StateProvider<String?>`) + an in-memory `.where(status)` is all it takes — **no backend, no extra fetch, no codegen.** The bar offers "All" + one chip per status *present* in the list (so every filter has matches); if a refresh drops the last return of the selected status it falls back to "All"; hidden entirely for a single-status list (keeps the populated golden pixel-stable). i18n `returns.filter_all` (all 4 locales).
+- **RT-05 — per-item reasons — 🚩 DEFER (read-path confirmed, needs a response field).** The detail response does **not** carry per-item reasons: `order_schema.return_items` (migration 0070) and the `ReturnItem` struct hold only `order_item_id`+`quantity`; the reason lives on the return header. Surfacing per-line reasons needs a migration + `CreateReturn`/`GetReturn` change + an OpenAPI/codegen change (`reasons[] per line`) → out of the no-codegen lane (kept conflict-free with OR-02's codegen lane), re-scoped with the heavier returns items (RT-02 cargo-leg, RT-03 photos).
+- **Gates:** returns list screen tests green (4 new: bar hidden single-status / shown mixed / chip filters / All restores); `flutter analyze` 0 new (touched screen clean; pre-existing order-package infos untouched); i18n `--strict` 0 extra + usage ratchet 0 dead/0 missing; no Go, spec, or codegen change. Goldens: local macOS run fails all order goldens (incl. untouched timeline/refund cards) = known font skew, not a flip — single-status layout unchanged, not rebaselined (informational, non-required job). Audit RT-06 → RESOLVED, RT-05 → DEFER.
+
 ---
 
 ## 5. CI / branch-protection

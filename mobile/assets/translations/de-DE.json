@@ -191,6 +191,7 @@
     "status_approved": "Approved",
     "status_rejected": "Rejected",
     "status_refunded": "Refunded",
+    "filter_all": "Alle",
     "list_title": "Meine Rücksendungen",
     "empty": "Du hast noch keine Rücksendungen.",
     "go_orders": "Go to my orders",

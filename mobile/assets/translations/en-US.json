@@ -657,6 +657,7 @@
     "status_approved": "Approved",
     "status_rejected": "Rejected",
     "status_refunded": "Refunded",
+    "filter_all": "All",
     "list_title": "My Returns",
     "empty": "You have no returns yet.",
     "go_orders": "Go to my orders",
