@@ -34,6 +34,7 @@ import 'package:mopro/features/favorites/favorites_provider.dart';
 import 'package:mopro/features/growth/meta_tags_service.dart';
 import 'package:mopro/features/growth/seo_head.dart';
 import 'package:mopro/features/growth/structured_data_service.dart';
+import 'package:mopro/features/home/recently_viewed_provider.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 class ProductDetailScreen extends ConsumerWidget {
@@ -411,6 +412,9 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
                   ),
                   const SizedBox(height: 24),
                   _SimilarProductsRail(productId: product.id),
+                  const SizedBox(height: 24),
+                  // PD-10: recently-viewed rail (zero space when empty).
+                  _RecentlyViewedRail(excludeProductId: product.id),
                   const SizedBox(height: 32),
                 ],
               ),
@@ -890,8 +894,34 @@ class _DescriptionTab extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
+          // PD-10: recently-viewed rail (zero space when empty/ungated).
+          _RecentlyViewedRail(excludeProductId: productId),
+          const SizedBox(height: 16),
         ],
       ),
+    );
+  }
+}
+
+/// "Son baktıkların" rail on the PDP (PD-10), reusing the home surface's
+/// [recentlyViewedProvider] (auth+consent gated; error→empty) and
+/// [ProductListRail] (read-only ProductCard mount). The product being viewed is
+/// filtered out — echoing it back is noise. Zero space when empty.
+class _RecentlyViewedRail extends ConsumerWidget {
+  const _RecentlyViewedRail({required this.excludeProductId});
+
+  final int excludeProductId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final products =
+        ref.watch(recentlyViewedProvider).valueOrNull ?? const [];
+    final filtered =
+        products.where((p) => p.id != excludeProductId).toList();
+    if (filtered.isEmpty) return const SizedBox.shrink();
+    return ProductListRail(
+      products: filtered,
+      title: 'home.rails.recently_viewed.title'.tr(),
     );
   }
 }
