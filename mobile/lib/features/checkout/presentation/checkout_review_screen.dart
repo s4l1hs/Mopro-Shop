@@ -36,10 +36,12 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
     final cartDto = cartState.cart.valueOrNull;
     final grandTotal = cartDto?.grandTotalMinor ?? 0;
     // CHK-01: full breakdown from the enriched cart (#176) — no longer total-only.
-    final subtotalMinor =
-        cartDto?.totalsBySeller.fold<int>(0, (s, t) => s + t.itemsMinor) ?? 0;
     final shippingMinor =
         cartDto?.totalsBySeller.fold<int>(0, (s, t) => s + t.shippingMinor) ?? 0;
+    // CHK-05/CT-09: per-seller itemsMinor is already basket-discounted, so the
+    // pre-discount subtotal = charged total + the "Sepette indirim" line.
+    final basketDiscountMinor = cartDto?.basketDiscountMinor ?? 0;
+    final subtotalMinor = grandTotal + basketDiscountMinor;
     final cashbackMinor = ref.watch(cartMonthlyCashbackProvider).valueOrNull;
 
     // Detect a fresh payment intent response and launch the Sipay WebView.
@@ -90,6 +92,13 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
                   label: 'cart.subtotal'.tr(),
                   value: moneyFmt.format(subtotalMinor / 100.0),
                 ),
+                if (basketDiscountMinor > 0) ...[
+                  const SizedBox(height: 4),
+                  _SummaryRow(
+                    label: 'cart.basket_discount'.tr(),
+                    value: '-${moneyFmt.format(basketDiscountMinor / 100.0)}',
+                  ),
+                ],
                 const SizedBox(height: 4),
                 _SummaryRow(
                   label: 'cart.shipping'.tr(),

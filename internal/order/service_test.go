@@ -287,6 +287,87 @@ func TestCheckout_CommissionSnapshot(t *testing.T) {
 	}
 }
 
+// TestCheckout_AppliesBasketDiscount is the CT-09 money test: a seller-funded
+// basket discount lowers the CHARGED unit (unit_price_minor), freezes
+// commission/KDV/seller-net on the discounted gross, and sets the order's
+// subtotal(pre-discount)/discount/total(charged) consistently.
+//
+// price=10000, qty=2, pct=15 → discUnit=10000-1500=8500, gross=17000, list=20000
+// commission = 17000*700/10000 = 1190; kdv = 1190*2000/10000 = 238
+// sellerNet  = 17000-1190-238 = 15572
+// order: subtotal=20000, discount=3000, total=17000
+func TestCheckout_AppliesBasketDiscount(t *testing.T) {
+	pct := 15
+	cat := &mockCatalogSvc{
+		getVariantByIDFn: func(_ context.Context, id int64) (catalog.Variant, error) {
+			return catalog.Variant{
+				ID: id, ProductID: 1, CategoryID: 30, SellerID: 99,
+				PriceMinor: 10000, PriceCurrency: "TRY", Stock: 100,
+				BasketDiscountPct: &pct,
+			}, nil
+		},
+	}
+	var capturedItem order.OrderItem
+	var capturedOrder order.Order
+	repo := &mockRepo{
+		insertOrderFn: func(_ context.Context, _ pgx.Tx, o order.Order) (order.Order, error) {
+			capturedOrder = o
+			o.ID = 1
+			return o, nil
+		},
+		insertOrderItemFn: func(_ context.Context, _ pgx.Tx, item order.OrderItem) (order.OrderItem, error) {
+			capturedItem = item
+			item.ID = 1
+			return item, nil
+		},
+	}
+	o, _, err := newTestService(repo, &mockCartSvc{}, cat, &mockOutbox{}).
+		Checkout(context.Background(), order.CheckoutRequest{UserID: 1, IdempotencyKey: "disc-test"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Item snapshot is on the DISCOUNTED gross.
+	if capturedItem.UnitPriceMinor != 8500 {
+		t.Errorf("unit_price (charged): want 8500, got %d", capturedItem.UnitPriceMinor)
+	}
+	if capturedItem.ListUnitPriceMinor != 10000 {
+		t.Errorf("list_unit_price: want 10000, got %d", capturedItem.ListUnitPriceMinor)
+	}
+	if capturedItem.BasketDiscountPct != 15 {
+		t.Errorf("basket_discount_pct: want 15, got %d", capturedItem.BasketDiscountPct)
+	}
+	if capturedItem.CommissionAmountMinor != 1190 {
+		t.Errorf("commission: want 1190, got %d", capturedItem.CommissionAmountMinor)
+	}
+	if capturedItem.KdvAmountMinor != 238 {
+		t.Errorf("kdv: want 238, got %d", capturedItem.KdvAmountMinor)
+	}
+	if capturedItem.SellerNetMinor != 15572 {
+		t.Errorf("seller_net: want 15572, got %d", capturedItem.SellerNetMinor)
+	}
+
+	// Order totals: subtotal pre-discount, total = charged.
+	if capturedOrder.SubtotalMinor != 20000 {
+		t.Errorf("subtotal: want 20000, got %d", capturedOrder.SubtotalMinor)
+	}
+	if capturedOrder.DiscountMinor != 3000 {
+		t.Errorf("discount: want 3000, got %d", capturedOrder.DiscountMinor)
+	}
+	if capturedOrder.TotalMinor != 17000 {
+		t.Errorf("total (charged): want 17000, got %d", capturedOrder.TotalMinor)
+	}
+	// Ledger-balance shape: total == seller_net + commission + kdv (per line, qty=2).
+	if capturedOrder.TotalMinor != capturedItem.SellerNetMinor+capturedItem.CommissionAmountMinor+capturedItem.KdvAmountMinor {
+		t.Errorf("balance: total %d != net+comm+kdv %d", capturedOrder.TotalMinor,
+			capturedItem.SellerNetMinor+capturedItem.CommissionAmountMinor+capturedItem.KdvAmountMinor)
+	}
+	// Invariant: subtotal − discount == total.
+	if o.SubtotalMinor-o.DiscountMinor != o.TotalMinor {
+		t.Errorf("subtotal−discount != total: %d−%d != %d", o.SubtotalMinor, o.DiscountMinor, o.TotalMinor)
+	}
+}
+
 func TestGetOrder_Success(t *testing.T) {
 	repo := &mockRepo{
 		getOrderFn: func(_ context.Context, orderID int64) (order.Order, []order.OrderItem, error) {

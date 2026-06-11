@@ -127,6 +127,13 @@
 - **CT-02 → NOT-ACTIONABLE** — cart shipping is **unconditionally 0** (cargo handled separately, §2.3/§4.8) → no threshold → a free-shipping *progress* bar has nothing to progress toward; not built.
 - **CT-09 → DEFER (financial, not display)** — `basket_discount_pct` (#133) is a **display-only card pill not applied to any price/total**; surfacing a real "Sepette indirim" discount line requires applying it across pricing→order→payment→cashback (a money change, CLAUDE.md §4) → deferred to that pricing PR. (`ProductSummaryRow.BasketDiscountPct` is already resolved in `enrichCart`, ready for it.) Discovery: `docs/internal/cart-checkout-totals.md`.
 
+## 4k. CT-09 basket-discount pricing — ✅ IMPLEMENT (seller-funded; `feat/basket-discount-pricing`)
+
+- **Supersedes the earlier DEFER (commit `88df133f`).** Re-examination + owner confirmation: `basket_discount_pct` lives on `products` (a **seller-owned** attribute, like Trendyol's "Sepette indirim") → it is **definitionally seller-funded**, not an open CFO call. Under seller-funded the cashback **formula is unchanged** (`price` was always "the price the item sold for"; with the discount the item *sells for* the discounted price) → **no constitution bump**, no §12 trigger.
+- **Discovery shift — the snapshot does the work.** Every fin-svc node derives from the `order_items` snapshot (cashback `priceMinor = Σ(unit_price×qty)`; orderledger `GrossMinor = total_minor`; payout reads `seller_net_minor`; returns refund `unit_price×qty`). So making `order_items.unit_price_minor` the **discounted** unit + freezing commission/KDV/net on the discounted gross means **every downstream consumer inherits the discount with zero code change**, and the capture ledger still balances exactly (`commission_revenue` residual = `total − Σnet − Σkdv` = `Σcommission`, D==C). **fin-svc untouched; no new accounts.**
+- **Ships:** catalog `Variant.BasketDiscountPct` (via `GetVariantByID`); migration `0091_order_basket_discount` (`order_items.list_unit_price_minor`/`basket_discount_pct`, `orders.discount_minor`, all `DEFAULT 0`); `order/pricing.go` pure helper shared by `enrichCart` (display) **and** the order build (charge) → **display==charge guaranteed**; `Checkout` + `InitiateCheckout` saga apply the per-unit discount; cart/seller-breakdown "Sepette indirim" line; mobile DTO. Generic helper + single `orders.discount_minor` line so **coupon (CT-03/CHK-04) reuses it**.
+- **Deliverable:** `docs/internal/basket-discount-pricing.md` (revised → seller-funded plan). The pill is now **honest** — the advertised basket discount is the charged one.
+
 ---
 
 ## 5. CI / branch-protection

@@ -39,8 +39,10 @@
 > The merge lives in `cmd/core-svc` (`internal/cart` imports neither catalog nor
 > seller → no JOIN). **The authed cart + the checkout review (which reads the same
 > `cart.lines`) now render → CT-01 / CT-04 / CT-05 + CHK-01 / CHK-02 closed.** The
-> guest path is untouched. Discovery: `docs/internal/cart-readpath.md`. *(Still
-> open: CT-02 free-shipping progress + CT-09 basket-discount — PR 2.)*
+> guest path is untouched. Discovery: `docs/internal/cart-readpath.md`. *(CT-02
+> free-shipping = NOT-ACTIONABLE (always-free cart); **CT-09 basket-discount ✅
+> RESOLVED** — now a charged seller-funded discount, migration 0091, doc
+> `docs/internal/basket-discount-pricing.md`.)*
 
 - **Cart is well-built (UI):** per-seller grouping, qty stepper, swipe+button remove,
   desktop price summary (subtotal/shipping/cashback/total + KDV-included), coin
@@ -67,7 +69,7 @@
 |---|---|---|---|---|---|
 | — | Line: image, title, variant, unit price, qty stepper, remove, **save-for-later/move-to-fav** | `CartLineCard` (now with **variant label**) + move-to-favorites | **CT-05 ✅ RESOLVED** — enriched `GET /cart` serves `variant_label` (colour/size) → rendered on the line; **save-for-later** (no saved list) separate | **CT-05 RESOLVED** | MED |
 | — | Per-seller grouping w/ per-seller subtotal + cargo | `_SellerGroupHeader`: **seller name** + per-seller subtotal | **CT-01 ✅ RESOLVED** — enriched `GET /cart` serves `seller_name` + `totals_by_seller`; header shows the real name (fallback `#id`) + subtotal | **CT-01 RESOLVED** | MED |
-| — | Summary: subtotal, cargo, coupon, "Sepette indirim", coin, **total** | desktop `OrderSummaryCard`; mobile `CartTotalsSummary` | **CT-04 ✅ RESOLVED**; **CT-09 DEFER (financial)** — `basket_discount_pct` is a **display-only card pill** (#133), **not applied to any price/total**; a real discount line needs it applied across pricing→order→payment→cashback (a money change, not display) → deferred to that pricing PR | **CT-04 RESOLVED / CT-09 DEFER** | MED |
+| — | Summary: subtotal, cargo, coupon, "Sepette indirim", coin, **total** | desktop `OrderSummaryCard`; mobile `CartTotalsSummary` | **CT-04 ✅ RESOLVED**; **CT-09 ✅ RESOLVED** — `basket_discount_pct` is now a **charged** seller-funded discount (migration 0091). The order build applies it per unit so `order_items.unit_price_minor` is the discounted (charged) unit; commission/KDV/seller-net freeze on the discounted gross; cart + PSP charge the discounted total; cashback computes on the discounted price; the "Sepette indirim" line shows in cart + checkout. **Display==charge** is guaranteed by the shared `order.DiscountedUnitMinor` helper used by both `enrichCart` and the order build. Seller-funded → **no constitution change, no new ledger accounts, fin-svc untouched** (the snapshot does the work). The pill is now honest. Doc: `docs/internal/basket-discount-pricing.md`. | **CT-04 / CT-09 RESOLVED** | MED |
 | — | Coupon/promo field | desktop coupon `TextField` — **placeholder, no coupon backend** ("Coupon application is a placeholder"); mobile has none | non-functional + desktop-only | **CT-03** | MED |
 | — | Free-shipping progress ("X TL daha ekle") | cart shipping is **unconditionally `0`** ("Ücretsiz"; cargo handled separately, §2.3/§4.8) | **CT-02 NOT-ACTIONABLE** — no cart-level shipping cost → **no threshold to progress toward**; fabricating one contradicts the always-free model | **NOT-ACTIONABLE** | — |
 | — | Sticky checkout CTA with total | `CartTotalsSummary`/`OrderSummaryCard` checkout button → `requireAuth` → `/checkout` | — (**auth-gated**, intentional) | **MATCHED** | — |

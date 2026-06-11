@@ -746,14 +746,16 @@ func (r *pgxRepository) GetVariantByID(ctx context.Context, variantID int64) (Va
 	var v Variant
 	err := r.pool.QueryRow(ctx,
 		`SELECT v.id, v.product_id, p.category_id, p.seller_id,
-		        v.sku, v.color, v.size, v.price_minor, v.price_currency, v.stock, v.image_keys
+		        v.sku, v.color, v.size, v.price_minor, v.price_currency, v.stock, v.image_keys,
+		        p.basket_discount_pct
 		FROM catalog_schema.variants v
 		JOIN catalog_schema.products p ON p.id = v.product_id
 		WHERE v.id = $1`,
 		variantID,
 	).Scan(&v.ID, &v.ProductID, &v.CategoryID, &v.SellerID,
 		&v.SKU, &v.Color, &v.Size,
-		&v.PriceMinor, &v.PriceCurrency, &v.Stock, &v.ImageKeys)
+		&v.PriceMinor, &v.PriceCurrency, &v.Stock, &v.ImageKeys,
+		&v.BasketDiscountPct)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Variant{}, ErrNotFound

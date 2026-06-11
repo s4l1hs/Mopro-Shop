@@ -124,6 +124,54 @@ func TestInitiateCheckout_HappyPath(t *testing.T) {
 	}
 }
 
+// TestInitiateCheckout_ChargesDiscountedTotal is the CT-09 asymmetry guard for the
+// PSP path: the saga must charge the basket-discounted total, not the list total.
+// Default cart = variant 1 × qty 2; price 10000, pct 15 → 8500×2 = 17000.
+func TestInitiateCheckout_ChargesDiscountedTotal(t *testing.T) {
+	pct := 15
+	cat := &mockCatalogSvc{
+		getVariantByIDFn: func(_ context.Context, id int64) (catalog.Variant, error) {
+			return catalog.Variant{
+				ID: id, ProductID: 1, CategoryID: 30, SellerID: 99,
+				PriceMinor: 10000, PriceCurrency: "TRY", Stock: 100,
+				BasketDiscountPct: &pct,
+			}, nil
+		},
+	}
+	var charged int64
+	psp := &mockPSP{
+		initiatePaymentFn: func(_ context.Context, req payment.InitiatePaymentRequest) (payment.InitiatePaymentResponse, error) {
+			charged = req.AmountMinor
+			return payment.InitiatePaymentResponse{ProviderRef: req.IdempotencyKey, ThreeDSHTML: "<form/>"}, nil
+		},
+	}
+	var capturedOrder order.Order
+	repo := &mockRepo{
+		insertOrderFn: func(_ context.Context, _ pgx.Tx, o order.Order) (order.Order, error) {
+			capturedOrder = o
+			o.ID = 1
+			return o, nil
+		},
+	}
+	resp, err := newSagaService(repo, &mockSessionRepo{}, &mockCartSvc{}, cat, &mockOutbox{}, psp).
+		InitiateCheckout(context.Background(), order.InitiateCheckoutRequest{
+			UserID: 1, SessionID: "sess-disc", BuyerEmail: "a@b.c",
+		})
+	if err != nil {
+		t.Fatalf("InitiateCheckout: %v", err)
+	}
+	if charged != 17000 {
+		t.Errorf("PSP charged: want 17000 (discounted), got %d", charged)
+	}
+	if capturedOrder.TotalMinor != 17000 || capturedOrder.SubtotalMinor != 20000 || capturedOrder.DiscountMinor != 3000 {
+		t.Errorf("order totals: want subtotal=20000 discount=3000 total=17000, got %d/%d/%d",
+			capturedOrder.SubtotalMinor, capturedOrder.DiscountMinor, capturedOrder.TotalMinor)
+	}
+	if len(resp.Orders) == 0 {
+		t.Error("Orders must not be empty")
+	}
+}
+
 func TestInitiateCheckout_EmptyCart(t *testing.T) {
 	cartSvc := &mockCartSvc{
 		getCartFn: func(_ context.Context, _ int64) (cart.Cart, error) {

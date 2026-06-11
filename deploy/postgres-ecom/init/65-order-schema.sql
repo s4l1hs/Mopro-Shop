@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS order_schema.orders (
   shipping_payer    TEXT         NOT NULL DEFAULT 'buyer'
                     CHECK (shipping_payer IN ('buyer','seller','split','threshold_free')),
   total_minor       BIGINT       NOT NULL CHECK (total_minor >= 0),
+  -- CT-09: Σ(list − discounted)×qty seller-funded basket discount; 0 = none.
+  -- subtotal_minor is pre-discount, total_minor = subtotal_minor − discount_minor.
+  discount_minor    BIGINT       NOT NULL DEFAULT 0 CHECK (discount_minor >= 0),
   currency          TEXT         NOT NULL,
   market            TEXT         NOT NULL DEFAULT 'TR',
   delivered_at      TIMESTAMPTZ,
@@ -30,7 +33,14 @@ CREATE TABLE IF NOT EXISTS order_schema.order_items (
   seller_id                BIGINT    NOT NULL,
   category_id              BIGINT    NOT NULL,
   qty                      INTEGER   NOT NULL CHECK (qty > 0),
+  -- unit_price_minor = the CHARGED (basket-discounted) unit; list_unit_price_minor
+  -- is the pre-discount unit (= variant.price_minor) and basket_discount_pct the
+  -- snapshotted whole-percent rate, kept for the strikethrough + "Sepette indirim"
+  -- delta (CT-09). All downstream math derives from unit_price_minor.
   unit_price_minor         BIGINT    NOT NULL CHECK (unit_price_minor >= 0),
+  list_unit_price_minor    BIGINT    NOT NULL DEFAULT 0 CHECK (list_unit_price_minor >= 0),
+  basket_discount_pct      SMALLINT  NOT NULL DEFAULT 0
+                           CHECK (basket_discount_pct >= 0 AND basket_discount_pct <= 100),
   unit_price_currency      TEXT      NOT NULL,
   commission_pct_bps       INTEGER   NOT NULL,
   kdv_pct_bps              INTEGER   NOT NULL,
