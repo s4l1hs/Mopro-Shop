@@ -209,7 +209,6 @@
 | Home | ✅ Parity-complete (IA-01/02, Sprints A/B, closeout #135–#137) within the Deliberately-Lean IA. **PROBABLE rows resolved source-side** (`feat/home-probable-resolution`, no manual walk): all 6 closed — HP-01/02/03 (Sepette-%X pill / Çok-Satan badge / circular pucks) were **already implemented** by the G-3/G-4 catalog vertical (audit table was stale: `product_card.dart` + `home_category_rail.dart`, wired from `ProductSummary`, i18n+tests); HP-04 (camera/visual-search) + HP-05 (location selector) are **NEEDS-DECISION (Salih)** — a feature build vs. intentional mobile-first IA omission, not pixel questions, not fakeable. **0 code fixes, 0 NEEDS-VISUAL pixel residue.** Establishes the **source-side template** for the unwalked surfaces (PDP/Cart/Checkout/Account/Orders/Returns/Search/Favorites/PLP): Mopro-from-code (fact) × Trendyol-convention (provisional, tagged) → CONFIRMED-fixable / NOT-ACTIONABLE / NEEDS-VISUAL / NEEDS-DECISION. Doc: `docs/internal/home-probable-resolution.md`. |
 
 | Phase C (divergences) | After parity surfaces — coin redeem (deferred), etc. |
-| Checkout | **PROBABLE resolved source-side** (`feat/checkout-probable-resolution`): CHK-07 saved-cards/installments = **NOT-ACTIONABLE** (PSP-hosted + cashback analog, settled); CHK-09 validation/error states = **NEEDS-VISUAL** (generic failed state exists; copy coverage needs eyes). 0 CONFIRMED fixes. Doc: `docs/internal/checkout-probable-resolution.md`. |
 
 
 ### Local walk env refreshed — ✅ (`chore/local-walk-env`)
