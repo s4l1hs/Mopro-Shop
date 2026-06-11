@@ -7,6 +7,12 @@ name: golden-rebaseline
 on:
   workflow_dispatch:
 
+# MUST equal flutter-ci.yml's FLUTTER_VERSION — goldens are baselined here and
+# compared by the `golden` job; a version mismatch reintroduces the pixel skew
+# (CI-hygiene-2). KEEP IN SYNC with flutter-ci.yml / make-verify.yml / openapi-ci.yml.
+env:
+  FLUTTER_VERSION: "3.44.1"
+
 jobs:
   rebaseline:
     name: Re-baseline goldens (linux)
@@ -27,7 +33,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.x"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
 
       - name: Install deps
