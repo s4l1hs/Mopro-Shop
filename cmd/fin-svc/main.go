@@ -28,6 +28,7 @@ import (
 	"github.com/mopro/platform/internal/orderledger"
 	"github.com/mopro/platform/internal/outbox"
 	"github.com/mopro/platform/internal/reconcile"
+	"github.com/mopro/platform/internal/refund"
 	"github.com/mopro/platform/internal/sellerpayout"
 	"github.com/mopro/platform/internal/sellerpayout/sipay"
 	"github.com/mopro/platform/internal/wallet"
@@ -132,6 +133,10 @@ func main() {
 	calLoader := timex.NewStaticCalendarLoader(calendarMap)
 	cashbackSvc := cashback.NewService(cashbackRepo, cashbackOutbox, calLoader, cashbackCurrency, walletSvc, slog.Default(), bizM)
 
+	// RT-01 refund settlement: mints approved-return refunds as coin (D
+	// equity:refund_distribution ↔ C user wallet) on ecom.return.refunded.v1.
+	refundSvc := refund.NewService(walletSvc, cashbackCurrency, slog.Default())
+
 	// Slack client for DLQ alerts (EXCEPTION: fin-svc → Slack direct; see CLAUDE.md §5).
 	// SLACK_DLQ_WEBHOOK_URL is optional; no-op when absent.
 	slackDLQClient := slack.New(os.Getenv("SLACK_DLQ_WEBHOOK_URL"))
@@ -193,6 +198,13 @@ func main() {
 	go func() {
 		if err := cashback.StartConsumer(ctx, bus, cashbackSvc); err != nil && !errors.Is(err, context.Canceled) {
 			slog.Error("fin-svc: cashback consumer exited unexpectedly", "err", err)
+		}
+	}()
+
+	// ── Start refund consumer goroutine (RT-01) ──────────────────────────────
+	go func() {
+		if err := refund.StartConsumer(ctx, bus, refundSvc); err != nil && !errors.Is(err, context.Canceled) {
+			slog.Error("fin-svc: refund consumer exited unexpectedly", "err", err)
 		}
 	}()
 

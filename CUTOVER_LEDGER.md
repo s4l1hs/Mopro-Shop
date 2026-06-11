@@ -144,6 +144,14 @@
 - **OR-04 — reorder:** frontend-only; a "Tekrar sipariş ver" button on the order detail re-adds the order's items via the existing `cartProvider.addItem` (→ `POST /cart/items`), counting per-item OOS failures gracefully, then → `/cart`. No backend change.
 - **Gates:** `flutter analyze` 0 (touched files), i18n `--strict` OK, order package tests green incl. new `GetReturnHistory` ownership tests. Audits AC-02/RT-04/OR-04 → RESOLVED.
 
+## 4m. RT-01 — refund settlement (refund-as-coin) — ✅ RESOLVED (`feat/refund-settlement`)
+
+- **The one genuinely-broken transaction flow: approved returns never refunded.** Discovery: `docs/internal/refund-settlement.md`. `SellerApprove` stopped at `approved` — nothing reached `refunded`, no coin/ledger/outbox → the refund card hung "pending" forever.
+- **Trigger:** `SellerApprove` now settles atomically in one core-svc tx: pending→approved→**refunded** + both history rows + `ecom.return.refunded.v1` to `order_schema.outbox` (§4.5). Idempotent (pending-status guard + outbox key `return:refunded:<id>`).
+- **Ledger treatment (refund-as-coin):** fin-svc `internal/refund` consumer mints the refund as Mopro Coin via `wallet.Service.Post` — **D `equity:refund_distribution:<COIN>` ↔ C the buyer wallet**, amount = `RefundAmountMinor` (the charged snapshot, CT-09+coupon-correct, partial-safe) credited 1:1. New equity account = **migration 0082** (+ chart seed), the analogue of `equity:cashback_distribution` → **§4-compliant, NOT a §12 change** (refund-as-coin is the audit-decided model, so no owner funding question). Idempotent on ledger key `refund:<return_id>` (wallet layer-3 returns the original txn id on replay). Emits `fin.refund.coin.credited.v1`.
+- **Display:** `buildReturnRefundView.method = wallet_credit`; mobile already maps `RefundInfo.isWallet → returns.method_wallet` + `refunded → issued` (no mobile change).
+- **Gates:** order + refund + wallet package tests green (settlement→refunded + event payload + history; consumer balanced-D/C + idempotency + zero-skip; producer→consumer wire-format contract); boundaries OK; `lint-discipline` 0; migration-safety OK; depguard `fin-no-ecom` now covers `internal/refund`. Audit RT-01 → RESOLVED.
+
 ---
 
 ## 4m. Orders absences bundle — OR-05/OR-07 ✅ RESOLVED, OR-02 🚩 DEFER (`feat/orders-absences`)

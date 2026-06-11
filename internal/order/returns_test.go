@@ -2,12 +2,27 @@ package order
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/mopro/platform/internal/outbox"
 )
+
+// fakeOutbox records rows written within the settlement tx (RT-01).
+type fakeOutbox struct{ rows []outbox.Row }
+
+func (f *fakeOutbox) Insert(_ context.Context, _ pgx.Tx, row outbox.Row) error {
+	f.rows = append(f.rows, row)
+	return nil
+}
+func (f *fakeOutbox) FetchUnpublished(_ context.Context, _ pgx.Tx, _ int) ([]outbox.Row, error) {
+	return nil, nil
+}
+func (f *fakeOutbox) MarkPublished(_ context.Context, _ pgx.Tx, _ int64) error { return nil }
 
 // ── in-memory fakes ───────────────────────────────────────────────────────────
 
@@ -96,6 +111,7 @@ func svcWith(o Order, items []OrderItem, rr *fakeReturnRepo) *returnService {
 	return &returnService{
 		orders:  &fakeOrderRepo{order: o, items: items},
 		returns: rr,
+		outbox:  &fakeOutbox{},
 		now:     func() time.Time { return time.Now().UTC() },
 	}
 }
@@ -253,15 +269,53 @@ func pendingReturn() Return {
 	return Return{ID: 5, OrderID: 1, UserID: 7, Status: ReturnPending, Reason: ReasonDamaged}
 }
 
-func TestSellerApprove_TransitionsPendingToApproved(t *testing.T) {
-	rr := &fakeReturnRepo{created: pendingReturn(), productIDs: []int64{10, 11}}
-	s := svcWith(deliveredOrder(2), nil, rr)
+// SellerApprove now settles atomically (RT-01): pending → approved → refunded,
+// records both history rows, and emits ecom.return.refunded.v1 with the snapshotted
+// refund amount and the idempotency key the fin-svc consumer dedupes on.
+func TestSellerApprove_SettlesToRefundedAndEmitsEvent(t *testing.T) {
+	r := pendingReturn()
+	r.RefundAmountMinor = 8000
+	r.RefundCurrency = "TRY"
+	rr := &fakeReturnRepo{created: r, productIDs: []int64{10, 11}}
+	ob := &fakeOutbox{}
+	s := &returnService{
+		orders:  &fakeOrderRepo{order: deliveredOrder(2)},
+		returns: rr,
+		outbox:  ob,
+		now:     func() time.Time { return time.Now().UTC() },
+	}
 	rec, err := s.SellerApprove(context.Background(), 5, []int64{11, 99}) // 11 overlaps
 	if err != nil {
 		t.Fatalf("SellerApprove: %v", err)
 	}
-	if rec.Status != ReturnApproved {
-		t.Errorf("status=%s want approved", rec.Status)
+	if rec.Status != ReturnRefunded {
+		t.Errorf("status=%s want refunded", rec.Status)
+	}
+	if len(ob.rows) != 1 || ob.rows[0].EventType != "ecom.return.refunded.v1" {
+		t.Fatalf("want 1 ecom.return.refunded.v1 outbox row, got %+v", ob.rows)
+	}
+	if ob.rows[0].IdempotencyKey != "return:refunded:5" {
+		t.Errorf("idempotency key=%q want return:refunded:5", ob.rows[0].IdempotencyKey)
+	}
+	var p returnRefundedPayload
+	if err := json.Unmarshal(ob.rows[0].Payload, &p); err != nil {
+		t.Fatalf("payload unmarshal: %v", err)
+	}
+	if p.RefundAmountMinor != 8000 || p.UserID != r.UserID || p.ReturnID != 5 || p.OrderID != 1 {
+		t.Errorf("payload mismatch: %+v", p)
+	}
+	if len(rr.history) != 2 || rr.history[0].Status != "approved" || rr.history[1].Status != "refunded" {
+		t.Errorf("history=%+v want [approved, refunded]", rr.history)
+	}
+}
+
+// The financial path requires an outbox; without it SellerApprove must refuse to
+// settle rather than silently transition without crediting the refund.
+func TestSellerApprove_RequiresOutbox(t *testing.T) {
+	rr := &fakeReturnRepo{created: pendingReturn(), productIDs: []int64{10}}
+	s := &returnService{orders: &fakeOrderRepo{order: deliveredOrder(2)}, returns: rr, now: func() time.Time { return time.Now().UTC() }}
+	if _, err := s.SellerApprove(context.Background(), 5, []int64{10}); !errors.Is(err, ErrOutboxNotConfigured) {
+		t.Fatalf("want ErrOutboxNotConfigured, got %v", err)
 	}
 }
 

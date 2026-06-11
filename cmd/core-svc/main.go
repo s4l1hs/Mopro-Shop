@@ -165,7 +165,7 @@ func main() {
 	orderRepo := order.NewRepository(pool)
 	checkoutSessionRepo := order.NewCheckoutSessionRepository(pool)
 	returnRepo := order.NewReturnRepository(pool)
-	returnSvc := order.NewReturnService(orderRepo, returnRepo)
+	returnSvc := order.NewReturnService(orderRepo, returnRepo, orderOutbox)
 	inboxSvc := inbox.NewService(inbox.NewRepository(pool))
 	helpSvc := help.NewService(help.NewRepository(pool), slog.Default())
 	supportSvc := support.NewService(support.NewRepository(pool))

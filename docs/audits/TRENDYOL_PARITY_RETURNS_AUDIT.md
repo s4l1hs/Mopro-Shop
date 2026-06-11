@@ -46,14 +46,15 @@
   status-history in one tx); the list (`GET /returns`) and detail (`GET /returns/{id}`)
   read `pgxReturnRepository`. Seller approve/reject (`/seller/returns/...`) is a real
   backend that transitions `pending → approved|rejected`.
-- **RT-01 — the refund *settlement* is not wired (the headline).** The lifecycle
-  defines `refunded`, and `buildReturnRefundView` maps `refunded → issued`, **but no
-  code transitions a return to `refunded`** — `SellerApprove` stops at `approved`,
-  and there is **no coin/ledger posting and no outbox event on return approval**
-  (`grep` confirms zero `outbox|event|wallet|coin|ledger` in `returns.go`). So the
-  refund card surfaces a "pending" that can never reach "issued" through the app.
-  This is an **S/A** (a status surface over a dead settlement step), the one
-  non-honest finding here.
+- **RT-01 — refund settlement (the headline) ✅ RESOLVED** (`feat/refund-settlement`).
+  `SellerApprove` now settles in one tx: pending→approved→**refunded** + emits
+  `ecom.return.refunded.v1` (order_schema.outbox, §4.5); fin-svc `internal/refund`
+  consumes it and **mints the refund as Mopro Coin** (D `equity:refund_distribution`
+  ↔ C the buyer wallet, migration 0082), idempotent on `refund:<return_id>`. The
+  refund card now reaches "issued" with `method=wallet_credit`. Refund amount = the
+  charged snapshot (`RefundAmountMinor`, CT-09+coupon-correct, partial-safe). No §12
+  change (a new equity account within §4, the cashback_distribution pattern). Doc:
+  `docs/internal/refund-settlement.md`.
 - **Absent features (A) — CONFIRMED gaps, not stubs:** **RT-02** no return shipping
   (no cargo code / drop-off / return label / method selection — the confirm screen's
   "tracking_no" is just the return *id*); **RT-03** no return photos (damage evidence);
@@ -99,15 +100,15 @@
 | Return states | requested → approved → cargo → refunded | `pending/approved/rejected/refunded`; detail maps current status → a 4-state `OrderStatusTimeline` | **L** (derived) | **MATCHED** (derived, like Orders) | — |
 | **Status-history timeline** | step-by-step with dates | `GET /returns/{id}` now returns `history[]` (`ListReturnStatusHistory`); detail renders the real event timeline (falls back to derived when empty) | **L** | **RT-04 ✅ RESOLVED** (`feat/quick-functional-gaps`) | — |
 | Cargo/return-leg tracking | "kargoya verildi" + tracking | — (no return-shipment state at all; ties RT-02) | **A** | **RT-02** | MED |
-| Refunded state reachable | yes | timeline maps `refunded → refundIssued`, but **nothing sets `refunded`** | **S/A** | **RT-01** settlement not wired | **MED** |
+| Refunded state reachable | yes | `SellerApprove` now settles pending→approved→**refunded** atomically | **L** | **RT-01 ✅ RESOLVED** (`feat/refund-settlement`) | — |
 
 ### Refund (`RefundStatusCard` / `buildReturnRefundView`)
 
 | Feature | Trendyol | Mopro (`src`) | Read-path | Status | Sev |
 |---|---|---|---|---|---|
 | Refund amount | order/line total | `RefundAmountMinor` snapshotted at creation (`Σ unit_price×qty`) | **L** | **MATCHED** | — |
-| Refund method | original payment | `refundView.method` hardcoded `original_payment` on the return view; the Mopro model is refund-as-coin (`wallet_credit`, previewed in the flow) | **L** (display) | **NOT-ACTIONABLE** (refund-as-coin model — do not flag) | — |
-| Refund **settlement** (status → issued + money moved) | auto on approval/receipt | `approved` is terminal in code — **no `approved→refunded`, no coin/ledger post, no event**; card stays "pending" (est. +10d) forever | **S/A** | **RT-01** settlement step dead | **MED** |
+| Refund method | original payment | `buildReturnRefundView.method = wallet_credit` (refund-as-coin); mobile `RefundInfo.isWallet` → `returns.method_wallet` | **L** (display) | **NOT-ACTIONABLE** (refund-as-coin model — do not flag) | — |
+| Refund **settlement** (status → issued + money moved) | auto on approval/receipt | **RT-01 ✅ RESOLVED**: `SellerApprove` settles in one tx (pending→approved→refunded) + emits `ecom.return.refunded.v1`; fin-svc `internal/refund` mints the refund as coin (D `equity:refund_distribution` ↔ C user wallet, idempotent `refund:<id>`). Card → "issued". | **L** | **RT-01 RESOLVED** (`feat/refund-settlement`) | — |
 | Refund timing/estimate | "X iş günü" | `refundEstimateDays = 10` (display-only `estimatedAt`) | **L** (display) | **MATCHED** | — |
 
 ### Return history (`returns_list_screen` — İadelerim)
@@ -172,12 +173,12 @@
 
 ## §6 — Prioritized fix list (after the walk)
 
-> One real **stub to close** (RT-01) + **build-the-absent-feature** items:
+> **RT-01 (the stub) ✅ DONE.** Remaining are **build-the-absent-feature** items:
 
-1. **RT-01 refund settlement** — wire `approved → refunded` with the refund posting
-   (coin per the Mopro model) + an outbox event so the card reaches "issued". **This
-   is a financial-path change — its own careful lane** (§4 invariants, idempotency,
-   outbox), not a docs fix.
+1. ~~**RT-01 refund settlement**~~ ✅ RESOLVED (`feat/refund-settlement`):
+   `approved → refunded` + refund-as-coin mint (D `equity:refund_distribution` ↔ C
+   user wallet, migration 0082) + `ecom.return.refunded.v1` outbox → fin-svc
+   `internal/refund` consumer; idempotent; card reaches "issued".
 2. **RT-02 return shipping** — a return cargo code / drop-off / label so the buyer can
    actually send the item back (today there's no return-leg at all).
 3. **RT-03 return photos** — damage/wrong-item evidence on the request (the upload

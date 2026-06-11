@@ -81,7 +81,8 @@ func TestIntegration_ConcurrentReturnSubmissionConverges(t *testing.T) {
 	const userID = 4242
 	orderID, itemID := seedDeliveredOrder(ctx, integOrderPool, t, userID)
 
-	svc := order.NewReturnService(order.NewRepository(integOrderPool), order.NewReturnRepository(integOrderPool))
+	// nil outbox: this suite exercises CreateReturn concurrency only, never SellerApprove.
+	svc := order.NewReturnService(order.NewRepository(integOrderPool), order.NewReturnRepository(integOrderPool), nil)
 
 	const n = 8
 	var wg sync.WaitGroup

@@ -47,6 +47,15 @@ var Registry = []EventEntry{
 		Notes:           "Emitted by MarkPaid on Sipay webhook capture. Payload enriched (Phase 4.5c) to include seller_id, shipping_minor, items[]. order-ledger-poster posts balanced capture ledger entry.",
 	},
 
+	// ── ecom domain: return ───────────────────────────────────────────────────────
+	{
+		EventType:      "ecom.return.refunded.v1",
+		ProducerModule: "internal/order",
+		ConsumerGroups: []string{"fin-refund-consumer"},
+		Status:         StatusActiveConsumed,
+		Notes:          "Emitted by SellerApprove on refund settlement (approved→refunded). internal/refund mints the refund as Mopro Coin to the buyer wallet (D equity:refund_distribution ↔ C liability:wallet:user). Idempotent: ledger key refund:<return_id>.",
+	},
+
 	// ── ecom domain: payment ─────────────────────────────────────────────────────
 	{
 		EventType:       "ecom.payment.captured.v1",
@@ -118,6 +127,16 @@ var Registry = []EventEntry{
 		ConsumerGroups: []string{},
 		Status:         StatusDeprecatedPendingDelete,
 		Notes:          "Removed Phase 3.0: outboxEventType switch case had no production call sites",
+	},
+
+	// ── fin domain: refund ───────────────────────────────────────────────────────
+	{
+		EventType:       "fin.refund.coin.credited.v1",
+		ProducerModule:  "internal/wallet",
+		ConsumerGroups:  []string{},
+		Status:          StatusActiveEmittedNoConsumer,
+		PlannedConsumer: "internal/notification (refund-issued push)",
+		Notes:           "Emitted by wallet.Post when internal/refund settles ecom.return.refunded.v1 (D equity:refund_distribution ↔ C user wallet).",
 	},
 
 	// ── fin domain: seller payout ────────────────────────────────────────────────
