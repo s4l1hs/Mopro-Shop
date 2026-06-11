@@ -260,14 +260,6 @@ class _CategoryProductsScreenState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // PLP-10: search within this category.
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-                            child: SizedBox(
-                              width: 360,
-                              child: PlpInlineSearchField(plpKey: _key),
-                            ),
-                          ),
                           // Breadcrumb + result count (PLP-05 / PLP-04).
                           Padding(
                             padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
@@ -280,6 +272,13 @@ class _CategoryProductsScreenState
                           Row(
                             children: [
                               Expanded(child: PlpFilterChips(plpKey: _key)),
+                              // PLP-10: search within this category (shares the
+                              // chips/sort row — zero extra column height).
+                              SizedBox(
+                                width: 260,
+                                child: PlpInlineSearchField(plpKey: _key),
+                              ),
+                              const SizedBox(width: 8),
                               _sortDropdown(),
                             ],
                           ),
