@@ -97,7 +97,7 @@
 | Feature | Trendyol | Mopro (`src`) | Read-path | Status | Sev |
 |---|---|---|---|---|---|
 | Return states | requested → approved → cargo → refunded | `pending/approved/rejected/refunded`; detail maps current status → a 4-state `OrderStatusTimeline` | **L** (derived) | **MATCHED** (derived, like Orders) | — |
-| **Status-history timeline** | step-by-step with dates | `return_status_history` rows ARE written (`InsertReturnStatusHistory`) but **`returnJSON` omits them** → timeline shows only the current state at `createdAt` | **A** | **RT-04** audit trail not surfaced | LOW–MED |
+| **Status-history timeline** | step-by-step with dates | `GET /returns/{id}` now returns `history[]` (`ListReturnStatusHistory`); detail renders the real event timeline (falls back to derived when empty) | **L** | **RT-04 ✅ RESOLVED** (`feat/quick-functional-gaps`) | — |
 | Cargo/return-leg tracking | "kargoya verildi" + tracking | — (no return-shipment state at all; ties RT-02) | **A** | **RT-02** | MED |
 | Refunded state reachable | yes | timeline maps `refunded → refundIssued`, but **nothing sets `refunded`** | **S/A** | **RT-01** settlement not wired | **MED** |
 
