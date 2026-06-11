@@ -19,13 +19,22 @@
 
 ## TL;DR
 
-- **CONFIRMED: 0** — nothing yet; this doc is **seeded, awaiting Salih's walk**. Every gap
-  below is **PROBABLE** until the walk confirms it and assigns a severity.
-- **PROBABLE: 6** — HP-01 (no "Sepette %X" basket-discount pill), HP-02 (no per-card
+- **UPDATE (`feat/home-probable-resolution`) — all 6 PROBABLE rows resolved source-side, no manual walk.** See `docs/internal/home-probable-resolution.md` + §7.
+  - **HP-01/02/03 → RESOLVED (audit stale):** the "Sepette %X" pill, the "Çok Satan"
+    badge, and the circular pucks were **already implemented** by the post-audit
+    catalog vertical (G-3/G-4) — confirmed in `product_card.dart` / `home_category_rail.dart`,
+    wired from `ProductSummary`, i18n + tests present. This table was seeded before that landed.
+  - **HP-04/05 → NEEDS-DECISION (Salih):** camera/visual-search icon + location
+    selector are source-confirmed absent, but resolving them = a **feature** (and for
+    HP-05, possibly an **intentional mobile-first IA** omission) — product/IA calls,
+    **not** pixel questions, and not fakeable. Handed to Salih.
+  - **NEEDS-VISUAL (pixel) residue: 0.** Every PROBABLE row was presence/shape, which
+    source + convention settled. **Zero code fixes** this pass.
+- ~~**PROBABLE: 6**~~ (original seeding) — HP-01 (no "Sepette %X" basket-discount pill), HP-02 (no per-card
   "Çok Satan" bestseller badge), HP-03 (category pucks are rounded-squares, not circular),
   HP-04 (search bar has no camera/visual-search icon), HP-05 (no location/address selector in
   header), HP-06 (no notification bell in header). All read on the Mopro side from source; the
-  Trendyol side is general-knowledge → PROBABLE.
+  Trendyol side is general-knowledge → PROBABLE. *(Resolved per the UPDATE above.)*
 - **NOT-ACTIONABLE: 5** — the intentional IA / brand divergences (Coin tab, categories-as-rail,
   cashback chip, coin-balance pill, Mopro brand-orange token). Pre-listed in §4, **not gaps**.
 - **Already-matched (VERIFIED, Mopro side): 9** — banner carousel + page indicators, flash-deals
@@ -105,11 +114,11 @@ Suggested severity is a *hint for the walk*, not a commitment.
 
 | HP-ID | Finding (Mopro side, confirmed from source) | Trendyol baseline (PROBABLE) | Suggested sev | Fix surface |
 |---|---|---|---|---|
-| **HP-01** | Product card has **no "Sepette %X" basket-discount pill** (`product_card.dart` price block ends at strikethrough + `DiscountPill` + cashback) | Trendyol shows a "Sepette %X" basket-price pill on many cards | MED | card widget + backend basket-discount field |
-| **HP-02** | Product card has **no per-card "Çok Satan"/bestseller badge** (bestseller *rail/sort* exists — P-029/P-031 — but no card-level badge) | Trendyol stamps a "Çok satan" ribbon on bestselling cards | LOW–MED | card overlay + `is_bestseller` signal |
-| **HP-03** | Category pucks are **rounded-square 52×52 (radius 14)**, not circular (`home_category_rail.dart:125`) | Trendyol category pucks are **circular** | LOW | `_CategoryPuck` shape only (golden-flip) |
-| **HP-04** | Search pill has search + **mic** icon, **no camera/visual-search icon** (`home_screen.dart:322`) | Trendyol search bar has a **camera** (visual search) icon | LOW | top-bar icon (+ visual-search route, likely DEFER) |
-| **HP-05** | **No location/address selector** in the Home header (`_HomeTopBar` = search + coin only) | Trendyol header has a location/address selector | LOW | header chrome (needs address model — likely DEFER) |
+| **HP-01** | ~~Product card has **no "Sepette %X" basket-discount pill**~~ → **RESOLVED / NOT-ACTIONABLE** (source-side pass, `feat/home-probable-resolution`). Audit row **stale**: `product_card.dart` renders `_BasketDiscountPill` ("Sepette %X İndirim", `:229-232/:399-429`) when `basketDiscountPct != null`; `ProductSummary.basketDiscountPct` exists + **all** card call sites wire it (`product_rail`/`product_list_rail`/`product_grid`); i18n `product.basket_discount`; tested in `product_card_test.dart`. Landed by the G-3/CT-09 catalog vertical **after** this audit was seeded. | Trendyol shows a "Sepette %X" basket-price pill on many cards *(convention, ~May 2025 — not visually verified)* | — | **DONE** (audit stale) |
+| **HP-02** | ~~Product card has **no per-card "Çok Satan"/bestseller badge**~~ → **RESOLVED / NOT-ACTIONABLE** (source-side). Stale: `product_card.dart:153/:329-362` stamps `_BestsellerBadge` ("Çok Satan") when `isBestseller==true`; `ProductSummary.isBestseller` wired at all call sites; i18n `product.bestseller`; signal flows P-029/P-031. Landed (G-3) post-audit. | Trendyol stamps a "Çok satan" ribbon on bestselling cards *(convention, ~May 2025 — not visually verified)* | — | **DONE** (audit stale) |
+| **HP-03** | ~~Category pucks are **rounded-square 52×52 (radius 14)**~~ → **RESOLVED / NOT-ACTIONABLE** (source-side). Stale: `home_category_rail.dart:133` is now `shape: BoxShape.circle` ("Trendyol-style circular category puck (G-4)"). | Trendyol category pucks are **circular** *(long-standing convention, ~May 2025 — not visually verified)* | — | **DONE** (audit stale) |
+| **HP-04** | Search pill has search + **mic** icon, **no camera/visual-search icon** (`home_screen.dart:297/:328`) — source-confirmed absent | Trendyol search bar has a **camera** (visual search) icon *(convention, ~May 2025 — not visually verified)* | LOW | **NEEDS-DECISION (Salih)** — visual-search **feature** (route + image pipeline) vs. omit; a camera icon wired to nothing is a fake affordance → not fixed on a guess |
+| **HP-05** | **No location/address selector** in the Home header (`_HomeTopBar` = search + `NotificationBell` + coin) — source-confirmed absent | Trendyol header has a location/address selector *(convention, ~May 2025 — not visually verified)* | LOW | **NEEDS-DECISION (Salih)** — address-on-Home **feature** vs. **intentional mobile-first IA** omission (cart/fav already in bottom nav) |
 | **HP-06** | ~~**No notification bell** in the Home header~~ → **RESOLVED** (Sprint A): `NotificationBell` mounted in `_HomeTopBar` (mobile) + `WebHeader` (desktop), reusing the Tranche-2a `unreadNotificationCountProvider` + `NotificationBadge`; taps to `/account/notifications`. Always-visible, badge auto-hidden for guests. See `docs/internal/hp06-notification-bell.md`. | Trendyol header has a notifications bell | LOW | **DONE** — header chrome (reused the shipped inbox stack) |
 | **HP-07** | ~~Desktop/tablet product rails were a **static fixed-column grid** (`RailLayout.grid` — 5-col/`maxItems:10` desktop, 3-col/6 tablet), clipping the set with no horizontal scroll~~ → **RESOLVED** (Sprint B): `RailLayout.carousel` — lazy horizontal `ListView.builder` (full set up to `maxItems`) + desktop **hover chevrons** (white circular floating cards, `HoverRegion` fade, slide one viewport, gated at extents). Tablet = scroller without chevrons; mobile scroller untouched. See `docs/internal/sprint-b-rail-carousel.md`. | Trendyol web rails scroll horizontally with left/right hover chevrons | **HIGH** (interaction parity) | **DONE** — `ProductRail` (`product_rail.dart`) |
 | **HP-08** | ~~Banner carousel indicator used the **`WormEffect`** sliding dot (`home_screen.dart`)~~ → **RESOLVED** (Closeout): `ExpandingDotsEffect` — Trendyol-style **pill dots** (inactive dots, active expands to a brand-`colorScheme.primary` pill). Carousel logic/aspect untouched. See `docs/internal/home-closeout.md`. | Trendyol banner uses thin-line / pill page dots | **MED** | **DONE** — `_BannerCarousel` indicator |
@@ -165,24 +174,27 @@ Suggested severity is a *hint for the walk*, not a commitment.
 
 ## §7 — Summary (status counts) + fix-prompt readiness
 
-**Counts (seeded, pre-walk):**
+**Counts (after the source-side resolution pass, `feat/home-probable-resolution`):**
 
 | Status | Count | IDs |
 |---|---|---|
-| CONFIRMED | 0 | — (await walk) |
-| PROBABLE | 6 | HP-01 … HP-06 |
+| CONFIRMED (open) | 0 | — |
+| PROBABLE (open) | 0 | — (all 6 resolved source-side) |
+| RESOLVED / already-implemented (audit stale) | 6 | HP-01, HP-02, HP-03 (card pill / bestseller badge / circular pucks — G-3/G-4); HP-06/07/08/09 (Sprint A/B/Closeout) |
+| NEEDS-DECISION (Salih — feature/IA, not pixel) | 2 | HP-04 (visual-search camera), HP-05 (location selector) |
+| NEEDS-VISUAL (pixel — your eyes) | 0 | — every PROBABLE row was presence/shape, source-settled |
 | NOT-ACTIONABLE (divergence) | 5 | D1 … D5 |
 | Already-matched (Mopro VERIFIED) | 9 | B4, B5, B6, B8, B10 + card-anatomy/carousel/rails/stories in B7/B3 |
 
-**"Ready for fix prompts" — populated after the walk** (CONFIRMED-HIGH/MED first):
+**Source-side resolution (no manual walk needed for these):** see
+`docs/internal/home-probable-resolution.md`. HP-01/02/03 were closed by the
+post-audit catalog vertical (the audit table was stale); HP-04/05 are product/IA
+decisions (build a feature vs. intentional mobile-first omission), **not** pixel
+questions — handed to Salih. **Zero code fixes; zero NEEDS-VISUAL residue for Home.**
 
-1. _(await walk)_ — likely **HP-01** (basket-discount pill) if CONFIRMED MED — highest product value.
-2. _(await walk)_ — likely **HP-02** (bestseller card badge) if CONFIRMED.
-3. _(await walk)_ — **HP-03** (circular pucks) — pure UI, golden-flip, no backend.
-
-Until the walk lands, **no fix prompts are scoped** (§7-4: don't invent severities for
-unconfirmed items). HP-03 is the only zero-dependency pure-UI candidate; HP-01/HP-02 likely
-need a backend signal (basket-discount field / `is_bestseller`).
+**Salih's decisions (not pixel-peeping):**
+1. **HP-04** — build visual-search (camera), or confirm intentional omission?
+2. **HP-05** — add an address/location selector to Home, or confirm the mobile-first bottom-nav IA deliberately omits header chrome?
 
 ---
 
