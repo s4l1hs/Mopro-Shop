@@ -50,6 +50,7 @@ linters:
             - "internal/treasury/**"
             - "internal/cashback/**"
             - "internal/sellerpayout/**"
+            - "internal/refund/**"
           deny:
             - pkg: github.com/mopro/platform/internal/order
               desc: "fin-svc MUST NOT import core-svc internals"

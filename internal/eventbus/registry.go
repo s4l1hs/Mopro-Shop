@@ -129,6 +129,16 @@ var Registry = []EventEntry{
 		Notes:          "Removed Phase 3.0: outboxEventType switch case had no production call sites",
 	},
 
+	// ── fin domain: refund ───────────────────────────────────────────────────────
+	{
+		EventType:       "fin.refund.coin.credited.v1",
+		ProducerModule:  "internal/wallet",
+		ConsumerGroups:  []string{},
+		Status:          StatusActiveEmittedNoConsumer,
+		PlannedConsumer: "internal/notification (refund-issued push)",
+		Notes:           "Emitted by wallet.Post when internal/refund settles ecom.return.refunded.v1 (D equity:refund_distribution ↔ C user wallet).",
+	},
+
 	// ── fin domain: seller payout ────────────────────────────────────────────────
 	{
 		EventType:       "fin.seller.payout.batch.paid.v1",
