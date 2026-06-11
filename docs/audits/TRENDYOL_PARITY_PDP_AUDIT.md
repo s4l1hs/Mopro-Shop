@@ -45,10 +45,16 @@
     has it → needs spec/codegen + backend); PD-04 seller rating (backend signal);
     PD-06 video (no asset/field).
   - **NEEDS-DECISION (Salih):** PD-05 installments (is the perpetual cashback card the
-    accepted substitute? — divergence, don't re-open on a guess); PD-06 mobile
-    thumbnail strip (PageView+dots already standard); PD-09 desktop sticky buy-box
-    (Mopro **deliberately** makes the *gallery* sticky-translate — pinning the buy-box
-    instead is a UX redesign, not a clean fix); PD-10 recently-viewed on PDP (placement).
+    accepted substitute? — divergence, don't re-open on a guess). ~~PD-06 mobile
+    thumbnail strip; PD-09 desktop sticky buy-box; PD-10 recently-viewed placement~~
+    — **decided + ✅ RESOLVED** (`feat/pdp-ux`, lane A1): PD-06 tappable thumbnail
+    strip replaces the worm dots on the mobile gallery (desktop pager already had
+    one); PD-09 a **condensed sticky buy-bar** (thumb+title+price+ATC) slides in on
+    the wide layout once the buy-box scrolls out of view — the locked sticky-gallery
+    translate is untouched (mobile already pins via `PdpStickyCta`); PD-10 the
+    recently-viewed rail mounts on the PDP (wide: below similar; mobile: description
+    tab), reusing `recentlyViewedProvider` + `ProductListRail`, current product
+    filtered out. See `docs/internal/pdp-ux.md`.
   - **NEEDS-VISUAL:** none beyond the PD-09 "which element tracks scroll" feel.
   - **Zero CONFIRMED UI-only fixes.** Most PDP rows were already closed pre-pass
     (PD-01 specs, PD-06 read-path, PD-07 review metadata, PLP-17 official badge).
@@ -74,16 +80,16 @@
 
 | ID | Baseline (Trendyol) | Mopro current (`src`) | Delta | Status | Sev |
 |---|---|---|---|---|---|
-| — | Gallery: carousel + thumbs + zoom + video | mobile `PdpImageGallery` (PageView + dots + tap-fullscreen + Hero); desktop `PdpImagePager` (thumbnail strip + arrows + **hover-zoom 2× lens**) | mobile has **no thumbnail strip**; **no video**; no lightbox beyond fullscreen | **PD-06** | LOW–MED |
+| — | Gallery: carousel + thumbs + zoom + video | mobile `PdpImageGallery` (PageView + **tappable thumbnail strip** + tap-fullscreen + Hero); desktop `PdpImagePager` (thumbnail strip + arrows + **hover-zoom 2× lens**) | mobile thumbnail strip **✅ RESOLVED** (`feat/pdp-ux` — replaces the worm dots; tap-to-jump + swipe-synced highlight). Remaining: **no video** (DEFER — no asset/field) | **PD-06** (thumbs ✅; video DEFER) | LOW |
 | — | Title: brand(linked) + title + rating→reviews + fav + share | brand `InkWell`→brand search, title, rating row→`_scrollToReviews`, favorite, `MoproShareButton` | — | **MATCHED** | — |
 | — | Price: strikethrough + discount + "Sepette %X" + cashback + lowest-N | `PdpPriceBlock` (strikethrough **P-032** + discount pill + **lowest-30d P-030**) + `_CashbackCard` | **no basket-discount "Sepette %X"** on the PDP price block (product carries `basketDiscountPct`). NB: as of CT-09 the basket discount is now a **charged** seller-funded discount (applied in cart/checkout/order; migration 0091), so surfacing the pill on the PDP would be honest — remaining work is display-only (this PDP surface), out of CT-09's pricing-path scope. | **PD-03** (display-only) | MED |
 | — | Variants: colour swatches + size pickers + OOS | `PdpVariantSelector` — one `FilterChip` per variant ("colour / size" label), OOS struck-through + disabled (**P-015**); only renders when `variants.length > 1` | **text chips, not swatch/size pickers**; flat variant list, not attribute groups (ties **PLP-13**) | **PD-02** | MED |
-| — | Buy box: ATC (sticky) + qty + installments | mobile `PdpStickyCta` (bottom bar); desktop ATC + favorite + `_QuantityStepper`; **desktop gallery** sticky-translates | **desktop buy-box itself not pinned**; **no installments** | **PD-09 / PD-05** | MED |
+| — | Buy box: ATC (sticky) + qty + installments | mobile `PdpStickyCta` (bottom bar); desktop ATC + favorite + `_QuantityStepper` + **`PdpStickyBuyBar`** (condensed thumb+title+price+ATC bar, slides in once the buy-box scrolls out of view); gallery sticky-translate kept | **PD-09 ✅ RESOLVED** (`feat/pdp-ux`); **no installments** (PD-05 NEEDS-DECISION) | **PD-05** | MED |
 | — | Delivery: ETA + cargo + return | `PdpDeliveryInfo(eta)` (**P-007**) + `_TrustBadges` (secure / return / free-ship) | trust badges, not a **detailed cargo/return policy** block | **NOT-ACTIONABLE** (D3) | — |
 | — | Seller: name + rating + official badge | `PdpSellerCard(name, official✓, →storefront)` | official badge **✅ RESOLVED** (`feat/plp-17-official-seller`: `Product.seller_official` → verified check on `PdpSellerCard`, ties **PLP-17**); **seller rating still open** | **PD-04** (partial) | LOW–MED |
 | — | Specs: key-spec attribute table | **RESOLVED for the PLP-13 `renk` slice** (`feat/plp-13-pdp-specs`): the specs tab now renders `Product.attributes` (`_SpecsTab` — name/value table + empty-state) on mobile + desktop; `_StubTab` removed. Backed by the normalized attribute model (0089) + the facet read-path. More attribute types arrive with PLP-13 Phase 2. | **PD-01** | **HIGH → resolved (renk)** |
 | — | Reviews: breakdown + photos + sort/filter + helpful | `PdpReviewsTab` — `RatingDistributionHistogram` + sort menu + paginated list + **helpful votes** + write-review (window-gated) + **reviewer name + photos (PD-07)** | **PD-07 RESOLVED** (`feat/pd-07-review-metadata`): reviews now return `reviewerName` (masked `identity.Service.GetMe`) + `photoUrls` (`attachments.Service.ListByEntity`, CDN-mapped) — §5-safe in-process calls, **no codegen** (the reviews endpoint is hand-written/not in the spec) — rendered as a name header + photo strip; live-handler contract test guards both. Remaining: rating-filter (sort only) | **PD-07 → resolved** | MED |
-| — | Similar / recommended + recently-viewed + Q&A | `_SimilarProductsRail` + mobile related rail (co-view) + **`PdpQaTab`** | **no recently-viewed on PDP** (it's a home rail) | **PD-10** | LOW |
+| — | Similar / recommended + recently-viewed + Q&A | `_SimilarProductsRail` + mobile related rail (co-view) + **`_RecentlyViewedRail`** (reuses `recentlyViewedProvider` + `ProductListRail`; current product filtered) + **`PdpQaTab`** | **PD-10 ✅ RESOLVED** (`feat/pdp-ux`) | **PD-10 → resolved** | — |
 
 ---
 
@@ -180,8 +186,9 @@ product 15):
 4. **PD-03 basket-discount** on the PDP price block (data already on the product).
 5. **PD-02 variant pickers** (swatch/size) — ties PLP-13; **PD-04 seller
    rating/official** — ties PLP-17 (backend flag).
-6. **PD-05 / PD-06 / PD-09** — per the walk (installments, gallery video/thumbs,
-   desktop sticky buy-box). LOW–MED.
+6. **PD-05** — per the walk (installments — NEEDS-DECISION). ~~PD-06 mobile thumbs /
+   PD-09 desktop sticky buy-box / PD-10 recently-viewed~~ — **✅ RESOLVED**
+   (`feat/pdp-ux`); PD-06 *video* remains DEFER (no asset/field). LOW–MED.
 
 > **Cross-surface ties:** PD-01/PD-02 ride the **PLP-13 attribute model**;
 > PD-04 rides the **PLP-17 official-seller flag**. Building those backends lights
