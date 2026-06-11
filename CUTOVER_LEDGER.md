@@ -211,6 +211,7 @@
 | Search | Pending (inherits PLP grid/filter patterns). |
 | PDP | Pending (own walk; may need seed extension: reviews/variants/gallery). |
 | Phase C (divergences) | After parity surfaces — coin redeem (deferred), etc. |
+| Account | **PROBABLE resolved source-side** (`feat/account-probable-resolution`): AC-05 membership tier/points = **NOT-ACTIONABLE** (coin+plans tiles are the deliberate analog; tier adoption = NEEDS-DECISION). 0 CONFIRMED fixes. Doc: `docs/internal/account-probable-resolution.md`. |
 
 ### Local walk env refreshed — ✅ (`chore/local-walk-env`)
 

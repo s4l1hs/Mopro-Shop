@@ -44,7 +44,8 @@
     `onTap: () {}` now routes to the existing `/help` (`HelpIndexScreen`).
 - **2 CONFIRMED gaps (src):** **AC-03** no email-change in Security (password +
   phone/MFA only); **AC-04** no notification-preferences setting.
-- **PROBABLE (await walk): 1** — **AC-05** no membership tier/points display.
+- **PROBABLE → resolved source-side** (`feat/account-probable-resolution`, no walk; `docs/internal/account-probable-resolution.md`): **AC-05** → **NOT-ACTIONABLE** — Mopro's coin+plans stat tiles are the deliberate analog to Trendyol tier/points (settled coin/cashback divergence, §5.3); adopting a tier concept is a **NEEDS-DECISION (Salih)**, not a source gap. **0 CONFIRMED fixes.**
+- ~~**PROBABLE (await walk): 1**~~ (original) — **AC-05** no membership tier/points display. *(Resolved above.)*
 - **NOT-ACTIONABLE: 3** — the Coin/cashback wallet hub (vs Trendyol coupons/wallet),
   coin+plans stats (vs Elite tier/points), brand-orange tokens.
 
