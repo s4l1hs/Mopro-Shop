@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/features/cart/application/cart_provider.dart';
+import 'package:mopro/features/cart/data/cart_dto.dart';
+import 'package:mopro/features/cart/data/cart_line_dto.dart';
 import 'package:mopro/features/checkout/application/checkout_controller.dart';
 import 'package:mopro/features/checkout/presentation/sipay_webview_screen.dart';
 import 'package:mopro/features/checkout/widgets/checkout_stepper.dart';
@@ -33,7 +35,6 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
     );
     final cartDto = cartState.cart.valueOrNull;
     final grandTotal = cartDto?.grandTotalMinor ?? 0;
-    final lines = cartDto?.lines ?? [];
     // CHK-01: full breakdown from the enriched cart (#176) — no longer total-only.
     final subtotalMinor =
         cartDto?.totalsBySeller.fold<int>(0, (s, t) => s + t.itemsMinor) ?? 0;
@@ -79,33 +80,9 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
               children: [
                 _SectionHeader(title: 'checkout.review_items'.tr()),
                 const SizedBox(height: 8),
-                ...lines.map(
-                  (line) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            line.title,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${line.qty}× ${moneyFmt.format(line.priceMinor / 100.0)}',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                // CHK-02: group line items by seller (seller_name flows from #176),
+                // each with a per-seller subtotal — parity with the cart.
+                ..._groupedItems(context, cartDto, moneyFmt),
                 const Divider(height: 24),
                 // CHK-01: subtotal + shipping breakdown (parity with the cart
                 // summary), then the bold total + KDV note + cashback line.
@@ -196,6 +173,85 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
             ref.read(checkoutControllerProvider.notifier).placeOrder(),
       ),
     );
+  }
+
+  // CHK-02: group review line items by seller (first-seen order), each preceded
+  // by a header (seller name + per-seller subtotal from totalsBySeller).
+  List<Widget> _groupedItems(
+    BuildContext context,
+    CartDto? cart,
+    NumberFormat moneyFmt,
+  ) {
+    final lines = cart?.lines ?? const <CartLineDto>[];
+    if (lines.isEmpty) return const [];
+    final order = <int>[];
+    final bySeller = <int, List<CartLineDto>>{};
+    final nameBySeller = <int, String>{};
+    for (final l in lines) {
+      if (!bySeller.containsKey(l.sellerId)) order.add(l.sellerId);
+      bySeller.putIfAbsent(l.sellerId, () => []).add(l);
+      nameBySeller[l.sellerId] = l.sellerName;
+    }
+    int subtotalFor(int sid) => (cart?.totalsBySeller ?? const [])
+        .where((t) => t.sellerId == sid)
+        .fold<int>(0, (s, t) => s + t.itemsMinor);
+
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.bodySmall
+        ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final out = <Widget>[];
+    for (final sid in order) {
+      final name = nameBySeller[sid] ?? '';
+      out.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  'cart.seller_section'.tr(
+                    namedArgs: {'seller': name.isEmpty ? '#$sid' : name},
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelLarge
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              Text(
+                '${'cart.subtotal'.tr()}: ${moneyFmt.format(subtotalFor(sid) / 100.0)}',
+                style: muted,
+              ),
+            ],
+          ),
+        ),
+      );
+      for (final line in bySeller[sid]!) {
+        out.add(
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    line.title,
+                    style: theme.textTheme.bodyMedium,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${line.qty}× ${moneyFmt.format(line.priceMinor / 100.0)}',
+                  style: muted,
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+    return out;
   }
 
   Future<void> _launchSipayWebView(String url, String invoiceId) async {
