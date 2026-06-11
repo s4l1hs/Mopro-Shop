@@ -29,7 +29,7 @@ type Order struct {
 	// items (CT-09): Σ(list_unit − unit)×qty. SubtotalMinor is pre-discount;
 	// TotalMinor = SubtotalMinor − DiscountMinor (the charged amount). 0 when no
 	// item carries a basket discount → SubtotalMinor == TotalMinor.
-	DiscountMinor    int64      `json:"discount_minor"`
+	DiscountMinor int64 `json:"discount_minor"`
 	// CouponCode is the applied coupon (empty = none) and CouponDiscountMinor is its
 	// slice of DiscountMinor (CT-03/CHK-04). The remainder of DiscountMinor is the
 	// CT-09 basket discount. Coupon is seller-funded ⇒ folded into the same snapshot.
@@ -38,12 +38,12 @@ type Order struct {
 	TotalMinor          int64      `json:"total_minor"`
 	Currency            string     `json:"currency"`
 	Market              string     `json:"market"`
-	DeliveredAt      *time.Time `json:"delivered_at,omitempty"`
-	CashbackEligible bool       `json:"cashback_eligible"`
-	CashbackCurrency string     `json:"cashback_currency"`
-	IdempotencyKey   string     `json:"idempotency_key"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	DeliveredAt         *time.Time `json:"delivered_at,omitempty"`
+	CashbackEligible    bool       `json:"cashback_eligible"`
+	CashbackCurrency    string     `json:"cashback_currency"`
+	IdempotencyKey      string     `json:"idempotency_key"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 // OrderItem is a single line in the order with frozen commission snapshots.
