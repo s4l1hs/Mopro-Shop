@@ -2,11 +2,14 @@ package order
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
+
+	"github.com/mopro/platform/internal/outbox"
 )
 
 // ReturnWindowDays is the default consumer return window measured from
@@ -26,6 +29,7 @@ var (
 	ErrInvalidReturnReason   = errors.New("order: invalid return reason")
 	ErrReturnNotPending      = errors.New("order: return is not pending; cannot transition")
 	ErrReturnNotOwned        = errors.New("order: return does not belong to this seller")
+	ErrOutboxNotConfigured   = errors.New("order: outbox repository not configured; refund settlement requires it")
 )
 
 // ReturnStatus is the per-return lifecycle (distinct from OrderStatus).
@@ -174,13 +178,19 @@ type ReturnService interface {
 type returnService struct {
 	orders  Repository
 	returns ReturnRepository
-	now     func() time.Time
+	// outbox writes ecom.return.refunded.v1 in the same tx as the settlement
+	// transition (RT-01, §4.5). nil disables refund settlement (SellerApprove
+	// returns ErrOutboxNotConfigured) — required on the financial path.
+	outbox outbox.Repository
+	now    func() time.Time
 }
 
 // NewReturnService builds a ReturnService. orders provides read access to the
-// referenced order; returns persists the request.
-func NewReturnService(orders Repository, returns ReturnRepository) ReturnService {
-	return &returnService{orders: orders, returns: returns, now: func() time.Time { return time.Now().UTC() }}
+// referenced order; returns persists the request; outboxRepo (order_schema.outbox)
+// carries the refund-settlement event to fin-svc — pass nil only in non-financial
+// tests that never call SellerApprove.
+func NewReturnService(orders Repository, returns ReturnRepository, outboxRepo outbox.Repository) ReturnService {
+	return &returnService{orders: orders, returns: returns, outbox: outboxRepo, now: func() time.Time { return time.Now().UTC() }}
 }
 
 // ComputeActions: canCancel iff pre-shipment; canReturn iff delivered, within
@@ -372,8 +382,89 @@ func (s *returnService) ListSellerReturns(ctx context.Context, productIDs []int6
 	return s.returns.ListReturnsByProductIDs(ctx, productIDs, status, limit, offset)
 }
 
+// returnRefundedPayload is the ecom.return.refunded.v1 body. The fin-svc
+// internal/refund consumer mints RefundAmountMinor as coin (1:1 peg) to user_id's
+// wallet; it derives the coin currency from its own config (the fiat Currency here
+// is for audit/display). Market drives the per-market coin code if ever needed.
+type returnRefundedPayload struct {
+	ReturnID          int64  `json:"return_id"`
+	OrderID           int64  `json:"order_id"`
+	UserID            int64  `json:"user_id"`
+	RefundAmountMinor int64  `json:"refund_amount_minor"`
+	Currency          string `json:"currency"` // fiat (the order's currency)
+	Market            string `json:"market"`
+}
+
+// SellerApprove approves AND settles a pending return in one tx (RT-01): it
+// transitions pending → approved → refunded, records both history rows, and writes
+// ecom.return.refunded.v1 to the outbox (§4.5) so fin-svc mints the refund as coin.
+// Atomic ⇒ no stuck "approved" state; idempotent ⇒ the pending-status guard runs it
+// once and the outbox key (return:refunded:<id>) + the fin ledger key dedupe.
 func (s *returnService) SellerApprove(ctx context.Context, returnID int64, sellerProductIDs []int64) (Return, error) {
-	return s.transition(ctx, returnID, sellerProductIDs, string(ReturnApproved), "seller approved")
+	if s.outbox == nil {
+		return Return{}, ErrOutboxNotConfigured
+	}
+	rec, _, err := s.returns.GetReturn(ctx, returnID)
+	if err != nil {
+		return Return{}, err
+	}
+	owns, err := s.returnOwnedBySeller(ctx, returnID, sellerProductIDs)
+	if err != nil {
+		return Return{}, err
+	}
+	if !owns {
+		return Return{}, ErrReturnNotOwned // do not leak existence to other sellers
+	}
+	if rec.Status != ReturnPending {
+		return Return{}, ErrReturnNotPending
+	}
+
+	// The order supplies Market for the event (the refund amount + fiat currency are
+	// already snapshotted on the return at CreateReturn).
+	o, _, err := s.orders.GetOrder(ctx, rec.OrderID)
+	if err != nil {
+		return Return{}, fmt.Errorf("order.returns: settle get order %d: %w", rec.OrderID, err)
+	}
+	payload, err := json.Marshal(returnRefundedPayload{
+		ReturnID:          rec.ID,
+		OrderID:           rec.OrderID,
+		UserID:            rec.UserID,
+		RefundAmountMinor: rec.RefundAmountMinor,
+		Currency:          rec.RefundCurrency,
+		Market:            o.Market,
+	})
+	if err != nil {
+		return Return{}, fmt.Errorf("order.returns: marshal refunded payload: %w", err)
+	}
+	idemKey := fmt.Sprintf("return:refunded:%d", rec.ID)
+
+	err = s.returns.WithTx(ctx, func(tx pgx.Tx) error {
+		if e := s.returns.UpdateReturnStatus(ctx, tx, returnID, string(ReturnApproved)); e != nil {
+			return e
+		}
+		if e := s.returns.InsertReturnStatusHistory(ctx, tx, returnID, string(ReturnApproved), "seller approved"); e != nil {
+			return e
+		}
+		if e := s.returns.UpdateReturnStatus(ctx, tx, returnID, string(ReturnRefunded)); e != nil {
+			return e
+		}
+		if e := s.returns.InsertReturnStatusHistory(ctx, tx, returnID, string(ReturnRefunded), "refund issued as Mopro Coin"); e != nil {
+			return e
+		}
+		return s.outbox.Insert(ctx, tx, outbox.Row{
+			Aggregate:      "return",
+			EventType:      "ecom.return.refunded.v1",
+			Payload:        json.RawMessage(payload),
+			IdempotencyKey: idemKey,
+			Market:         o.Market,
+			Currency:       rec.RefundCurrency,
+		})
+	})
+	if err != nil {
+		return Return{}, err
+	}
+	rec.Status = ReturnRefunded
+	return rec, nil
 }
 
 func (s *returnService) SellerReject(ctx context.Context, returnID int64, sellerProductIDs []int64, reasonCode, note string) (Return, error) {
