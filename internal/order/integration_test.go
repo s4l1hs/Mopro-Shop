@@ -66,6 +66,10 @@ CREATE TABLE order_schema.orders (
                     CHECK (shipping_payer IN ('buyer','seller','split','threshold_free')),
   total_minor       BIGINT       NOT NULL CHECK (total_minor >= 0),
   discount_minor    BIGINT       NOT NULL DEFAULT 0 CHECK (discount_minor >= 0),
+  -- CT-03 coupon (migration 0092): the order repo SELECTs these on every order
+  -- scan, so the hand-rolled schema must carry them or scans error 42703.
+  coupon_code           TEXT,
+  coupon_discount_minor BIGINT   NOT NULL DEFAULT 0 CHECK (coupon_discount_minor >= 0),
   currency          TEXT         NOT NULL,
   market            TEXT         NOT NULL DEFAULT 'TR',
   delivered_at      TIMESTAMPTZ,
