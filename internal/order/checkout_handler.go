@@ -11,6 +11,7 @@ type checkoutInitiateRequest struct {
 	ReservationID string `json:"reservation_id"`
 	Market        string `json:"market,omitempty"`
 	Currency      string `json:"currency,omitempty"`
+	CouponCode    string `json:"coupon_code,omitempty"`
 	BuyerName     string `json:"buyer_name"`
 	BuyerSurname  string `json:"buyer_surname"`
 	BuyerEmail    string `json:"buyer_email"`
@@ -51,6 +52,7 @@ func HandleInitiateCheckout(svc Service, userIDFromContext func(*http.Request) (
 			ReservationID: body.ReservationID,
 			Market:        body.Market,
 			Currency:      body.Currency,
+			CouponCode:    body.CouponCode,
 			SessionID:     sessionID,
 			BuyerName:     body.BuyerName,
 			BuyerSurname:  body.BuyerSurname,

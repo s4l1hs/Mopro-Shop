@@ -584,7 +584,7 @@ func main() {
 		httpTrace(requireAuth(http.HandlerFunc(handleCartRemoveItem(cartSvc)))),
 	)
 	mux.Handle("GET /cart",
-		httpTrace(requireAuth(http.HandlerFunc(handleGetCart(cartSvc, catalogSvc, sellerSvc, defaultLocale, market)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleGetCart(cartSvc, catalogSvc, sellerSvc, orderSvc, defaultLocale, market)))),
 	)
 	mux.Handle("POST /cart/reserve",
 		httpTrace(requireAuth(http.HandlerFunc(handleCartReserve(cartSvc)))),
@@ -1130,7 +1130,7 @@ func handleCartRemoveItem(svc cart.Service) http.HandlerFunc {
 	}
 }
 
-func handleGetCart(svc cart.Service, cat cartCatalogResolver, namer cartSellerNamer, defaultLocale, defaultMarket string) http.HandlerFunc {
+func handleGetCart(svc cart.Service, cat cartCatalogResolver, namer cartSellerNamer, coupons cartCouponValidator, defaultLocale, defaultMarket string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := middleware.UserIDFromCtx(r.Context())
 		c, err := svc.GetCart(r.Context(), userID)
@@ -1141,8 +1141,11 @@ func handleGetCart(svc cart.Service, cat cartCatalogResolver, namer cartSellerNa
 		}
 		// Enrich raw {variant_id, qty} into the rich CartDto the mobile expects
 		// (lines + per-seller totals + grand total) §5-safely — no cross-schema JOIN.
+		// An optional ?coupon=CODE applies the coupon discount for display (CT-03);
+		// the same code passed at checkout charges the same total.
 		locale := parseLocale(r, defaultLocale)
-		jsonOK(w, http.StatusOK, enrichCart(r.Context(), c, cat, namer, locale, defaultMarket))
+		couponCode := r.URL.Query().Get("coupon")
+		jsonOK(w, http.StatusOK, enrichCart(r.Context(), c, cat, namer, coupons, couponCode, locale, defaultMarket))
 	}
 }
 
@@ -1205,6 +1208,7 @@ func handleCreateOrder(svc order.Service) http.HandlerFunc {
 			ReservationID string `json:"reservation_id"`
 			Market        string `json:"market"`
 			Currency      string `json:"currency"`
+			CouponCode    string `json:"coupon_code"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			jsonError(w, "invalid JSON body", http.StatusBadRequest)
@@ -1215,6 +1219,7 @@ func handleCreateOrder(svc order.Service) http.HandlerFunc {
 			ReservationID:  body.ReservationID,
 			Market:         body.Market,
 			Currency:       body.Currency,
+			CouponCode:     body.CouponCode,
 			IdempotencyKey: r.Header.Get("Idempotency-Key"),
 		})
 		if err != nil {
