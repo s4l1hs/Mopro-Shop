@@ -111,13 +111,11 @@ func (s *orderService) Checkout(ctx context.Context, req CheckoutRequest) (Order
 		market = s.defaultMarket
 	}
 
-	// 3. Build order items with commission snapshots (frozen at order time).
-	// The seller-funded basket discount (CT-09) is applied per unit here so the
-	// snapshot unit_price_minor is the CHARGED unit; commission/KDV/seller-net are
-	// frozen on the discounted gross. subtotal is pre-discount; discount is the
-	// summary line; total = subtotal − discount (the PSP charge).
-	items := make([]OrderItem, 0, len(cartState.Items))
-	var subtotal, discount int64
+	// 3. Resolve variants + commissions first, then build order items with frozen
+	// snapshots. Two passes so the coupon (CT-03) — which depends on the
+	// basket-discounted subtotal — is resolved before the per-unit charge.
+	lines := make([]resolvedLine, 0, len(cartState.Items))
+	var basketSubtotal int64 // Σ basket-discounted unit × qty (pre-coupon; the base the coupon % applies to)
 	var currency string
 	for _, ci := range cartState.Items {
 		v, err := s.catalog.GetVariantByID(ctx, ci.VariantID)
@@ -128,33 +126,10 @@ func (s *orderService) Checkout(ctx context.Context, req CheckoutRequest) (Order
 		if err != nil {
 			return Order{}, nil, fmt.Errorf("order: checkout get commission variant %d: %w", ci.VariantID, err)
 		}
-
-		// Integer arithmetic — NEVER float (CLAUDE.md § 4.6 + § 10.7).
 		pct := basketPctOf(v.BasketDiscountPct)
 		discUnit := DiscountedUnitMinor(v.PriceMinor, pct)
-		listGross := v.PriceMinor * int64(ci.Qty)
-		gross := discUnit * int64(ci.Qty)
-		commAmt := gross * int64(comm.CommissionPctBps) / 10000
-		kdvAmt := commAmt * int64(comm.KdvPctBps) / 10000
-		sellerNet := gross - commAmt - kdvAmt
-
-		items = append(items, OrderItem{
-			VariantID:             ci.VariantID,
-			SellerID:              v.SellerID,
-			CategoryID:            v.CategoryID,
-			Qty:                   ci.Qty,
-			UnitPriceMinor:        discUnit,
-			ListUnitPriceMinor:    v.PriceMinor,
-			BasketDiscountPct:     pct,
-			UnitPriceCurrency:     v.PriceCurrency,
-			CommissionPctBps:      comm.CommissionPctBps,
-			KdvPctBps:             comm.KdvPctBps,
-			CommissionAmountMinor: commAmt,
-			KdvAmountMinor:        kdvAmt,
-			SellerNetMinor:        sellerNet,
-		})
-		subtotal += listGross
-		discount += listGross - gross
+		basketSubtotal += discUnit * int64(ci.Qty)
+		lines = append(lines, resolvedLine{ci: ci, v: v, comm: comm, basketPct: pct, discUnit: discUnit})
 		if currency == "" {
 			currency = v.PriceCurrency
 		}
@@ -163,19 +138,63 @@ func (s *orderService) Checkout(ctx context.Context, req CheckoutRequest) (Order
 		currency = req.Currency
 	}
 
+	// Resolve the optional coupon against the basket-discounted subtotal. Seller-
+	// funded ⇒ applied per unit ON TOP of the basket discount, so the snapshot
+	// unit_price_minor stays the final CHARGED unit and commission/KDV/seller-net/
+	// cashback all derive from it. Same resolve logic the cart used ⇒ display==charge.
+	couponPct, coupon := s.resolveCouponForCharge(ctx, req.CouponCode, market, basketSubtotal)
+
+	// Integer arithmetic — NEVER float (CLAUDE.md § 4.6 + § 10.7).
+	items := make([]OrderItem, 0, len(lines))
+	var subtotal, discount, couponDiscount int64
+	for _, ln := range lines {
+		qty := int64(ln.ci.Qty)
+		couponedUnit := DiscountedUnitMinor(ln.discUnit, couponPct)
+		listGross := ln.v.PriceMinor * qty
+		gross := couponedUnit * qty
+		commAmt := gross * int64(ln.comm.CommissionPctBps) / 10000
+		kdvAmt := commAmt * int64(ln.comm.KdvPctBps) / 10000
+		sellerNet := gross - commAmt - kdvAmt
+
+		items = append(items, OrderItem{
+			VariantID:             ln.ci.VariantID,
+			SellerID:              ln.v.SellerID,
+			CategoryID:            ln.v.CategoryID,
+			Qty:                   ln.ci.Qty,
+			UnitPriceMinor:        couponedUnit,
+			ListUnitPriceMinor:    ln.v.PriceMinor,
+			BasketDiscountPct:     ln.basketPct,
+			UnitPriceCurrency:     ln.v.PriceCurrency,
+			CommissionPctBps:      ln.comm.CommissionPctBps,
+			KdvPctBps:             ln.comm.KdvPctBps,
+			CommissionAmountMinor: commAmt,
+			KdvAmountMinor:        kdvAmt,
+			SellerNetMinor:        sellerNet,
+		})
+		subtotal += listGross
+		discount += listGross - gross
+		couponDiscount += (ln.discUnit - couponedUnit) * qty
+	}
+	couponCode := ""
+	if coupon != nil && couponDiscount > 0 {
+		couponCode = coupon.Code
+	}
+
 	o := Order{
-		UserID:           req.UserID,
-		Status:           StatusPendingPayment,
-		SubtotalMinor:    subtotal,
-		ShippingMinor:    0,
-		ShippingPayer:    "buyer",
-		DiscountMinor:    discount,
-		TotalMinor:       subtotal - discount,
-		Currency:         currency,
-		Market:           market,
-		CashbackEligible: true,
-		CashbackCurrency: s.cashbackCurrency,
-		IdempotencyKey:   req.IdempotencyKey,
+		UserID:              req.UserID,
+		Status:              StatusPendingPayment,
+		SubtotalMinor:       subtotal,
+		ShippingMinor:       0,
+		ShippingPayer:       "buyer",
+		DiscountMinor:       discount,
+		CouponCode:          couponCode,
+		CouponDiscountMinor: couponDiscount,
+		TotalMinor:          subtotal - discount,
+		Currency:            currency,
+		Market:              market,
+		CashbackEligible:    true,
+		CashbackCurrency:    s.cashbackCurrency,
+		IdempotencyKey:      req.IdempotencyKey,
 	}
 
 	// 4. Persist order + items in a single DB transaction
@@ -194,6 +213,16 @@ func (s *orderService) Checkout(ctx context.Context, req CheckoutRequest) (Order
 				return txErr
 			}
 			createdItems = append(createdItems, inserted)
+		}
+		if coupon != nil && couponDiscount > 0 {
+			if txErr := s.repo.InsertCouponRedemption(ctx, tx, CouponRedemption{
+				CouponID:      coupon.ID,
+				OrderID:       createdOrder.ID,
+				UserID:        req.UserID,
+				DiscountMinor: couponDiscount,
+			}); txErr != nil {
+				return txErr
+			}
 		}
 		return nil
 	}); err != nil {
@@ -475,4 +504,72 @@ func buildDeliveredPayload(
 		ProductTitle:    productTitle,
 		ProductImageURL: productImageURL,
 	}
+}
+
+// ── coupon helpers (CT-03/CHK-04) ─────────────────────────────────────────────
+
+// resolvedLine is a cart line resolved to its variant + commission + basket-
+// discounted unit, computed once so the coupon can be resolved against the
+// basket-discounted subtotal before the per-unit charge is built.
+type resolvedLine struct {
+	ci        cart.CartItem
+	v         catalog.Variant
+	comm      catalog.CategoryCommission
+	basketPct int   // snapshotted basket discount pct (CT-09)
+	discUnit  int64 // basket-discounted unit price (pre-coupon)
+}
+
+// resolveCouponForCharge looks up a coupon code and resolves the whole-percent to
+// apply against a basket-discounted subtotal. Returns (0, nil) when the code is
+// empty, unknown, or invalid — silently dropped, never failing the checkout (a
+// stale/expired code charges the full price, which is buyer-safe). The returned
+// *Coupon is non-nil only when valid (used to record the redemption in-tx).
+func (s *orderService) resolveCouponForCharge(ctx context.Context, code, market string, subtotalMinor int64) (int, *Coupon) {
+	code = NormalizeCouponCode(code)
+	if code == "" {
+		return 0, nil
+	}
+	c, err := s.repo.GetCouponByCode(ctx, code, market)
+	if err != nil {
+		if !errors.Is(err, ErrCouponNotFound) {
+			slog.Warn("order: coupon lookup failed", "code", code, "err", err)
+		}
+		return 0, nil
+	}
+	redemptions, err := s.repo.CountCouponRedemptions(ctx, c.ID)
+	if err != nil {
+		slog.Warn("order: coupon redemption count failed", "code", code, "err", err)
+		return 0, nil
+	}
+	res := resolveCoupon(&c, subtotalMinor, redemptions, time.Now().UTC())
+	if !res.Valid {
+		slog.Info("order: coupon not applied", "code", code, "reason", res.Reason)
+		return 0, nil
+	}
+	return res.PercentOff, &c
+}
+
+// ValidateCoupon resolves a coupon code against a basket-discounted subtotal for a
+// read-only preview (cart display). An unknown/invalid code returns Valid=false +
+// a Reason, never an error (only an infra failure surfaces as an error).
+func (s *orderService) ValidateCoupon(ctx context.Context, code string, subtotalMinor int64, market string) (CouponValidation, error) {
+	code = NormalizeCouponCode(code)
+	if code == "" {
+		return CouponValidation{Reason: "not_found"}, nil
+	}
+	if market == "" {
+		market = s.defaultMarket
+	}
+	c, err := s.repo.GetCouponByCode(ctx, code, market)
+	if err != nil {
+		if errors.Is(err, ErrCouponNotFound) {
+			return CouponValidation{Code: code, Reason: "not_found"}, nil
+		}
+		return CouponValidation{}, fmt.Errorf("order: validate coupon: %w", err)
+	}
+	redemptions, err := s.repo.CountCouponRedemptions(ctx, c.ID)
+	if err != nil {
+		return CouponValidation{}, fmt.Errorf("order: validate coupon count: %w", err)
+	}
+	return resolveCoupon(&c, subtotalMinor, redemptions, time.Now().UTC()), nil
 }

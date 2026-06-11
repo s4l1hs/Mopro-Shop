@@ -122,6 +122,9 @@ type mockRepo struct {
 	updateStatusFn         func(ctx context.Context, tx pgx.Tx, orderID int64, status order.OrderStatus, updatedAt time.Time) error
 	setDeliveredFn         func(ctx context.Context, tx pgx.Tx, orderID int64, deliveredAt time.Time) error
 	withTxFn               func(ctx context.Context, fn func(pgx.Tx) error) error
+	getCouponByCodeFn      func(ctx context.Context, code, market string) (order.Coupon, error)
+	countRedemptionsFn     func(ctx context.Context, couponID int64) (int, error)
+	insertRedemptionFn     func(ctx context.Context, tx pgx.Tx, red order.CouponRedemption) error
 }
 
 func (m *mockRepo) InsertOrder(ctx context.Context, tx pgx.Tx, o order.Order) (order.Order, error) {
@@ -145,6 +148,24 @@ func (m *mockRepo) GetOrder(ctx context.Context, orderID int64) (order.Order, []
 		return m.getOrderFn(ctx, orderID)
 	}
 	return order.Order{ID: orderID, Status: order.StatusPendingPayment}, nil, nil
+}
+func (m *mockRepo) GetCouponByCode(ctx context.Context, code, market string) (order.Coupon, error) {
+	if m.getCouponByCodeFn != nil {
+		return m.getCouponByCodeFn(ctx, code, market)
+	}
+	return order.Coupon{}, order.ErrCouponNotFound
+}
+func (m *mockRepo) CountCouponRedemptions(ctx context.Context, couponID int64) (int, error) {
+	if m.countRedemptionsFn != nil {
+		return m.countRedemptionsFn(ctx, couponID)
+	}
+	return 0, nil
+}
+func (m *mockRepo) InsertCouponRedemption(ctx context.Context, tx pgx.Tx, red order.CouponRedemption) error {
+	if m.insertRedemptionFn != nil {
+		return m.insertRedemptionFn(ctx, tx, red)
+	}
+	return nil
 }
 func (m *mockRepo) GetOrderItems(ctx context.Context, orderID int64) ([]order.OrderItem, error) {
 	if m.getOrderItemsFn != nil {

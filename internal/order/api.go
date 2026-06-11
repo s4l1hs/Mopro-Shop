@@ -29,6 +29,11 @@ type Service interface {
 
 	// CancelOrder transitions an order to cancelled. Only valid from pending_payment or paid.
 	CancelOrder(ctx context.Context, orderID int64, reason string) error
+
+	// ValidateCoupon resolves a coupon code against a basket-discounted subtotal
+	// (read-only preview; CT-03/CHK-04). An unknown/invalid code returns a
+	// CouponValidation with Valid=false + a Reason — never an error.
+	ValidateCoupon(ctx context.Context, code string, subtotalMinor int64, market string) (CouponValidation, error)
 }
 
 // Repository is the storage interface used only by service.go.
@@ -42,6 +47,14 @@ type Repository interface {
 	UpdateStatus(ctx context.Context, tx pgx.Tx, orderID int64, status OrderStatus, updatedAt time.Time) error
 	SetDelivered(ctx context.Context, tx pgx.Tx, orderID int64, deliveredAt time.Time) error
 	WithTx(ctx context.Context, fn func(pgx.Tx) error) error
+
+	// Coupon storage (CT-03/CHK-04). GetCouponByCode returns ErrCouponNotFound when
+	// the code is unknown. CountCouponRedemptions backs the max-redemptions guard.
+	// InsertCouponRedemption is idempotent (UNIQUE(coupon_id, order_id)) — a repeat
+	// (coupon, order) is a no-op, not an error.
+	GetCouponByCode(ctx context.Context, code, market string) (Coupon, error)
+	CountCouponRedemptions(ctx context.Context, couponID int64) (int, error)
+	InsertCouponRedemption(ctx context.Context, tx pgx.Tx, red CouponRedemption) error
 }
 
 // CheckoutSessionRepository persists checkout session state.

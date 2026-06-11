@@ -82,16 +82,21 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 
 	// 3. Build per-seller groups with commission snapshots.
 	type sellerGroup struct {
-		sellerID int64
-		items    []OrderItem
-		subtotal int64 // pre-discount Σ(list_unit×qty)
-		discount int64 // Σ(list−discounted)×qty (seller-funded basket discount, CT-09)
-		currency string
+		sellerID       int64
+		items          []OrderItem
+		subtotal       int64 // pre-discount Σ(list_unit×qty)
+		discount       int64 // Σ(list−charged)×qty (basket CT-09 + coupon CT-03 combined)
+		couponDiscount int64 // Σ(basket-discounted−charged)×qty (coupon slice of discount)
+		currency       string
 	}
 	groupsBySellerID := make(map[int64]*sellerGroup)
 	var totalMinor int64 // charged total across all sellers (discounted)
 	var currency string
 
+	// Phase 1: resolve all lines + the basket-discounted subtotal so the cart-level
+	// coupon (CHK-04) can be resolved against it before the per-unit charge is built.
+	lines := make([]resolvedLine, 0, len(cartState.Items))
+	var basketSubtotal int64
 	for _, ci := range cartState.Items {
 		v, vErr := s.catalog.GetVariantByID(ctx, ci.VariantID)
 		if vErr != nil {
@@ -101,44 +106,55 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 		if cErr != nil {
 			return InitiateCheckoutResponse{}, fmt.Errorf("order: saga get commission variant %d: %w", ci.VariantID, cErr)
 		}
-
-		// Per-unit basket discount → charged unit = snapshot unit_price_minor (CT-09).
 		pct := basketPctOf(v.BasketDiscountPct)
 		discUnit := DiscountedUnitMinor(v.PriceMinor, pct)
-		listGross := v.PriceMinor * int64(ci.Qty)
-		gross := discUnit * int64(ci.Qty)
-		commAmt := gross * int64(comm.CommissionPctBps) / 10000
-		kdvAmt := commAmt * int64(comm.KdvPctBps) / 10000
+		basketSubtotal += discUnit * int64(ci.Qty)
+		lines = append(lines, resolvedLine{ci: ci, v: v, comm: comm, basketPct: pct, discUnit: discUnit})
+		if currency == "" {
+			currency = v.PriceCurrency
+		}
+	}
+
+	// Resolve the optional coupon once (seller-funded; applied per unit on top of
+	// the basket discount). Same resolve logic the cart used ⇒ display==charge.
+	couponPct, coupon := s.resolveCouponForCharge(ctx, req.CouponCode, market, basketSubtotal)
+
+	// Phase 2: build per-seller groups with the coupon applied per unit.
+	for _, ln := range lines {
+		qty := int64(ln.ci.Qty)
+		couponedUnit := DiscountedUnitMinor(ln.discUnit, couponPct)
+		listGross := ln.v.PriceMinor * qty
+		gross := couponedUnit * qty
+		commAmt := gross * int64(ln.comm.CommissionPctBps) / 10000
+		kdvAmt := commAmt * int64(ln.comm.KdvPctBps) / 10000
 		sellerNet := gross - commAmt - kdvAmt
 
 		item := OrderItem{
-			VariantID:             ci.VariantID,
-			SellerID:              v.SellerID,
-			CategoryID:            v.CategoryID,
-			Qty:                   ci.Qty,
-			UnitPriceMinor:        discUnit,
-			ListUnitPriceMinor:    v.PriceMinor,
-			BasketDiscountPct:     pct,
-			UnitPriceCurrency:     v.PriceCurrency,
-			CommissionPctBps:      comm.CommissionPctBps,
-			KdvPctBps:             comm.KdvPctBps,
+			VariantID:             ln.ci.VariantID,
+			SellerID:              ln.v.SellerID,
+			CategoryID:            ln.v.CategoryID,
+			Qty:                   ln.ci.Qty,
+			UnitPriceMinor:        couponedUnit,
+			ListUnitPriceMinor:    ln.v.PriceMinor,
+			BasketDiscountPct:     ln.basketPct,
+			UnitPriceCurrency:     ln.v.PriceCurrency,
+			CommissionPctBps:      ln.comm.CommissionPctBps,
+			KdvPctBps:             ln.comm.KdvPctBps,
 			CommissionAmountMinor: commAmt,
 			KdvAmountMinor:        kdvAmt,
 			SellerNetMinor:        sellerNet,
 		}
 
-		g := groupsBySellerID[v.SellerID]
+		g := groupsBySellerID[ln.v.SellerID]
 		if g == nil {
-			g = &sellerGroup{sellerID: v.SellerID, currency: v.PriceCurrency}
-			groupsBySellerID[v.SellerID] = g
+			g = &sellerGroup{sellerID: ln.v.SellerID, currency: ln.v.PriceCurrency}
+			groupsBySellerID[ln.v.SellerID] = g
 		}
 		g.items = append(g.items, item)
 		g.subtotal += listGross
 		g.discount += listGross - gross
+		g.couponDiscount += (ln.discUnit - couponedUnit) * qty
 		totalMinor += gross
-		if currency == "" {
-			currency = v.PriceCurrency
-		}
 	}
 	if req.Currency != "" {
 		currency = req.Currency
@@ -161,21 +177,31 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 		for _, g := range groupsBySellerID {
 			// One idempotency key per seller within this checkout session.
 			idemKey := fmt.Sprintf("%s:seller_%d", req.SessionID, g.sellerID)
+			// A cart-level coupon spans sellers; each per-seller order carries its
+			// own slice (couponDiscount), so a multi-seller checkout records one
+			// redemption per seller-order. Conservative (counts ≥, never <) so the
+			// max-redemptions guard can't be exceeded.
+			couponCode := ""
+			if coupon != nil && g.couponDiscount > 0 {
+				couponCode = coupon.Code
+			}
 			o := Order{
-				UserID:            req.UserID,
-				SellerID:          g.sellerID,
-				CheckoutSessionID: req.SessionID,
-				Status:            StatusPendingPayment,
-				SubtotalMinor:     g.subtotal,
-				ShippingMinor:     0,
-				ShippingPayer:     "buyer",
-				DiscountMinor:     g.discount,
-				TotalMinor:        g.subtotal - g.discount,
-				Currency:          g.currency,
-				Market:            market,
-				CashbackEligible:  true,
-				CashbackCurrency:  s.cashbackCurrency,
-				IdempotencyKey:    idemKey,
+				UserID:              req.UserID,
+				SellerID:            g.sellerID,
+				CheckoutSessionID:   req.SessionID,
+				Status:              StatusPendingPayment,
+				SubtotalMinor:       g.subtotal,
+				ShippingMinor:       0,
+				ShippingPayer:       "buyer",
+				DiscountMinor:       g.discount,
+				CouponCode:          couponCode,
+				CouponDiscountMinor: g.couponDiscount,
+				TotalMinor:          g.subtotal - g.discount,
+				Currency:            g.currency,
+				Market:              market,
+				CashbackEligible:    true,
+				CashbackCurrency:    s.cashbackCurrency,
+				IdempotencyKey:      idemKey,
 			}
 			created, txErr := s.repo.InsertOrder(ctx, tx, o)
 			if txErr != nil {
@@ -184,6 +210,16 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 			for _, item := range g.items {
 				item.OrderID = created.ID
 				if _, txErr = s.repo.InsertOrderItem(ctx, tx, item); txErr != nil {
+					return txErr
+				}
+			}
+			if coupon != nil && g.couponDiscount > 0 {
+				if txErr = s.repo.InsertCouponRedemption(ctx, tx, CouponRedemption{
+					CouponID:      coupon.ID,
+					OrderID:       created.ID,
+					UserID:        req.UserID,
+					DiscountMinor: g.couponDiscount,
+				}); txErr != nil {
 					return txErr
 				}
 			}
