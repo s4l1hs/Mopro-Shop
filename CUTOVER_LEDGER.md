@@ -211,6 +211,7 @@
 | Search | Pending (inherits PLP grid/filter patterns). |
 | PDP | Pending (own walk; may need seed extension: reviews/variants/gallery). |
 | Phase C (divergences) | After parity surfaces — coin redeem (deferred), etc. |
+| Checkout | **PROBABLE resolved source-side** (`feat/checkout-probable-resolution`): CHK-07 saved-cards/installments = **NOT-ACTIONABLE** (PSP-hosted + cashback analog, settled); CHK-09 validation/error states = **NEEDS-VISUAL** (generic failed state exists; copy coverage needs eyes). 0 CONFIRMED fixes. Doc: `docs/internal/checkout-probable-resolution.md`. |
 
 ### Local walk env refreshed — ✅ (`chore/local-walk-env`)
 
