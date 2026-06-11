@@ -86,8 +86,13 @@ func newSagaService(
 	catSvc catalog.Service,
 	ob outbox.Repository,
 	psp payment.Service,
+	resolver ...order.AddressResolver,
 ) order.Service {
-	return order.NewServiceFull(repo, sessionRepo, cartSvc, catSvc, ob, "TR", "TRY_COIN", psp, nil, nil)
+	var ar order.AddressResolver
+	if len(resolver) > 0 {
+		ar = resolver[0]
+	}
+	return order.NewServiceFull(repo, sessionRepo, cartSvc, catSvc, ob, "TR", "TRY_COIN", psp, nil, nil, ar)
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────
@@ -169,6 +174,112 @@ func TestInitiateCheckout_ChargesDiscountedTotal(t *testing.T) {
 	}
 	if len(resp.Orders) == 0 {
 		t.Error("Orders must not be empty")
+	}
+}
+
+// fakeAddressResolver returns a fixed snapshot, recording the (userID, addressID)
+// it was asked to resolve (OR-02).
+type fakeAddressResolver struct {
+	snap      order.OrderAddress
+	err       error
+	gotUserID int64
+	gotAddrID int64
+	callCount int
+}
+
+func (f *fakeAddressResolver) ResolveDeliveryAddress(_ context.Context, userID, addressID int64) (order.OrderAddress, error) {
+	f.callCount++
+	f.gotUserID, f.gotAddrID = userID, addressID
+	return f.snap, f.err
+}
+
+// TestInitiateCheckout_CapturesDeliveryAddress proves OR-02: when AddressID is set and
+// a resolver is wired, the saga resolves the address once and freezes the snapshot onto
+// each created order within the persist tx.
+func TestInitiateCheckout_CapturesDeliveryAddress(t *testing.T) {
+	resolver := &fakeAddressResolver{snap: order.OrderAddress{
+		Label: "Ev", RecipientName: "Ali Veli", Phone: "+905551112233",
+		FullAddress: "Atatürk Cad. No:1", Neighborhood: "Merkez Mah.",
+		District: "Kadıköy", City: "İstanbul", PostalCode: "34000",
+	}}
+	var captured []order.OrderAddress
+	repo := &mockRepo{
+		insertOrderFn: func(_ context.Context, _ pgx.Tx, o order.Order) (order.Order, error) {
+			o.ID = 7
+			return o, nil
+		},
+		insertOrderAddressFn: func(_ context.Context, _ pgx.Tx, a order.OrderAddress) error {
+			captured = append(captured, a)
+			return nil
+		},
+	}
+
+	svc := newSagaService(repo, &mockSessionRepo{}, &mockCartSvc{}, &mockCatalogSvc{}, &mockOutbox{}, &mockPSP{}, resolver)
+	_, err := svc.InitiateCheckout(context.Background(), order.InitiateCheckoutRequest{
+		UserID: 1, SessionID: "sess-addr", AddressID: 55, BuyerEmail: "a@b.c",
+	})
+	if err != nil {
+		t.Fatalf("InitiateCheckout: %v", err)
+	}
+	if resolver.callCount != 1 || resolver.gotUserID != 1 || resolver.gotAddrID != 55 {
+		t.Errorf("resolver called wrong: count=%d user=%d addr=%d", resolver.callCount, resolver.gotUserID, resolver.gotAddrID)
+	}
+	if len(captured) != 1 {
+		t.Fatalf("want 1 captured snapshot, got %d", len(captured))
+	}
+	if captured[0].OrderID != 7 || captured[0].RecipientName != "Ali Veli" || captured[0].City != "İstanbul" {
+		t.Errorf("snapshot mismatch: %+v", captured[0])
+	}
+}
+
+// TestInitiateCheckout_NoAddressID_NoSnapshot proves the capture is opt-in: with no
+// AddressID, the resolver is never called and no snapshot is written (legacy-safe).
+func TestInitiateCheckout_NoAddressID_NoSnapshot(t *testing.T) {
+	resolver := &fakeAddressResolver{}
+	wrote := false
+	repo := &mockRepo{
+		insertOrderAddressFn: func(_ context.Context, _ pgx.Tx, _ order.OrderAddress) error {
+			wrote = true
+			return nil
+		},
+	}
+	svc := newSagaService(repo, &mockSessionRepo{}, &mockCartSvc{}, &mockCatalogSvc{}, &mockOutbox{}, &mockPSP{}, resolver)
+	if _, err := svc.InitiateCheckout(context.Background(), order.InitiateCheckoutRequest{
+		UserID: 1, SessionID: "sess-noaddr", BuyerEmail: "a@b.c",
+	}); err != nil {
+		t.Fatalf("InitiateCheckout: %v", err)
+	}
+	if resolver.callCount != 0 {
+		t.Errorf("resolver should not be called without AddressID (count=%d)", resolver.callCount)
+	}
+	if wrote {
+		t.Error("no snapshot should be written without AddressID")
+	}
+}
+
+// TestInitiateCheckout_AddressResolveFails_NonFatal proves a resolve failure degrades
+// gracefully: the order is still created, just without a snapshot.
+func TestInitiateCheckout_AddressResolveFails_NonFatal(t *testing.T) {
+	resolver := &fakeAddressResolver{err: errors.New("address not found")}
+	wrote := false
+	repo := &mockRepo{
+		insertOrderAddressFn: func(_ context.Context, _ pgx.Tx, _ order.OrderAddress) error {
+			wrote = true
+			return nil
+		},
+	}
+	svc := newSagaService(repo, &mockSessionRepo{}, &mockCartSvc{}, &mockCatalogSvc{}, &mockOutbox{}, &mockPSP{}, resolver)
+	resp, err := svc.InitiateCheckout(context.Background(), order.InitiateCheckoutRequest{
+		UserID: 1, SessionID: "sess-addrfail", AddressID: 99, BuyerEmail: "a@b.c",
+	})
+	if err != nil {
+		t.Fatalf("resolve failure must not fail checkout: %v", err)
+	}
+	if len(resp.Orders) == 0 {
+		t.Error("order should still be created")
+	}
+	if wrote {
+		t.Error("no snapshot should be written when resolve fails")
 	}
 }
 

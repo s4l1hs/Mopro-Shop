@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:mopro_api/src/model/delivery_address.dart';
 import 'package:mopro_api/src/model/order_item.dart';
 import 'package:json_annotation/json_annotation.dart';
 
@@ -36,6 +37,8 @@ class Order {
      this.cashbackUnlockAt,
 
      this.deliveredAt,
+
+     this.deliveryAddress,
 
     required  this.createdAt,
   });
@@ -149,6 +152,19 @@ class Order {
 
 
 
+      /// Immutable ship-to snapshot captured at checkout (OR-02). Null for legacy orders created before address capture. A frozen copy, NOT a live reference to the user's (mutable) saved address. 
+  @JsonKey(
+    
+    name: r'delivery_address',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final DeliveryAddress? deliveryAddress;
+
+
+
   @JsonKey(
     
     name: r'created_at',
@@ -174,6 +190,7 @@ class Order {
       other.cargoOption == cargoOption &&
       other.cashbackUnlockAt == cashbackUnlockAt &&
       other.deliveredAt == deliveredAt &&
+      other.deliveryAddress == deliveryAddress &&
       other.createdAt == createdAt;
 
     @override
@@ -187,6 +204,7 @@ class Order {
         cargoOption.hashCode +
         cashbackUnlockAt.hashCode +
         deliveredAt.hashCode +
+        deliveryAddress.hashCode +
         createdAt.hashCode;
 
   factory Order.fromJson(Map<String, dynamic> json) => _$OrderFromJson(json);

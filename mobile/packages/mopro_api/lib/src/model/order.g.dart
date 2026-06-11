@@ -49,6 +49,12 @@ Order _$OrderFromJson(Map<String, dynamic> json) => $checkedCreate(
         'delivered_at',
         (v) => v == null ? null : DateTime.parse(v as String),
       ),
+      deliveryAddress: $checkedConvert(
+        'delivery_address',
+        (v) => v == null
+            ? null
+            : DeliveryAddress.fromJson(v as Map<String, dynamic>),
+      ),
       createdAt: $checkedConvert(
         'created_at',
         (v) => DateTime.parse(v as String),
@@ -62,6 +68,7 @@ Order _$OrderFromJson(Map<String, dynamic> json) => $checkedCreate(
     'cargoOption': 'cargo_option',
     'cashbackUnlockAt': 'cashback_unlock_at',
     'deliveredAt': 'delivered_at',
+    'deliveryAddress': 'delivery_address',
     'createdAt': 'created_at',
   },
 );
@@ -76,6 +83,7 @@ Map<String, dynamic> _$OrderToJson(Order instance) => <String, dynamic>{
   'cargo_option': ?_$OrderCargoOptionEnumEnumMap[instance.cargoOption],
   'cashback_unlock_at': ?instance.cashbackUnlockAt?.toIso8601String(),
   'delivered_at': ?instance.deliveredAt?.toIso8601String(),
+  'delivery_address': ?instance.deliveryAddress?.toJson(),
   'created_at': instance.createdAt.toIso8601String(),
 };
 

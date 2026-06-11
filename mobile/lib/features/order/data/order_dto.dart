@@ -142,6 +142,53 @@ class RefundInfo {
   bool get isWallet => method == 'wallet_credit';
 }
 
+/// Immutable ship-to snapshot captured at checkout (OR-02). Null for legacy orders
+/// created before address capture — a frozen copy, not a live address reference.
+class DeliveryAddressDto {
+  const DeliveryAddressDto({
+    required this.recipientName,
+    required this.fullAddress,
+    required this.district,
+    required this.city,
+    this.label = '',
+    this.phone = '',
+    this.neighborhood = '',
+    this.postalCode = '',
+  });
+
+  factory DeliveryAddressDto.fromJson(Map<String, dynamic> json) =>
+      DeliveryAddressDto(
+        label: (json['label'] as String?) ?? '',
+        recipientName: (json['recipient_name'] as String?) ?? '',
+        phone: (json['phone'] as String?) ?? '',
+        fullAddress: (json['full_address'] as String?) ?? '',
+        neighborhood: (json['neighborhood'] as String?) ?? '',
+        district: (json['district'] as String?) ?? '',
+        city: (json['city'] as String?) ?? '',
+        postalCode: (json['postal_code'] as String?) ?? '',
+      );
+
+  final String label;
+  final String recipientName;
+  final String phone;
+  final String fullAddress;
+  final String neighborhood;
+  final String district;
+  final String city;
+  final String postalCode;
+
+  /// "Mah. ... District/City PostalCode" — the locality line under the street.
+  String get localityLine {
+    final parts = <String>[
+      if (neighborhood.isNotEmpty) neighborhood,
+      if (district.isNotEmpty || city.isNotEmpty)
+        [district, city].where((s) => s.isNotEmpty).join('/'),
+      if (postalCode.isNotEmpty) postalCode,
+    ];
+    return parts.join(' ');
+  }
+}
+
 class OrderDto {
   const OrderDto({
     required this.id,
@@ -158,6 +205,7 @@ class OrderDto {
     this.updatedAt,
     this.shippedAt,
     this.deliveredAt,
+    this.deliveryAddress,
     this.items = const [],
     this.actions,
     this.refund,
@@ -190,6 +238,11 @@ class OrderDto {
       deliveredAt: o['delivered_at'] != null
           ? DateTime.tryParse(o['delivered_at'] as String)
           : null,
+      deliveryAddress: o['delivery_address'] is Map<String, dynamic>
+          ? DeliveryAddressDto.fromJson(
+              o['delivery_address'] as Map<String, dynamic>,
+            )
+          : null,
       items: (itemsJson ?? [])
           .map((e) => OrderItemDto.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -216,6 +269,7 @@ class OrderDto {
   final DateTime? updatedAt;
   final DateTime? shippedAt;
   final DateTime? deliveredAt;
+  final DeliveryAddressDto? deliveryAddress;
   final List<OrderItemDto> items;
   final OrderActions? actions;
   final RefundInfo? refund;
@@ -241,6 +295,7 @@ class OrderDto {
         updatedAt: updatedAt ?? this.updatedAt,
         shippedAt: shippedAt,
         deliveredAt: deliveredAt,
+        deliveryAddress: deliveryAddress,
         items: items,
         actions: actions ?? this.actions,
         refund: refund ?? this.refund,

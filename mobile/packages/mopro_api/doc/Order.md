@@ -17,6 +17,7 @@ Name | Type | Description | Notes
 **cargoOption** | **String** |  | [optional] 
 **cashbackUnlockAt** | [**DateTime**](DateTime.md) | When the cashback plan becomes active. Computed as delivered_at + 3 business days (TR calendar). Null until the order is delivered.  | [optional] 
 **deliveredAt** | [**DateTime**](DateTime.md) |  | [optional] 
+**deliveryAddress** | [**DeliveryAddress**](DeliveryAddress.md) | Immutable ship-to snapshot captured at checkout (OR-02). Null for legacy orders created before address capture. A frozen copy, NOT a live reference to the user's (mutable) saved address.  | [optional] 
 **createdAt** | [**DateTime**](DateTime.md) |  | 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

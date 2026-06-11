@@ -453,6 +453,7 @@
     "number": "Sipariş #{id}",
     "item_count": "{count} ürün",
     "status_timeline": "Sipariş Durumu",
+    "delivery_address_title": "Teslimat Adresi",
     "items": "Ürünler",
     "subtotal": "Ara Toplam",
     "shipping": "Kargo",

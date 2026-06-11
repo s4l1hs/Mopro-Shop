@@ -9,6 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/mopro/platform/pkg/crypto"
 )
 
 const pgUniqueViolation = "23505"
@@ -119,6 +121,74 @@ func (r *pgxOrderRepository) GetOrderItems(ctx context.Context, orderID int64) (
 	}
 	defer rows.Close()
 	return scanItems(rows)
+}
+
+// InsertOrderAddress encrypts the snapshot's PII fields and persists it (OR-02).
+// ON CONFLICT (order_id) DO NOTHING makes a re-entrant checkout retry a no-op.
+func (r *pgxOrderRepository) InsertOrderAddress(ctx context.Context, tx pgx.Tx, a OrderAddress) error {
+	nameEnc, err := crypto.EncryptPII(a.RecipientName)
+	if err != nil {
+		return fmt.Errorf("order.repo: encrypt recipient_name: %w", err)
+	}
+	phoneEnc, err := crypto.EncryptPII(a.Phone)
+	if err != nil {
+		return fmt.Errorf("order.repo: encrypt phone: %w", err)
+	}
+	fullEnc, err := crypto.EncryptPII(a.FullAddress)
+	if err != nil {
+		return fmt.Errorf("order.repo: encrypt full_address: %w", err)
+	}
+	neighEnc, err := crypto.EncryptPII(a.Neighborhood)
+	if err != nil {
+		return fmt.Errorf("order.repo: encrypt neighborhood: %w", err)
+	}
+	_, err = tx.Exec(ctx,
+		`INSERT INTO order_schema.order_addresses
+			(order_id, label, recipient_name_enc, phone_enc, full_address_enc,
+			 neighborhood_enc, district, city, postal_code)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		ON CONFLICT (order_id) DO NOTHING`,
+		a.OrderID, a.Label, nameEnc, phoneEnc, fullEnc,
+		neighEnc, a.District, a.City, a.PostalCode,
+	)
+	if err != nil {
+		return fmt.Errorf("order.repo: InsertOrderAddress: %w", err)
+	}
+	return nil
+}
+
+// GetOrderAddress returns the decrypted delivery-address snapshot, or (nil, nil) when
+// the order has no snapshot (legacy orders predating OR-02).
+func (r *pgxOrderRepository) GetOrderAddress(ctx context.Context, orderID int64) (*OrderAddress, error) {
+	var a OrderAddress
+	var nameEnc, phoneEnc, fullEnc, neighEnc string
+	err := r.pool.QueryRow(ctx,
+		`SELECT order_id, label, recipient_name_enc, phone_enc, full_address_enc,
+		        COALESCE(neighborhood_enc, ''), district, city, COALESCE(postal_code, '')
+		 FROM order_schema.order_addresses WHERE order_id = $1`, orderID,
+	).Scan(&a.OrderID, &a.Label, &nameEnc, &phoneEnc, &fullEnc,
+		&neighEnc, &a.District, &a.City, &a.PostalCode)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("order.repo: GetOrderAddress: %w", err)
+	}
+	if a.RecipientName, err = crypto.DecryptPII(nameEnc); err != nil {
+		return nil, fmt.Errorf("order.repo: decrypt recipient_name: %w", err)
+	}
+	if a.Phone, err = crypto.DecryptPII(phoneEnc); err != nil {
+		return nil, fmt.Errorf("order.repo: decrypt phone: %w", err)
+	}
+	if a.FullAddress, err = crypto.DecryptPII(fullEnc); err != nil {
+		return nil, fmt.Errorf("order.repo: decrypt full_address: %w", err)
+	}
+	if neighEnc != "" {
+		if a.Neighborhood, err = crypto.DecryptPII(neighEnc); err != nil {
+			return nil, fmt.Errorf("order.repo: decrypt neighborhood: %w", err)
+		}
+	}
+	return &a, nil
 }
 
 func (r *pgxOrderRepository) FindByIdempotencyKey(ctx context.Context, key string) (Order, error) {

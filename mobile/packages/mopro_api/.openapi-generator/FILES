@@ -29,6 +29,7 @@ doc/CreateOrderRequest.md
 doc/CreateProductRequest.md
 doc/CursorPaginationMeta.md
 doc/DeleteMeRequest.md
+doc/DeliveryAddress.md
 doc/DeliveryEta.md
 doc/Device.md
 doc/DiscoveryApi.md
@@ -128,6 +129,7 @@ lib/src/model/create_order_request.dart
 lib/src/model/create_product_request.dart
 lib/src/model/cursor_pagination_meta.dart
 lib/src/model/delete_me_request.dart
+lib/src/model/delivery_address.dart
 lib/src/model/delivery_eta.dart
 lib/src/model/device.dart
 lib/src/model/error_envelope.dart
@@ -177,3 +179,4 @@ lib/src/model/variant.dart
 lib/src/model/verify_otp_request.dart
 lib/src/model/wallet_balance.dart
 lib/src/model/wallet_transaction.dart
+test/delivery_address_test.dart

@@ -216,6 +216,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// identitySvc is constructed below (after its deps); the order address resolver
+	// closes over it and is only invoked at request time (checkout) — OR-02.
+	var identitySvc identity.Service
 	orderSvc := order.NewServiceFull(
 		orderRepo, checkoutSessionRepo,
 		cartSvc, catalogSvc, orderOutbox,
@@ -223,6 +226,7 @@ func main() {
 		paymentSvc,
 		&redisDiskPanicChecker{rc: rc},
 		bizM,
+		identityAddressResolver{get: func() identity.Service { return identitySvc }},
 	)
 
 	// ── Outbox publisher — drains order_schema.outbox → Redis Streams ───────
@@ -383,7 +387,7 @@ func main() {
 	default: // "mock" or empty
 		smsProv = mock.New(slog.Default())
 	}
-	identitySvc := identity.NewService(
+	identitySvc = identity.NewService(
 		identityRepo, smsProv, emailProv, identityLimiter, jwtSigner,
 		market, defaultLocale, slog.Default(),
 		bizM,

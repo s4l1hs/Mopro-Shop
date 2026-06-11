@@ -12,6 +12,7 @@ class CheckoutRepositoryImpl implements CheckoutRepository {
     required String buyerName,
     required String buyerSurname,
     required String idempotencyKey,
+    int? addressId,
     String returnUrl = 'mopro://checkout/result',
     String couponCode = '',
   }) async {
@@ -22,6 +23,7 @@ class CheckoutRepositoryImpl implements CheckoutRepository {
         'buyer_surname': buyerSurname,
         'buyer_email': '',
         'return_url': returnUrl,
+        if (addressId != null) 'address_id': addressId,
         if (couponCode.isNotEmpty) 'coupon_code': couponCode,
       },
       options: Options(
