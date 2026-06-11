@@ -164,13 +164,34 @@ carries the discounted snapshot).
 
 ## 5. Decision log
 
-- [ ] **Funding model — AWAITING SALIH.** Option A (seller-funded, recommended,
-      reuses CT-09, ships now) vs Option B (platform-funded → §12 → DEFER+ADR).
-- Once confirmed A: implement validation → apply via per-unit distribution into the
-  CT-09 snapshot path → cart + checkout entry + coupon summary line → tests + money
-  gates. Update `TRENDYOL_PARITY_CART_AUDIT.md` (CT-03), the checkout audit
-  (CHK-04), and the ledger note.
-- If B: STOP, write the ADR, do not code.
+- [x] **Funding model — SELLER-FUNDED (Salih-confirmed, Option A).** Mirrors the
+      CT-09 basket-discount decision. No constitution change, no new ledger account,
+      fin-svc untouched.
+- [x] **Implemented (v1 = percent, cart-level):**
+  - migration `0092`: `order_schema.coupons` + `coupon_redemptions`
+    (UNIQUE(coupon_id, order_id) ⇒ idempotent redemption, financial-core §4) +
+    `orders.coupon_code` / `coupon_discount_minor`; seed `WELCOME10`/`SAVE20`.
+  - `internal/order/coupon.go`: `Coupon` + pure `resolveCoupon` guards
+    (active/window/min-basket/redemption) + `CouponRedemption`.
+  - `order.Service.ValidateCoupon` (read preview) + Repository coupon methods.
+  - `Checkout` + `InitiateCheckout` (saga): two-pass build resolves the coupon
+    against the basket-discounted subtotal, applies `couponPct` **per unit on top
+    of** the CT-09 basket discount → `order_items.unit_price_minor` is the final
+    CHARGED unit → commission/KDV/seller-net/cashback all derive from it. Redemption
+    recorded in the same tx.
+  - Display: `GET /cart?coupon=CODE` (`cart_enrich`) applies the same resolve logic
+    ⇒ **display==charge**; carry-through via `/checkout/initiate` + legacy
+    `/orders/checkout` body `coupon_code`.
+  - Mobile: cart `applyCoupon` + coupon line + invalid message; checkout sends the
+    code.
+- **Edge handling:** a stale/expired code at charge time is silently dropped (charge
+  full = buyer-safe). A multi-seller cart-level coupon records one redemption per
+  seller-order (conservative — counts ≥, never <, so max-redemptions can't be
+  exceeded).
+- **Deferred (follow-ups, not v1):** fixed-amount coupons (need largest-remainder
+  distribution across lines), coupon *creation*/admin, stacking rules beyond
+  basket+single-coupon, scope=seller/category. Option B (platform-funded) remains
+  ADR-gated (§12) if ever wanted.
 
 ---
 

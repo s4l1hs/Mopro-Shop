@@ -123,5 +123,19 @@ order build + the display surfaces.
 5. **mobile** — cart DTO + summary render the "Sepette indirim" line.
 6. **tests + audits** — order/cart property + integration; the asymmetry test
    (charged == displayed); CT-09 → RESOLVED.
+
+## 6. Ledger note — coupon (CT-03/CHK-04) extends this seam
+
+The coupon discount (`docs/internal/coupon.md`, migration `0092`) is **also
+seller-funded** and reuses this exact mechanism: `order/pricing.go`
+`DiscountedUnitMinor` is applied a second time, **per unit, on top of** the basket
+discount, so `order_items.unit_price_minor` remains the single charged-unit
+snapshot every downstream consumer derives from. Therefore the coupon — like the
+basket discount — needs **no new ledger account and no fin-svc change**: the capture
+move still balances (buyer-charged total == Σ seller_net+commission+kdv) and cashback
+computes on the coupon-discounted price. The only new persistence is
+`order_schema.coupon_redemptions` (idempotent usage tracking, financial-core §4) —
+not a ledger account. `orders.discount_minor` now aggregates basket + coupon;
+`orders.coupon_discount_minor` carries the coupon slice for the summary line.
 </content>
 </invoke>

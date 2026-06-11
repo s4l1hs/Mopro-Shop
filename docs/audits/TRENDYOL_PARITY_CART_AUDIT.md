@@ -50,8 +50,8 @@
   guest→auth merge**, stock reservation (`reservedUntil`) — *all built UI-side,
   awaiting the backend enrichment above.*
 - **CONFIRMED gaps (src): 10** — CT-01 seller group shows `#id` not name + no
-  per-seller subtotal; CT-02 no free-shipping progress; CT-03 coupon is a
-  desktop-only placeholder (no backend); CT-04 mobile summary lacks the
+  per-seller subtotal; CT-02 no free-shipping progress; ~~CT-03 coupon
+  placeholder~~ **(RESOLVED — seller-funded coupon, migration 0092)**; CT-04 mobile summary lacks the
   subtotal/shipping breakdown; CT-05 no variant label / save-for-later /
   move-to-favorites on a line; CT-06 no stock/price-changed warnings; CT-07/08 no
   recommendations (empty + populated); CT-09 no basket-discount line; CT-10
@@ -70,7 +70,7 @@
 | — | Line: image, title, variant, unit price, qty stepper, remove, **save-for-later/move-to-fav** | `CartLineCard` (now with **variant label**) + move-to-favorites | **CT-05 ✅ RESOLVED** — enriched `GET /cart` serves `variant_label` (colour/size) → rendered on the line; **save-for-later** (no saved list) separate | **CT-05 RESOLVED** | MED |
 | — | Per-seller grouping w/ per-seller subtotal + cargo | `_SellerGroupHeader`: **seller name** + per-seller subtotal | **CT-01 ✅ RESOLVED** — enriched `GET /cart` serves `seller_name` + `totals_by_seller`; header shows the real name (fallback `#id`) + subtotal | **CT-01 RESOLVED** | MED |
 | — | Summary: subtotal, cargo, coupon, "Sepette indirim", coin, **total** | desktop `OrderSummaryCard`; mobile `CartTotalsSummary` | **CT-04 ✅ RESOLVED**; **CT-09 ✅ RESOLVED** — `basket_discount_pct` is now a **charged** seller-funded discount (migration 0091). The order build applies it per unit so `order_items.unit_price_minor` is the discounted (charged) unit; commission/KDV/seller-net freeze on the discounted gross; cart + PSP charge the discounted total; cashback computes on the discounted price; the "Sepette indirim" line shows in cart + checkout. **Display==charge** is guaranteed by the shared `order.DiscountedUnitMinor` helper used by both `enrichCart` and the order build. Seller-funded → **no constitution change, no new ledger accounts, fin-svc untouched** (the snapshot does the work). The pill is now honest. Doc: `docs/internal/basket-discount-pricing.md`. | **CT-04 / CT-09 RESOLVED** | MED |
-| — | Coupon/promo field | desktop coupon `TextField` — **placeholder, no coupon backend** ("Coupon application is a placeholder"); mobile has none | non-functional + desktop-only | **CT-03** | MED |
+| — | Coupon/promo field | desktop `OrderSummaryCard` coupon field — **now functional** | **CT-03 ✅ RESOLVED** — seller-funded coupon (Salih-confirmed). `GET /cart?coupon=CODE` applies a percent coupon **per unit on top of** the CT-09 basket discount via the shared `order.DiscountedUnitMinor`, so `order_items.unit_price_minor` is the final charged unit and commission/KDV/seller-net/cashback all derive from it (snapshot does the work; **no new ledger accounts, fin-svc untouched**). Backend `order.Service.ValidateCoupon` + idempotent `coupon_redemptions` (migration 0092); the same code is charged at `/checkout/initiate` (**display==charge**). Coupon line + invalid-message now render in the cart. v1 = percent only; fixed-amount + admin deferred. Doc: `docs/internal/coupon.md`. | **CT-03 RESOLVED** | MED |
 | — | Free-shipping progress ("X TL daha ekle") | cart shipping is **unconditionally `0`** ("Ücretsiz"; cargo handled separately, §2.3/§4.8) | **CT-02 NOT-ACTIONABLE** — no cart-level shipping cost → **no threshold to progress toward**; fabricating one contradicts the always-free model | **NOT-ACTIONABLE** | — |
 | — | Sticky checkout CTA with total | `CartTotalsSummary`/`OrderSummaryCard` checkout button → `requireAuth` → `/checkout` | — (**auth-gated**, intentional) | **MATCHED** | — |
 | — | Empty cart + suggestions | `EmptyCart`: icon + title + subtitle + one CTA | **no recommendations/popular** | **CT-07** | LOW |
@@ -166,8 +166,9 @@ shared backend prerequisites for both surfaces.
    save-for-later needs a saved-items store, separate).
 3. **CT-06** — stock (out/low) + price-changed-since-added warnings (surface
    `reservedUntil`; add price-at-add).
-4. **CT-02 / CT-09 / CT-03** — free-shipping progress; basket-discount line;
-   coupon backend (shared with Checkout). Backend-gated.
+4. **CT-02** — free-shipping progress (NOT-ACTIONABLE: always-free cart).
+   ~~CT-09 basket-discount line~~ ✅ (PR #180) · ~~CT-03 coupon backend~~ ✅
+   (seller-funded, migration 0092 — shared with Checkout CHK-04).
 5. **CT-07 / CT-08 / CT-10** — recommendations (empty + cart) + a real Undo. LOW.
 
 > Severities provisional until the walk. No fixes in this PR.
