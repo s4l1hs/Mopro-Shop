@@ -36,6 +36,11 @@ INSERT INTO wallet_schema.accounts (type, owner_type, owner_id, currency, status
 
   -- Equity (TRY_COIN): counter-equity debited each monthly cashback cron payment.
   -- v6 perpetual model: NO upfront provision; each month's coin issuance is recognized as it is paid.
-  ('equity:cashback_distribution','platform', NULL, 'TRY_COIN', 'active')
+  ('equity:cashback_distribution','platform', NULL, 'TRY_COIN', 'active'),
+
+  -- Equity (TRY_COIN): counter-equity debited each refund settlement (RT-01,
+  -- refund-as-coin). Recognized per-settlement, no upfront provision — the exact
+  -- analogue of cashback_distribution. Migration: 0082_refund_distribution_account.
+  ('equity:refund_distribution',  'platform', NULL, 'TRY_COIN', 'active')
 
 ON CONFLICT DO NOTHING;
