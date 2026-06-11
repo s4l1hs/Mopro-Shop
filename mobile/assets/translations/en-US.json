@@ -207,7 +207,9 @@
   "empty_state": {
     "empty_message": "Nothing here yet",
     "error_message": "Something went wrong. Please try again.",
-    "not_found_message": "No products found."
+    "not_found_message": "No products found.",
+    "no_results_filtered": "No products match your filters.",
+    "clear_filters": "Clear Filters"
   },
   "favorites": {
     "empty_title": "No favourites yet",

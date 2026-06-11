@@ -46,7 +46,8 @@
     clear-all, **FAV-04** error-retry state.
   - **CONFIRMED (src), still open: 1** — **FAV-01** flat list / no collections
     (MED, = main-audit **P-013**, a separate flagship feature).
-  - **PROBABLE (await walk): 3** — **FAV-05** no add-to-cart on the card (LOW–MED),
+  - **PROBABLE → resolved source-side** (`feat/favorites-probable-resolution`, no walk; `docs/internal/favorites-probable-resolution.md`): **FAV-05** add-to-cart → **DEFER** (discovery shift: favorites store only product IDs, so ATC needs variant resolution — a quick-add sheet/PDP redirect — + touches the shared `ProductCard`, §3; not a clean button). **FAV-06** sort/filter → **NEEDS-DECISION** (UI feature, LOW). **FAV-07** price-drop-since-favorited → **DEFER** (needs a price-at-favorite snapshot; favorites hold only IDs). **0 CONFIRMED UI-only fixes.**
+  - ~~**PROBABLE (await walk): 3**~~ (original) — **FAV-05** no add-to-cart on the card (LOW–MED),
     **FAV-06** no sort/filter (LOW), **FAV-07** no "fiyatı düştü since favorited"
     indicator (LOW–MED).
 - **NOT-ACTIONABLE: 2** — guest-local favorites (no login wall — a deliberate
