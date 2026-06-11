@@ -388,6 +388,8 @@
     "total": "Total",
     "coupon_code": "Coupon code",
     "apply": "Apply",
+    "coupon_discount": "Coupon discount",
+    "coupon_invalid": "Coupon could not be applied.",
     "confirm_cart": "Confirm Cart",
     "summary_helper": "Taxes and shipping not included.",
     "checkout_login_reason": "Sign in to complete your order."

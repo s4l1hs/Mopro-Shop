@@ -6,5 +6,6 @@ abstract class CheckoutRepository {
     required String buyerSurname,
     required String idempotencyKey,
     String returnUrl = 'mopro://checkout/result',
+    String couponCode = '', // CT-03/CHK-04: charges the cart's coupon-discounted total
   });
 }

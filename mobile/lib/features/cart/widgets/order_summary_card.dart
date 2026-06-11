@@ -9,8 +9,9 @@ import 'package:mopro/utils/money.dart';
 /// subtotal / shipping / estimated cashback / total, a coupon input, and the
 /// "Sepeti Onayla" CTA. [onCheckout] is wired by the screen.
 ///
-/// Coupon application is a placeholder (no coupon backend exists yet) — the
-/// "Uygula" button is inert; see REPORT §4.
+/// Coupon (CT-03): "Uygula" applies a seller-funded coupon via the cart
+/// notifier's applyCoupon (GET /cart?coupon=); the discounted total + the coupon
+/// line come back on the cart DTO and the same code charges at checkout.
 class OrderSummaryCard extends ConsumerStatefulWidget {
   const OrderSummaryCard({required this.onCheckout, super.key});
 
@@ -33,7 +34,8 @@ class _OrderSummaryCardState extends ConsumerState<OrderSummaryCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final cart = ref.watch(cartProvider).cart.valueOrNull;
+    final cartState = ref.watch(cartProvider);
+    final cart = cartState.cart.valueOrNull;
     final cashback = ref.watch(cartMonthlyCashbackProvider).valueOrNull;
 
     final subtotalMinor =
@@ -41,6 +43,8 @@ class _OrderSummaryCardState extends ConsumerState<OrderSummaryCard> {
     final shippingMinor =
         cart?.totalsBySeller.fold<int>(0, (s, t) => s + t.shippingMinor) ?? 0;
     final totalMinor = cart?.grandTotalMinor ?? 0;
+    final couponDiscountMinor = cart?.couponDiscountMinor ?? 0;
+    final couponMessage = cart?.couponMessage ?? '';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -68,6 +72,15 @@ class _OrderSummaryCardState extends ConsumerState<OrderSummaryCard> {
                 ? 'cart.shipping_free'.tr()
                 : MoneyUtils.formatMinor(shippingMinor),
           ),
+          if (couponDiscountMinor > 0) ...[
+            const SizedBox(height: 6),
+            _row(
+              theme,
+              'cart.coupon_discount'.tr(),
+              '-${MoneyUtils.formatMinor(couponDiscountMinor)}',
+              valueColor: cs.primary,
+            ),
+          ],
           if (cashback != null && cashback > 0) ...[
             const SizedBox(height: 6),
             _row(
@@ -106,11 +119,22 @@ class _OrderSummaryCardState extends ConsumerState<OrderSummaryCard> {
                 ),
               ),
               TextButton(
-                onPressed: () {}, // coupon backend not wired (REPORT §4)
+                onPressed: cartState.isMutating
+                    ? null
+                    : () => ref
+                        .read(cartProvider.notifier)
+                        .applyCoupon(_coupon.text),
                 child: Text('cart.apply'.tr()),
               ),
             ],
           ),
+          if (couponMessage.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'cart.coupon_invalid'.tr(),
+              style: theme.textTheme.labelSmall?.copyWith(color: cs.error),
+            ),
+          ],
           const SizedBox(height: 12),
           SizedBox(
             height: 56,

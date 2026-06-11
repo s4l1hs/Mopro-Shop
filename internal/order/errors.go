@@ -10,4 +10,5 @@ var (
 	ErrReservationExpired       = errors.New("order: reservation has expired")
 	ErrCheckoutSessionNotFound  = errors.New("order: checkout session not found")
 	ErrCheckoutSessionDuplicate = errors.New("order: checkout session already exists")
+	ErrCouponNotFound           = errors.New("order: coupon not found")
 )

@@ -26,6 +26,13 @@ type cartSellerNamer interface {
 	SellerNamesByIDs(ctx context.Context, ids []int64) (map[int64]string, error)
 }
 
+// cartCouponValidator resolves a coupon code against a basket-discounted subtotal
+// (CT-03). order.Service satisfies it. The SAME resolve logic the order build uses,
+// so the displayed coupon discount can never diverge from the charged one.
+type cartCouponValidator interface {
+	ValidateCoupon(ctx context.Context, code string, subtotalMinor int64, market string) (order.CouponValidation, error)
+}
+
 // cartLineJSON / sellerTotalJSON / cartJSON mirror the mobile CartLineDto /
 // SellerTotalDto / CartDto exactly (hand-written; cart isn't in the OpenAPI spec).
 type cartLineJSON struct {
@@ -59,10 +66,17 @@ type cartJSON struct {
 	TotalsBySeller []sellerTotalJSON `json:"totals_by_seller"`
 	// BasketDiscountMinor is Σ(list − discounted)×qty — the "Sepette indirim"
 	// summary line (CT-09). GrandTotalMinor is the post-discount charged total, so
-	// pre-discount subtotal = GrandTotalMinor + BasketDiscountMinor.
+	// pre-discount subtotal = GrandTotalMinor + BasketDiscountMinor + CouponDiscountMinor.
 	BasketDiscountMinor int64 `json:"basket_discount_minor"`
-	GrandTotalMinor     int64 `json:"grand_total_minor"`
-	KdvIncludedMinor    int64 `json:"kdv_included_minor"`
+	// CouponCode/CouponDiscountMinor are the applied coupon (CT-03), folded into
+	// GrandTotalMinor. CouponMessage carries a reason ("expired","min_basket",…) when
+	// an entered code is NOT applied, so the UI can show why. CouponCode is empty +
+	// CouponDiscountMinor 0 when no/invalid coupon.
+	CouponCode          string `json:"coupon_code,omitempty"`
+	CouponDiscountMinor int64  `json:"coupon_discount_minor"`
+	CouponMessage       string `json:"coupon_message,omitempty"`
+	GrandTotalMinor     int64  `json:"grand_total_minor"`
+	KdvIncludedMinor    int64  `json:"kdv_included_minor"`
 }
 
 // variantLabel joins the variant's non-empty colour/size into a display string
@@ -83,7 +97,7 @@ func variantLabel(v catalog.Variant) string {
 // mobile expects, resolving everything §5-safely via in-process service calls
 // (no cross-schema JOIN; the merge lives here in cmd/core-svc, not internal/cart).
 // Per-line resolution failures skip that line rather than failing the whole cart.
-func enrichCart(ctx context.Context, c cart.Cart, cat cartCatalogResolver, namer cartSellerNamer, locale, market string) cartJSON {
+func enrichCart(ctx context.Context, c cart.Cart, cat cartCatalogResolver, namer cartSellerNamer, coupons cartCouponValidator, couponCode, locale, market string) cartJSON {
 	out := cartJSON{
 		ID:             "",
 		UserID:         c.UserID,
@@ -142,6 +156,30 @@ func enrichCart(ctx context.Context, c cart.Cart, cat cartCatalogResolver, namer
 		}
 	}
 
+	// Resolve the optional coupon (CT-03) against the basket-discounted subtotal —
+	// the SAME number the order build computes, so the displayed coupon discount can
+	// never diverge from the charged one (the asymmetry rule). An invalid code yields
+	// couponPct 0 + a CouponMessage reason for the UI.
+	var basketSubtotal int64
+	for _, pr := range resolved {
+		bp := 0
+		if pr.variant.BasketDiscountPct != nil {
+			bp = *pr.variant.BasketDiscountPct
+		}
+		basketSubtotal += order.DiscountedUnitMinor(pr.variant.PriceMinor, bp) * int64(pr.item.Qty)
+	}
+	couponPct := 0
+	if couponCode != "" && coupons != nil {
+		if res, err := coupons.ValidateCoupon(ctx, couponCode, basketSubtotal, market); err != nil {
+			slog.Warn("cart: coupon validate", "err", err)
+		} else if res.Valid {
+			couponPct = res.PercentOff
+			out.CouponCode = res.Code
+		} else {
+			out.CouponMessage = res.Reason
+		}
+	}
+
 	// Build lines + accumulate per-seller totals + KDV (preserving cart order).
 	type acc struct {
 		items int64
@@ -149,23 +187,27 @@ func enrichCart(ctx context.Context, c cart.Cart, cat cartCatalogResolver, namer
 	}
 	totals := map[int64]*acc{}
 	sellerOrder := 0
-	var grand, kdv, basketDiscount int64
+	var grand, kdv, basketDiscount, couponDiscount int64
 	for _, pr := range resolved {
 		v := pr.variant
-		// Seller-funded basket discount (CT-09): the SAME pure helper + the SAME
-		// products.basket_discount_pct the order build uses, so the displayed line
-		// price can never diverge from the charged price (the asymmetry rule).
+		// Seller-funded basket discount (CT-09) + coupon (CT-03): the SAME pure
+		// helper + the SAME inputs the order build uses, applied per unit, so the
+		// displayed line price can never diverge from the charged price.
 		pct := 0
 		if v.BasketDiscountPct != nil {
 			pct = *v.BasketDiscountPct
 		}
 		discUnit := order.DiscountedUnitMinor(v.PriceMinor, pct)
-		lineTotal := discUnit * int64(pr.item.Qty)
+		effUnit := order.DiscountedUnitMinor(discUnit, couponPct)
+		lineTotal := effUnit * int64(pr.item.Qty)
 		listPrice := int64(0)
 		if discUnit != v.PriceMinor {
-			listPrice = v.PriceMinor
 			basketDiscount += (v.PriceMinor - discUnit) * int64(pr.item.Qty)
 		}
+		if effUnit != v.PriceMinor {
+			listPrice = v.PriceMinor
+		}
+		couponDiscount += (discUnit - effUnit) * int64(pr.item.Qty)
 		grand += lineTotal
 		if bps, ok := kdvByCat[v.CategoryID]; ok && bps > 0 {
 			kdv += lineTotal * int64(bps) / int64(10000+bps)
@@ -185,7 +227,7 @@ func enrichCart(ctx context.Context, c cart.Cart, cat cartCatalogResolver, namer
 			SellerName:     names[v.SellerID],
 			Title:          prodByID[v.ProductID].Title,
 			VariantLabel:   variantLabel(v),
-			PriceMinor:     discUnit,
+			PriceMinor:     effUnit,
 			ListPriceMinor: listPrice,
 			Qty:            pr.item.Qty,
 			CoverImageURL:  cover,
@@ -215,6 +257,10 @@ func enrichCart(ctx context.Context, c cart.Cart, cat cartCatalogResolver, namer
 		})
 	}
 	out.BasketDiscountMinor = basketDiscount
+	out.CouponDiscountMinor = couponDiscount
+	if couponDiscount == 0 {
+		out.CouponCode = "" // a valid-but-zero coupon isn't worth echoing as applied
+	}
 	out.GrandTotalMinor = grand
 	out.KdvIncludedMinor = kdv
 	return out

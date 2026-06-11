@@ -394,6 +394,8 @@
     "total": "Toplam",
     "coupon_code": "Kupon kodu",
     "apply": "Uygula",
+    "coupon_discount": "Kupon indirimi",
+    "coupon_invalid": "Kupon uygulanamadı.",
     "confirm_cart": "Sepeti Onayla",
     "summary_helper": "Vergi ve kargo dahil değildir.",
     "checkout_login_reason": "Siparişi tamamlamak için giriş yap."

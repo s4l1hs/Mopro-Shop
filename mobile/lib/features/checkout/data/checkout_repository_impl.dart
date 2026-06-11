@@ -13,6 +13,7 @@ class CheckoutRepositoryImpl implements CheckoutRepository {
     required String buyerSurname,
     required String idempotencyKey,
     String returnUrl = 'mopro://checkout/result',
+    String couponCode = '',
   }) async {
     final resp = await _dio.post<Map<String, dynamic>>(
       '/checkout/initiate',
@@ -21,6 +22,7 @@ class CheckoutRepositoryImpl implements CheckoutRepository {
         'buyer_surname': buyerSurname,
         'buyer_email': '',
         'return_url': returnUrl,
+        if (couponCode.isNotEmpty) 'coupon_code': couponCode,
       },
       options: Options(
         headers: {'Idempotency-Key': idempotencyKey},

@@ -33,7 +33,7 @@ class _FakeCartRepo implements CartRepository {
   );
 
   @override
-  Future<CartDto> getCart() async => _cart;
+  Future<CartDto> getCart({String? coupon}) async => _cart;
 
   @override
   Future<CartDto> addItem({

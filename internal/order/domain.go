@@ -29,16 +29,21 @@ type Order struct {
 	// items (CT-09): Σ(list_unit − unit)×qty. SubtotalMinor is pre-discount;
 	// TotalMinor = SubtotalMinor − DiscountMinor (the charged amount). 0 when no
 	// item carries a basket discount → SubtotalMinor == TotalMinor.
-	DiscountMinor    int64      `json:"discount_minor"`
-	TotalMinor       int64      `json:"total_minor"`
-	Currency         string     `json:"currency"`
-	Market           string     `json:"market"`
-	DeliveredAt      *time.Time `json:"delivered_at,omitempty"`
-	CashbackEligible bool       `json:"cashback_eligible"`
-	CashbackCurrency string     `json:"cashback_currency"`
-	IdempotencyKey   string     `json:"idempotency_key"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	DiscountMinor int64 `json:"discount_minor"`
+	// CouponCode is the applied coupon (empty = none) and CouponDiscountMinor is its
+	// slice of DiscountMinor (CT-03/CHK-04). The remainder of DiscountMinor is the
+	// CT-09 basket discount. Coupon is seller-funded ⇒ folded into the same snapshot.
+	CouponCode          string     `json:"coupon_code,omitempty"`
+	CouponDiscountMinor int64      `json:"coupon_discount_minor"`
+	TotalMinor          int64      `json:"total_minor"`
+	Currency            string     `json:"currency"`
+	Market              string     `json:"market"`
+	DeliveredAt         *time.Time `json:"delivered_at,omitempty"`
+	CashbackEligible    bool       `json:"cashback_eligible"`
+	CashbackCurrency    string     `json:"cashback_currency"`
+	IdempotencyKey      string     `json:"idempotency_key"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 // OrderItem is a single line in the order with frozen commission snapshots.
@@ -75,6 +80,7 @@ type CheckoutRequest struct {
 	ReservationID  string // from cart.Reserve; empty tolerated on idempotent retries
 	Market         string // overrides service default when non-empty
 	Currency       string // overrides first-item currency when non-empty
+	CouponCode     string // optional coupon code (CT-03); empty = none
 	IdempotencyKey string
 }
 
@@ -114,6 +120,7 @@ type InitiateCheckoutRequest struct {
 	Market        string
 	Currency      string
 	SessionID     string // from Idempotency-Key header; becomes checkout_session.id and PSP invoice_id
+	CouponCode    string // optional coupon code (CHK-04); empty = none
 	BuyerName     string
 	BuyerSurname  string
 	BuyerEmail    string

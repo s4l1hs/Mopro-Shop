@@ -8,8 +8,13 @@ class CartRepositoryImpl implements CartRepository {
   final Dio _dio;
 
   @override
-  Future<CartDto> getCart() async {
-    final resp = await _dio.get<Map<String, dynamic>>('/cart');
+  Future<CartDto> getCart({String? coupon}) async {
+    final resp = await _dio.get<Map<String, dynamic>>(
+      '/cart',
+      queryParameters: (coupon != null && coupon.isNotEmpty)
+          ? {'coupon': coupon}
+          : null,
+    );
     return CartDto.fromJson(resp.data!);
   }
 

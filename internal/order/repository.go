@@ -44,18 +44,22 @@ func (r *pgxOrderRepository) InsertOrder(ctx context.Context, tx pgx.Tx, o Order
 	if o.SellerID != 0 {
 		sellerID = &o.SellerID
 	}
+	var couponCode *string
+	if o.CouponCode != "" {
+		couponCode = &o.CouponCode
+	}
 	err := tx.QueryRow(ctx,
 		`INSERT INTO order_schema.orders
 			(user_id, status, subtotal_minor, shipping_minor, shipping_payer,
 			 discount_minor, total_minor, currency, market,
 			 cashback_eligible, cashback_currency, idempotency_key,
-			 seller_id, checkout_session_id)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+			 seller_id, checkout_session_id, coupon_code, coupon_discount_minor)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
 		RETURNING id, created_at, updated_at`,
 		o.UserID, string(o.Status), o.SubtotalMinor, o.ShippingMinor, o.ShippingPayer,
 		o.DiscountMinor, o.TotalMinor, o.Currency, o.Market,
 		o.CashbackEligible, o.CashbackCurrency, o.IdempotencyKey,
-		sellerID, checkoutSessionID,
+		sellerID, checkoutSessionID, couponCode, o.CouponDiscountMinor,
 	).Scan(&o.ID, &o.CreatedAt, &o.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
@@ -93,7 +97,8 @@ func (r *pgxOrderRepository) GetOrder(ctx context.Context, orderID int64) (Order
 		        discount_minor, total_minor, currency, market, delivered_at,
 		        cashback_eligible, cashback_currency, idempotency_key,
 		        created_at, updated_at,
-		        COALESCE(seller_id, 0), COALESCE(checkout_session_id, '')
+		        COALESCE(seller_id, 0), COALESCE(checkout_session_id, ''),
+		        COALESCE(coupon_code, ''), coupon_discount_minor
 		FROM order_schema.orders WHERE id = $1`, orderID))
 	if err != nil {
 		return Order{}, nil, err
@@ -122,7 +127,8 @@ func (r *pgxOrderRepository) FindByIdempotencyKey(ctx context.Context, key strin
 		        discount_minor, total_minor, currency, market, delivered_at,
 		        cashback_eligible, cashback_currency, idempotency_key,
 		        created_at, updated_at,
-		        COALESCE(seller_id, 0), COALESCE(checkout_session_id, '')
+		        COALESCE(seller_id, 0), COALESCE(checkout_session_id, ''),
+		        COALESCE(coupon_code, ''), coupon_discount_minor
 		FROM order_schema.orders WHERE idempotency_key = $1`, key))
 }
 
@@ -132,7 +138,8 @@ func (r *pgxOrderRepository) ListOrders(ctx context.Context, userID int64) ([]Or
 		        discount_minor, total_minor, currency, market, delivered_at,
 		        cashback_eligible, cashback_currency, idempotency_key,
 		        created_at, updated_at,
-		        COALESCE(seller_id, 0), COALESCE(checkout_session_id, '')
+		        COALESCE(seller_id, 0), COALESCE(checkout_session_id, ''),
+		        COALESCE(coupon_code, ''), coupon_discount_minor
 		FROM order_schema.orders
 		WHERE user_id = $1
 		ORDER BY created_at DESC`, userID)
@@ -191,6 +198,7 @@ func (r *pgxOrderRepository) scanOrder(ctx context.Context, row pgx.Row) (Order,
 		&o.CashbackEligible, &o.CashbackCurrency, &o.IdempotencyKey,
 		&o.CreatedAt, &o.UpdatedAt,
 		&o.SellerID, &o.CheckoutSessionID,
+		&o.CouponCode, &o.CouponDiscountMinor,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Order{}, ErrOrderNotFound
@@ -209,6 +217,7 @@ func (r *pgxOrderRepository) scanOrderRow(rows pgx.Rows) (Order, error) {
 		&o.CashbackEligible, &o.CashbackCurrency, &o.IdempotencyKey,
 		&o.CreatedAt, &o.UpdatedAt,
 		&o.SellerID, &o.CheckoutSessionID,
+		&o.CouponCode, &o.CouponDiscountMinor,
 	); err != nil {
 		return Order{}, fmt.Errorf("order.repo: scan order row: %w", err)
 	}
@@ -230,4 +239,50 @@ func scanItems(rows pgx.Rows) ([]OrderItem, error) {
 		items = append(items, it)
 	}
 	return items, rows.Err()
+}
+
+// ── coupon storage (CT-03/CHK-04) ─────────────────────────────────────────────
+
+func (r *pgxOrderRepository) GetCouponByCode(ctx context.Context, code, market string) (Coupon, error) {
+	var c Coupon
+	err := r.pool.QueryRow(ctx,
+		`SELECT id, code, kind, percent_off, min_basket_minor, max_redemptions,
+		        starts_at, expires_at, active, market
+		 FROM order_schema.coupons
+		 WHERE upper(code) = upper($1) AND market = $2`, code, market,
+	).Scan(&c.ID, &c.Code, &c.Kind, &c.PercentOff, &c.MinBasketMinor, &c.MaxRedemptions,
+		&c.StartsAt, &c.ExpiresAt, &c.Active, &c.Market)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Coupon{}, ErrCouponNotFound
+		}
+		return Coupon{}, fmt.Errorf("order.repo: GetCouponByCode: %w", err)
+	}
+	return c, nil
+}
+
+func (r *pgxOrderRepository) CountCouponRedemptions(ctx context.Context, couponID int64) (int, error) {
+	var n int
+	if err := r.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM order_schema.coupon_redemptions WHERE coupon_id = $1`,
+		couponID,
+	).Scan(&n); err != nil {
+		return 0, fmt.Errorf("order.repo: CountCouponRedemptions: %w", err)
+	}
+	return n, nil
+}
+
+// InsertCouponRedemption is idempotent: a duplicate (coupon_id, order_id) is a
+// no-op (ON CONFLICT DO NOTHING), so a retried capture cannot double-count.
+func (r *pgxOrderRepository) InsertCouponRedemption(ctx context.Context, tx pgx.Tx, red CouponRedemption) error {
+	_, err := tx.Exec(ctx,
+		`INSERT INTO order_schema.coupon_redemptions
+			(coupon_id, order_id, user_id, discount_minor)
+		 VALUES ($1,$2,$3,$4)
+		 ON CONFLICT (coupon_id, order_id) DO NOTHING`,
+		red.CouponID, red.OrderID, red.UserID, red.DiscountMinor)
+	if err != nil {
+		return fmt.Errorf("order.repo: InsertCouponRedemption: %w", err)
+	}
+	return nil
 }

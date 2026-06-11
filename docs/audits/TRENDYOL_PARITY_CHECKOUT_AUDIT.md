@@ -33,8 +33,9 @@
 - **CONFIRMED gaps (src): 3** — CHK-01 review summary shows **total only** (no
   subtotal/shipping/KDV/cashback breakdown); CHK-02 **no per-seller grouping** in
   review (🔗 Cart); CHK-03 **no delivery options/slots** step.
-- **🧩 Shared backend cluster (lands on cart + checkout): 3** — CHK-04 coupon
-  (=CT-03), CHK-05 basket-discount (=CT-09), CHK-06 free-shipping (=CT-02).
+- **🧩 Shared backend cluster (lands on cart + checkout):** ~~CHK-04 coupon
+  (=CT-03)~~ ✅ RESOLVED (seller-funded, migration 0092), ~~CHK-05 basket-discount
+  (=CT-09)~~ ✅, CHK-06 free-shipping (=CT-02, NOT-ACTIONABLE: always-free cart).
 - **PROBABLE (walk): 2** — CHK-07 saved-cards/installments, CHK-09
   validation/error states.
 - **NOT-ACTIONABLE: 5** — coin-redeem-as-payment (**disabled, deferred IA-02**),
@@ -54,7 +55,7 @@
 | — | Payment: card + **saved cards** + **installments** + coin/wallet | `card` (→ **3DS Sipay webview**, PSP-hosted) · `bank_transfer` · `cashback` (**disabled**) | **no saved cards / no installments** (PSP-hosted; cashback is the Mopro analog) | **CHK-07** | PROBABLE |
 | — | Order summary: lines + subtotal/shipping/coupon/basket-disc/KDV/cashback/**total** | `CheckoutReviewScreen` now renders the **full breakdown**: subtotal + shipping (free) + **total** + KDV note + monthly cashback (from `totals_by_seller`/`kdv_included` + `cartMonthlyCashbackProvider`) | **CHK-01 ✅ RESOLVED** (coupon/basket-disc still 🧩) | MED |
 | — | Per-seller grouping carried from cart | review groups lines **by seller** (header = `seller_name` + per-seller subtotal) | **CHK-02 ✅ RESOLVED** | MED |
-| — | Coupon/promo entry | — | absent (**= CT-03**) | **CHK-04** 🧩 | MED |
+| — | Coupon/promo entry | coupon applied in cart (CT-03) flows into `/checkout/initiate` as `coupon_code` → the saga charges the coupon-discounted total | **CHK-04 ✅ RESOLVED** (**= CT-03**) — seller-funded percent coupon; the same code shown in the cart charges at checkout (**display==charge**), commission/cashback on the discounted price (snapshot does the work; fin-svc untouched). Idempotent redemption (migration 0092). Doc: `docs/internal/coupon.md` | **CHK-04 RESOLVED** | MED |
 | — | "Sepette indirim" basket-discount line | review summary shows pre-discount subtotal + a "Sepette indirim" (−amount) line + the discounted total | **CHK-05 ✅ RESOLVED** (**= CT-09**) — the discount is a charged seller-funded discount (migration 0091); the checkout total equals the PSP charge. Doc: `docs/internal/basket-discount-pricing.md` | **CHK-05 RESOLVED** | MED |
 | — | Free-shipping threshold/progress | — | absent (**= CT-02**) | **CHK-06** 🧩 | LOW–MED |
 | — | Consent (distance-sales + pre-info, TR legal) | **2 `_ConsentCheckbox`** (`consent_sales` + `consent_distance_contract`) gating place-order | — | **MATCHED** | — |

@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mopro/features/cart/application/cart_provider.dart';
+import 'package:mopro/features/cart/data/cart_dto.dart';
+import 'package:mopro/features/cart/data/cart_repository.dart';
 import 'package:mopro/features/checkout/application/checkout_controller.dart';
 import 'package:mopro/features/checkout/data/checkout_repository.dart';
 import 'package:mopro/features/checkout/data/checkout_response_dto.dart';
@@ -40,6 +43,7 @@ class _FakeCheckoutRepo implements CheckoutRepository {
     required String buyerSurname,
     required String idempotencyKey,
     String returnUrl = 'mopro://checkout/result',
+    String couponCode = '',
   }) async =>
       _successResponse();
 }
@@ -51,12 +55,36 @@ class _FailingCheckoutRepo implements CheckoutRepository {
     required String buyerSurname,
     required String idempotencyKey,
     String returnUrl = 'mopro://checkout/result',
+    String couponCode = '',
   }) async =>
       throw DioException(requestOptions: RequestOptions(), message: 'fail');
 }
 
+// _EmptyCartRepo lets cartProvider build (the controller reads its coupon code).
+class _EmptyCartRepo implements CartRepository {
+  @override
+  Future<CartDto> getCart({String? coupon}) async => CartDto.empty();
+  @override
+  Future<CartDto> addItem({
+    required int productId,
+    required int variantId,
+    required int qty,
+  }) async =>
+      CartDto.empty();
+  @override
+  Future<CartDto> updateQty({required String lineId, required int qty}) async =>
+      CartDto.empty();
+  @override
+  Future<void> removeLine({required String lineId}) async {}
+  @override
+  Future<void> clear() async {}
+}
+
 ProviderContainer _container(CheckoutRepository repo) => ProviderContainer(
-      overrides: [checkoutRepositoryProvider.overrideWithValue(repo)],
+      overrides: [
+        checkoutRepositoryProvider.overrideWithValue(repo),
+        cartRepositoryProvider.overrideWithValue(_EmptyCartRepo()),
+      ],
     );
 
 void main() {
