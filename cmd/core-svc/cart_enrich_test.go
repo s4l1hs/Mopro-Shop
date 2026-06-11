@@ -9,6 +9,7 @@ import (
 
 	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
+	"github.com/mopro/platform/internal/order"
 )
 
 type fakeCartCatalog struct{}
@@ -97,6 +98,51 @@ func TestEnrichCart(t *testing.T) {
 		if !strings.Contains(string(b), key) {
 			t.Errorf("marshaled cart missing key %s: %s", key, b)
 		}
+	}
+}
+
+// discountCatalog returns variant 10 with a 20% basket discount (CT-09).
+type discountCatalog struct{ fakeCartCatalog }
+
+func (discountCatalog) GetVariantByID(_ context.Context, id int64) (catalog.Variant, error) {
+	pct := 20
+	return catalog.Variant{ID: id, ProductID: 100, CategoryID: 30, SellerID: 1,
+		PriceMinor: 10000, PriceCurrency: "TRY", BasketDiscountPct: &pct}, nil
+}
+
+// TestEnrichCart_BasketDiscount is the CT-09 asymmetry guard: the cart DISPLAY
+// charges the discounted price (PriceMinor) computed by the SAME helper the order
+// build uses, surfaces the strikethrough (ListPriceMinor) and the "Sepette
+// indirim" line (BasketDiscountMinor), and the grand total is the discounted sum.
+func TestEnrichCart_BasketDiscount(t *testing.T) {
+	c := cart.Cart{UserID: 7, Items: []cart.CartItem{{VariantID: 10, Qty: 2}}}
+	out := enrichCart(context.Background(), c, discountCatalog{}, fakeNamer{}, "tr-TR", "TR")
+
+	if len(out.Lines) != 1 {
+		t.Fatalf("want 1 line, got %d", len(out.Lines))
+	}
+	l := out.Lines[0]
+	// 10000 − round(10000*20/100)=2000 → 8000 charged unit; list = 10000.
+	if l.PriceMinor != 8000 {
+		t.Errorf("charged unit: want 8000, got %d", l.PriceMinor)
+	}
+	if l.ListPriceMinor != 10000 {
+		t.Errorf("list (strikethrough) unit: want 10000, got %d", l.ListPriceMinor)
+	}
+	// Display == charge: the cart helper and the order build agree by construction.
+	if l.PriceMinor != order.DiscountedUnitMinor(10000, 20) {
+		t.Errorf("display/charge asymmetry: cart %d != order build %d",
+			l.PriceMinor, order.DiscountedUnitMinor(10000, 20))
+	}
+	if out.BasketDiscountMinor != 4000 { // (10000−8000)*2
+		t.Errorf("basket_discount_minor: want 4000, got %d", out.BasketDiscountMinor)
+	}
+	if out.GrandTotalMinor != 16000 { // 8000*2
+		t.Errorf("grand_total (charged): want 16000, got %d", out.GrandTotalMinor)
+	}
+	// Pre-discount subtotal = charged total + the discount line.
+	if out.GrandTotalMinor+out.BasketDiscountMinor != 20000 {
+		t.Errorf("subtotal reconstruction: want 20000, got %d", out.GrandTotalMinor+out.BasketDiscountMinor)
 	}
 }
 
