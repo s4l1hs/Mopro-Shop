@@ -125,6 +125,8 @@ type mockRepo struct {
 	getCouponByCodeFn      func(ctx context.Context, code, market string) (order.Coupon, error)
 	countRedemptionsFn     func(ctx context.Context, couponID int64) (int, error)
 	insertRedemptionFn     func(ctx context.Context, tx pgx.Tx, red order.CouponRedemption) error
+	insertOrderAddressFn   func(ctx context.Context, tx pgx.Tx, a order.OrderAddress) error
+	getOrderAddressFn      func(ctx context.Context, orderID int64) (*order.OrderAddress, error)
 }
 
 func (m *mockRepo) InsertOrder(ctx context.Context, tx pgx.Tx, o order.Order) (order.Order, error) {
@@ -170,6 +172,18 @@ func (m *mockRepo) InsertCouponRedemption(ctx context.Context, tx pgx.Tx, red or
 func (m *mockRepo) GetOrderItems(ctx context.Context, orderID int64) ([]order.OrderItem, error) {
 	if m.getOrderItemsFn != nil {
 		return m.getOrderItemsFn(ctx, orderID)
+	}
+	return nil, nil
+}
+func (m *mockRepo) InsertOrderAddress(ctx context.Context, tx pgx.Tx, a order.OrderAddress) error {
+	if m.insertOrderAddressFn != nil {
+		return m.insertOrderAddressFn(ctx, tx, a)
+	}
+	return nil
+}
+func (m *mockRepo) GetOrderAddress(ctx context.Context, orderID int64) (*order.OrderAddress, error) {
+	if m.getOrderAddressFn != nil {
+		return m.getOrderAddressFn(ctx, orderID)
 	}
 	return nil, nil
 }

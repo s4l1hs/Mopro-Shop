@@ -1,6 +1,9 @@
 package order
 
-import "time"
+import (
+	"context"
+	"time"
+)
 
 // OrderStatus represents the order lifecycle state.
 type OrderStatus string
@@ -44,6 +47,36 @@ type Order struct {
 	IdempotencyKey      string     `json:"idempotency_key"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
+	// DeliveryAddress is the immutable ship-to snapshot captured at checkout (OR-02),
+	// nil for legacy orders that predate capture. Populated on the read path only
+	// (service.GetOrder); the financial repo.GetOrder callers leave it nil.
+	DeliveryAddress *OrderAddress `json:"delivery_address,omitempty"`
+}
+
+// OrderAddress is the frozen delivery-address snapshot for an order (OR-02). It is an
+// as-of-purchase copy of the user's saved address — NOT a live reference (the saved
+// address is mutable and lives in a different schema; §5 forbids the cross-schema
+// JOIN/FK). This struct always holds PLAINTEXT; the repository encrypts the PII fields
+// (RecipientName/Phone/FullAddress/Neighborhood) on write and decrypts on read, so the
+// snapshot is AES-GCM encrypted at rest exactly like identity_schema.addresses (§6).
+type OrderAddress struct {
+	OrderID       int64  `json:"-"`
+	Label         string `json:"label,omitempty"`
+	RecipientName string `json:"recipient_name"`
+	Phone         string `json:"phone"`
+	FullAddress   string `json:"full_address"`
+	Neighborhood  string `json:"neighborhood,omitempty"`
+	District      string `json:"district"`
+	City          string `json:"city"`
+	PostalCode    string `json:"postal_code,omitempty"`
+}
+
+// AddressResolver resolves a user's saved address into a delivery-address snapshot at
+// checkout time. The composition root (cmd/core-svc) wires an adapter over
+// identity.Service.GetAddress, so the order package stays decoupled from identity
+// (no internal/order → internal/identity import). A nil resolver disables capture.
+type AddressResolver interface {
+	ResolveDeliveryAddress(ctx context.Context, userID, addressID int64) (OrderAddress, error)
 }
 
 // OrderItem is a single line in the order with frozen commission snapshots.
@@ -120,6 +153,7 @@ type InitiateCheckoutRequest struct {
 	Market        string
 	Currency      string
 	SessionID     string // from Idempotency-Key header; becomes checkout_session.id and PSP invoice_id
+	AddressID     int64  // selected delivery address (OR-02); 0 = none → no snapshot captured
 	CouponCode    string // optional coupon code (CHK-04); empty = none
 	BuyerName     string
 	BuyerSurname  string

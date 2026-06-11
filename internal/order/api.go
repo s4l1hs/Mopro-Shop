@@ -43,6 +43,15 @@ type Repository interface {
 	GetOrder(ctx context.Context, orderID int64) (Order, []OrderItem, error)
 	GetOrderItems(ctx context.Context, orderID int64) ([]OrderItem, error)
 	FindByIdempotencyKey(ctx context.Context, key string) (Order, error)
+
+	// InsertOrderAddress persists the frozen delivery-address snapshot for an order
+	// (OR-02), encrypting the PII fields at rest. Idempotent: a repeat (order_id) is
+	// a no-op. Called inside the checkout persist tx.
+	InsertOrderAddress(ctx context.Context, tx pgx.Tx, addr OrderAddress) error
+
+	// GetOrderAddress returns the decrypted delivery-address snapshot for an order, or
+	// (nil, nil) when the order has none (legacy orders predating OR-02).
+	GetOrderAddress(ctx context.Context, orderID int64) (*OrderAddress, error)
 	ListOrders(ctx context.Context, userID int64) ([]Order, error)
 	UpdateStatus(ctx context.Context, tx pgx.Tx, orderID int64, status OrderStatus, updatedAt time.Time) error
 	SetDelivered(ctx context.Context, tx pgx.Tx, orderID int64, deliveredAt time.Time) error

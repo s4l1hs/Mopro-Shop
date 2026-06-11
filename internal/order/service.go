@@ -241,7 +241,19 @@ func (s *orderService) Checkout(ctx context.Context, req CheckoutRequest) (Order
 }
 
 func (s *orderService) GetOrder(ctx context.Context, orderID int64) (Order, []OrderItem, error) {
-	return s.repo.GetOrder(ctx, orderID)
+	o, items, err := s.repo.GetOrder(ctx, orderID)
+	if err != nil {
+		return Order{}, nil, err
+	}
+	// OR-02: attach the frozen delivery-address snapshot on the read path. Absent for
+	// legacy orders (nil → omitted from the response); a lookup failure is non-fatal —
+	// the order still renders without the address card.
+	if addr, aErr := s.repo.GetOrderAddress(ctx, orderID); aErr != nil {
+		slog.Warn("order: GetOrderAddress", "order_id", orderID, "err", aErr)
+	} else {
+		o.DeliveryAddress = addr
+	}
+	return o, items, nil
 }
 
 func (s *orderService) ListOrders(ctx context.Context, userID int64) ([]Order, error) {
