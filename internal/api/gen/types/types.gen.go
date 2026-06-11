@@ -24,9 +24,9 @@ const (
 
 // Defines values for CashbackPaymentStatus.
 const (
-	Failed    CashbackPaymentStatus = "failed"
-	Paid      CashbackPaymentStatus = "paid"
-	Scheduled CashbackPaymentStatus = "scheduled"
+	CashbackPaymentStatusFailed    CashbackPaymentStatus = "failed"
+	CashbackPaymentStatusPaid      CashbackPaymentStatus = "paid"
+	CashbackPaymentStatusScheduled CashbackPaymentStatus = "scheduled"
 )
 
 // Defines values for CashbackPlanStatus.
@@ -54,8 +54,8 @@ const (
 
 // Defines values for CheckoutResponseStatus.
 const (
-	CheckoutResponseStatusAwaitingPayment CheckoutResponseStatus = "awaiting_payment"
-	CheckoutResponseStatusConfirmed       CheckoutResponseStatus = "confirmed"
+	AwaitingPayment CheckoutResponseStatus = "awaiting_payment"
+	Confirmed       CheckoutResponseStatus = "confirmed"
 )
 
 // Defines values for OrderCargoOption.
@@ -70,13 +70,13 @@ const (
 
 // Defines values for OrderStatus.
 const (
-	OrderStatusCancelled OrderStatus = "cancelled"
-	OrderStatusConfirmed OrderStatus = "confirmed"
-	OrderStatusDelivered OrderStatus = "delivered"
-	OrderStatusPending   OrderStatus = "pending"
-	OrderStatusPreparing OrderStatus = "preparing"
-	OrderStatusRefunded  OrderStatus = "refunded"
-	OrderStatusShipped   OrderStatus = "shipped"
+	OrderStatusCancelled         OrderStatus = "cancelled"
+	OrderStatusDelivered         OrderStatus = "delivered"
+	OrderStatusPaid              OrderStatus = "paid"
+	OrderStatusPartiallyRefunded OrderStatus = "partially_refunded"
+	OrderStatusPendingPayment    OrderStatus = "pending_payment"
+	OrderStatusRefunded          OrderStatus = "refunded"
+	OrderStatusShipped           OrderStatus = "shipped"
 )
 
 // Defines values for ProductStatus.
@@ -95,10 +95,10 @@ const (
 
 // Defines values for ReturnStatus.
 const (
-	Approved ReturnStatus = "approved"
-	Pending  ReturnStatus = "pending"
-	Refunded ReturnStatus = "refunded"
-	Rejected ReturnStatus = "rejected"
+	ReturnStatusApproved ReturnStatus = "approved"
+	ReturnStatusPending  ReturnStatus = "pending"
+	ReturnStatusRefunded ReturnStatus = "refunded"
+	ReturnStatusRejected ReturnStatus = "rejected"
 )
 
 // Defines values for ReturnRequestReason.
@@ -166,9 +166,9 @@ const (
 
 // Defines values for ListCashbackPlansParamsStatus.
 const (
-	Active    ListCashbackPlansParamsStatus = "active"
-	Cancelled ListCashbackPlansParamsStatus = "cancelled"
-	Suspended ListCashbackPlansParamsStatus = "suspended"
+	ListCashbackPlansParamsStatusActive    ListCashbackPlansParamsStatus = "active"
+	ListCashbackPlansParamsStatusCancelled ListCashbackPlansParamsStatus = "cancelled"
+	ListCashbackPlansParamsStatusSuspended ListCashbackPlansParamsStatus = "suspended"
 )
 
 // Defines values for DeleteMeJSONBodyReason.
@@ -182,13 +182,13 @@ const (
 
 // Defines values for ListOrdersParamsStatus.
 const (
-	ListOrdersParamsStatusCancelled ListOrdersParamsStatus = "cancelled"
-	ListOrdersParamsStatusConfirmed ListOrdersParamsStatus = "confirmed"
-	ListOrdersParamsStatusDelivered ListOrdersParamsStatus = "delivered"
-	ListOrdersParamsStatusPending   ListOrdersParamsStatus = "pending"
-	ListOrdersParamsStatusPreparing ListOrdersParamsStatus = "preparing"
-	ListOrdersParamsStatusRefunded  ListOrdersParamsStatus = "refunded"
-	ListOrdersParamsStatusShipped   ListOrdersParamsStatus = "shipped"
+	ListOrdersParamsStatusCancelled         ListOrdersParamsStatus = "cancelled"
+	ListOrdersParamsStatusDelivered         ListOrdersParamsStatus = "delivered"
+	ListOrdersParamsStatusPaid              ListOrdersParamsStatus = "paid"
+	ListOrdersParamsStatusPartiallyRefunded ListOrdersParamsStatus = "partially_refunded"
+	ListOrdersParamsStatusPendingPayment    ListOrdersParamsStatus = "pending_payment"
+	ListOrdersParamsStatusRefunded          ListOrdersParamsStatus = "refunded"
+	ListOrdersParamsStatusShipped           ListOrdersParamsStatus = "shipped"
 )
 
 // Defines values for ListProductsParamsSort.

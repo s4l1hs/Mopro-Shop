@@ -71,13 +71,17 @@ func (stubOrderCatalog) ListProductsByIDs(context.Context, []int64, string, stri
 
 // TestContract_GetOrder_DeliveryAddress proves OR-02: GET /orders/{id} surfaces the
 // frozen delivery-address snapshot under order.delivery_address, conforming to the
-// DeliveryAddress schema.
+// DeliveryAddress schema, and asserts the order's status conforms to the (now honest)
+// Order status enum.
 //
-// NOTE: we validate the delivery_address sub-object (the field OR-02 owns) against the
-// DeliveryAddress schema rather than the whole order against the Order schema — the
-// live order.Order serialization predates and diverges from the aspirational Order
-// schema (e.g. status="paid" is absent from the spec enum), a pre-existing drift this
-// vertical does not touch.
+// We validate the delivery_address sub-object + the status field rather than the whole
+// order against the Order schema. The status-enum drift is now FIXED (the spec enum
+// matches internal/order.OrderStatus — pending_payment/paid/…/partially_refunded), so
+// status="paid" conforms. A SEPARATE structural divergence remains: the API envelope
+// emits items as a sibling of order ({"order":…, "items":[…]}) while the Order schema
+// nests items inside the order, so a whole-order assertion still fails on the missing
+// nested "items". Reconciling that is a response-shape/schema change out of this
+// gen-drift lane (it would touch the mobile read-path) — documented as a follow-up.
 func TestContract_GetOrder_DeliveryAddress(t *testing.T) {
 	doc := loadSpec(t)
 
@@ -106,12 +110,15 @@ func TestContract_GetOrder_DeliveryAddress(t *testing.T) {
 
 	var wrapper struct {
 		Order struct {
+			Status          string          `json:"status"`
 			DeliveryAddress json.RawMessage `json:"delivery_address"`
 		} `json:"order"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &wrapper); err != nil {
 		t.Fatalf("decode envelope: %v", err)
 	}
+	// The reconciled enum: status="paid" must now be a member of the Order schema enum.
+	assertEnumMember(t, doc, "Order", "status", wrapper.Order.Status)
 	if len(wrapper.Order.DeliveryAddress) == 0 || string(wrapper.Order.DeliveryAddress) == "null" {
 		t.Fatalf("delivery_address missing: %s", rec.Body.String())
 	}
@@ -162,6 +169,28 @@ func assertConformsToSchema(t *testing.T, doc *openapi3.T, schemaName string, bo
 	if err := schemaRef.Value.VisitJSON(decoded); err != nil {
 		t.Errorf("handler response does not satisfy schema %q: %v\nJSON: %s", schemaName, err, body)
 	}
+}
+
+// assertEnumMember checks that value is a declared member of the enum on
+// <schemaName>.<property> — used to prove a live serialized value (e.g. an Order
+// status) is honest against the spec without validating the whole object (which can
+// fail on unrelated structural divergences).
+func assertEnumMember(t *testing.T, doc *openapi3.T, schemaName, property, value string) {
+	t.Helper()
+	schemaRef, ok := doc.Components.Schemas[schemaName]
+	if !ok {
+		t.Fatalf("schema %q not found in components", schemaName)
+	}
+	prop, ok := schemaRef.Value.Properties[property]
+	if !ok {
+		t.Fatalf("property %q not found on schema %q", property, schemaName)
+	}
+	for _, e := range prop.Value.Enum {
+		if s, _ := e.(string); s == value {
+			return
+		}
+	}
+	t.Errorf("value %q is not in the %s.%s enum %v (spec drift)", value, schemaName, property, prop.Value.Enum)
 }
 
 // TestContract_GetProductDetail_LiveHandler proves GET /products/{id} emits the

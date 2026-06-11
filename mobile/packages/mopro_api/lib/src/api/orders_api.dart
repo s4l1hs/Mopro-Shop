@@ -26,7 +26,7 @@ class OrdersApi {
 
   const OrdersApi(this._dio);
 
-  /// Cancel an order (only while in pending/confirmed status)
+  /// Cancel an order (only while in pending_payment/paid status)
   /// 
   ///
   /// Parameters:

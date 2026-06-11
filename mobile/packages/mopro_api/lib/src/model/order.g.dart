@@ -88,13 +88,13 @@ Map<String, dynamic> _$OrderToJson(Order instance) => <String, dynamic>{
 };
 
 const _$OrderStatusEnumEnumMap = {
-  OrderStatusEnum.pending: 'pending',
-  OrderStatusEnum.confirmed: 'confirmed',
-  OrderStatusEnum.preparing: 'preparing',
+  OrderStatusEnum.pendingPayment: 'pending_payment',
+  OrderStatusEnum.paid: 'paid',
   OrderStatusEnum.shipped: 'shipped',
   OrderStatusEnum.delivered: 'delivered',
   OrderStatusEnum.cancelled: 'cancelled',
   OrderStatusEnum.refunded: 'refunded',
+  OrderStatusEnum.partiallyRefunded: 'partially_refunded',
 };
 
 const _$OrderCargoOptionEnumEnumMap = {

@@ -1304,7 +1304,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [pending, confirmed, preparing, shipped, delivered, cancelled, refunded]
+            enum: [pending_payment, paid, shipped, delivered, cancelled, refunded, partially_refunded]
         - name: page
           in: query
           required: false
@@ -1371,7 +1371,7 @@ paths:
     post:
       operationId: CancelOrder
       tags: [orders]
-      summary: Cancel an order (only while in pending/confirmed status)
+      summary: Cancel an order (only while in pending_payment/paid status)
       parameters:
         - $ref: '#/components/parameters/TraceId'
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -2856,7 +2856,7 @@ components:
           format: int64
         status:
           type: string
-          enum: [pending, confirmed, preparing, shipped, delivered, cancelled, refunded]
+          enum: [pending_payment, paid, shipped, delivered, cancelled, refunded, partially_refunded]
         items:
           type: array
           items:
