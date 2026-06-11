@@ -211,6 +211,7 @@
 | Search | Pending (inherits PLP grid/filter patterns). |
 | PDP | Pending (own walk; may need seed extension: reviews/variants/gallery). |
 | Phase C (divergences) | After parity surfaces — coin redeem (deferred), etc. |
+| Orders | **PROBABLE resolved source-side** (`feat/orders-probable-resolution`): **no open PROBABLE rows** — OR-02 (#190)/OR-04 (#184)/OR-05/OR-07 (#187) all RESOLVED; refund-as-coin + status-derived timeline NOT-ACTIONABLE. 0 fixes/visual/decision open. Doc: `docs/internal/orders-probable-resolution.md`. |
 
 ### Local walk env refreshed — ✅ (`chore/local-walk-env`)
 
