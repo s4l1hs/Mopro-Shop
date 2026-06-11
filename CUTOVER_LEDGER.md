@@ -209,7 +209,7 @@
 | Home | ✅ Parity-complete (IA-01/02, Sprints A/B, closeout #135–#137) within the Deliberately-Lean IA. **PROBABLE rows resolved source-side** (`feat/home-probable-resolution`, no manual walk): all 6 closed — HP-01/02/03 (Sepette-%X pill / Çok-Satan badge / circular pucks) were **already implemented** by the G-3/G-4 catalog vertical (audit table was stale: `product_card.dart` + `home_category_rail.dart`, wired from `ProductSummary`, i18n+tests); HP-04 (camera/visual-search) + HP-05 (location selector) are **NEEDS-DECISION (Salih)** — a feature build vs. intentional mobile-first IA omission, not pixel questions, not fakeable. **0 code fixes, 0 NEEDS-VISUAL pixel residue.** Establishes the **source-side template** for the unwalked surfaces (PDP/Cart/Checkout/Account/Orders/Returns/Search/Favorites/PLP): Mopro-from-code (fact) × Trendyol-convention (provisional, tagged) → CONFIRMED-fixable / NOT-ACTIONABLE / NEEDS-VISUAL / NEEDS-DECISION. Doc: `docs/internal/home-probable-resolution.md`. |
 
 | Phase C (divergences) | After parity surfaces — coin redeem (deferred), etc. |
-| Favorites | **PROBABLE resolved source-side** (`feat/favorites-probable-resolution`, no walk): 0 CONFIRMED UI fixes — FAV-05 ATC **DEFER** (favorites hold only product IDs → needs variant resolution + touches shared ProductCard; not a clean button — discovery shift), FAV-06 sort/filter **NEEDS-DECISION**, FAV-07 price-drop-since-favorited **DEFER** (price-at-favorite snapshot). FAV-02 already RESOLVED. Doc: `docs/internal/favorites-probable-resolution.md`. |
+
 
 ### Local walk env refreshed — ✅ (`chore/local-walk-env`)
 
