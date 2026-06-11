@@ -55,6 +55,46 @@ void main() {
       expect(o.refund!.isWallet, isFalse);
     });
 
+    test('parses delivery_address snapshot from the envelope (OR-02)', () {
+      final o = OrderDto.fromJson({
+        'order': {
+          'id': 9,
+          'user_id': 1,
+          'status': 'paid',
+          'total_minor': 9900,
+          'currency': 'TRY',
+          'created_at': '2026-05-01T00:00:00Z',
+          'delivery_address': {
+            'label': 'Ev',
+            'recipient_name': 'Ali Veli',
+            'phone': '+905551112233',
+            'full_address': 'Atatürk Cad. No:1',
+            'neighborhood': 'Merkez Mah.',
+            'district': 'Kadıköy',
+            'city': 'İstanbul',
+            'postal_code': '34000',
+          },
+        },
+        'items': const <Map<String, dynamic>>[],
+      });
+      expect(o.deliveryAddress, isNotNull);
+      expect(o.deliveryAddress!.recipientName, 'Ali Veli');
+      expect(o.deliveryAddress!.city, 'İstanbul');
+      expect(o.deliveryAddress!.localityLine, 'Merkez Mah. Kadıköy/İstanbul 34000');
+    });
+
+    test('delivery_address is null when absent (legacy order)', () {
+      final o = OrderDto.fromJson({
+        'id': 5,
+        'user_id': 1,
+        'status': 'delivered',
+        'total_minor': 9900,
+        'currency': 'TRY',
+        'created_at': '2026-05-01T00:00:00Z',
+      });
+      expect(o.deliveryAddress, isNull);
+    });
+
     test('copyWith preserves refund/actions unless overridden', () {
       final base = OrderDto(
         id: 1,

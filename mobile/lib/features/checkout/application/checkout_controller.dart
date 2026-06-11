@@ -131,6 +131,7 @@ class CheckoutController extends Notifier<CheckoutState> {
         buyerName: buyerName,
         buyerSurname: buyerSurname,
         idempotencyKey: idempotencyKey,
+        addressId: address.id, // OR-02: capture the ship-to snapshot on the order
         couponCode: ref.read(cartProvider).couponCode,
       );
       state = state.copyWith(

@@ -438,6 +438,7 @@
     "number": "Order #{id}",
     "item_count": "{count} items",
     "status_timeline": "Order Status",
+    "delivery_address_title": "Delivery Address",
     "items": "Items",
     "subtotal": "Subtotal",
     "shipping": "Shipping",

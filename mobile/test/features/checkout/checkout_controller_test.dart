@@ -42,6 +42,7 @@ class _FakeCheckoutRepo implements CheckoutRepository {
     required String buyerName,
     required String buyerSurname,
     required String idempotencyKey,
+    int? addressId,
     String returnUrl = 'mopro://checkout/result',
     String couponCode = '',
   }) async =>
@@ -54,6 +55,7 @@ class _FailingCheckoutRepo implements CheckoutRepository {
     required String buyerName,
     required String buyerSurname,
     required String idempotencyKey,
+    int? addressId,
     String returnUrl = 'mopro://checkout/result',
     String couponCode = '',
   }) async =>

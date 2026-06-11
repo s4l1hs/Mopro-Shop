@@ -12,6 +12,7 @@ import 'package:mopro/features/order/application/order_detail_provider.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
 import 'package:mopro/features/order/data/order_item_dto.dart';
 import 'package:mopro/features/order/widgets/cashback_schedule.dart';
+import 'package:mopro/features/order/widgets/delivery_address_card.dart';
 import 'package:mopro/features/order/widgets/order_eligibility_actions.dart';
 import 'package:mopro/features/order/widgets/order_status_chip.dart';
 import 'package:mopro/features/order/widgets/refund_status_card.dart';
@@ -105,6 +106,11 @@ class _OrderDetailBody extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   OrderStatusTimeline(status: order.status),
+                  // OR-02: frozen delivery-address snapshot (absent on legacy orders).
+                  if (order.deliveryAddress != null) ...[
+                    const SizedBox(height: 24),
+                    DeliveryAddressCard(address: order.deliveryAddress!),
+                  ],
                   const SizedBox(height: 24),
                   Text(
                     'order.items'.tr(),
