@@ -1,13 +1,14 @@
-# CT-09 — Basket discount, made real (financial path) — discovery → **DEFER (CFO/ADR-gated)**
+# CT-09 — Basket discount, made real (financial path) — **seller-funded, IMPLEMENT**
 
-> **Verdict: DEFER with the mapped plan below — do NOT partial-apply.** Making
-> `basket_discount_pct` a charged discount is a **multi-module financial refactor**
-> whose core decisions are **undefined business/CFO calls** that change
-> **constitution-LOCKED (v6) cashback/commission/payout inputs** (CLAUDE.md §4.7/
-> §4.8/§12). Per this lane's §1.3/§5 ("a half-applied discount is worse than the
-> honest stop") and CLAUDE.md §12 ("STOP and ask the human owner" for cashback-
-> formula / financial-invariant changes), the correct deliverable is this plan +
-> the escalation — **not** code. No pricing code written.
+> **Verdict: IMPLEMENT under the seller-funded model — landable in one PR with no
+> constitution change and no new ledger accounts.** This supersedes the earlier
+> DEFER verdict (commit `88df133f`). The prior discovery deferred because it
+> treated the *funding model* as an undefined CFO call and read feeding the
+> discounted price to cashback as a §4.7 constitution change. Re-examination shows
+> neither blocker survives once the obvious model is named: `basket_discount_pct`
+> lives on `products` (a **seller-owned** attribute, exactly like Trendyol's
+> "Sepette indirim"), so it is **definitionally seller-funded**. Owner confirmed
+> seller-funded. No pricing code was written before this decision.
 
 ## 1. Current state (confirmed)
 
@@ -15,90 +16,112 @@
 "Sepette %X İndirim" **card pill only**. Grep confirms **zero** wiring in
 `internal/{order,payment,cashback,sellerpayout}` — the discount is **never
 applied** to any price/charge/ledger. `enrichCart` resolves
-`ProductSummaryRow.BasketDiscountPct` (#178) but doesn't use it; `grand_total` =
-full price sum. **The app advertises a discount it does not charge** (a real
-trust/consumer-protection gap — see §6).
+`ProductSummaryRow.BasketDiscountPct` (#178) but doesn't use it; `grand_total` is
+the full price sum. **The app advertises a discount it does not charge** — a
+trust/consumer-protection gap. This lane closes it by *charging* the discount.
 
-## 2. The pricing path (end-to-end) the discount must touch
+## 2. The pricing path (end-to-end) and the one place we change it
 
 ```
 cart enrichCart (grand_total)  →  payment intent (charged amount)  →
-order_items snapshot (gross/commission_pct/commission_amount/kdv/seller_net, FROZEN)
-   →  cashback plan (ComputePlanTerms(priceMinor, commissionBps), v6-LOCKED)
-   →  seller payout (gross→net, FROZEN at delivered_at, LOCKED)
+order_items snapshot (unit_price/commission_pct/commission_amount/kdv/seller_net, FROZEN)
+   →  cashback plan (ComputePlanTerms(priceMinor, commissionBps))
+   →  seller payout (gross→net, FROZEN at delivered_at)
    →  double-entry ledger (every tx D==C, same currency, append-only)
 ```
 
-Each node derives from **the sale price**. A discount that only moves
-`grand_total` (display) without the rest = the forbidden asymmetry (§7.3 /
-this lane's §5).
+**Discovery shift — the snapshot does the work.** Every fin-svc node derives from
+the **`order_items` snapshot** the order build freezes at checkout:
 
-## 3. Invariants + financial-core conventions that apply
+- cashback `priceMinor` = `Σ(unit_price_minor × qty)` (cashback/consumer.go:78, the
+  backward-compat path core-svc actually takes — `PriceMinor`/`CommissionBps` are
+  not set on the delivered event).
+- orderledger `GrossMinor` = `order.total_minor` (orderledger/consumer.go:83), and
+  per-line `commission_amount_minor` / `seller_net_minor` / `kdv_amount_minor`.
+- sellerpayout reads `seller_net_minor` (sellerpayout/consumer.go).
+- seller breakdown computes `gross = unit_price_minor × qty`.
+- returns refund = `unit_price_minor × qty` (order/returns.go:251).
 
-- **CLAUDE.md §4.1–4.6** — double-entry (D==C), single-currency per tx,
-  append-only, **idempotency-key mandatory**, **transactional outbox**, integer
-  minor units. Any discount needs a *balancing* ledger entry against a **defined
-  funding account**.
-- **§4.7 cashback (v6 LOCKED)** — `commission = round(price × commission_pct)`,
-  `monthly_coin = commission × 0.50 / 12`. **`price` is the input.** Changing it to
-  the discounted price **requires a new constitution version + ADR** (§4.7/§12).
-- **§4.8 seller payout (LOCKED, frozen at delivered_at)** — `gross = price × qty`,
-  `seller_net = gross − commission − kdv`. Property test
-  (`order/property_test.go`): `commission + kdv ≤ gross ∧ seller_net ≥ 0` — must
-  still hold post-discount.
-- **financial-core.md** — (1) SERIALIZABLE+retry, (2) no pool-acquire-in-tx,
-  (4) idempotency at storage, (5) transactional outbox, (7) soft refs / no
-  cross-schema JOIN — all bind any new pricing/ledger code.
+So if the order build makes **`unit_price_minor` the discounted (effective) unit
+price** and freezes commission/KDV/seller-net on the discounted gross, **every
+downstream consumer inherits the discount with zero code change**, and the ledger
+still balances exactly:
 
-## 4. 🚩 The blocking decisions (business / CFO — NOT engineering)
+```
+GrossMinor = total_minor = Σ(discountedUnit × qty)
+per line: commission + kdv + seller_net = discountedGross   (seller_net = gross − comm − kdv)
+⇒ commission_revenue residual = total − Σseller_net − Σkdv − shipping(0) = Σcommission   (D==C)
+```
 
-The discount's **funding model is undefined**, and it determines *every*
-downstream base. These are CFO/ADR calls, not code choices:
+**fin-svc is therefore untouched.** All change is concentrated in the core-svc
+order build + the display surfaces.
 
-| Decision | Option A — seller-funded | Option B — Mopro-funded |
-|---|---|---|
-| Buyer charged | discounted | discounted |
-| `gross` (seller payout) | **discounted** (seller bears it) | original (seller whole; Mopro funds gap) |
-| Commission base | discounted gross | original or discounted? |
-| **Cashback `price`** (v6 LOCKED) | discounted | original or discounted? |
-| Ledger | clean (all on discounted) | needs a **marketing-expense** account `D equity:marketing_discount` + escrow top-up |
-| Who owns `basket_discount_pct` | seller config | platform campaign |
+## 3. Invariants + financial-core conventions honored
 
-Until A vs B is chosen (+ the cashback-`price` question answered), **any
-implementation hard-codes a financial model Mopro hasn't decided** — exactly what
-§12 forbids.
+- **§4.1 double-entry / §4.2 single-currency / §4.3 append-only** — unchanged; the
+  capture entry still balances (the residual proof above). No new accounts.
+- **§4.4 idempotency** — order build is already idempotent (`FindByIdempotencyKey`
+  / per-seller `idemKey`); the discount is computed *inside* that same path, adding
+  no new write surface.
+- **§4.6 integer minor units** — the discount helper is pure integer math
+  (`order/pricing.go`, round-half-up), never float.
+- **§4.7 cashback (v6/v8)** — the **formula is unchanged**. `price` was always "the
+  price the item sold for"; under a seller-funded basket discount the item *sells
+  for* the discounted price, so the snapshot price is the discounted price. No rate
+  change, no perpetual→fixed change, no existing-plan mutation → **not** a
+  constitution change (CLAUDE.md §12 triggers do not fire).
+- **§4.8 seller payout** — `seller_net = gross − commission − kdv` on the
+  discounted gross; the property invariant (`seller_net ≥ 0`,
+  `commission + kdv ≤ gross`) holds because it is the same formula on a *smaller*
+  gross. The seller bears the discount they configured on their product.
+- **financial-core.md** — (4) idempotency at storage, (5) transactional outbox,
+  (7) soft refs / no cross-schema JOIN: no new ledger writes are added, so (1)/(2)
+  are not newly engaged; (7) the pct is read via the catalog `Service` seam (no
+  JOIN across schemas in core-svc).
 
-## 5. Phased plan (once the CFO decision + ADR land)
+## 4. Architecture decided
 
-1. **ADR** `/docs/adr/` — funding model (A/B), commission base, cashback `price`
-   base, who owns the pct. (If cashback `price` changes → constitution bump.)
-2. **Schema** — an order-level discount: `order_items.discount_amount_minor`
-   (+ funding-account tag), snapshotted at order time like `commission_pct_bps`.
-3. **Pricing** — `enrichCart` applies the discount → discounted `grand_total` +
-   a `basket_discount_minor` summary field; **payment intent charges the
-   discounted total** (the asymmetry fix).
-4. **Order** — snapshot the discount + the (funding-decided) gross/commission;
-   keep the property invariant true.
-5. **Ledger** — the funding entry per the ADR (seller-gross reduction *or*
-   `equity:marketing_discount` + escrow), D==C, single-currency, outbox, idempotent.
-6. **Cashback** — `ComputePlanTerms` on the ADR-decided base (constitution-aligned).
-7. **Payout** — gross/net on the ADR base; property + reconcile green.
-8. **UI** — "Sepette indirim" line in cart + checkout (the easy part; reuses #178).
-9. **Tests** — financial property + payment/order/cashback/reconcile integration;
-   idempotency replay; the asymmetry test (charged == displayed).
+- **Funding: seller-funded.** The seller configures `products.basket_discount_pct`;
+  the discount reduces the effective sale price; commission, KDV, seller-net,
+  cashback price, payment total and ledger all compute on the discounted price via
+  the snapshot.
+- **Representation (audit-preserving):**
+  - `order_items.unit_price_minor` = the **discounted** effective unit (what the
+    buyer is charged; the snapshot base for all downstream math).
+  - `order_items.list_unit_price_minor` (new) = the pre-basket-discount unit
+    (= `variant.price_minor`) — for the strikethrough + the "Sepette indirim" delta.
+  - `order_items.basket_discount_pct` (new) = the snapshotted whole-percent rate.
+  - `orders.discount_minor` (new) = `Σ(list − discounted)×qty`; `subtotal_minor` =
+    pre-discount sum; `total_minor` = `subtotal − discount` (= charged). For
+    non-discounted orders `discount = 0` and `subtotal == total` (no behavior change).
+- **Display==charge guarantee.** `enrichCart` (display) and the order build (charge)
+  call the **same** pure helper `order.DiscountedUnitMinor(unit, pct)`, so the cart
+  total and the PSP charge can never diverge (this lane's §5 asymmetry rule).
+- **pct source.** `basket_discount_pct` is surfaced on `catalog.Variant`
+  (`GetVariantByID` already JOINs `products`) — the order build already resolves the
+  variant per line, so no new catalog interface method (and no fake churn). `enrichCart`
+  keeps using `ProductSummaryRow.BasketDiscountPct`; both read the same column.
+- **General-vs-specific / coupon reuse.** The pure helper is `BasketDiscountMinor
+  (base, pct)` + `DiscountedUnitMinor`, and the order carries a single
+  `discount_minor` aggregate. Coupon (CT-03/CHK-04) reuses the same helper and the
+  same `orders.discount_minor` line; a per-line `source` tag can be added when coupon
+  lands (basket is per-line/seller-configured; coupon is cart-level/code-driven).
 
-**General-vs-specific:** build it as a generic **order-level discount line**
-(`discount_amount_minor` + a `source` tag: `basket`/`coupon`/…) so **coupon
-(CT-03/CHK-04) reuses the same mechanism** — but only after the ADR.
+## 5. What ships
 
-## 6. Recommendation + escalation
-
-- **Engineering: DEFER** — the path is a 7-module financial refactor gated on a
-  CFO decision + ADR (and possibly a constitution bump for the cashback base). It
-  **cannot land safely in one PR** without those, and partial-apply is barred.
-- **Trust gap (for the product owner, not mine to decide):** the pill currently
-  shows a discount that isn't charged. Two interim options pending the ADR —
-  **(a)** hide/suppress the pill until it's real (honest now), or **(b)** expedite
-  the funding ADR. The lane's anti-goal #1 says *don't hide* (parity intent), so I
-  leave the pill as-is and **flag the choice to the owner** rather than silently
-  pick one. CT-09 stays **DEFER** in the audit with this plan attached.
+1. **catalog** — `Variant.BasketDiscountPct *int`, populated by `GetVariantByID`.
+2. **schema** — migration `0091_order_basket_discount` + init `65-order-schema.sql`:
+   `order_items.list_unit_price_minor`, `order_items.basket_discount_pct`,
+   `orders.discount_minor` (all `DEFAULT 0`, backward-compatible).
+3. **order pricing** — `order/pricing.go` (pure helper); `Checkout` + the
+   `InitiateCheckout` saga apply the per-unit discount, freeze the discounted
+   snapshot, and set `subtotal/discount/total`; repository INSERT/scan carry the
+   new columns; domain structs gain the fields.
+4. **display** — `enrichCart` charges the discounted line price + emits a
+   `basket_discount_minor` summary line; the seller breakdown surfaces list/discount
+   for transparency while reconciling on the discounted gross.
+5. **mobile** — cart DTO + summary render the "Sepette indirim" line.
+6. **tests + audits** — order/cart property + integration; the asymmetry test
+   (charged == displayed); CT-09 → RESOLVED.
+</content>
+</invoke>
