@@ -8,6 +8,7 @@ import 'package:mopro/features/checkout/application/checkout_controller.dart';
 import 'package:mopro/features/checkout/presentation/sipay_webview_screen.dart';
 import 'package:mopro/features/checkout/widgets/checkout_stepper.dart';
 import 'package:mopro/features/payments/sipay_error_map.dart';
+import 'package:mopro/utils/money.dart';
 
 class CheckoutReviewScreen extends ConsumerStatefulWidget {
   const CheckoutReviewScreen({super.key});
@@ -30,8 +31,15 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
       symbol: '₺',
       decimalDigits: 2,
     );
-    final grandTotal = cartState.cart.valueOrNull?.grandTotalMinor ?? 0;
-    final lines = cartState.cart.valueOrNull?.lines ?? [];
+    final cartDto = cartState.cart.valueOrNull;
+    final grandTotal = cartDto?.grandTotalMinor ?? 0;
+    final lines = cartDto?.lines ?? [];
+    // CHK-01: full breakdown from the enriched cart (#176) — no longer total-only.
+    final subtotalMinor =
+        cartDto?.totalsBySeller.fold<int>(0, (s, t) => s + t.itemsMinor) ?? 0;
+    final shippingMinor =
+        cartDto?.totalsBySeller.fold<int>(0, (s, t) => s + t.shippingMinor) ?? 0;
+    final cashbackMinor = ref.watch(cartMonthlyCashbackProvider).valueOrNull;
 
     // Detect a fresh payment intent response and launch the Sipay WebView.
     ref.listen(checkoutControllerProvider, (prev, next) {
@@ -99,11 +107,49 @@ class _CheckoutReviewScreenState extends ConsumerState<CheckoutReviewScreen> {
                   ),
                 ),
                 const Divider(height: 24),
+                // CHK-01: subtotal + shipping breakdown (parity with the cart
+                // summary), then the bold total + KDV note + cashback line.
+                _SummaryRow(
+                  label: 'cart.subtotal'.tr(),
+                  value: moneyFmt.format(subtotalMinor / 100.0),
+                ),
+                const SizedBox(height: 4),
+                _SummaryRow(
+                  label: 'cart.shipping'.tr(),
+                  value: shippingMinor == 0
+                      ? 'cart.shipping_free'.tr()
+                      : moneyFmt.format(shippingMinor / 100.0),
+                ),
+                const Divider(height: 16),
                 _SummaryRow(
                   label: 'checkout.total'.tr(),
                   value: moneyFmt.format(grandTotal / 100.0),
                   isTotal: true,
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  'cart.kdv_included'.tr(),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                if (cashbackMinor != null && cashbackMinor > 0) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'cart.cashback_monthly'.tr(
+                      namedArgs: {
+                        'amount': MoneyUtils.formatMinor(
+                          cashbackMinor,
+                          currency: 'TRY_COIN',
+                        ),
+                      },
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 _ConsentCheckbox(
                   value: _consentSales,
