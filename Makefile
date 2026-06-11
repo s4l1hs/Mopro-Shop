@@ -14,7 +14,7 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
 # `make verify` explicitly), so this is a safe, friendlier default.
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap verify soak fmt vet test lint govulncheck boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order \
+.PHONY: help bootstrap verify verify-fast analyze soak fmt vet test lint govulncheck boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order \
         verify-image-manifest update-goldens audit audit-test i18n-check i18n-usage riverpod-check \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
@@ -36,8 +36,23 @@ help: ## Show this help.
 	@echo "Mopro Shop — make targets:"
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z0-9_-]+:.*?## /{printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-# verify chains all static checks; must pass before every push.
-verify: fmt vet test lint boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment integration-analytics integration-shipping integration-order integration-sellerpayout integration-outbox integration-eventbus integration-apifin integration-reconcile integration-attachments integration-help integration-inbox integration-idempotency test-integration-catalog verify-image-manifest verify-contrast ## Full verification gate (run before every push).
+# verify chains all static checks + the full DB/integration/property suites.
+# This is the CI gate (the required `verify` workflow). It needs the Postgres +
+# Redis test clusters up, so it is NOT what the local pre-push hook runs — see
+# `verify-fast` below.
+verify: fmt vet test lint boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order integration-e2e integration-cart integration-identity integration-identity-race integration-payment integration-analytics integration-shipping integration-order integration-sellerpayout integration-outbox integration-eventbus integration-apifin integration-reconcile integration-attachments integration-help integration-inbox integration-idempotency test-integration-catalog verify-image-manifest verify-contrast ## Full verification gate (CI; needs DB clusters).
+
+# verify-fast: the fast, DB-free subset wired into the LOCAL pre-push hook.
+# Everything here runs WITHOUT the Postgres/Redis test clusters or Docker, so it
+# finishes in a couple of minutes and never hangs — unlike the full `verify`,
+# whose property + integration suites need the DB cluster up (that suite stays in
+# CI, where the required `verify` workflow runs it). A fast hook that actually
+# runs beats a heavy one that's always `--no-verify`'d.
+verify-fast: fmt vet lint-discipline boundaries migration-check build-all test analyze i18n-check i18n-usage ## Fast DB-free pre-push gate (full verify runs in CI).
+
+# flutter analyze over the app — mirrors CI (green-on-compile; infos non-fatal).
+analyze: ## flutter analyze the mobile app (--no-fatal-infos, mirrors CI).
+	cd mobile && flutter analyze --no-fatal-infos
 
 # WCAG contrast check for the documented brand colour pairs. Fails if any
 # non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.
