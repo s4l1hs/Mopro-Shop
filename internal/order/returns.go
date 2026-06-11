@@ -82,6 +82,15 @@ type ReturnItem struct {
 	Quantity    int   `json:"quantity"`
 }
 
+// ReturnStatusEvent is one append-only status-history row (RT-04). The audit
+// trail recorded by InsertReturnStatusHistory, surfaced read-only so the return
+// detail can render the real timeline instead of a status-derived one.
+type ReturnStatusEvent struct {
+	Status    string    `json:"status"`
+	Note      string    `json:"note"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // ReturnItemInput is a requested item to return.
 type ReturnItemInput struct {
 	OrderItemID int64
@@ -131,6 +140,9 @@ type ReturnRepository interface {
 	ReturnProductIDs(ctx context.Context, returnID int64) ([]int64, error)
 	// UpdateReturnStatus transitions a return's status within a tx.
 	UpdateReturnStatus(ctx context.Context, tx pgx.Tx, returnID int64, status string) error
+	// ListReturnStatusHistory reads the append-only status audit trail, oldest
+	// first (RT-04).
+	ListReturnStatusHistory(ctx context.Context, returnID int64) ([]ReturnStatusEvent, error)
 }
 
 // ReturnService is the public return surface. Kept separate from Service so the
@@ -139,6 +151,9 @@ type ReturnRepository interface {
 type ReturnService interface {
 	CreateReturn(ctx context.Context, in ReturnInput) (Return, []ReturnItem, error)
 	GetReturn(ctx context.Context, userID, returnID int64) (Return, []ReturnItem, error)
+	// GetReturnHistory returns the append-only status timeline for a return the
+	// user owns (RT-04). Ownership-scoped: non-owners get ErrReturnNotFound.
+	GetReturnHistory(ctx context.Context, userID, returnID int64) ([]ReturnStatusEvent, error)
 	ListReturns(ctx context.Context, userID int64, limit, offset int) ([]Return, error)
 	// ComputeActions derives the eligibility block for an order + its items.
 	ComputeActions(ctx context.Context, o Order, items []OrderItem) (OrderActions, error)
@@ -317,6 +332,19 @@ func (s *returnService) GetReturn(ctx context.Context, userID, returnID int64) (
 		return Return{}, nil, ErrReturnNotFound // ownership scoping
 	}
 	return r, items, nil
+}
+
+// GetReturnHistory returns the status audit trail for a return the user owns
+// (RT-04). Reuses GetReturn's ownership check so non-owners get ErrReturnNotFound.
+func (s *returnService) GetReturnHistory(ctx context.Context, userID, returnID int64) ([]ReturnStatusEvent, error) {
+	r, _, err := s.returns.GetReturn(ctx, returnID)
+	if err != nil {
+		return nil, err
+	}
+	if r.UserID != userID {
+		return nil, ErrReturnNotFound // ownership scoping
+	}
+	return s.returns.ListReturnStatusHistory(ctx, returnID)
 }
 
 func (s *returnService) ListReturns(ctx context.Context, userID int64, limit, offset int) ([]Return, error) {

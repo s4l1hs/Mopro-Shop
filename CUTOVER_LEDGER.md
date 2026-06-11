@@ -136,6 +136,16 @@
 
 ---
 
+## 4l. Quick cross-surface functional gaps — ✅ RESOLVED (`feat/quick-functional-gaps`)
+
+- **Three read-path-verified-cheap gaps from the surface audits, shipped together.** Discovery: `docs/internal/quick-gaps.md` (each confirmed cheap before building — the cart-stub lesson).
+- **AC-02 — Help wired:** the account guest-menu Help row was `onTap: () {}` (dead); now `context.push('/help')` (the real `HelpIndexScreen` route). One-liner.
+- **RT-04 — return status-history surfaced:** `return_status_history` rows (migration 0070) were written but never read. Added `ReturnRepository.ListReturnStatusHistory` + `ReturnService.GetReturnHistory` (ownership-scoped) → `GET /returns/{id}` gains a `history[]`; mobile renders the real event timeline (falls back to the status-derived one when empty). No refund-settlement change (RT-01 stays a separate financial lane).
+- **OR-04 — reorder:** frontend-only; a "Tekrar sipariş ver" button on the order detail re-adds the order's items via the existing `cartProvider.addItem` (→ `POST /cart/items`), counting per-item OOS failures gracefully, then → `/cart`. No backend change.
+- **Gates:** `flutter analyze` 0 (touched files), i18n `--strict` OK, order package tests green incl. new `GetReturnHistory` ownership tests. Audits AC-02/RT-04/OR-04 → RESOLVED.
+
+---
+
 ## 5. CI / branch-protection
 
 - **F-022b (#138)** made `flutter analyze` green-on-compile (`--no-fatal-infos`; errors/warnings still fatal).

@@ -765,7 +765,7 @@ class _GuestMenu extends ConsumerWidget {
           _GuestRow(
             icon: Icons.help_outline_rounded,
             label: 'account.menu_help'.tr(),
-            onTap: () {},
+            onTap: () => context.push('/help'), // AC-02: real /help route (was dead)
           ),
           _Sep(),
           // Theme toggle works for guests too

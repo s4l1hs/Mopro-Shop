@@ -31,7 +31,8 @@ type fakeReturnRepo struct {
 	created     Return
 	items       []ReturnItem
 	nextID      int64
-	productIDs  []int64 // returned by ReturnProductIDs (seller-scope tests)
+	productIDs  []int64             // returned by ReturnProductIDs (seller-scope tests)
+	history     []ReturnStatusEvent // RT-04 status timeline
 }
 
 func (f *fakeReturnRepo) WithTx(ctx context.Context, fn func(pgx.Tx) error) error {
@@ -53,8 +54,12 @@ func (f *fakeReturnRepo) InsertReturnItem(_ context.Context, _ pgx.Tx, it Return
 	f.items = append(f.items, it)
 	return it, nil
 }
-func (f *fakeReturnRepo) InsertReturnStatusHistory(_ context.Context, _ pgx.Tx, _ int64, _, _ string) error {
+func (f *fakeReturnRepo) InsertReturnStatusHistory(_ context.Context, _ pgx.Tx, _ int64, status, note string) error {
+	f.history = append(f.history, ReturnStatusEvent{Status: status, Note: note, CreatedAt: time.Now().UTC()})
 	return nil
+}
+func (f *fakeReturnRepo) ListReturnStatusHistory(_ context.Context, _ int64) ([]ReturnStatusEvent, error) {
+	return f.history, nil
 }
 func (f *fakeReturnRepo) GetReturn(_ context.Context, _ int64) (Return, []ReturnItem, error) {
 	return f.created, f.items, nil
@@ -92,6 +97,34 @@ func svcWith(o Order, items []OrderItem, rr *fakeReturnRepo) *returnService {
 		orders:  &fakeOrderRepo{order: o, items: items},
 		returns: rr,
 		now:     func() time.Time { return time.Now().UTC() },
+	}
+}
+
+// ── GetReturnHistory (RT-04) ──────────────────────────────────────────────────
+
+func TestGetReturnHistory_OwnerSeesTimeline(t *testing.T) {
+	rr := &fakeReturnRepo{created: Return{ID: 5, UserID: 7}}
+	rr.history = []ReturnStatusEvent{
+		{Status: "pending", Note: "submitted"},
+		{Status: "approved", Note: "seller approved"},
+	}
+	s := svcWith(deliveredOrder(1), nil, rr)
+
+	got, err := s.GetReturnHistory(context.Background(), 7, 5)
+	if err != nil {
+		t.Fatalf("owner GetReturnHistory: %v", err)
+	}
+	if len(got) != 2 || got[0].Status != "pending" || got[1].Status != "approved" {
+		t.Errorf("history = %+v, want [pending, approved]", got)
+	}
+}
+
+func TestGetReturnHistory_NonOwnerDenied(t *testing.T) {
+	rr := &fakeReturnRepo{created: Return{ID: 5, UserID: 7}, history: []ReturnStatusEvent{{Status: "pending"}}}
+	s := svcWith(deliveredOrder(1), nil, rr)
+
+	if _, err := s.GetReturnHistory(context.Background(), 99, 5); !errors.Is(err, ErrReturnNotFound) {
+		t.Errorf("non-owner: want ErrReturnNotFound, got %v", err)
 	}
 }
 

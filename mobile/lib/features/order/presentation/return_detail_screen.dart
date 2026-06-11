@@ -72,10 +72,15 @@ class _Body extends StatelessWidget {
           style: theme.textTheme.titleMedium,
         ),
         const SizedBox(height: 16),
-        OrderStatusTimeline(
-          status: ReturnDetailScreen.timelineStatus(ret.status),
-          at: ret.createdAt,
-        ),
+        // RT-04: render the real status-history audit trail when present; fall
+        // back to the status-derived timeline for pre-history returns.
+        if (ret.history.isNotEmpty)
+          _StatusHistory(events: ret.history)
+        else
+          OrderStatusTimeline(
+            status: ReturnDetailScreen.timelineStatus(ret.status),
+            at: ret.createdAt,
+          ),
         const SizedBox(height: 24),
         Text('returns.review_title'.tr(), style: theme.textTheme.titleSmall),
         const SizedBox(height: 8),
@@ -106,6 +111,73 @@ class _Body extends StatelessWidget {
           icon: const Icon(Icons.receipt_long_outlined),
           label: Text('returns.original_order'.tr()),
         ),
+      ],
+    );
+  }
+}
+
+/// RT-04: the append-only status-history timeline (status label + optional note
+/// + date), oldest → newest, the latest highlighted.
+class _StatusHistory extends StatelessWidget {
+  const _StatusHistory({required this.events});
+
+  final List<ReturnStatusEventDto> events;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final fmt = DateFormat('d MMM y · HH:mm', 'tr_TR');
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < events.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, right: 12),
+                  child: Icon(
+                    i == events.length - 1
+                        ? Icons.radio_button_checked
+                        : Icons.check_circle,
+                    size: 18,
+                    color: i == events.length - 1
+                        ? cs.primary
+                        : cs.onSurfaceVariant,
+                  ),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        ReturnLifecycle.label(events[i].status),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: i == events.length - 1
+                              ? FontWeight.w600
+                              : FontWeight.normal,
+                        ),
+                      ),
+                      if (events[i].note.isNotEmpty)
+                        Text(
+                          events[i].note,
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                      Text(
+                        fmt.format(events[i].createdAt.toLocal()),
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }

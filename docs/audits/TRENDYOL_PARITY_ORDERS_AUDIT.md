@@ -62,7 +62,7 @@
 | Pagination | paged | `ListOrders(userID)` returns **all** (no `page`/`limit`) | **A** | **OR-06** no server pagination (scale) | LOW |
 | Per-order quick action: detail | yes | tap → detail | **L** | **MATCHED** | — |
 | Per-order quick action: return | yes | via `actions.canReturn` | **L** | **MATCHED** (returns = own audit) | — |
-| Per-order quick action: reorder | "Tekrar sipariş ver" | — | **A** | **OR-04** no reorder | LOW–MED |
+| Per-order quick action: reorder | "Tekrar sipariş ver" | reorder on the **detail** (re-add items → cart) | **L** | **OR-04 ✅ RESOLVED** (detail-level; list quick-action still A) | — |
 | Per-order quick action: track | "Kargo takip" | — | **A** | **OR-01** no tracking | MED |
 
 ### Order detail (`order_detail_screen`)
@@ -80,7 +80,7 @@
 | **Invoice / e-arşiv** | PDF / e-arşiv link | — (`internal/einvoice` is **PLANNED**, not built) | **A** | **OR-03** no invoice (TR legal: e-arşiv) | MED |
 | Cancel / return entry | yes | `order_eligibility_actions` + `POST /orders/{id}/cancel`,`/returns` | **L** | **MATCHED** | — |
 | Refund status | yes | `RefundInfo` (`refund_status_card`) + `/orders/{id}/refund` | **L** | **MATCHED** (refund-as-coin = NOT-ACTIONABLE) | — |
-| Reorder | "Tekrar sipariş" | — | **A** | **OR-04** no reorder | LOW–MED |
+| Reorder | "Tekrar sipariş" | `_ReorderButton` → re-add items to cart (graceful OOS) | **L** | **OR-04 ✅ RESOLVED** (`feat/quick-functional-gaps`) | — |
 | Per-item help / Q&A | yes | — | **A** | **OR-07** no per-order help/Q&A entry | LOW |
 
 ---

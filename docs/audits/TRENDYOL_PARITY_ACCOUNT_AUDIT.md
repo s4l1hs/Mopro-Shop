@@ -40,8 +40,8 @@
 - **2 STUBS the read-path check caught (a UI-only audit would have missed):**
   - **AC-01 Saved Cards (S)** — `cards_screen` always renders `cards.empty` + the
     add-card flow is `// TODO(mopro): wire to add card flow`. No list, no add.
-  - **AC-02 Help (S)** — the hub's Help entry is **`onTap: () {}`** (a dead button);
-    an `internal/help` backend exists but the mobile is **unwired** to it.
+  - **AC-02 Help — ✅ RESOLVED** (`feat/quick-functional-gaps`): the dead
+    `onTap: () {}` now routes to the existing `/help` (`HelpIndexScreen`).
 - **2 CONFIRMED gaps (src):** **AC-03** no email-change in Security (password +
   phone/MFA only); **AC-04** no notification-preferences setting.
 - **PROBABLE (await walk): 1** — **AC-05** no membership tier/points display.
@@ -65,7 +65,7 @@
 | **Security** | password, 2FA, email/phone | `security_screen` | **L** (`GET /me`, `POST /me/password`, `/auth/mfa` enroll/confirm) | **AC-03** password + phone/MFA present; **no email-change** path | LOW–MED |
 | **Privacy / consent** | (KVKK) | `privacy_settings_screen` | **L** (`GET/PUT /me/consent`, `DELETE /me/analytics-data`) | **MATCHED** (Mopro PLUS: data-deletion) | — |
 | **Browsing history** | recently viewed | `browsing_history_screen` | **L** (`GET /me/recently-viewed`) | **MATCHED** | — |
-| **Help / support** | help center + tickets | hub Help entry | **S** | **AC-02** entry is `onTap: () {}` (dead); `internal/help`/`internal/support` backends exist but unwired | MED |
+| **Help / support** | help center + tickets | hub Help entry → `/help` (`HelpIndexScreen`) | **L** | **AC-02 ✅ RESOLVED** — the dead `onTap: () {}` now routes to the existing `/help` route (`feat/quick-functional-gaps`) | — |
 | **Settings — appearance** | theme | theme light/dark/system toggle | **U** (client) | **MATCHED** | — |
 | **Settings — language** | language | `account.language` (desktop rail) | **U** (easy_localization) | **MATCHED** (mobile-hub placement — confirm on walk) | — |
 | **Settings — notifications** | push/email prefs | — | **—** | **AC-04** no notification-preferences setting | LOW–MED |
