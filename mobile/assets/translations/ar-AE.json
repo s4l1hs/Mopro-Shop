@@ -191,6 +191,7 @@
     "status_approved": "Approved",
     "status_rejected": "Rejected",
     "status_refunded": "Refunded",
+    "filter_all": "الكل",
     "list_title": "مرتجعاتي",
     "empty": "ليس لديك مرتجعات بعد.",
     "go_orders": "Go to my orders",

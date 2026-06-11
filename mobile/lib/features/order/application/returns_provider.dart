@@ -11,6 +11,11 @@ final returnsProvider =
   ReturnsNotifier.new,
 );
 
+/// RT-06: the consumer's selected status filter on the return-history list.
+/// `null` = all statuses. Pure client-side filter over the already-fetched
+/// list — no extra fetch, no backend round-trip.
+final returnsStatusFilterProvider = StateProvider<String?>((ref) => null);
+
 class ReturnsNotifier extends Notifier<AsyncValue<List<ReturnListItemDto>>> {
   @override
   AsyncValue<List<ReturnListItemDto>> build() {

@@ -34,18 +34,111 @@ class ReturnsListScreen extends ConsumerWidget {
             ),
           );
         },
-        data: (returns) => returns.isEmpty
-            ? _Empty(onGoOrders: () => context.go('/orders'))
-            : RefreshIndicator(
-                onRefresh: () => ref.read(returnsProvider.notifier).refresh(),
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: returns.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (_, i) => _ReturnCard(item: returns[i]),
+        data: (returns) {
+          if (returns.isEmpty) {
+            return _Empty(onGoOrders: () => context.go('/orders'));
+          }
+          // RT-06: client-side status filter over the already-fetched list.
+          // The bar only offers statuses present in the list, so a selected
+          // filter always has matches — except if a refresh removes the last
+          // return of the selected status, in which case we fall back to all.
+          final selected = ref.watch(returnsStatusFilterProvider);
+          final present = {for (final r in returns) r.status};
+          final effective =
+              (selected != null && present.contains(selected)) ? selected : null;
+          final visible = effective == null
+              ? returns
+              : returns.where((r) => r.status == effective).toList();
+          return RefreshIndicator(
+            onRefresh: () => ref.read(returnsProvider.notifier).refresh(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _StatusFilterBar(returns: returns),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: visible.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (_, i) => _ReturnCard(item: visible[i]),
+                  ),
                 ),
-              ),
+              ],
+            ),
+          );
+        },
       ),
+    );
+  }
+}
+
+/// RT-06: a horizontal status-filter chip row. "All" plus one chip per status
+/// actually present in the fetched list (so we never offer an empty filter).
+class _StatusFilterBar extends ConsumerWidget {
+  const _StatusFilterBar({required this.returns});
+
+  final List<ReturnListItemDto> returns;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Preserve the lifecycle order; only show statuses that occur in the list.
+    const order = [
+      ReturnLifecycle.pending,
+      ReturnLifecycle.approved,
+      ReturnLifecycle.rejected,
+      ReturnLifecycle.refunded,
+    ];
+    final present = {for (final r in returns) r.status};
+    final statuses = order.where(present.contains).toList();
+    if (statuses.length < 2) {
+      // Nothing meaningful to filter (all one status) — hide the bar entirely.
+      return const SizedBox.shrink();
+    }
+    final selected = ref.watch(returnsStatusFilterProvider);
+    return SizedBox(
+      height: 56,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        children: [
+          _FilterChip(
+            label: 'returns.filter_all'.tr(),
+            selected: selected == null,
+            onSelected: () =>
+                ref.read(returnsStatusFilterProvider.notifier).state = null,
+          ),
+          for (final s in statuses) ...[
+            const SizedBox(width: 8),
+            _FilterChip(
+              label: ReturnLifecycle.label(s),
+              selected: selected == s,
+              onSelected: () =>
+                  ref.read(returnsStatusFilterProvider.notifier).state = s,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
     );
   }
 }
