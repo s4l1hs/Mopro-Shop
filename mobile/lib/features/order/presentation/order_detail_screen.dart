@@ -173,6 +173,16 @@ class _OrderDetailBody extends ConsumerWidget {
                     _ReorderButton(items: order.items),
                     const SizedBox(height: 16),
                   ],
+                  // OR-07: per-order help entry → the help center (like AC-02).
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton.icon(
+                      onPressed: () => context.push('/help'),
+                      icon: const Icon(Icons.help_outline_rounded),
+                      label: Text('order.help'.tr()),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   // ── Cashback schedule ──────────────────────────────────
                   if (order.items.isNotEmpty) ...[
                     Text(

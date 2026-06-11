@@ -444,6 +444,7 @@
     "kdv": "VAT",
     "total": "Total",
     "cancel": "Cancel Order",
+    "help": "Help with this order",
     "reorder": "Order again",
     "reorder_done": "{count} items added to cart",
     "reorder_partial": "{added} added to cart, {failed} unavailable (out of stock)",
