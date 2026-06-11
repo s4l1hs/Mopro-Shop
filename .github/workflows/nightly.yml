@@ -36,7 +36,5 @@ jobs:
         run: |
           gh issue create \
             --title "Nightly soak failed — $(date -u +%F)" \
-            --body "The nightly \`make soak\` (-race -count) failed. A suite Step 2 hardened (wallet RefreshWorker / payment reconciler / identity rate-limiter) regressed or flaked.
-
-Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --body "The nightly make soak (-race -count) failed — a Step 2 hardened suite (wallet RefreshWorker / payment reconciler / identity rate-limiter) regressed or flaked. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             || echo "issue create failed (non-fatal)"
