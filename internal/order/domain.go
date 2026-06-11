@@ -25,27 +25,42 @@ type Order struct {
 	SubtotalMinor     int64       `json:"subtotal_minor"`
 	ShippingMinor     int64       `json:"shipping_minor"`
 	ShippingPayer     string      `json:"shipping_payer"`
-	TotalMinor        int64       `json:"total_minor"`
-	Currency          string      `json:"currency"`
-	Market            string      `json:"market"`
-	DeliveredAt       *time.Time  `json:"delivered_at,omitempty"`
-	CashbackEligible  bool        `json:"cashback_eligible"`
-	CashbackCurrency  string      `json:"cashback_currency"`
-	IdempotencyKey    string      `json:"idempotency_key"`
-	CreatedAt         time.Time   `json:"created_at"`
-	UpdatedAt         time.Time   `json:"updated_at"`
+	// DiscountMinor is the total seller-funded basket discount applied across all
+	// items (CT-09): Σ(list_unit − unit)×qty. SubtotalMinor is pre-discount;
+	// TotalMinor = SubtotalMinor − DiscountMinor (the charged amount). 0 when no
+	// item carries a basket discount → SubtotalMinor == TotalMinor.
+	DiscountMinor    int64      `json:"discount_minor"`
+	TotalMinor       int64      `json:"total_minor"`
+	Currency         string     `json:"currency"`
+	Market           string     `json:"market"`
+	DeliveredAt      *time.Time `json:"delivered_at,omitempty"`
+	CashbackEligible bool       `json:"cashback_eligible"`
+	CashbackCurrency string     `json:"cashback_currency"`
+	IdempotencyKey   string     `json:"idempotency_key"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
 }
 
 // OrderItem is a single line in the order with frozen commission snapshots.
 // Snapshots are set at order time and NEVER recomputed.
 type OrderItem struct {
-	ID                    int64  `json:"id"`
-	OrderID               int64  `json:"order_id"`
-	VariantID             int64  `json:"variant_id"`
-	SellerID              int64  `json:"seller_id"`
-	CategoryID            int64  `json:"category_id"`
-	Qty                   int    `json:"qty"`
-	UnitPriceMinor        int64  `json:"unit_price_minor"`
+	ID         int64 `json:"id"`
+	OrderID    int64 `json:"order_id"`
+	VariantID  int64 `json:"variant_id"`
+	SellerID   int64 `json:"seller_id"`
+	CategoryID int64 `json:"category_id"`
+	Qty        int   `json:"qty"`
+	// UnitPriceMinor is the CHARGED unit price — already basket-discounted (CT-09).
+	// Every downstream consumer (cashback, orderledger, sellerpayout, returns,
+	// seller breakdown) derives from it, so the discount propagates via the snapshot.
+	UnitPriceMinor int64 `json:"unit_price_minor"`
+	// ListUnitPriceMinor is the pre-discount unit (= variant.price_minor); used for
+	// the strikethrough + the per-line discount delta. Equals UnitPriceMinor when
+	// BasketDiscountPct == 0.
+	ListUnitPriceMinor int64 `json:"list_unit_price_minor"`
+	// BasketDiscountPct is the snapshotted whole-percent basket discount applied to
+	// this line (0 = none). Frozen at order time like CommissionPctBps.
+	BasketDiscountPct     int    `json:"basket_discount_pct"`
 	UnitPriceCurrency     string `json:"unit_price_currency"`
 	CommissionPctBps      int    `json:"commission_pct_bps"`
 	KdvPctBps             int    `json:"kdv_pct_bps"`

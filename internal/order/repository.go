@@ -47,13 +47,13 @@ func (r *pgxOrderRepository) InsertOrder(ctx context.Context, tx pgx.Tx, o Order
 	err := tx.QueryRow(ctx,
 		`INSERT INTO order_schema.orders
 			(user_id, status, subtotal_minor, shipping_minor, shipping_payer,
-			 total_minor, currency, market,
+			 discount_minor, total_minor, currency, market,
 			 cashback_eligible, cashback_currency, idempotency_key,
 			 seller_id, checkout_session_id)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 		RETURNING id, created_at, updated_at`,
 		o.UserID, string(o.Status), o.SubtotalMinor, o.ShippingMinor, o.ShippingPayer,
-		o.TotalMinor, o.Currency, o.Market,
+		o.DiscountMinor, o.TotalMinor, o.Currency, o.Market,
 		o.CashbackEligible, o.CashbackCurrency, o.IdempotencyKey,
 		sellerID, checkoutSessionID,
 	).Scan(&o.ID, &o.CreatedAt, &o.UpdatedAt)
@@ -71,13 +71,13 @@ func (r *pgxOrderRepository) InsertOrderItem(ctx context.Context, tx pgx.Tx, ite
 	err := tx.QueryRow(ctx,
 		`INSERT INTO order_schema.order_items
 			(order_id, variant_id, seller_id, category_id, qty,
-			 unit_price_minor, unit_price_currency,
+			 unit_price_minor, list_unit_price_minor, basket_discount_pct, unit_price_currency,
 			 commission_pct_bps, kdv_pct_bps,
 			 commission_amount_minor, kdv_amount_minor, seller_net_minor)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 		RETURNING id`,
 		item.OrderID, item.VariantID, item.SellerID, item.CategoryID, item.Qty,
-		item.UnitPriceMinor, item.UnitPriceCurrency,
+		item.UnitPriceMinor, item.ListUnitPriceMinor, item.BasketDiscountPct, item.UnitPriceCurrency,
 		item.CommissionPctBps, item.KdvPctBps,
 		item.CommissionAmountMinor, item.KdvAmountMinor, item.SellerNetMinor,
 	).Scan(&item.ID)
@@ -90,7 +90,7 @@ func (r *pgxOrderRepository) InsertOrderItem(ctx context.Context, tx pgx.Tx, ite
 func (r *pgxOrderRepository) GetOrder(ctx context.Context, orderID int64) (Order, []OrderItem, error) {
 	o, err := r.scanOrder(ctx, r.pool.QueryRow(ctx,
 		`SELECT id, user_id, status, subtotal_minor, shipping_minor, shipping_payer,
-		        total_minor, currency, market, delivered_at,
+		        discount_minor, total_minor, currency, market, delivered_at,
 		        cashback_eligible, cashback_currency, idempotency_key,
 		        created_at, updated_at,
 		        COALESCE(seller_id, 0), COALESCE(checkout_session_id, '')
@@ -105,7 +105,7 @@ func (r *pgxOrderRepository) GetOrder(ctx context.Context, orderID int64) (Order
 func (r *pgxOrderRepository) GetOrderItems(ctx context.Context, orderID int64) ([]OrderItem, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT id, order_id, variant_id, seller_id, category_id, qty,
-		        unit_price_minor, unit_price_currency,
+		        unit_price_minor, list_unit_price_minor, basket_discount_pct, unit_price_currency,
 		        commission_pct_bps, kdv_pct_bps,
 		        commission_amount_minor, kdv_amount_minor, seller_net_minor
 		FROM order_schema.order_items WHERE order_id = $1 ORDER BY id ASC`, orderID)
@@ -119,7 +119,7 @@ func (r *pgxOrderRepository) GetOrderItems(ctx context.Context, orderID int64) (
 func (r *pgxOrderRepository) FindByIdempotencyKey(ctx context.Context, key string) (Order, error) {
 	return r.scanOrder(ctx, r.pool.QueryRow(ctx,
 		`SELECT id, user_id, status, subtotal_minor, shipping_minor, shipping_payer,
-		        total_minor, currency, market, delivered_at,
+		        discount_minor, total_minor, currency, market, delivered_at,
 		        cashback_eligible, cashback_currency, idempotency_key,
 		        created_at, updated_at,
 		        COALESCE(seller_id, 0), COALESCE(checkout_session_id, '')
@@ -129,7 +129,7 @@ func (r *pgxOrderRepository) FindByIdempotencyKey(ctx context.Context, key strin
 func (r *pgxOrderRepository) ListOrders(ctx context.Context, userID int64) ([]Order, error) {
 	rows, err := r.pool.Query(ctx,
 		`SELECT id, user_id, status, subtotal_minor, shipping_minor, shipping_payer,
-		        total_minor, currency, market, delivered_at,
+		        discount_minor, total_minor, currency, market, delivered_at,
 		        cashback_eligible, cashback_currency, idempotency_key,
 		        created_at, updated_at,
 		        COALESCE(seller_id, 0), COALESCE(checkout_session_id, '')
@@ -187,7 +187,7 @@ func (r *pgxOrderRepository) scanOrder(ctx context.Context, row pgx.Row) (Order,
 	if err := row.Scan(
 		&o.ID, &o.UserID, &o.Status,
 		&o.SubtotalMinor, &o.ShippingMinor, &o.ShippingPayer,
-		&o.TotalMinor, &o.Currency, &o.Market, &o.DeliveredAt,
+		&o.DiscountMinor, &o.TotalMinor, &o.Currency, &o.Market, &o.DeliveredAt,
 		&o.CashbackEligible, &o.CashbackCurrency, &o.IdempotencyKey,
 		&o.CreatedAt, &o.UpdatedAt,
 		&o.SellerID, &o.CheckoutSessionID,
@@ -205,7 +205,7 @@ func (r *pgxOrderRepository) scanOrderRow(rows pgx.Rows) (Order, error) {
 	if err := rows.Scan(
 		&o.ID, &o.UserID, &o.Status,
 		&o.SubtotalMinor, &o.ShippingMinor, &o.ShippingPayer,
-		&o.TotalMinor, &o.Currency, &o.Market, &o.DeliveredAt,
+		&o.DiscountMinor, &o.TotalMinor, &o.Currency, &o.Market, &o.DeliveredAt,
 		&o.CashbackEligible, &o.CashbackCurrency, &o.IdempotencyKey,
 		&o.CreatedAt, &o.UpdatedAt,
 		&o.SellerID, &o.CheckoutSessionID,
@@ -221,7 +221,7 @@ func scanItems(rows pgx.Rows) ([]OrderItem, error) {
 		var it OrderItem
 		if err := rows.Scan(
 			&it.ID, &it.OrderID, &it.VariantID, &it.SellerID, &it.CategoryID, &it.Qty,
-			&it.UnitPriceMinor, &it.UnitPriceCurrency,
+			&it.UnitPriceMinor, &it.ListUnitPriceMinor, &it.BasketDiscountPct, &it.UnitPriceCurrency,
 			&it.CommissionPctBps, &it.KdvPctBps,
 			&it.CommissionAmountMinor, &it.KdvAmountMinor, &it.SellerNetMinor,
 		); err != nil {

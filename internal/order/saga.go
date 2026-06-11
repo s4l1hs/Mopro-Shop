@@ -84,11 +84,12 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 	type sellerGroup struct {
 		sellerID int64
 		items    []OrderItem
-		subtotal int64
+		subtotal int64 // pre-discount Σ(list_unit×qty)
+		discount int64 // Σ(list−discounted)×qty (seller-funded basket discount, CT-09)
 		currency string
 	}
 	groupsBySellerID := make(map[int64]*sellerGroup)
-	var totalMinor int64
+	var totalMinor int64 // charged total across all sellers (discounted)
 	var currency string
 
 	for _, ci := range cartState.Items {
@@ -101,7 +102,11 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 			return InitiateCheckoutResponse{}, fmt.Errorf("order: saga get commission variant %d: %w", ci.VariantID, cErr)
 		}
 
-		gross := v.PriceMinor * int64(ci.Qty)
+		// Per-unit basket discount → charged unit = snapshot unit_price_minor (CT-09).
+		pct := basketPctOf(v.BasketDiscountPct)
+		discUnit := DiscountedUnitMinor(v.PriceMinor, pct)
+		listGross := v.PriceMinor * int64(ci.Qty)
+		gross := discUnit * int64(ci.Qty)
 		commAmt := gross * int64(comm.CommissionPctBps) / 10000
 		kdvAmt := commAmt * int64(comm.KdvPctBps) / 10000
 		sellerNet := gross - commAmt - kdvAmt
@@ -111,7 +116,9 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 			SellerID:              v.SellerID,
 			CategoryID:            v.CategoryID,
 			Qty:                   ci.Qty,
-			UnitPriceMinor:        v.PriceMinor,
+			UnitPriceMinor:        discUnit,
+			ListUnitPriceMinor:    v.PriceMinor,
+			BasketDiscountPct:     pct,
 			UnitPriceCurrency:     v.PriceCurrency,
 			CommissionPctBps:      comm.CommissionPctBps,
 			KdvPctBps:             comm.KdvPctBps,
@@ -126,7 +133,8 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 			groupsBySellerID[v.SellerID] = g
 		}
 		g.items = append(g.items, item)
-		g.subtotal += gross
+		g.subtotal += listGross
+		g.discount += listGross - gross
 		totalMinor += gross
 		if currency == "" {
 			currency = v.PriceCurrency
@@ -161,7 +169,8 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 				SubtotalMinor:     g.subtotal,
 				ShippingMinor:     0,
 				ShippingPayer:     "buyer",
-				TotalMinor:        g.subtotal,
+				DiscountMinor:     g.discount,
+				TotalMinor:        g.subtotal - g.discount,
 				Currency:          g.currency,
 				Market:            market,
 				CashbackEligible:  true,

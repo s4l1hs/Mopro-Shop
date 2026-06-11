@@ -111,9 +111,13 @@ func (s *orderService) Checkout(ctx context.Context, req CheckoutRequest) (Order
 		market = s.defaultMarket
 	}
 
-	// 3. Build order items with commission snapshots (frozen at order time)
+	// 3. Build order items with commission snapshots (frozen at order time).
+	// The seller-funded basket discount (CT-09) is applied per unit here so the
+	// snapshot unit_price_minor is the CHARGED unit; commission/KDV/seller-net are
+	// frozen on the discounted gross. subtotal is pre-discount; discount is the
+	// summary line; total = subtotal − discount (the PSP charge).
 	items := make([]OrderItem, 0, len(cartState.Items))
-	var subtotal int64
+	var subtotal, discount int64
 	var currency string
 	for _, ci := range cartState.Items {
 		v, err := s.catalog.GetVariantByID(ctx, ci.VariantID)
@@ -125,8 +129,11 @@ func (s *orderService) Checkout(ctx context.Context, req CheckoutRequest) (Order
 			return Order{}, nil, fmt.Errorf("order: checkout get commission variant %d: %w", ci.VariantID, err)
 		}
 
-		gross := v.PriceMinor * int64(ci.Qty)
-		// Integer arithmetic — NEVER float (CLAUDE.md § 4.6 + § 10.7)
+		// Integer arithmetic — NEVER float (CLAUDE.md § 4.6 + § 10.7).
+		pct := basketPctOf(v.BasketDiscountPct)
+		discUnit := DiscountedUnitMinor(v.PriceMinor, pct)
+		listGross := v.PriceMinor * int64(ci.Qty)
+		gross := discUnit * int64(ci.Qty)
 		commAmt := gross * int64(comm.CommissionPctBps) / 10000
 		kdvAmt := commAmt * int64(comm.KdvPctBps) / 10000
 		sellerNet := gross - commAmt - kdvAmt
@@ -136,7 +143,9 @@ func (s *orderService) Checkout(ctx context.Context, req CheckoutRequest) (Order
 			SellerID:              v.SellerID,
 			CategoryID:            v.CategoryID,
 			Qty:                   ci.Qty,
-			UnitPriceMinor:        v.PriceMinor,
+			UnitPriceMinor:        discUnit,
+			ListUnitPriceMinor:    v.PriceMinor,
+			BasketDiscountPct:     pct,
 			UnitPriceCurrency:     v.PriceCurrency,
 			CommissionPctBps:      comm.CommissionPctBps,
 			KdvPctBps:             comm.KdvPctBps,
@@ -144,7 +153,8 @@ func (s *orderService) Checkout(ctx context.Context, req CheckoutRequest) (Order
 			KdvAmountMinor:        kdvAmt,
 			SellerNetMinor:        sellerNet,
 		})
-		subtotal += gross
+		subtotal += listGross
+		discount += listGross - gross
 		if currency == "" {
 			currency = v.PriceCurrency
 		}
@@ -159,7 +169,8 @@ func (s *orderService) Checkout(ctx context.Context, req CheckoutRequest) (Order
 		SubtotalMinor:    subtotal,
 		ShippingMinor:    0,
 		ShippingPayer:    "buyer",
-		TotalMinor:       subtotal,
+		DiscountMinor:    discount,
+		TotalMinor:       subtotal - discount,
 		Currency:         currency,
 		Market:           market,
 		CashbackEligible: true,
