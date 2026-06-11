@@ -1,5 +1,9 @@
 # Favorites PROBABLE resolution — source-side pass (not a visual walk)
 
+> **Superseded for FAV-05/FAV-06:** both shipped on `feat/favorites-ux` — see
+> `docs/internal/favorites-ux.md` (client-side variant resolution, no codegen;
+> shared-card §3 trap dodged with a favorites-local wrapper).
+
 Home method: Mopro from code (fact) × Trendyol convention (provisional, ~May 2025,
 *not visually verified*). No fabricated observations.
 

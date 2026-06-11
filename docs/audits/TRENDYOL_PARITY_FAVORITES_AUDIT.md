@@ -44,6 +44,13 @@
   - **✅ RESOLVED (`feat/favorites-downsync`): 3** — **FAV-02** server→local
     down-sync (cross-device; `GET /favorites` + hydration), **FAV-03** i18n
     clear-all, **FAV-04** error-retry state.
+  - **✅ RESOLVED (`feat/favorites-ux`; `docs/internal/favorites-ux.md`): 2** —
+    **FAV-05** add-to-cart on the card (client-side variant resolution via the
+    existing `GET /products/{id}` read path — no codegen, no backend change;
+    0 in-stock → OOS snackbar, 1 in-stock → direct add, several → PDP redirect;
+    button in a favorites-local wrapper, shared `ProductCard` untouched) and
+    **FAV-06** sort/filter (client-side toolbar: default/price↑/price↓/discount
+    sort + discounted/free-shipping chips over the fetched list).
   - **CONFIRMED (src), still open: 1** — **FAV-01** flat list / no collections
     (MED, = main-audit **P-013**, a separate flagship feature).
   - **PROBABLE → resolved source-side** (`feat/favorites-probable-resolution`, no walk; `docs/internal/favorites-probable-resolution.md`): **FAV-05** add-to-cart → **DEFER** (discovery shift: favorites store only product IDs, so ATC needs variant resolution — a quick-add sheet/PDP redirect — + touches the shared `ProductCard`, §3; not a clean button). **FAV-06** sort/filter → **NEEDS-DECISION** (UI feature, LOW). **FAV-07** price-drop-since-favorited → **DEFER** (needs a price-at-favorite snapshot; favorites hold only IDs). **0 CONFIRMED UI-only fixes.**
@@ -79,8 +86,8 @@ FAV-02/04/05/06/07 are **new** (favorites-specific, not in the flagship audit).
 | **FAV-02** | ~~One-way sync only~~ → **✅ RESOLVED** (`feat/favorites-downsync`): added **`GET /favorites`** (requireAuth → `{product_ids}`, §5-safe single-schema query via a `favoritesReader` seam) + mobile **server→local hydration** (`hydrateFavoritesFromServer` → `FavoritesNotifier.mergeServer` union), triggered after the up-sync on login **and** fire-and-forget on launch when authed. Favorites are now **cross-device**. | src | **RESOLVED** | **MED–HIGH** |
 | **FAV-03** | ~~hardcoded `'Temizle'` clear-all~~ → **✅ RESOLVED**: `favorites.clear_all`.tr() (en/tr). | src | **RESOLVED** | LOW |
 | **FAV-04** | ~~error → infinite skeleton~~ → **✅ RESOLVED**: a `/products/batch` failure now renders `_ErrorState` (icon + message + **retry**), distinct from the empty/loading states. | src | **RESOLVED** | LOW |
-| **FAV-05** | **No add-to-cart from the favorites card** — the card offers heart (remove) + tap→PDP only; no "Sepete Ekle". Trendyol's favorites cards have a direct add-to-cart. | src | **PROBABLE** (Trendyol) | LOW–MED |
-| **FAV-06** | **No sort/filter** of favorites (insertion-order `Set`). Trendyol favorites can sort (price/discount) + filter. | src | **PROBABLE** | LOW |
+| **FAV-05** | ~~No add-to-cart from the favorites card~~ → **✅ RESOLVED** (`feat/favorites-ux`): "Sepete Ekle" under every card, in a favorites-local wrapper (shared `ProductCard` untouched). Variant resolution is client-side via `GET /products/{id}`: all-OOS → snackbar; one in-stock → direct add; several in-stock → PDP redirect for size/colour. | src | **RESOLVED** | LOW–MED |
+| **FAV-06** | ~~No sort/filter of favorites~~ → **✅ RESOLVED** (`feat/favorites-ux`): toolbar with sort (default / price ↑↓ / discount) + discounted & free-shipping chips, client-side over the fetched list; filter-empty hint distinct from the true empty state. In-stock not filterable (no stock on `ProductSummary` — FAV-07 residue). | src | **RESOLVED** | LOW |
 | **FAV-07** | **No favorites-specific price-drop indicator** ("fiyatı düştü" since you favorited). Favorites store only IDs — no price-at-favorite snapshot — so the only price signal is the card's generic lowest-30d strikethrough, not a "dropped since you saved it" cue. | src | **PROBABLE** | LOW–MED |
 
 ---
@@ -128,10 +135,12 @@ favorites grid is visually at parity wherever the card is.
 4. **Cross-device (FAV-02)** — favorite as guest → login → (does anything sync
    down? expected: no). Then login on a *second* device → favorites expected
    **empty** (confirms the one-way-sync gap).
-5. **Add-to-cart (FAV-05)** — confirm Trendyol's favorites card has "Sepete Ekle";
-   Mopro's does not.
-6. **Sort/filter (FAV-06) + price-drop (FAV-07)** — confirm Trendyol exposes these
-   on its favorites; Mopro has neither.
+5. ~~**Add-to-cart (FAV-05)**~~ **shipped** — verify the new "Sepete Ekle" under each
+   card: single-variant adds directly; a multi-variant product routes to the PDP;
+   an all-OOS product shows the stok-yok snackbar.
+6. **Price-drop (FAV-07)** — confirm Trendyol's "fiyatı düştü" cue; Mopro still
+   lacks it (needs price-at-favorite snapshot). ~~Sort/filter (FAV-06)~~ **shipped** —
+   verify the sort popup + the İndirimli / Ücretsiz Kargo chips.
 7. **Collections (FAV-01)** — confirm Trendyol's named lists; Mopro is flat.
 
 ---
@@ -155,9 +164,14 @@ favorites grid is visually at parity wherever the card is.
    **✅ DONE** (`feat/favorites-downsync`): `GET /favorites` + `hydrateFavoritesFromServer`
    (login + launch), §5-safe, contract-tested. *(Two-way sync now: up via
    `/favorites/sync`, down via `/favorites`.)*
-4. **FAV-05 / FAV-06 / FAV-07 / FAV-01** — await the walk to confirm the Trendyol
-   side before sizing (add-to-cart on card; sort/filter; price-drop-since-favorited;
-   collections/lists). FAV-01 = the flagship audit's P-013.
+4. ~~**FAV-05** — add-to-cart on the card~~ **✅ DONE** (`feat/favorites-ux`):
+   client-side variant resolution (OOS / direct-add / PDP-redirect), button in a
+   favorites-local wrapper. `docs/internal/favorites-ux.md`.
+5. ~~**FAV-06** — sort/filter~~ **✅ DONE** (`feat/favorites-ux`): client-side
+   toolbar (sort popup + discounted/free-shipping chips).
+6. **FAV-07 / FAV-01** — await the walk / sizing (price-drop-since-favorited
+   needs a price-at-favorite snapshot; collections = the flagship audit's P-013).
 
-> **Status:** the substantive gap (FAV-02 cross-device) + the two polish items are
-> **shipped**; FAV-05/06/07 + FAV-01 (collections) remain **awaiting Salih's walk**.
+> **Status:** FAV-02/03/04 (downsync + polish) and now **FAV-05/06** (add-to-cart +
+> sort/filter, `feat/favorites-ux`) are **shipped**; FAV-07 (price-drop snapshot) +
+> FAV-01 (collections) remain open.
