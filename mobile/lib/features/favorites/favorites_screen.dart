@@ -3,8 +3,10 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mopro/api/client.dart';
 import 'package:mopro/core/di/providers.dart';
 import 'package:mopro/design/responsive/responsive.dart';
+import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/catalog/widgets/product_card.dart';
 import 'package:mopro/features/favorites/favorites_provider.dart';
 import 'package:mopro_api/mopro_api.dart';
@@ -12,6 +14,10 @@ import 'package:mopro_api/mopro_api.dart';
 /// Favorites grid columns per breakpoint: 2 mobile / 4 tablet / 5 desktop.
 int _favColumns(BuildContext context) =>
     context.isDesktop ? 5 : (context.isTablet ? 4 : 2);
+
+/// Card + the FAV-05 add-to-cart button below it: slightly taller cell than
+/// the bare ProductCard grids (0.62).
+const double _favCellAspectRatio = 0.54;
 
 /// Mobile keeps the full-width 12dp-padded grid (unchanged); tablet/desktop
 /// center + clamp via [CenteredContentColumn].
@@ -41,6 +47,10 @@ final _favProductsProvider =
     return const [];
   }
 });
+
+/// FAV-05: product IDs with an add-to-cart resolution in flight — disables the
+/// card's button + shows its spinner while GET /products/{id} resolves.
+final _atcBusyProvider = StateProvider.autoDispose<Set<int>>((_) => const {});
 
 class FavoritesScreen extends ConsumerWidget {
   const FavoritesScreen({super.key});
@@ -74,35 +84,141 @@ class FavoritesScreen extends ConsumerWidget {
               ),
               data: (products) => products.isEmpty
                   ? const _SkeletonGrid()
-                  : RefreshIndicator(
-                      onRefresh: () async =>
-                          ref.invalidate(_favProductsProvider),
-                      child: _wrapGrid(
-                        context,
-                        GridView.builder(
-                          padding: const EdgeInsets.all(12),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: _favColumns(context),
-                            childAspectRatio: 0.62,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                          ),
-                          itemCount: products.length,
-                          itemBuilder: (ctx, i) {
-                            final p = products[i];
-                            return ProductCard(
-                              product: p,
-                              isBestseller: p.isBestseller ?? false,
-                              isOfficialSeller: p.isOfficialSeller ?? false,
-                              basketDiscountPct: p.basketDiscountPct,
-                              onTap: () => ctx.push('/products/${p.id}'),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+                  : _PopulatedBody(products: products),
             ),
     );
+  }
+}
+
+class _PopulatedBody extends ConsumerWidget {
+  const _PopulatedBody({required this.products});
+
+  final List<ProductSummary> products;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return RefreshIndicator(
+      onRefresh: () async => ref.invalidate(_favProductsProvider),
+      child: _wrapGrid(
+        context,
+        GridView.builder(
+          padding: const EdgeInsets.all(12),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: _favColumns(context),
+            childAspectRatio: _favCellAspectRatio,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+          ),
+          itemCount: products.length,
+          itemBuilder: (ctx, i) => _FavCard(product: products[i]),
+        ),
+      ),
+    );
+  }
+}
+
+/// FAV-05: the shared [ProductCard] + a favorites-local add-to-cart button.
+/// The button stays out of the shared card (§3 — PLP/PDP lanes own surfaces
+/// rendering it); variant resolution is client-side via GET /products/{id}.
+class _FavCard extends ConsumerWidget {
+  const _FavCard({required this.product});
+
+  final ProductSummary product;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final busy = ref.watch(_atcBusyProvider).contains(product.id);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: ProductCard(
+            product: product,
+            originalPriceMinor: product.originalPriceMinor,
+            discountPct: product.discountPct,
+            ratingAvg: product.ratingAvg,
+            ratingCount: product.ratingCount ?? 0,
+            isBestseller: product.isBestseller ?? false,
+            isOfficialSeller: product.isOfficialSeller ?? false,
+            basketDiscountPct: product.basketDiscountPct,
+            onTap: () => context.push('/products/${product.id}'),
+          ),
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 32,
+          child: OutlinedButton.icon(
+            onPressed: busy ? null : () => _addToCart(context, ref),
+            icon: busy
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.add_shopping_cart_outlined, size: 16),
+            label: Text(
+              'product.add_to_cart'.tr(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Resolves the product's variants (favorites store product IDs only):
+  /// none in stock → OOS snackbar; exactly one in stock → direct add (the only
+  /// purchasable choice); several in stock → the user must pick size/colour →
+  /// PDP. Mirrors the PDP's add-to-cart snackbars.
+  Future<void> _addToCart(BuildContext context, WidgetRef ref) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final busy = ref.read(_atcBusyProvider.notifier);
+    busy.state = {...busy.state, product.id};
+    try {
+      final resp =
+          await ref.read(catalogApiProvider).getProduct(id: product.id);
+      final inStock = (resp.data?.variants ?? const <Variant>[])
+          .where((v) => v.stock > 0)
+          .toList();
+      if (inStock.isEmpty) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('favorites.out_of_stock'.tr())),
+        );
+        return;
+      }
+      if (inStock.length > 1) {
+        messenger.showSnackBar(
+          SnackBar(content: Text('favorites.select_options'.tr())),
+        );
+        if (context.mounted) {
+          await context.push('/products/${product.id}');
+        }
+        return;
+      }
+      await ref.read(cartProvider.notifier).addItem(
+            productId: product.id,
+            variantId: inStock.first.id,
+            qty: 1,
+          );
+      if (context.mounted) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('cart.added_to_cart'.tr()),
+            action: SnackBarAction(
+              label: 'nav.cart'.tr(),
+              onPressed: () => context.push('/cart'),
+            ),
+          ),
+        );
+      }
+    } catch (_) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('cart.add_failed'.tr())),
+      );
+    } finally {
+      busy.state = {...busy.state}..remove(product.id);
+    }
   }
 }
 
@@ -118,7 +234,7 @@ class _SkeletonGrid extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: cols,
-          childAspectRatio: 0.62,
+          childAspectRatio: _favCellAspectRatio,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
         ),

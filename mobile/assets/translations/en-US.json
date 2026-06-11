@@ -217,7 +217,9 @@
     "explore": "Explore",
     "clear_all": "Clear all",
     "load_error": "Couldn't load your favourites.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "out_of_stock": "This product is out of stock",
+    "select_options": "This product has options — choose on the product page"
   },
   "account": {
     "title": "My Account",
