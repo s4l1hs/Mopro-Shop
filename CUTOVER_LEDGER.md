@@ -211,6 +211,7 @@
 | Search | Pending (inherits PLP grid/filter patterns). |
 | PDP | Pending (own walk; may need seed extension: reviews/variants/gallery). |
 | Phase C (divergences) | After parity surfaces — coin redeem (deferred), etc. |
+| Returns | **PROBABLE resolved source-side** (`feat/returns-probable-resolution`): **no open PROBABLE rows** — RT-01 (#188)/RT-04 (#184)/RT-06 (#189) RESOLVED, RT-05 DEFER (contract/codegen). RT-02 cargo-leg + RT-03 photos = CONFIRMED-absent, terminal-DEFER feature verticals. 0 CONFIRMED UI fixes/visual/decision open. Doc: `docs/internal/returns-probable-resolution.md`. |
 
 ### Local walk env refreshed — ✅ (`chore/local-walk-env`)
 
