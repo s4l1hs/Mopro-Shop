@@ -45,9 +45,11 @@
   loads all + filters client-side). **Resolved:** ~~OR-04 reorder~~ (#184),
   **~~OR-05 variant label~~** (`feat/orders-absences` — was actually a raw-item
   enrichment stub, fixed via the §5 carrier), **~~OR-07 per-order help~~**
-  (`feat/orders-absences`). **DEFERRED:** **OR-02 delivery address** — *deeper than
-  audited*: the order never captures the address (mobile selects it only for the PSP
-  buyer name) → a checkout-capture vertical, see `docs/internal/orders-absences.md`.
+  (`feat/orders-absences`), **~~OR-02 delivery address~~**
+  (`feat/order-address-capture` — the checkout-capture vertical: address_id threaded
+  to the saga, resolved via identity.Service (§3.1), frozen as an AES-GCM-encrypted
+  snapshot in `order_schema.order_addresses` (§5-safe — copy, not cross-schema FK),
+  rendered as a card on the order detail; see `docs/internal/order-address.md`).
 - **NOT-ACTIONABLE: 3** — the cashback-schedule on the order + refund-as-coin
   (`wallet_credit`) (Mopro model), brand-orange tokens.
 
@@ -76,7 +78,7 @@
 | Line-item **variant label** | colour/size | `handleGetOrder` enriches items (title + `variant_label` + cover + price) via the catalog §5 carrier; line renders "Siyah, M" | **L** | **OR-05 ✅ RESOLVED** (`feat/orders-absences`) — DISCOVERY SHIFT: items were served **raw** (no title/price either → didn't render); the §5 carrier (#176) adds the label AND fixes that stub | — |
 | **Status timeline** | order states | `OrderStatusTimeline(status)` from status + `shipped_at`/`delivered_at` | **L** (derived) | **MATCHED** (simpler than carrier tracking) | — |
 | **Cargo tracking** (carrier + tracking no. + live status) | yes | carriers push via `POST /shipping/webhook/*` but **not surfaced**; `OrderDto` has no carrier/tracking_no | **A** | **OR-01** no consumer tracking | MED |
-| **Delivery address** | yes | `OrderDto` carries **no address**; the order/checkout **never capture it** (mobile selects an `Address` but only uses `.name` for the PSP buyer name) | **A** | **OR-02 🚩 DEFER** (`feat/orders-absences`) — deeper than "surface it": the data isn't on the order → needs a checkout-capture vertical (snapshot in `InitiateCheckoutRequest` + orders schema + handler + mobile send). Plan in `docs/internal/orders-absences.md` | MED |
+| **Delivery address** | yes | `OrderDto.deliveryAddress` from `order.delivery_address`; checkout threads `address_id` → frozen snapshot in `order_schema.order_addresses`; `DeliveryAddressCard` on the detail | **L** | **~~OR-02~~ RESOLVED** (`feat/order-address-capture`) — checkout-capture vertical: `address_id` on `InitiateCheckoutRequest` → resolved via identity.Service (§3.1) → AES-GCM-encrypted snapshot (§5-safe copy, not cross-schema FK; migration 0093) → order detail card. `docs/internal/order-address.md` | — |
 | Payment summary (subtotal/shipping/KDV/total) | yes | `items/shipping/commission/kdv/total` minor on `OrderDto` | **L** | **MATCHED** | — |
 | Discounts on the order | coupon/basket-disc | — (the cart discount cluster isn't built) | **A** | ties Cart **CT-09** | LOW |
 | Cashback schedule | (n/a) | `CashbackSchedule` (monthly coin plan) | **L** | **NOT-ACTIONABLE** (Mopro PLUS) | — |
@@ -119,7 +121,9 @@
 2. **Detail** — items, status timeline, totals breakdown, cashback schedule, the
    cancel/return actions, refund status.
 3. **OR-01** — confirm there's **no carrier/tracking-number** "where's my package".
-4. **OR-02** — confirm the detail shows **no delivery address**.
+4. ~~**OR-02** — confirm the detail shows no delivery address.~~ **RESOLVED**
+   (`feat/order-address-capture`) — the detail now renders a delivery-address card
+   for orders placed after capture went live.
 5. **OR-03** — confirm **no invoice / e-arşiv** link.
 6. **OR-04 / OR-05** — confirm **no reorder** + **no variant label** on item lines.
 7. **OR-06** — confirm the list isn't server-paged/searched (client-only).
@@ -130,9 +134,9 @@
 
 > No stubs to wire (unlike Account). These are **build-the-absent-feature** items:
 
-1. **OR-01 cargo tracking** + **OR-02 delivery address** — the highest-value detail
-   gaps (the webhook ingest exists for OR-01; surface carrier + tracking_no + the
-   address snapshot on the order).
+1. **OR-01 cargo tracking** (the webhook ingest exists; surface carrier + tracking_no)
+   — ~~+ OR-02 delivery address~~ **DONE** (`feat/order-address-capture`: the address
+   snapshot is now captured at checkout + rendered on the order detail).
 2. **OR-03 invoice / e-arşiv** — TR legal; gated on `internal/einvoice` (PLANNED).
 3. **OR-05 variant label** (cheap — reuse the cart `GetVariantByID` enrichment) +
    **OR-04 reorder** (re-add items to cart).
