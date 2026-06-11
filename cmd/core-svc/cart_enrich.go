@@ -8,6 +8,7 @@ import (
 
 	"github.com/mopro/platform/internal/cart"
 	"github.com/mopro/platform/internal/catalog"
+	"github.com/mopro/platform/internal/order"
 	"github.com/mopro/platform/pkg/mediaurl"
 )
 
@@ -28,16 +29,20 @@ type cartSellerNamer interface {
 // cartLineJSON / sellerTotalJSON / cartJSON mirror the mobile CartLineDto /
 // SellerTotalDto / CartDto exactly (hand-written; cart isn't in the OpenAPI spec).
 type cartLineJSON struct {
-	ID            string `json:"id"`
-	ProductID     int64  `json:"product_id"`
-	VariantID     int64  `json:"variant_id"`
-	SellerID      int64  `json:"seller_id"`
-	SellerName    string `json:"seller_name"`
-	Title         string `json:"title"`
-	VariantLabel  string `json:"variant_label"`
-	PriceMinor    int64  `json:"price_minor"`
-	Qty           int    `json:"qty"`
-	CoverImageURL string `json:"cover_image_url,omitempty"`
+	ID           string `json:"id"`
+	ProductID    int64  `json:"product_id"`
+	VariantID    int64  `json:"variant_id"`
+	SellerID     int64  `json:"seller_id"`
+	SellerName   string `json:"seller_name"`
+	Title        string `json:"title"`
+	VariantLabel string `json:"variant_label"`
+	// PriceMinor is the CHARGED unit price — already basket-discounted (CT-09), so
+	// it matches what the order build will charge. ListPriceMinor is the
+	// pre-discount unit (strikethrough), set only when a basket discount applies.
+	PriceMinor     int64  `json:"price_minor"`
+	ListPriceMinor int64  `json:"list_price_minor,omitempty"`
+	Qty            int    `json:"qty"`
+	CoverImageURL  string `json:"cover_image_url,omitempty"`
 }
 
 type sellerTotalJSON struct {
@@ -48,12 +53,16 @@ type sellerTotalJSON struct {
 }
 
 type cartJSON struct {
-	ID               string            `json:"id"`
-	UserID           int64             `json:"user_id"`
-	Lines            []cartLineJSON    `json:"lines"`
-	TotalsBySeller   []sellerTotalJSON `json:"totals_by_seller"`
-	GrandTotalMinor  int64             `json:"grand_total_minor"`
-	KdvIncludedMinor int64             `json:"kdv_included_minor"`
+	ID             string            `json:"id"`
+	UserID         int64             `json:"user_id"`
+	Lines          []cartLineJSON    `json:"lines"`
+	TotalsBySeller []sellerTotalJSON `json:"totals_by_seller"`
+	// BasketDiscountMinor is Σ(list − discounted)×qty — the "Sepette indirim"
+	// summary line (CT-09). GrandTotalMinor is the post-discount charged total, so
+	// pre-discount subtotal = GrandTotalMinor + BasketDiscountMinor.
+	BasketDiscountMinor int64 `json:"basket_discount_minor"`
+	GrandTotalMinor     int64 `json:"grand_total_minor"`
+	KdvIncludedMinor    int64 `json:"kdv_included_minor"`
 }
 
 // variantLabel joins the variant's non-empty colour/size into a display string
@@ -140,10 +149,23 @@ func enrichCart(ctx context.Context, c cart.Cart, cat cartCatalogResolver, namer
 	}
 	totals := map[int64]*acc{}
 	sellerOrder := 0
-	var grand, kdv int64
+	var grand, kdv, basketDiscount int64
 	for _, pr := range resolved {
 		v := pr.variant
-		lineTotal := v.PriceMinor * int64(pr.item.Qty)
+		// Seller-funded basket discount (CT-09): the SAME pure helper + the SAME
+		// products.basket_discount_pct the order build uses, so the displayed line
+		// price can never diverge from the charged price (the asymmetry rule).
+		pct := 0
+		if v.BasketDiscountPct != nil {
+			pct = *v.BasketDiscountPct
+		}
+		discUnit := order.DiscountedUnitMinor(v.PriceMinor, pct)
+		lineTotal := discUnit * int64(pr.item.Qty)
+		listPrice := int64(0)
+		if discUnit != v.PriceMinor {
+			listPrice = v.PriceMinor
+			basketDiscount += (v.PriceMinor - discUnit) * int64(pr.item.Qty)
+		}
 		grand += lineTotal
 		if bps, ok := kdvByCat[v.CategoryID]; ok && bps > 0 {
 			kdv += lineTotal * int64(bps) / int64(10000+bps)
@@ -156,16 +178,17 @@ func enrichCart(ctx context.Context, c cart.Cart, cat cartCatalogResolver, namer
 			cover = mediaurl.CDNUrl(p.CoverImageKey)
 		}
 		out.Lines = append(out.Lines, cartLineJSON{
-			ID:            strconv.FormatInt(v.ID, 10),
-			ProductID:     v.ProductID,
-			VariantID:     v.ID,
-			SellerID:      v.SellerID,
-			SellerName:    names[v.SellerID],
-			Title:         prodByID[v.ProductID].Title,
-			VariantLabel:  variantLabel(v),
-			PriceMinor:    v.PriceMinor,
-			Qty:           pr.item.Qty,
-			CoverImageURL: cover,
+			ID:             strconv.FormatInt(v.ID, 10),
+			ProductID:      v.ProductID,
+			VariantID:      v.ID,
+			SellerID:       v.SellerID,
+			SellerName:     names[v.SellerID],
+			Title:          prodByID[v.ProductID].Title,
+			VariantLabel:   variantLabel(v),
+			PriceMinor:     discUnit,
+			ListPriceMinor: listPrice,
+			Qty:            pr.item.Qty,
+			CoverImageURL:  cover,
 		})
 
 		a := totals[v.SellerID]
@@ -191,6 +214,7 @@ func enrichCart(ctx context.Context, c cart.Cart, cat cartCatalogResolver, namer
 			TotalMinor:    a.items,
 		})
 	}
+	out.BasketDiscountMinor = basketDiscount
 	out.GrandTotalMinor = grand
 	out.KdvIncludedMinor = kdv
 	return out

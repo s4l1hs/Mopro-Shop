@@ -1459,9 +1459,16 @@ func handleRefundOrder(
 
 // sellerBreakdownItem is the per-line Trendyol-style transparent breakdown for sellers.
 type sellerBreakdownItem struct {
-	VariantID             int64  `json:"variant_id"`
-	Qty                   int    `json:"qty"`
+	VariantID int64 `json:"variant_id"`
+	Qty       int   `json:"qty"`
+	// GrossMinor is the CHARGED (basket-discounted) gross — the reconciling base
+	// (gross − commission − kdv = seller_net). ListGrossMinor / BasketDiscountMinor
+	// expose the pre-discount gross and the seller-funded discount for transparency
+	// (CT-09); BasketDiscountPct is the snapshotted rate (omitted when 0).
 	GrossMinor            int64  `json:"gross_minor"`
+	ListGrossMinor        int64  `json:"list_gross_minor"`
+	BasketDiscountMinor   int64  `json:"basket_discount_minor"`
+	BasketDiscountPct     int    `json:"basket_discount_pct,omitempty"`
 	CommissionPctBps      int    `json:"commission_pct_bps"`
 	KdvPctBps             int    `json:"kdv_pct_bps"`
 	CommissionAmountMinor int64  `json:"commission_amount_minor"`
@@ -1501,10 +1508,17 @@ func handleSellerBreakdown(svc order.Service) http.HandlerFunc {
 				continue
 			}
 			gross := it.UnitPriceMinor * int64(it.Qty)
+			listGross := it.ListUnitPriceMinor * int64(it.Qty)
+			if listGross == 0 {
+				listGross = gross // pre-CT-09 rows have no list price snapshot
+			}
 			breakdown = append(breakdown, sellerBreakdownItem{
 				VariantID:             it.VariantID,
 				Qty:                   it.Qty,
 				GrossMinor:            gross,
+				ListGrossMinor:        listGross,
+				BasketDiscountMinor:   listGross - gross,
+				BasketDiscountPct:     it.BasketDiscountPct,
 				CommissionPctBps:      it.CommissionPctBps,
 				KdvPctBps:             it.KdvPctBps,
 				CommissionAmountMinor: it.CommissionAmountMinor,
