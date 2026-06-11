@@ -160,6 +160,19 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 		currency = req.Currency
 	}
 
+	// OR-02: resolve the selected delivery address ONCE before the persist tx (a read
+	// from identity_schema, §3.1 in-process). A resolve failure is non-fatal — the
+	// order is still created, just without a ship-to snapshot.
+	var deliveryAddr *OrderAddress
+	if s.addressResolver != nil && req.AddressID != 0 {
+		if addr, aErr := s.addressResolver.ResolveDeliveryAddress(ctx, req.UserID, req.AddressID); aErr != nil {
+			slog.Warn("order: resolve delivery address",
+				"user_id", req.UserID, "address_id", req.AddressID, "err", aErr)
+		} else {
+			deliveryAddr = &addr
+		}
+	}
+
 	// 4. DB transaction: insert orders + items + checkout session.
 	var createdOrders []Order
 	var orderIDs []int64
@@ -220,6 +233,15 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 					UserID:        req.UserID,
 					DiscountMinor: g.couponDiscount,
 				}); txErr != nil {
+					return txErr
+				}
+			}
+			// OR-02: freeze the delivery-address snapshot onto each per-seller order,
+			// in the same tx so capture is atomic + once-only with the order.
+			if deliveryAddr != nil {
+				snap := *deliveryAddr
+				snap.OrderID = created.ID
+				if txErr = s.repo.InsertOrderAddress(ctx, tx, snap); txErr != nil {
 					return txErr
 				}
 			}

@@ -29,6 +29,7 @@ type orderService struct {
 	psp              payment.Service          // nil for legacy NewService (no PSP call in Checkout)
 	diskChecker      DiskPressureChecker      // nil disables disk panic check
 	biz              *metrics.BusinessMetrics // nil disables business KPI counters
+	addressResolver  AddressResolver          // nil disables delivery-address capture (OR-02)
 }
 
 // NewService constructs an order Service for the legacy single-order checkout flow.
@@ -65,6 +66,7 @@ func NewServiceFull(
 	psp payment.Service,
 	diskChecker DiskPressureChecker,
 	biz *metrics.BusinessMetrics,
+	addressResolver AddressResolver,
 ) Service {
 	return &orderService{
 		repo:             repo,
@@ -77,6 +79,7 @@ func NewServiceFull(
 		psp:              psp,
 		diskChecker:      diskChecker,
 		biz:              biz,
+		addressResolver:  addressResolver,
 	}
 }
 
