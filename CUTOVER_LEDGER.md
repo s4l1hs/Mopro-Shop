@@ -211,6 +211,7 @@
 | Search | Pending (inherits PLP grid/filter patterns). |
 | PDP | Pending (own walk; may need seed extension: reviews/variants/gallery). |
 | Phase C (divergences) | After parity surfaces — coin redeem (deferred), etc. |
+| Favorites | **PROBABLE resolved source-side** (`feat/favorites-probable-resolution`, no walk): 0 CONFIRMED UI fixes — FAV-05 ATC **DEFER** (favorites hold only product IDs → needs variant resolution + touches shared ProductCard; not a clean button — discovery shift), FAV-06 sort/filter **NEEDS-DECISION**, FAV-07 price-drop-since-favorited **DEFER** (price-at-favorite snapshot). FAV-02 already RESOLVED. Doc: `docs/internal/favorites-probable-resolution.md`. |
 
 ### Local walk env refreshed — ✅ (`chore/local-walk-env`)
 
