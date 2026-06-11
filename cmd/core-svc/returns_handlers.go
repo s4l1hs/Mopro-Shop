@@ -57,12 +57,14 @@ func buildOrderRefundView(o order.Order, pi payment.PaymentIntent, found bool) *
 }
 
 // buildReturnRefundView surfaces the refund block for a return request from its
-// own snapshotted refund fields + lifecycle status.
+// own snapshotted refund fields + lifecycle status. Method is wallet_credit: an
+// approved return settles as Mopro Coin to the buyer's wallet (RT-01, the audit's
+// refund-as-coin model) — not a PSP fiat reversal.
 func buildReturnRefundView(r order.Return) *refundView {
 	rv := &refundView{
 		AmountMinor: r.RefundAmountMinor,
 		Currency:    r.RefundCurrency,
-		Method:      "original_payment",
+		Method:      "wallet_credit",
 	}
 	switch r.Status {
 	case order.ReturnRefunded:
