@@ -33,7 +33,8 @@
 - **DEFER'd (backend track): 1** — PLP-13 (attribute facets, Outcome C; ledger §4b).
 - **CONFIRMED open (backend/data): 3** — PLP-12 (subtree rollup, **HIGH**),
   PLP-14 (price-history filter), PLP-09 (fast-delivery).
-- **PROBABLE (await visual walk): 5** — PLP-02, PLP-06, PLP-07 (softened), PLP-08,
+- **PROBABLE → resolved source-side** (`feat/plp-probable-resolution`, no walk; `docs/internal/plp-probable-resolution.md`): **PLP-08** no-results clear-filters CTA → **CONFIRMED ✅ FIXED** (`EmptyState.filtered` + `CatalogShell.onClearFilters` + `PlpFiltersNotifier.clear()`, i18n + test). **PLP-06** quick-filter pills → **NEEDS-DECISION** (curated set). **PLP-07** brand-facet counts → **NEEDS-VISUAL** (Trendyol-side inconclusive — counts not in SSR). **PLP-10** inline PLP search bar → **NEEDS-DECISION** (IA — search is its own surface). §9 bucket → **NEEDS-VISUAL**. (PLP-02 was remapped to PLP-18, already resolved.)
+- ~~**PROBABLE (await visual walk): 5**~~ (original) — PLP-02, PLP-06, PLP-07 (softened), PLP-08,
   PLP-10, + the unnumbered visual bucket (§9).
 - **NEW from markup: 5** — PLP-13, PLP-14, PLP-15, PLP-16, PLP-17.
 - **NOT-ACTIONABLE (intentional / Mopro PLUS): 4** — D1–D4 (§5).

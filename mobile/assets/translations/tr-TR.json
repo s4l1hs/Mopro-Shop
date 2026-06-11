@@ -207,7 +207,9 @@
   "empty_state": {
     "empty_message": "Henüz içerik yok",
     "error_message": "Bir hata oluştu. Lütfen tekrar deneyin.",
-    "not_found_message": "Aradığınız ürün bulunamadı."
+    "not_found_message": "Aradığınız ürün bulunamadı.",
+    "no_results_filtered": "Seçtiğin filtrelere uygun ürün bulunamadı.",
+    "clear_filters": "Filtreleri Temizle"
   },
   "favorites": {
     "empty_title": "Henüz favori yok",

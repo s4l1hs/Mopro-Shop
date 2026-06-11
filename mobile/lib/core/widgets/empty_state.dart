@@ -1,7 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
-enum _EmptyStateVariant { empty, error, notFound }
+enum _EmptyStateVariant { empty, error, notFound, filtered }
 
 class EmptyState extends StatelessWidget {
   const EmptyState._({
@@ -18,6 +18,15 @@ class EmptyState extends StatelessWidget {
 
   factory EmptyState.notFound({VoidCallback? onAction, Key? key}) =>
       EmptyState._(variant: _EmptyStateVariant.notFound, onAction: onAction, key: key);
+
+  /// PLP-08: no results *because of active filters* — carries a "clear filters"
+  /// CTA (distinct from the bare `empty` state, which has no action).
+  factory EmptyState.filtered({required VoidCallback onAction, Key? key}) =>
+      EmptyState._(
+        variant: _EmptyStateVariant.filtered,
+        onAction: onAction,
+        key: key,
+      );
 
   final _EmptyStateVariant _variant;
   final VoidCallback? onAction;
@@ -42,6 +51,11 @@ class EmptyState extends StatelessWidget {
           Icons.search_off_outlined,
           'empty_state.not_found_message',
           null,
+        ),
+      _EmptyStateVariant.filtered => (
+          Icons.filter_alt_off_outlined,
+          'empty_state.no_results_filtered',
+          'empty_state.clear_filters',
         ),
     };
 
