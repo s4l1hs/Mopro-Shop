@@ -1,9 +1,16 @@
 #!/bin/sh
-# pre-push: run the full verification suite before publishing.
-# Mirrors the legacy `scripts/install-hooks.sh` behavior; lives here so
-# `core.hooksPath = .githooks` doesn't deactivate it.
+# pre-push: run the FAST, DB-free verification subset before publishing.
+# Lives here so `core.hooksPath = .githooks` doesn't deactivate it.
+#
+# Why `verify-fast`, not `verify`: the full `make verify` runs the property +
+# integration suites, which need the Postgres/Redis test clusters up. Without
+# them it hangs (the cashback DB crons never return), so devs reflexively
+# `--no-verify`'d — which skips the gate entirely. `verify-fast` is the subset
+# that runs WITHOUT any DB/Docker (gofmt, vet, build, lint-discipline,
+# boundaries, migration-check, unit tests, flutter analyze, i18n) in a couple of
+# minutes. The full suite stays in CI (the required `verify` workflow).
 #
 # Bypass: `git push --no-verify` (only if you know what you're skipping).
 
 set -e
-make verify
+make verify-fast

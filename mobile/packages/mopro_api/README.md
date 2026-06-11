@@ -148,7 +148,7 @@ Class | Method | HTTP request | Description
 [*MeApi*](doc/MeApi.md) | [**registerDevice**](doc/MeApi.md#registerdevice) | **POST** /me/devices | Register a device FCM token for push notifications
 [*MeApi*](doc/MeApi.md) | [**unregisterDevice**](doc/MeApi.md#unregisterdevice) | **DELETE** /me/devices/{id} | Remove a registered device (deregister push notifications)
 [*MeApi*](doc/MeApi.md) | [**updateMe**](doc/MeApi.md#updateme) | **PATCH** /me | Update user profile fields
-[*OrdersApi*](doc/OrdersApi.md) | [**cancelOrder**](doc/OrdersApi.md#cancelorder) | **POST** /orders/{id}/cancel | Cancel an order (only while in pending/confirmed status)
+[*OrdersApi*](doc/OrdersApi.md) | [**cancelOrder**](doc/OrdersApi.md#cancelorder) | **POST** /orders/{id}/cancel | Cancel an order (only while in pending_payment/paid status)
 [*OrdersApi*](doc/OrdersApi.md) | [**checkout**](doc/OrdersApi.md#checkout) | **POST** /orders/checkout | Atomically reserve cart → create order → initiate PSP payment
 [*OrdersApi*](doc/OrdersApi.md) | [**createOrder**](doc/OrdersApi.md#createorder) | **POST** /orders | Create an order from a reservation (admin / internal)
 [*OrdersApi*](doc/OrdersApi.md) | [**createReturn**](doc/OrdersApi.md#createreturn) | **POST** /orders/{id}/returns | Submit a return request for delivered order items

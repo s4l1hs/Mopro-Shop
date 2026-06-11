@@ -220,12 +220,10 @@ class Order {
 
 
 enum OrderStatusEnum {
-@JsonValue(r'pending')
-pending(r'pending'),
-@JsonValue(r'confirmed')
-confirmed(r'confirmed'),
-@JsonValue(r'preparing')
-preparing(r'preparing'),
+@JsonValue(r'pending_payment')
+pendingPayment(r'pending_payment'),
+@JsonValue(r'paid')
+paid(r'paid'),
 @JsonValue(r'shipped')
 shipped(r'shipped'),
 @JsonValue(r'delivered')
@@ -233,7 +231,9 @@ delivered(r'delivered'),
 @JsonValue(r'cancelled')
 cancelled(r'cancelled'),
 @JsonValue(r'refunded')
-refunded(r'refunded');
+refunded(r'refunded'),
+@JsonValue(r'partially_refunded')
+partiallyRefunded(r'partially_refunded');
 
 const OrderStatusEnum(this.value);
 

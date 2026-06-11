@@ -48,8 +48,8 @@ const (
 
 // Defines values for CheckoutResponseStatus.
 const (
-	CheckoutResponseStatusAwaitingPayment CheckoutResponseStatus = "awaiting_payment"
-	CheckoutResponseStatusConfirmed       CheckoutResponseStatus = "confirmed"
+	AwaitingPayment CheckoutResponseStatus = "awaiting_payment"
+	Confirmed       CheckoutResponseStatus = "confirmed"
 )
 
 // Defines values for OrderCargoOption.
@@ -64,13 +64,13 @@ const (
 
 // Defines values for OrderStatus.
 const (
-	OrderStatusCancelled OrderStatus = "cancelled"
-	OrderStatusConfirmed OrderStatus = "confirmed"
-	OrderStatusDelivered OrderStatus = "delivered"
-	OrderStatusPending   OrderStatus = "pending"
-	OrderStatusPreparing OrderStatus = "preparing"
-	OrderStatusRefunded  OrderStatus = "refunded"
-	OrderStatusShipped   OrderStatus = "shipped"
+	OrderStatusCancelled         OrderStatus = "cancelled"
+	OrderStatusDelivered         OrderStatus = "delivered"
+	OrderStatusPaid              OrderStatus = "paid"
+	OrderStatusPartiallyRefunded OrderStatus = "partially_refunded"
+	OrderStatusPendingPayment    OrderStatus = "pending_payment"
+	OrderStatusRefunded          OrderStatus = "refunded"
+	OrderStatusShipped           OrderStatus = "shipped"
 )
 
 // Defines values for ProductStatus.
@@ -156,13 +156,13 @@ const (
 
 // Defines values for ListOrdersParamsStatus.
 const (
-	ListOrdersParamsStatusCancelled ListOrdersParamsStatus = "cancelled"
-	ListOrdersParamsStatusConfirmed ListOrdersParamsStatus = "confirmed"
-	ListOrdersParamsStatusDelivered ListOrdersParamsStatus = "delivered"
-	ListOrdersParamsStatusPending   ListOrdersParamsStatus = "pending"
-	ListOrdersParamsStatusPreparing ListOrdersParamsStatus = "preparing"
-	ListOrdersParamsStatusRefunded  ListOrdersParamsStatus = "refunded"
-	ListOrdersParamsStatusShipped   ListOrdersParamsStatus = "shipped"
+	Cancelled         ListOrdersParamsStatus = "cancelled"
+	Delivered         ListOrdersParamsStatus = "delivered"
+	Paid              ListOrdersParamsStatus = "paid"
+	PartiallyRefunded ListOrdersParamsStatus = "partially_refunded"
+	PendingPayment    ListOrdersParamsStatus = "pending_payment"
+	Refunded          ListOrdersParamsStatus = "refunded"
+	Shipped           ListOrdersParamsStatus = "shipped"
 )
 
 // Defines values for ListProductsParamsSort.
@@ -1636,7 +1636,7 @@ type ServerInterface interface {
 	// Get order detail
 	// (GET /orders/{id})
 	GetOrder(w http.ResponseWriter, r *http.Request, id int64, params GetOrderParams)
-	// Cancel an order (only while in pending/confirmed status)
+	// Cancel an order (only while in pending_payment/paid status)
 	// (POST /orders/{id}/cancel)
 	CancelOrder(w http.ResponseWriter, r *http.Request, id int64, params CancelOrderParams)
 	// Trigger a full refund for a delivered order (admin only)
@@ -6720,7 +6720,7 @@ type StrictServerInterface interface {
 	// Get order detail
 	// (GET /orders/{id})
 	GetOrder(ctx context.Context, request GetOrderRequestObject) (GetOrderResponseObject, error)
-	// Cancel an order (only while in pending/confirmed status)
+	// Cancel an order (only while in pending_payment/paid status)
 	// (POST /orders/{id}/cancel)
 	CancelOrder(ctx context.Context, request CancelOrderRequestObject) (CancelOrderResponseObject, error)
 	// Trigger a full refund for a delivered order (admin only)

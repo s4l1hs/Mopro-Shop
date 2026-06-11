@@ -9,7 +9,7 @@ All URIs are relative to *https://api.moproshop.com*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
-[**cancelOrder**](OrdersApi.md#cancelorder) | **POST** /orders/{id}/cancel | Cancel an order (only while in pending/confirmed status)
+[**cancelOrder**](OrdersApi.md#cancelorder) | **POST** /orders/{id}/cancel | Cancel an order (only while in pending_payment/paid status)
 [**checkout**](OrdersApi.md#checkout) | **POST** /orders/checkout | Atomically reserve cart → create order → initiate PSP payment
 [**createOrder**](OrdersApi.md#createorder) | **POST** /orders | Create an order from a reservation (admin / internal)
 [**createReturn**](OrdersApi.md#createreturn) | **POST** /orders/{id}/returns | Submit a return request for delivered order items
@@ -22,7 +22,7 @@ Method | HTTP request | Description
 # **cancelOrder**
 > cancelOrder(xIdempotencyKey, id, xTraceId)
 
-Cancel an order (only while in pending/confirmed status)
+Cancel an order (only while in pending_payment/paid status)
 
 ### Example
 ```dart
