@@ -127,6 +127,12 @@
 - **CT-02 → NOT-ACTIONABLE** — cart shipping is **unconditionally 0** (cargo handled separately, §2.3/§4.8) → no threshold → a free-shipping *progress* bar has nothing to progress toward; not built.
 - **CT-09 → DEFER (financial, not display)** — `basket_discount_pct` (#133) is a **display-only card pill not applied to any price/total**; surfacing a real "Sepette indirim" discount line requires applying it across pricing→order→payment→cashback (a money change, CLAUDE.md §4) → deferred to that pricing PR. (`ProductSummaryRow.BasketDiscountPct` is already resolved in `enrichCart`, ready for it.) Discovery: `docs/internal/cart-checkout-totals.md`.
 
+## 4k. CT-09 basket-discount pricing — 🛑 DEFER (CFO/ADR-gated; `feat/basket-discount-pricing`, docs-only)
+
+- **The "make it real" lane ran discovery → DEFER (no code).** Making `basket_discount_pct` a charged discount is a **7-module financial refactor** — `enrichCart` → payment intent (charged amount) → `order_items` snapshot → **cashback `ComputePlanTerms(priceMinor)` (v6-LOCKED §4.7)** → seller payout (LOCKED §4.8) → **double-entry ledger** (needs a defined funding account). `basket_discount` has **zero** wiring in `internal/{order,payment,cashback,sellerpayout}` today.
+- **🚩 Blocking = an undefined CFO decision, not engineering:** the **funding model** (seller-funded via reduced gross vs Mopro-funded via a `marketing_discount` expense) determines the commission/cashback/payout base + the ledger entries. Choosing it (and whether the cashback `price` input changes — which would need a **constitution bump** per §4.7) is a **CFO + ADR** call (CLAUDE.md §12). Per the lane's split-bailout (a half-applied discount is worse than the honest stop), **partial-apply was barred → DEFER with the plan.**
+- **Deliverable:** `docs/internal/basket-discount-pricing.md` — full pricing-path map, the §4 invariants + financial-core conventions that bind it, the A/B funding decision table, and a **9-step phased plan** (ADR → order-level `discount_amount_minor` + `source` tag, generic so **coupon CT-03/CHK-04 reuses it** → ledger → cashback/payout → UI → property/integration/idempotency tests). **Trust gap flagged for the product owner** (pill advertises an uncharged discount; interim = hide-until-real *or* expedite the ADR — owner's call, not unilaterally taken).
+
 ---
 
 ## 5. CI / branch-protection
