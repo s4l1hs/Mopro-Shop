@@ -81,11 +81,12 @@ func buildReturnRefundView(r order.Return) *refundView {
 
 // returnJSON is the wire shape for a return (snake_case order fields, with the
 // nested items + camelCase refund block used elsewhere on the orders surface).
-func returnJSON(r order.Return, items []order.ReturnItem, refund *refundView) map[string]any {
+// history is the append-only status timeline (RT-04); nil omits the key.
+func returnJSON(r order.Return, items []order.ReturnItem, refund *refundView, history []order.ReturnStatusEvent) map[string]any {
 	if items == nil {
 		items = []order.ReturnItem{}
 	}
-	return map[string]any{
+	out := map[string]any{
 		"id":          r.ID,
 		"order_id":    r.OrderID,
 		"status":      r.Status,
@@ -95,6 +96,10 @@ func returnJSON(r order.Return, items []order.ReturnItem, refund *refundView) ma
 		"items":       items,
 		"refund":      refund,
 	}
+	if history != nil {
+		out["history"] = history
+	}
+	return out
 }
 
 // handleCreateReturn wires the OpenAPI CreateReturn op: POST /orders/{id}/returns.
@@ -149,7 +154,7 @@ func handleCreateReturn(returnSvc order.ReturnService) http.HandlerFunc {
 			}
 			return
 		}
-		jsonOK(w, http.StatusCreated, returnJSON(rec, items, buildReturnRefundView(rec)))
+		jsonOK(w, http.StatusCreated, returnJSON(rec, items, buildReturnRefundView(rec), nil))
 	}
 }
 
@@ -205,7 +210,14 @@ func handleGetReturn(returnSvc order.ReturnService) http.HandlerFunc {
 			jsonError(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		jsonOK(w, http.StatusOK, returnJSON(rec, items, buildReturnRefundView(rec)))
+		// RT-04: surface the append-only status timeline. Best-effort — a history
+		// read failure degrades to the derived timeline rather than failing the page.
+		history, hErr := returnSvc.GetReturnHistory(r.Context(), userID, returnID)
+		if hErr != nil {
+			slog.Warn("returns: GetReturnHistory", "err", hErr)
+			history = []order.ReturnStatusEvent{}
+		}
+		jsonOK(w, http.StatusOK, returnJSON(rec, items, buildReturnRefundView(rec), history))
 	}
 }
 

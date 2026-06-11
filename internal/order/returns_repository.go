@@ -70,6 +70,27 @@ func (r *pgxReturnRepository) InsertReturnStatusHistory(ctx context.Context, tx 
 	return nil
 }
 
+func (r *pgxReturnRepository) ListReturnStatusHistory(ctx context.Context, returnID int64) ([]ReturnStatusEvent, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT status, note, created_at
+		   FROM order_schema.return_status_history
+		  WHERE return_id = $1
+		  ORDER BY created_at ASC, id ASC`, returnID)
+	if err != nil {
+		return nil, fmt.Errorf("order.returns.repo: list status history: %w", err)
+	}
+	defer rows.Close()
+	out := []ReturnStatusEvent{}
+	for rows.Next() {
+		var e ReturnStatusEvent
+		if err := rows.Scan(&e.Status, &e.Note, &e.CreatedAt); err != nil {
+			return nil, fmt.Errorf("order.returns.repo: scan history: %w", err)
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
 func (r *pgxReturnRepository) GetReturn(ctx context.Context, returnID int64) (Return, []ReturnItem, error) {
 	var rec Return
 	var status, reason string

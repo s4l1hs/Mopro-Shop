@@ -32,6 +32,26 @@ class ReturnLifecycle {
   static String label(String s) => 'returns.status_$s'.tr();
 }
 
+/// One status-history event (RT-04): the append-only return audit trail.
+class ReturnStatusEventDto {
+  const ReturnStatusEventDto({
+    required this.status,
+    required this.createdAt,
+    this.note = '',
+  });
+
+  factory ReturnStatusEventDto.fromJson(Map<String, dynamic> json) =>
+      ReturnStatusEventDto(
+        status: (json['status'] as String?) ?? '',
+        note: (json['note'] as String?) ?? '',
+        createdAt: DateTime.parse(json['created_at'] as String),
+      );
+
+  final String status;
+  final String note;
+  final DateTime createdAt;
+}
+
 /// One requested item line within a return.
 class ReturnItemDto {
   const ReturnItemDto({required this.orderItemId, required this.quantity});
@@ -87,6 +107,7 @@ class ReturnDetailDto {
     required this.createdAt,
     this.description = '',
     this.items = const [],
+    this.history = const [],
     this.refund,
   });
 
@@ -101,6 +122,9 @@ class ReturnDetailDto {
         items: (json['items'] as List<dynamic>? ?? [])
             .map((e) => ReturnItemDto.fromJson(e as Map<String, dynamic>))
             .toList(),
+        history: (json['history'] as List<dynamic>? ?? [])
+            .map((e) => ReturnStatusEventDto.fromJson(e as Map<String, dynamic>))
+            .toList(),
         refund: json['refund'] is Map<String, dynamic>
             ? RefundInfo.fromJson(json['refund'] as Map<String, dynamic>)
             : null,
@@ -113,6 +137,10 @@ class ReturnDetailDto {
   final String description;
   final DateTime createdAt;
   final List<ReturnItemDto> items;
+
+  /// RT-04: the append-only status timeline; empty for pre-history returns →
+  /// the detail falls back to the status-derived timeline.
+  final List<ReturnStatusEventDto> history;
   final RefundInfo? refund;
 }
 
