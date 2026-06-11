@@ -121,6 +121,12 @@
 - **Closes:** **CT-01** (seller name + subtotal), **CT-04** (breakdown), **CT-05** (variant label) — live; **CHK-01/CHK-02 data-unblocked** (the review renders real lines + total; the full breakdown + per-seller grouping in the *review UI* is a fast-follow — data all present).
 - **Still open (PR 2):** CT-02 free-shipping progress + CT-09 basket-discount (the shared discount cluster); CT-03/CHK-04 coupon (PR 3 if it balloons). Discovery: `docs/internal/cart-readpath.md`.
 
+## 4j. Totals/discount display completion (`feat/cart-checkout-totals-completion`)
+
+- **CHK-01 ✅ + CHK-02 ✅ shipped** — the **checkout review** now renders the full breakdown (subtotal/shipping/total + KDV note + cashback) and **groups by seller** (name + per-seller subtotal), on the #4i enriched cart. Pure display, reuses cart i18n keys (0/0), widget-tested.
+- **CT-02 → NOT-ACTIONABLE** — cart shipping is **unconditionally 0** (cargo handled separately, §2.3/§4.8) → no threshold → a free-shipping *progress* bar has nothing to progress toward; not built.
+- **CT-09 → DEFER (financial, not display)** — `basket_discount_pct` (#133) is a **display-only card pill not applied to any price/total**; surfacing a real "Sepette indirim" discount line requires applying it across pricing→order→payment→cashback (a money change, CLAUDE.md §4) → deferred to that pricing PR. (`ProductSummaryRow.BasketDiscountPct` is already resolved in `enrichCart`, ready for it.) Discovery: `docs/internal/cart-checkout-totals.md`.
+
 ---
 
 ## 5. CI / branch-protection
