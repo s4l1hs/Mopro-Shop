@@ -146,6 +146,16 @@
 
 ---
 
+## 4m. Orders absences bundle — OR-05/OR-07 ✅ RESOLVED, OR-02 🚩 DEFER (`feat/orders-absences`)
+
+- **Read-path check before building (cart-stub lesson) → 2 of 3 were deeper than the audit's "cheap surfacing."** Discovery: `docs/internal/orders-absences.md`.
+- **OR-05 — variant label — ✅ RESOLVED, but it was a STUB not a one-field add.** `GET /orders/{id}` served the **raw** `order_items` snapshot (only `variant_id`/`unit_price_minor`); the mobile `OrderItemDto` requires `title`+`price_minor` → detail items didn't render against the real backend. Built the §5 variant carrier `enrichOrderItems` (`GetVariantByID` + `ListProductsByIDs`, reuses `variantLabel`, no cross-schema JOIN, graceful per-item degradation) emitting title/variant_label/cover/price_minor — both adds the label and fixes the stub. `OrderItemDto.variantLabel` + hardened null parsing; line renders "Siyah, M". Contract + degradation tests.
+- **OR-07 — per-order help — ✅ RESOLVED.** "Bu siparişle ilgili yardım" button → `/help` (like AC-02). i18n `order.help`.
+- **OR-02 — delivery address — 🚩 DEFER (deeper than audited).** The order **never captures** an address (no schema column, no domain field, `InitiateCheckoutRequest` has none; mobile selects an `Address` only to derive the PSP buyer name). Nothing to surface → a checkout-capture vertical (snapshot in the initiate body + orders schema + handler + mobile send), out of the variant-carrier scope. Precise plan in the discovery doc.
+- **Gates:** core-svc build + tests green (incl. `enrichOrderItems` contract/degradation); `flutter analyze` 0 (touched); i18n `--strict` OK; §5/boundary clean (catalog Service carrier). Audit OR-05/OR-07 → RESOLVED, OR-02 → DEFER.
+
+---
+
 ## 5. CI / branch-protection
 
 - **F-022b (#138)** made `flutter analyze` green-on-compile (`--no-fatal-infos`; errors/warnings still fatal).

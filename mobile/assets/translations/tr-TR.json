@@ -459,6 +459,7 @@
     "kdv": "KDV",
     "total": "Toplam",
     "cancel": "Siparişi İptal Et",
+    "help": "Bu siparişle ilgili yardım",
     "reorder": "Tekrar sipariş ver",
     "reorder_done": "{count} ürün sepete eklendi",
     "reorder_partial": "{added} ürün sepete eklendi, {failed} ürün eklenemedi (stokta yok)",
