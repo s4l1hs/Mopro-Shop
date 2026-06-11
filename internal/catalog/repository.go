@@ -206,14 +206,19 @@ func (r *pgxRepository) loadTranslations(ctx context.Context, productID int64) (
 
 func (r *pgxRepository) SearchProducts(ctx context.Context, query, locale, market string) ([]Product, error) {
 	rows, err := r.pool.Query(ctx,
-		`SELECT DISTINCT p.id, p.seller_id, p.category_id, p.brand,
+		// SE-08: default sort is RELEVANCE (ts_rank), the universal search
+		// convention — not id-order. product_translations PK is (product_id,
+		// locale) so the locale-filtered JOIN is 1:1 → DISTINCT is redundant and
+		// ts_rank can drive ORDER BY. Full-text matches rank by score; ILIKE-only
+		// fallback matches (rank 0) sort after, stable by id.
+		`SELECT p.id, p.seller_id, p.category_id, p.brand,
 		        p.default_currency, p.default_locale, p.status, p.created_at, p.updated_at
 		FROM catalog_schema.products p
 		JOIN catalog_schema.product_translations t ON t.product_id = p.id AND t.locale = $1
 		WHERE p.status = 'active'
 		  AND (t.search_vector @@ plainto_tsquery('simple', $2)
 		       OR t.title ILIKE '%' || $2 || '%')
-		ORDER BY p.id ASC
+		ORDER BY ts_rank(t.search_vector, plainto_tsquery('simple', $2)) DESC, p.id ASC
 		LIMIT 50`,
 		locale, query,
 	)
