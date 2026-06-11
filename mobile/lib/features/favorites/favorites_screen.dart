@@ -52,6 +52,49 @@ final _favProductsProvider =
 /// card's button + shows its spinner while GET /products/{id} resolves.
 final _atcBusyProvider = StateProvider.autoDispose<Set<int>>((_) => const {});
 
+// ── FAV-06: client-side sort/filter over the fetched list ────────────────────
+
+enum _FavSort { defaultOrder, priceAsc, priceDesc, discount }
+
+final _favSortProvider =
+    StateProvider.autoDispose<_FavSort>((_) => _FavSort.defaultOrder);
+final _favDiscountedOnlyProvider =
+    StateProvider.autoDispose<bool>((_) => false);
+final _favFreeShippingOnlyProvider =
+    StateProvider.autoDispose<bool>((_) => false);
+
+String _sortLabel(_FavSort s) => switch (s) {
+      _FavSort.defaultOrder => 'favorites.sort_default'.tr(),
+      _FavSort.priceAsc => 'catalog.sort_price_asc'.tr(),
+      _FavSort.priceDesc => 'catalog.sort_price_desc'.tr(),
+      _FavSort.discount => 'favorites.sort_discount'.tr(),
+    };
+
+List<ProductSummary> _applyView(
+  List<ProductSummary> items,
+  _FavSort sort,
+  bool discountedOnly,
+  bool freeShippingOnly,
+) {
+  final out = [
+    for (final p in items)
+      if ((!discountedOnly || (p.discountPct ?? 0) > 0) &&
+          (!freeShippingOnly || (p.freeShipping ?? false)))
+        p,
+  ];
+  switch (sort) {
+    case _FavSort.priceAsc:
+      out.sort((a, b) => a.priceMinor.compareTo(b.priceMinor));
+    case _FavSort.priceDesc:
+      out.sort((a, b) => b.priceMinor.compareTo(a.priceMinor));
+    case _FavSort.discount:
+      out.sort((a, b) => (b.discountPct ?? 0).compareTo(a.discountPct ?? 0));
+    case _FavSort.defaultOrder:
+      break; // fetch order
+  }
+  return out;
+}
+
 class FavoritesScreen extends ConsumerWidget {
   const FavoritesScreen({super.key});
 
@@ -97,21 +140,124 @@ class _PopulatedBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return RefreshIndicator(
-      onRefresh: () async => ref.invalidate(_favProductsProvider),
-      child: _wrapGrid(
-        context,
-        GridView.builder(
-          padding: const EdgeInsets.all(12),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: _favColumns(context),
-            childAspectRatio: _favCellAspectRatio,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-          ),
-          itemCount: products.length,
-          itemBuilder: (ctx, i) => _FavCard(product: products[i]),
+    final visible = _applyView(
+      products,
+      ref.watch(_favSortProvider),
+      ref.watch(_favDiscountedOnlyProvider),
+      ref.watch(_favFreeShippingOnlyProvider),
+    );
+    return Column(
+      children: [
+        const _FavToolbar(),
+        Expanded(
+          child: visible.isEmpty
+              ? const _FilterEmptyState()
+              : RefreshIndicator(
+                  onRefresh: () async => ref.invalidate(_favProductsProvider),
+                  child: _wrapGrid(
+                    context,
+                    GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: _favColumns(context),
+                        childAspectRatio: _favCellAspectRatio,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                      ),
+                      itemCount: visible.length,
+                      itemBuilder: (ctx, i) => _FavCard(product: visible[i]),
+                    ),
+                  ),
+                ),
         ),
+      ],
+    );
+  }
+}
+
+/// FAV-06 toolbar: sort popup + discounted / free-shipping toggle chips.
+class _FavToolbar extends ConsumerWidget {
+  const _FavToolbar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sort = ref.watch(_favSortProvider);
+    final discountedOnly = ref.watch(_favDiscountedOnlyProvider);
+    final freeShippingOnly = ref.watch(_favFreeShippingOnlyProvider);
+    final cs = Theme.of(context).colorScheme;
+
+    final bar = Row(
+      children: [
+        PopupMenuButton<_FavSort>(
+          initialValue: sort,
+          tooltip: 'catalog.sort_title'.tr(),
+          onSelected: (s) => ref.read(_favSortProvider.notifier).state = s,
+          itemBuilder: (_) => [
+            for (final s in _FavSort.values)
+              PopupMenuItem(value: s, child: Text(_sortLabel(s))),
+          ],
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              border: Border.all(color: cs.outlineVariant),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.swap_vert_rounded, size: 16, color: cs.onSurface),
+                const SizedBox(width: 4),
+                Text(
+                  sort == _FavSort.defaultOrder
+                      ? 'catalog.sort_title'.tr()
+                      : _sortLabel(sort),
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        FilterChip(
+          label: Text('favorites.filter_discounted'.tr()),
+          selected: discountedOnly,
+          onSelected: (v) =>
+              ref.read(_favDiscountedOnlyProvider.notifier).state = v,
+        ),
+        const SizedBox(width: 8),
+        FilterChip(
+          label: Text('plp.free_shipping'.tr()),
+          selected: freeShippingOnly,
+          onSelected: (v) =>
+              ref.read(_favFreeShippingOnlyProvider.notifier).state = v,
+        ),
+      ],
+    );
+
+    final padded = Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: bar),
+    );
+    return context.isMobile ? padded : CenteredContentColumn(child: padded);
+  }
+}
+
+/// Shown when the FAV-06 filters prune every favorite — distinct from the true
+/// empty state (the favorites themselves are intact).
+class _FilterEmptyState extends StatelessWidget {
+  const _FilterEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Text(
+        'favorites.filter_empty'.tr(),
+        style: Theme.of(context)
+            .textTheme
+            .bodyMedium
+            ?.copyWith(color: cs.onSurfaceVariant),
+        textAlign: TextAlign.center,
       ),
     );
   }

@@ -344,4 +344,99 @@ void main() {
     expect(cartRepo.added, isEmpty);
     expect(find.text('cart.add_failed'), findsOneWidget);
   });
+
+  // ── FAV-06: client-side sort/filter ─────────────────────────────────────────
+
+  /// Visible card titles in grid (paint) order.
+  List<String> titlesOf(WidgetTester tester) => [
+        for (final w in tester.widgetList<ProductCard>(find.byType(ProductCard)))
+          w.product.title,
+      ];
+
+  Future<void> selectSort(WidgetTester tester, String label) async {
+    await tester.tap(find.byIcon(Icons.swap_vert_rounded));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(label).last);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('FAV-06: price sort reorders the grid both ways', (tester) async {
+    await _pumpWithRouter(
+      tester,
+      products: [
+        _p(1, priceMinor: 30000),
+        _p(2, priceMinor: 10000),
+        _p(3, priceMinor: 20000),
+      ],
+      details: const {},
+    );
+    expect(titlesOf(tester).take(2), ['P1', 'P2']); // fetch order
+
+    await selectSort(tester, 'catalog.sort_price_asc');
+    expect(titlesOf(tester).first, 'P2');
+
+    await selectSort(tester, 'catalog.sort_price_desc');
+    expect(titlesOf(tester).first, 'P1');
+  });
+
+  testWidgets('FAV-06: discount sort puts the deepest discount first',
+      (tester) async {
+    await _pumpWithRouter(
+      tester,
+      products: [_p(1), _p(2, discountPct: 10), _p(3, discountPct: 40)],
+      details: const {},
+    );
+    await selectSort(tester, 'favorites.sort_discount');
+    expect(titlesOf(tester).take(2), ['P3', 'P2']);
+  });
+
+  testWidgets('FAV-06: discounted + free-shipping chips prune the grid',
+      (tester) async {
+    await _pumpWithRouter(
+      tester,
+      products: [
+        _p(1),
+        _p(2, discountPct: 10),
+        _p(3, freeShipping: true),
+        _p(4, discountPct: 20, freeShipping: true),
+      ],
+      details: const {},
+    );
+    expect(find.byType(ProductCard), findsNWidgets(4));
+
+    await tester.tap(find.widgetWithText(FilterChip, 'favorites.filter_discounted'));
+    await tester.pumpAndSettle();
+    expect(titlesOf(tester), ['P2', 'P4']);
+
+    await tester.ensureVisible(
+      find.widgetWithText(FilterChip, 'plp.free_shipping'),
+    );
+    await tester.tap(find.widgetWithText(FilterChip, 'plp.free_shipping'));
+    await tester.pumpAndSettle();
+    expect(titlesOf(tester), ['P4']);
+
+    // Deselect both → everything back.
+    await tester.tap(find.widgetWithText(FilterChip, 'favorites.filter_discounted'));
+    await tester.ensureVisible(
+      find.widgetWithText(FilterChip, 'plp.free_shipping'),
+    );
+    await tester.tap(find.widgetWithText(FilterChip, 'plp.free_shipping'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProductCard), findsNWidgets(4));
+  });
+
+  testWidgets('FAV-06: filters that prune everything show the filter-empty hint',
+      (tester) async {
+    await _pumpWithRouter(
+      tester,
+      products: [_p(1), _p(2)],
+      details: const {},
+    );
+    await tester.tap(find.widgetWithText(FilterChip, 'favorites.filter_discounted'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ProductCard), findsNothing);
+    expect(find.text('favorites.filter_empty'), findsOneWidget);
+    // The true empty state is NOT shown — favorites are intact.
+    expect(find.text('favorites.empty_title'), findsNothing);
+  });
 }

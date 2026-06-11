@@ -219,7 +219,11 @@
     "load_error": "Favorilerin yüklenemedi.",
     "retry": "Tekrar dene",
     "out_of_stock": "Ürün stokta yok",
-    "select_options": "Bu ürünün seçenekleri var — ürün sayfasından seç"
+    "select_options": "Bu ürünün seçenekleri var — ürün sayfasından seç",
+    "sort_default": "Varsayılan",
+    "sort_discount": "İndirim Oranı",
+    "filter_discounted": "İndirimli",
+    "filter_empty": "Filtreyle eşleşen favori yok"
   },
   "account": {
     "title": "Hesabım",
