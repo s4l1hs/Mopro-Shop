@@ -211,6 +211,7 @@
 | Search | Pending (inherits PLP grid/filter patterns). |
 | PDP | **PROBABLE resolved source-side** (`feat/pdp-probable-resolution`, no walk): 0 CONFIRMED UI fixes — rows DEFER (PD-02 swatches→PLP-13 Ph2; **PD-03 Sepette-%X = codegen+backend, NOT display-only — audit stale**; PD-04 seller-rating backend; PD-06 video no-asset) or NEEDS-DECISION (PD-05 installments-vs-cashback; PD-06 mobile thumbs; PD-09 sticky buy-box vs the deliberate sticky-gallery; PD-10 recently-viewed placement). Most rows already closed pre-pass (PD-01/06-readpath/07, PLP-17). Doc: `docs/internal/pdp-probable-resolution.md`. |
 | Phase C (divergences) | After parity surfaces — coin redeem (deferred), etc. |
+| Favorites | **PROBABLE resolved source-side** (`feat/favorites-probable-resolution`, no walk): 0 CONFIRMED UI fixes — FAV-05 ATC **DEFER** (favorites hold only product IDs → needs variant resolution + touches shared ProductCard; not a clean button — discovery shift), FAV-06 sort/filter **NEEDS-DECISION**, FAV-07 price-drop-since-favorited **DEFER** (price-at-favorite snapshot). FAV-02 already RESOLVED. Doc: `docs/internal/favorites-probable-resolution.md`. |
 
 ### Local walk env refreshed — ✅ (`chore/local-walk-env`)
 
