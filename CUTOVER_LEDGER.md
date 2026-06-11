@@ -211,6 +211,7 @@
 | Search | Pending (inherits PLP grid/filter patterns). |
 | PDP | Pending (own walk; may need seed extension: reviews/variants/gallery). |
 | Phase C (divergences) | After parity surfaces — coin redeem (deferred), etc. |
+| Cart | **PROBABLE resolved source-side** (`feat/cart-probable-resolution`): **no open PROBABLE rows** — CT-01/04/05/09 already RESOLVED (read-path enrichment + basket-discount line); CT-02 free-shipping bar NOT-ACTIONABLE (shipping=0). 0 fixes/visual/decision open. Doc: `docs/internal/cart-probable-resolution.md`. |
 
 ### Local walk env refreshed — ✅ (`chore/local-walk-env`)
 
