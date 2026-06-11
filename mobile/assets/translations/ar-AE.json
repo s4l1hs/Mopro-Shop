@@ -311,5 +311,9 @@
     "delete_error": "Deletion failed, please try again.",
     "more_section": "More Information",
     "read_policy": "Read the privacy policy"
+  },
+  "empty_state": {
+    "no_results_filtered": "لا توجد منتجات تطابق عوامل التصفية.",
+    "clear_filters": "مسح عوامل التصفية"
   }
 }
