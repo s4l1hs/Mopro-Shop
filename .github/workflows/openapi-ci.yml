@@ -19,6 +19,11 @@ on:
   # never runs blocks the merge). They validate the merged result.
   pull_request:
 
+# Pin the same exact Flutter version as the rest of CI (CI-hygiene-2).
+# KEEP IN SYNC with flutter-ci.yml / golden-rebaseline.yml / make-verify.yml.
+env:
+  FLUTTER_VERSION: "3.44.1"
+
 jobs:
   lint-spec:
     name: Spectral OpenAPI lint
@@ -102,7 +107,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: "3.x"
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
 
       - name: Get dependencies
