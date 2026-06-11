@@ -29,10 +29,11 @@ class CartTotalsSummary extends StatelessWidget {
     final itemCount = cart.lines.length;
     // CT-04: subtotal + shipping breakdown (parity with the desktop summary),
     // folded from the existing per-seller totals.
-    final subtotalMinor =
-        cart.totalsBySeller.fold<int>(0, (s, t) => s + t.itemsMinor);
     final shippingMinor =
         cart.totalsBySeller.fold<int>(0, (s, t) => s + t.shippingMinor);
+    // CT-09: per-seller itemsMinor is already basket-discounted, so the
+    // pre-discount subtotal = charged total + the "Sepette indirim" line.
+    final subtotalMinor = cart.grandTotalMinor + cart.basketDiscountMinor;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -68,6 +69,13 @@ class CartTotalsSummary extends StatelessWidget {
             value: fmt.format(subtotalMinor / 100.0),
             theme: theme,
           ),
+          if (cart.basketDiscountMinor > 0)
+            _BreakdownRow(
+              label: 'cart.basket_discount'.tr(),
+              value: '-${fmt.format(cart.basketDiscountMinor / 100.0)}',
+              theme: theme,
+              emphasizeColor: colorScheme.primary,
+            ),
           _BreakdownRow(
             label: 'cart.shipping'.tr(),
             value: shippingMinor == 0
@@ -122,16 +130,23 @@ class _BreakdownRow extends StatelessWidget {
     required this.label,
     required this.value,
     required this.theme,
+    this.emphasizeColor,
   });
 
   final String label;
   final String value;
   final ThemeData theme;
 
+  /// CT-09: when set, the row (label + value) renders in this colour with a
+  /// medium weight — used to make the "Sepette indirim" line read as a saving.
+  final Color? emphasizeColor;
+
   @override
   Widget build(BuildContext context) {
-    final style = theme.textTheme.bodySmall
-        ?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final style = theme.textTheme.bodySmall?.copyWith(
+      color: emphasizeColor ?? theme.colorScheme.onSurfaceVariant,
+      fontWeight: emphasizeColor != null ? FontWeight.w600 : null,
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(

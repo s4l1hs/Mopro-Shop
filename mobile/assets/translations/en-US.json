@@ -381,6 +381,7 @@
     "add_failed": "Failed to add to cart",
     "order_summary": "Order Summary",
     "subtotal": "Subtotal",
+    "basket_discount": "Basket Discount",
     "shipping": "Shipping",
     "shipping_free": "Free",
     "estimated_earnings": "Estimated Earnings",

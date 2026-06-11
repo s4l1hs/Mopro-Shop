@@ -9,6 +9,7 @@ class CartDto {
     required this.totalsBySeller,
     required this.grandTotalMinor,
     required this.kdvIncludedMinor,
+    this.basketDiscountMinor = 0,
   });
 
   factory CartDto.fromJson(Map<String, dynamic> json) => CartDto(
@@ -27,6 +28,8 @@ class CartDto {
         grandTotalMinor: (json['grand_total_minor'] as num?)?.toInt() ?? 0,
         kdvIncludedMinor:
             (json['kdv_included_minor'] as num?)?.toInt() ?? 0,
+        basketDiscountMinor:
+            (json['basket_discount_minor'] as num?)?.toInt() ?? 0,
       );
 
   factory CartDto.empty() => const CartDto(
@@ -45,6 +48,11 @@ class CartDto {
   final int grandTotalMinor;
   final int kdvIncludedMinor;
 
+  /// CT-09: the seller-funded "Sepette indirim" total (Σ list − charged). 0 when
+  /// no line carries a basket discount. grandTotalMinor is already discounted, so
+  /// the pre-discount subtotal = grandTotalMinor + basketDiscountMinor.
+  final int basketDiscountMinor;
+
   bool get isEmpty => lines.isEmpty;
   bool get isAboveTotalLimit => grandTotalMinor >= 5000000; // ₺50,000 in minor units
   bool get isAtItemLimit => lines.length >= 50;
@@ -57,5 +65,6 @@ class CartDto {
             totalsBySeller.map((t) => t.toJson()).toList(),
         'grand_total_minor': grandTotalMinor,
         'kdv_included_minor': kdvIncludedMinor,
+        'basket_discount_minor': basketDiscountMinor,
       };
 }

@@ -9,6 +9,7 @@ class CartLineDto {
     required this.qty,
     this.sellerName = '',
     this.variantLabel = '',
+    this.listPriceMinor = 0,
     this.coverImageUrl,
     this.reservedUntil,
   });
@@ -23,6 +24,7 @@ class CartLineDto {
         qty: (json['qty'] as num).toInt(),
         sellerName: (json['seller_name'] as String?) ?? '',
         variantLabel: (json['variant_label'] as String?) ?? '',
+        listPriceMinor: (json['list_price_minor'] as num?)?.toInt() ?? 0,
         coverImageUrl: json['cover_image_url'] as String?,
         reservedUntil: json['reserved_until'] != null
             ? DateTime.tryParse(json['reserved_until'] as String)
@@ -42,8 +44,15 @@ class CartLineDto {
 
   /// CT-05: the variant's colour/size label, e.g. "Siyah, M". Empty when none.
   final String variantLabel;
+
+  /// CT-09: the pre-basket-discount unit price (strikethrough). 0 when the line
+  /// carries no basket discount (priceMinor is already the charged unit).
+  final int listPriceMinor;
   final String? coverImageUrl;
   final DateTime? reservedUntil;
+
+  /// True when a seller-funded basket discount applies to this line (CT-09).
+  bool get hasBasketDiscount => listPriceMinor > priceMinor;
 
   int get lineTotalMinor => priceMinor * qty;
 
@@ -57,6 +66,7 @@ class CartLineDto {
         'qty': qty,
         'seller_name': sellerName,
         'variant_label': variantLabel,
+        if (listPriceMinor > 0) 'list_price_minor': listPriceMinor,
         if (coverImageUrl != null) 'cover_image_url': coverImageUrl,
         if (reservedUntil != null)
           'reserved_until': reservedUntil!.toIso8601String(),
@@ -72,6 +82,7 @@ class CartLineDto {
         qty: qty ?? this.qty,
         sellerName: sellerName,
         variantLabel: variantLabel,
+        listPriceMinor: listPriceMinor,
         coverImageUrl: coverImageUrl,
         reservedUntil: reservedUntil,
       );

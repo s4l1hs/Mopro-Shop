@@ -95,12 +95,28 @@ class CartLineCard extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          fmt.format(line.priceMinor / 100.0),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              fmt.format(line.priceMinor / 100.0),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            // CT-09: strikethrough the pre-basket-discount unit.
+                            if (line.hasBasketDiscount) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                fmt.format(line.listPriceMinor / 100.0),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         Text(
                           fmt.format(line.lineTotalMinor / 100.0),
