@@ -40,11 +40,14 @@
   return + cashback schedule all read a real backend.
 - **NO stubs** — the read-path check found **no UI-over-dead-backend** in Orders
   (unlike Account's Help/Cards). That's the headline: the surface is honest.
-- **Absent features (A) — CONFIRMED gaps, not stubs:** **OR-01** cargo tracking
-  (carrier + tracking no.), **OR-02** delivery address on the order, **OR-03**
-  invoice / e-arşiv, **OR-04** reorder, **OR-05** variant label on order-item lines,
-  **OR-06** server-side order search/pagination (list loads all + filters
-  client-side).
+- **Absent features (A):** **OR-01** cargo tracking (carrier + tracking no.),
+  **OR-03** invoice / e-arşiv, **OR-06** server-side order search/pagination (list
+  loads all + filters client-side). **Resolved:** ~~OR-04 reorder~~ (#184),
+  **~~OR-05 variant label~~** (`feat/orders-absences` — was actually a raw-item
+  enrichment stub, fixed via the §5 carrier), **~~OR-07 per-order help~~**
+  (`feat/orders-absences`). **DEFERRED:** **OR-02 delivery address** — *deeper than
+  audited*: the order never captures the address (mobile selects it only for the PSP
+  buyer name) → a checkout-capture vertical, see `docs/internal/orders-absences.md`.
 - **NOT-ACTIONABLE: 3** — the cashback-schedule on the order + refund-as-coin
   (`wallet_credit`) (Mopro model), brand-orange tokens.
 
@@ -70,10 +73,10 @@
 | Feature | Trendyol | Mopro (`src`) | Read-path | Status | Sev |
 |---|---|---|---|---|---|
 | Line items (image/title/qty/price) | yes | `OrderItemDto` (title/price/qty/cover) | **L** | **MATCHED** | — |
-| Line-item **variant label** | colour/size | `OrderItemDto` has `variantId` only (no label) | **A** | **OR-05** no variant label (the pre-enrichment cart gap; same `GetVariantByID` carrier fixes it) | LOW–MED |
+| Line-item **variant label** | colour/size | `handleGetOrder` enriches items (title + `variant_label` + cover + price) via the catalog §5 carrier; line renders "Siyah, M" | **L** | **OR-05 ✅ RESOLVED** (`feat/orders-absences`) — DISCOVERY SHIFT: items were served **raw** (no title/price either → didn't render); the §5 carrier (#176) adds the label AND fixes that stub | — |
 | **Status timeline** | order states | `OrderStatusTimeline(status)` from status + `shipped_at`/`delivered_at` | **L** (derived) | **MATCHED** (simpler than carrier tracking) | — |
 | **Cargo tracking** (carrier + tracking no. + live status) | yes | carriers push via `POST /shipping/webhook/*` but **not surfaced**; `OrderDto` has no carrier/tracking_no | **A** | **OR-01** no consumer tracking | MED |
-| **Delivery address** | yes | `OrderDto` carries **no address** | **A** | **OR-02** no delivery address on the order | MED |
+| **Delivery address** | yes | `OrderDto` carries **no address**; the order/checkout **never capture it** (mobile selects an `Address` but only uses `.name` for the PSP buyer name) | **A** | **OR-02 🚩 DEFER** (`feat/orders-absences`) — deeper than "surface it": the data isn't on the order → needs a checkout-capture vertical (snapshot in `InitiateCheckoutRequest` + orders schema + handler + mobile send). Plan in `docs/internal/orders-absences.md` | MED |
 | Payment summary (subtotal/shipping/KDV/total) | yes | `items/shipping/commission/kdv/total` minor on `OrderDto` | **L** | **MATCHED** | — |
 | Discounts on the order | coupon/basket-disc | — (the cart discount cluster isn't built) | **A** | ties Cart **CT-09** | LOW |
 | Cashback schedule | (n/a) | `CashbackSchedule` (monthly coin plan) | **L** | **NOT-ACTIONABLE** (Mopro PLUS) | — |
@@ -81,7 +84,7 @@
 | Cancel / return entry | yes | `order_eligibility_actions` + `POST /orders/{id}/cancel`,`/returns` | **L** | **MATCHED** | — |
 | Refund status | yes | `RefundInfo` (`refund_status_card`) + `/orders/{id}/refund` | **L** | **MATCHED** (refund-as-coin = NOT-ACTIONABLE) | — |
 | Reorder | "Tekrar sipariş" | `_ReorderButton` → re-add items to cart (graceful OOS) | **L** | **OR-04 ✅ RESOLVED** (`feat/quick-functional-gaps`) | — |
-| Per-item help / Q&A | yes | — | **A** | **OR-07** no per-order help/Q&A entry | LOW |
+| Per-item help / Q&A | yes | "Bu siparişle ilgili yardım" → `/help` (`HelpIndexScreen`) | **L** | **OR-07 ✅ RESOLVED** (`feat/orders-absences`) — order help entry (like AC-02) | — |
 
 ---
 
