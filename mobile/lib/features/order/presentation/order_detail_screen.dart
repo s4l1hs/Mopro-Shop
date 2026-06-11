@@ -2,9 +2,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mopro/core/network/app_error.dart';
 import 'package:mopro/core/widgets/error_banner.dart';
 import 'package:mopro/features/account/widgets/account_chrome_scope.dart';
+import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/catalog/pdp/reviews/review_submission.dart';
 import 'package:mopro/features/order/application/order_detail_provider.dart';
 import 'package:mopro/features/order/data/order_dto.dart';
@@ -166,6 +168,11 @@ class _OrderDetailBody extends ConsumerWidget {
                   if ((order.actions?.canCancel ?? false) ||
                       (order.actions?.canReturn ?? false))
                     const SizedBox(height: 16),
+                  // OR-04: reorder — re-add this order's items to the cart.
+                  if (order.items.isNotEmpty) ...[
+                    _ReorderButton(items: order.items),
+                    const SizedBox(height: 16),
+                  ],
                   // ── Cashback schedule ──────────────────────────────────
                   if (order.items.isNotEmpty) ...[
                     Text(
@@ -342,6 +349,80 @@ class _PriceRow extends StatelessWidget {
           Text(label, style: style),
           Text(value, style: style),
         ],
+      ),
+    );
+  }
+}
+
+/// OR-04: re-adds an order's items to the cart via the existing add path, then
+/// navigates to the cart. Per-item failures (out-of-stock / unavailable) are
+/// counted and reported rather than aborting the whole reorder.
+class _ReorderButton extends ConsumerStatefulWidget {
+  const _ReorderButton({required this.items});
+
+  final List<OrderItemDto> items;
+
+  @override
+  ConsumerState<_ReorderButton> createState() => _ReorderButtonState();
+}
+
+class _ReorderButtonState extends ConsumerState<_ReorderButton> {
+  bool _busy = false;
+
+  Future<void> _reorder() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+    final cart = ref.read(cartProvider.notifier);
+    var added = 0;
+    var failed = 0;
+    for (final it in widget.items) {
+      try {
+        await cart.addItem(
+          productId: it.productId,
+          variantId: it.variantId,
+          qty: it.qty,
+        );
+        added++;
+      } on Object catch (_) {
+        failed++; // out-of-stock / unavailable — skip this line
+      }
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    final String msg;
+    if (added == 0) {
+      msg = 'order.reorder_none'.tr();
+    } else if (failed > 0) {
+      msg = 'order.reorder_partial'.tr(
+        namedArgs: {
+          'added': '$added',
+          'failed': '$failed',
+        },
+      );
+    } else {
+      msg = 'order.reorder_done'.tr(namedArgs: {'count': '$added'});
+    }
+    messenger.showSnackBar(SnackBar(content: Text(msg)));
+    if (added > 0) router.go('/cart');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _busy ? null : _reorder,
+        icon: _busy
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.refresh_rounded),
+        label: Text('order.reorder'.tr()),
       ),
     );
   }
