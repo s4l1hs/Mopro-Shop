@@ -75,6 +75,13 @@ type Variant struct {
 	// unlike the product-level value on ProductSummary). Nil when no in-window
 	// history; equals PriceMinor until prices change (see p030/p032 docs).
 	Lowest30dPriceMinor *int64 `json:"lowest_30d_price_minor,omitempty"`
+	// BasketDiscountPct denormalizes the owning products.basket_discount_pct (#133,
+	// migration 0087) — the whole-percent "Sepette %X İndirim". Nil = no discount.
+	// Carried on the variant so the order build (which resolves the variant per line
+	// via GetVariantByID) can apply the seller-funded basket discount (CT-09) without
+	// a separate catalog round-trip. The pct is a product attribute; this is pure
+	// read-side denormalization.
+	BasketDiscountPct *int `json:"basket_discount_pct,omitempty"`
 }
 
 // ProductTranslation holds locale-specific title and description.
