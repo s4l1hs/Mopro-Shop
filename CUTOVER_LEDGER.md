@@ -207,11 +207,9 @@
 | Surface | Status |
 |---|---|
 | Home | ✅ Parity-complete (IA-01/02, Sprints A/B, closeout #135–#137) within the Deliberately-Lean IA. **PROBABLE rows resolved source-side** (`feat/home-probable-resolution`, no manual walk): all 6 closed — HP-01/02/03 (Sepette-%X pill / Çok-Satan badge / circular pucks) were **already implemented** by the G-3/G-4 catalog vertical (audit table was stale: `product_card.dart` + `home_category_rail.dart`, wired from `ProductSummary`, i18n+tests); HP-04 (camera/visual-search) + HP-05 (location selector) are **NEEDS-DECISION (Salih)** — a feature build vs. intentional mobile-first IA omission, not pixel questions, not fakeable. **0 code fixes, 0 NEEDS-VISUAL pixel residue.** Establishes the **source-side template** for the unwalked surfaces (PDP/Cart/Checkout/Account/Orders/Returns/Search/Favorites/PLP): Mopro-from-code (fact) × Trendyol-convention (provisional, tagged) → CONFIRMED-fixable / NOT-ACTIONABLE / NEEDS-VISUAL / NEEDS-DECISION. Doc: `docs/internal/home-probable-resolution.md`. |
-| PLP / category browse | **UI parity ~done** — canonical registry `docs/audits/TRENDYOL_PARITY_PLP_AUDIT.md`. **RESOLVED:** PLP-01/03 (#142), PLP-04/05 (count+breadcrumb), **PLP-15/18/19/20** (numbered pages / sticky sidebar [already-matched] / ultra-wide breakpoints / sticky mobile bar, `feat/plp-layout-closeout`). **DEFER'd (backend):** **PLP-13** attribute facets (§4b), **PLP-12** rollup (§4). **Open CONFIRMED:** PLP-14 price-history (backend), PLP-09 fast-delivery. Remaining = MED/LOW polish + PROBABLE visual items awaiting Salih's live walk (§9). **ID re-map:** contract `PLP-02/05/07` (sticky sidebar / ultra-wide grid / sticky mobile bar) = **PLP-18/19/20**. |
-| Search | Pending (inherits PLP grid/filter patterns). |
-| PDP | Pending (own walk; may need seed extension: reviews/variants/gallery). |
+
 | Phase C (divergences) | After parity surfaces — coin redeem (deferred), etc. |
-| Returns | **PROBABLE resolved source-side** (`feat/returns-probable-resolution`): **no open PROBABLE rows** — RT-01 (#188)/RT-04 (#184)/RT-06 (#189) RESOLVED, RT-05 DEFER (contract/codegen). RT-02 cargo-leg + RT-03 photos = CONFIRMED-absent, terminal-DEFER feature verticals. 0 CONFIRMED UI fixes/visual/decision open. Doc: `docs/internal/returns-probable-resolution.md`. |
+
 
 ### Local walk env refreshed — ✅ (`chore/local-walk-env`)
 
