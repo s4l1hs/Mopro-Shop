@@ -315,5 +315,8 @@
   "empty_state": {
     "no_results_filtered": "لا توجد منتجات تطابق عوامل التصفية.",
     "clear_filters": "مسح عوامل التصفية"
+  },
+  "plp": {
+    "search_in_category": "ابحث في هذه الفئة"
   }
 }

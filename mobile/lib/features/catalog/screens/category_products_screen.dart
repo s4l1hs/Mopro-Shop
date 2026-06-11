@@ -16,6 +16,7 @@ import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
 import 'package:mopro/features/catalog/plp/widgets/filter_panel.dart';
 import 'package:mopro/features/catalog/plp/widgets/plp_breadcrumb.dart';
 import 'package:mopro/features/catalog/plp/widgets/plp_filter_chips.dart';
+import 'package:mopro/features/catalog/plp/widgets/plp_inline_search_field.dart';
 import 'package:mopro/features/catalog/plp/widgets/plp_quick_pills.dart';
 import 'package:mopro/features/catalog/providers/filtered_products_provider.dart';
 import 'package:mopro/features/catalog/widgets/filter_sheet.dart';
@@ -199,6 +200,12 @@ class _CategoryProductsScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // PLP-10: search within this category (swaps the grid source to the
+        // category-scoped /search; filters + pagination keep working).
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: PlpInlineSearchField(plpKey: _key),
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
           child: PlpBreadcrumb(categoryId: widget.categoryId),
@@ -253,6 +260,14 @@ class _CategoryProductsScreenState
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // PLP-10: search within this category.
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                            child: SizedBox(
+                              width: 360,
+                              child: PlpInlineSearchField(plpKey: _key),
+                            ),
+                          ),
                           // Breadcrumb + result count (PLP-05 / PLP-04).
                           Padding(
                             padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),

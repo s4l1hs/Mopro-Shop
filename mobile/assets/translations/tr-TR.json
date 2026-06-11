@@ -164,7 +164,8 @@
     "chip_price": "Fiyat: {min}–{max}",
     "chip_rating": "{rating}★ ve üzeri",
     "filter_price_history": "Fiyat Geçmişi",
-    "filter_price_dropped": "Fiyatı Düşenler"
+    "filter_price_dropped": "Fiyatı Düşenler",
+    "search_in_category": "Bu kategoride ara"
   },
   "catalog": {
     "categories": "Kategoriler",

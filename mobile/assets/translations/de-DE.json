@@ -315,5 +315,8 @@
   "empty_state": {
     "no_results_filtered": "Keine Produkte entsprechen deinen Filtern.",
     "clear_filters": "Filter zurücksetzen"
+  },
+  "plp": {
+    "search_in_category": "In dieser Kategorie suchen"
   }
 }
