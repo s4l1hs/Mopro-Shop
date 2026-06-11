@@ -37,9 +37,24 @@
 - **CONFIRMED-src deltas: 1** — PD-04 seller card: official badge **✅ RESOLVED**
   (`feat/plp-17-official-seller`); **seller rating** still missing (open)
   (ties PLP-17).
-- **PROBABLE (await walk): 4** — PD-02 variant pickers (text chips vs swatches),
+- **PROBABLE → all resolved source-side** (`feat/pdp-probable-resolution`, no walk;
+  see `docs/internal/pdp-probable-resolution.md`):
+  - **DEFER (engineering):** PD-02 variant swatches (needs per-variant colour-attribute
+    data → PLP-13 Ph2); **PD-03** "Sepette %X" on PDP (**discovery shift:** *not*
+    display-only — the flat `Product` lacks `basketDiscountPct`, only `ProductSummary`
+    has it → needs spec/codegen + backend); PD-04 seller rating (backend signal);
+    PD-06 video (no asset/field).
+  - **NEEDS-DECISION (Salih):** PD-05 installments (is the perpetual cashback card the
+    accepted substitute? — divergence, don't re-open on a guess); PD-06 mobile
+    thumbnail strip (PageView+dots already standard); PD-09 desktop sticky buy-box
+    (Mopro **deliberately** makes the *gallery* sticky-translate — pinning the buy-box
+    instead is a UX redesign, not a clean fix); PD-10 recently-viewed on PDP (placement).
+  - **NEEDS-VISUAL:** none beyond the PD-09 "which element tracks scroll" feel.
+  - **Zero CONFIRMED UI-only fixes.** Most PDP rows were already closed pre-pass
+    (PD-01 specs, PD-06 read-path, PD-07 review metadata, PLP-17 official badge).
+- ~~**PROBABLE (await walk): 4**~~ (original) — PD-02 variant pickers (text chips vs swatches),
   PD-05 installments, PD-06 gallery (video / mobile thumbnails), PD-09 desktop
-  sticky buy-box.
+  sticky buy-box. *(Resolved per the UPDATE above.)*
 - **NOT-ACTIONABLE: 3** — coin/cashback card, brand tokens, trust badges vs a
   detailed cargo/return block.
 - **✅ SEED WALK-FIXTURE ADDED (§6)** — `chore/pdp-seed` (`pdp-walk-extras.sql`)

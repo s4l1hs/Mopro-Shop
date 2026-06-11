@@ -20,6 +20,7 @@ class CatalogShell extends StatelessWidget {
     this.onSort,
     this.onFilter,
     this.activeFilterCount = 0,
+    this.onClearFilters,
     this.onRefresh,
     this.gridCrossAxisCount = 2,
     this.infiniteScroll = false,
@@ -39,6 +40,11 @@ class CatalogShell extends StatelessWidget {
   final VoidCallback? onSort;
   final VoidCallback? onFilter;
   final int activeFilterCount;
+
+  /// PLP-08: when the empty result is caused by active filters, the no-results
+  /// state shows a "clear filters" CTA wired to this. Null → bare empty state.
+  final VoidCallback? onClearFilters;
+
   final Future<void> Function()? onRefresh;
   final int gridCrossAxisCount;
 
@@ -79,7 +85,12 @@ class CatalogShell extends StatelessWidget {
             sliver: _SkeletonGrid(),
           )
         else if (products.isEmpty)
-          SliverToBoxAdapter(child: EmptyState.empty())
+          SliverToBoxAdapter(
+            // PLP-08: if filters are what emptied the grid, offer "clear filters".
+            child: (activeFilterCount > 0 && onClearFilters != null)
+                ? EmptyState.filtered(onAction: onClearFilters!)
+                : EmptyState.empty(),
+          )
         else
           SliverPadding(
             padding: const EdgeInsets.all(12),

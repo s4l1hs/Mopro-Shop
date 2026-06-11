@@ -134,6 +134,8 @@ class _CategoryProductsScreenState
       onSort: context.isMobile ? _showSortSheet : null,
       onFilter: context.isMobile ? _showFilterSheet : null,
       activeFilterCount: filters.activeChipCount,
+      // PLP-08: no-results "clear filters" CTA (only meaningful when filters active).
+      onClearFilters: () => ref.read(plpFiltersProvider(_key).notifier).clear(),
       gridCrossAxisCount: _gridColumns(context),
       // PLP-03: mobile auto-loads the next page on scroll. PLP-15: desktop uses
       // numbered pages instead.
