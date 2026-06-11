@@ -519,6 +519,7 @@ CREATE TABLE order_schema.orders (
   shipping_minor    BIGINT       NOT NULL DEFAULT 0,
   shipping_payer    TEXT         NOT NULL DEFAULT 'buyer',
   total_minor       BIGINT       NOT NULL CHECK (total_minor >= 0),
+  discount_minor    BIGINT       NOT NULL DEFAULT 0 CHECK (discount_minor >= 0),
   currency          TEXT         NOT NULL,
   market            TEXT         NOT NULL DEFAULT 'TR',
   delivered_at      TIMESTAMPTZ,
@@ -543,6 +544,9 @@ CREATE TABLE order_schema.order_items (
   category_id              BIGINT    NOT NULL,
   qty                      INTEGER   NOT NULL CHECK (qty > 0),
   unit_price_minor         BIGINT    NOT NULL CHECK (unit_price_minor >= 0),
+  list_unit_price_minor    BIGINT    NOT NULL DEFAULT 0 CHECK (list_unit_price_minor >= 0),
+  basket_discount_pct      SMALLINT  NOT NULL DEFAULT 0
+                           CHECK (basket_discount_pct >= 0 AND basket_discount_pct <= 100),
   unit_price_currency      TEXT      NOT NULL,
   commission_pct_bps       INTEGER   NOT NULL,
   kdv_pct_bps              INTEGER   NOT NULL,
