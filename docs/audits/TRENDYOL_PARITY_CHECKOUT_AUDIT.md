@@ -36,8 +36,9 @@
 - **🧩 Shared backend cluster (lands on cart + checkout):** ~~CHK-04 coupon
   (=CT-03)~~ ✅ RESOLVED (seller-funded, migration 0092), ~~CHK-05 basket-discount
   (=CT-09)~~ ✅, CHK-06 free-shipping (=CT-02, NOT-ACTIONABLE: always-free cart).
-- **PROBABLE (walk): 2** — CHK-07 saved-cards/installments, CHK-09
-  validation/error states.
+- **PROBABLE → resolved source-side** (`feat/checkout-probable-resolution`, no walk; `docs/internal/checkout-probable-resolution.md`): **CHK-07** saved-cards/installments → **NOT-ACTIONABLE** (PSP-hosted card entry + cashback is the installment analog — settled, §5.3). **CHK-09** validation/error states → **NEEDS-VISUAL** (a generic `failed` state exists; error-copy coverage/feel needs Salih's eyes). **0 CONFIRMED fixes.**
+- ~~**PROBABLE (walk): 2**~~ (original) — CHK-07 saved-cards/installments, CHK-09
+  validation/error states. *(Resolved above.)*
 - **NOT-ACTIONABLE: 5** — coin-redeem-as-payment (**disabled, deferred IA-02**),
   cashback-earned note, PSP-hosted card entry, no installments (cashback is the
   analog), brand tokens.
