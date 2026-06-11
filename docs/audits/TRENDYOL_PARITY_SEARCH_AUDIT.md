@@ -38,7 +38,8 @@
   `SearchProductsSummary`, §5-safe) and the dropdown renders brand + product
   (as-you-type) rows, SE-07 (no "did you mean"/no-results recovery), SE-09 (mobile
   empty lacks trending).
-- **PROBABLE (await walk): 2** — SE-08 (relevance ranking), SE-10 (search-within /
+- **PROBABLE → resolved source-side** (`feat/search-probable-resolution`, no walk; `docs/internal/search-probable-resolution.md`): **SE-08** relevance ranking → **CONFIRMED ✅ FIXED** (`SearchProducts` now `ORDER BY ts_rank(...) DESC, p.id ASC` — discovery shift: it was id-ordered on `main`, *not* already done). **SE-10**: sponsored results → **NOT-ACTIONABLE** (no ads model, settled); search-within refine box → **NEEDS-DECISION** (product).
+- ~~**PROBABLE (await walk): 2**~~ (original) — SE-08 (relevance ranking), SE-10 (search-within /
   sponsored).
 - **NOT-ACTIONABLE: 4** — no camera (HP-04 dropped), no sponsored ads (no ads
   model), cashback chip on cards, brand-orange tokens.
