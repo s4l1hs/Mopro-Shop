@@ -31,4 +31,3 @@ UPDATE order_schema.order_items
 ALTER TABLE order_schema.orders
   ADD COLUMN IF NOT EXISTS discount_minor BIGINT NOT NULL DEFAULT 0
       CHECK (discount_minor >= 0);
-</content>
