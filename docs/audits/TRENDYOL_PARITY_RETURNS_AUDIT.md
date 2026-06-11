@@ -61,9 +61,21 @@
   **RT-04** the `return_status_history` table is written but **not surfaced** — the
   detail timeline is *derived from the current status* (4-state map), not the audit
   trail.
+- **RT-06 — consumer status filter ✅ RESOLVED** (`feat/returns-ui-polish`). A
+  client-side status chip bar on the return-history list (`returnsStatusFilterProvider`
+  over the already-fetched list — no backend, no extra fetch). "All" + one chip per
+  status present; hidden when only one status exists (single-status golden stays
+  pixel-stable). Read-path confirmed: the list DTO already carries `status`.
 - **Fidelity loss (U):** **RT-05** the flow collects a **per-item** reason + note but
   the contract takes a single return-level reason → it submits the *first* item's
-  reason and folds notes into `description` (`buildRequest`).
+  reason and folds notes into `description` (`buildRequest`). **DEFER (read-path
+  confirmed):** surfacing per-item reasons in the detail needs a response field that
+  does not exist — `order_schema.return_items` (migration 0070) and the `ReturnItem`
+  struct carry only `order_item_id`+`quantity`; the reason lives on the return header.
+  Rendering per-line reasons therefore requires a migration + `CreateReturn`/`GetReturn`
+  change + an OpenAPI/codegen change (`reasons[] per line`). Out of scope for the
+  no-codegen returns-UI lane (kept parallel-safe with OR-02); re-scoped as a contract
+  change alongside RT-02/RT-03. See `docs/internal/returns-ui.md`.
 - **NOT-ACTIONABLE: 3** — refund-as-coin (the `wallet_credit` model; the flow even
   previews `method_wallet` from `order.refund.isWallet`), the status-derived timeline
   (simpler than carrier tracking, same as Orders), brand-orange tokens.
@@ -118,7 +130,7 @@
 | Past returns + status | yes | `GET /returns` → `ReturnListItemDto` (id, order, status chip, reason, refund amount, date) | **L** | **MATCHED** | — |
 | Empty state | yes | `returns.empty` + "go to orders" CTA | **L** | **MATCHED** | — |
 | Pagination | paged | `limit/offset` + `hasMore` (`limit+1` probe) | **L** | **MATCHED** | — |
-| Filter by status | yes | — (no consumer-side status filter; seller list has one) | **A** | **RT-06** no status filter on consumer list | LOW |
+| Filter by status | yes | client-side status chip bar over the already-fetched list (`returnsStatusFilterProvider`); "All" + one chip per present status; hidden when single-status | **L** | **RT-06 ✅ RESOLVED** (`feat/returns-ui-polish`) | — |
 
 ---
 
@@ -185,8 +197,11 @@
    pipeline exists for product photos — reuse the `POST /uploads/photos` carrier).
 4. **RT-04 surface status history** — cheap: emit the `return_status_history` rows on
    `GET /returns/{id}` so the timeline is the real audit trail, not a derived state.
-5. **RT-05 per-item reasons** (contract change: reasons[] per line) · **RT-06**
-   consumer status filter on İadelerim.
+5. ~~**RT-06** consumer status filter on İadelerim~~ ✅ RESOLVED
+   (`feat/returns-ui-polish`): client-side chip bar over the fetched list.
+   **RT-05 per-item reasons** — DEFER: contract change (`reasons[] per line`)
+   needs a migration + backend + codegen; out of scope for the no-codegen lane,
+   re-scoped with RT-02/RT-03. See `docs/internal/returns-ui.md`.
 
 > **Status: SEEDED — awaiting Salih's walk.** Read-path **L/S/A/U** ratings are
 > CONFIRMED from source; Trendyol-side deltas firm up on the walk. **This is the last
