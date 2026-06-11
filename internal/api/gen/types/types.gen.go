@@ -431,6 +431,20 @@ type CursorPaginationMeta struct {
 	NextCursor *string `json:"next_cursor"`
 }
 
+// DeliveryAddress Frozen as-of-purchase delivery-address snapshot on an order (OR-02).
+type DeliveryAddress struct {
+	City        string `json:"city"`
+	District    string `json:"district"`
+	FullAddress string `json:"full_address"`
+
+	// Label User's label for the address (e.g. "Ev", "İş").
+	Label         *string `json:"label,omitempty"`
+	Neighborhood  *string `json:"neighborhood,omitempty"`
+	Phone         *string `json:"phone,omitempty"`
+	PostalCode    *string `json:"postal_code,omitempty"`
+	RecipientName string  `json:"recipient_name"`
+}
+
 // DeliveryEta Cheap, table-driven pre-purchase delivery estimate in transit business
 // days (P-034). Computed from the seller dispatch origin + optional
 // destination via a static ref_schema lookup — NO carrier call. An estimate,
@@ -507,15 +521,20 @@ type Order struct {
 	// CashbackUnlockAt When the cashback plan becomes active.
 	// Computed as delivered_at + 3 business days (TR calendar).
 	// Null until the order is delivered.
-	CashbackUnlockAt *time.Time  `json:"cashback_unlock_at"`
-	CreatedAt        time.Time   `json:"created_at"`
-	Currency         string      `json:"currency"`
-	DeliveredAt      *time.Time  `json:"delivered_at"`
-	Id               int64       `json:"id"`
-	Items            []OrderItem `json:"items"`
-	Status           OrderStatus `json:"status"`
-	TotalMinor       int64       `json:"total_minor"`
-	UserId           int64       `json:"user_id"`
+	CashbackUnlockAt *time.Time `json:"cashback_unlock_at"`
+	CreatedAt        time.Time  `json:"created_at"`
+	Currency         string     `json:"currency"`
+	DeliveredAt      *time.Time `json:"delivered_at"`
+
+	// DeliveryAddress Immutable ship-to snapshot captured at checkout (OR-02). Null for legacy
+	// orders created before address capture. A frozen copy, NOT a live reference
+	// to the user's (mutable) saved address.
+	DeliveryAddress *DeliveryAddress `json:"delivery_address"`
+	Id              int64            `json:"id"`
+	Items           []OrderItem      `json:"items"`
+	Status          OrderStatus      `json:"status"`
+	TotalMinor      int64            `json:"total_minor"`
+	UserId          int64            `json:"user_id"`
 }
 
 // OrderCargoOption defines model for Order.CargoOption.

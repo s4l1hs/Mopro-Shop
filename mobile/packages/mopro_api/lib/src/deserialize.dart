@@ -20,6 +20,7 @@ import 'package:mopro_api/src/model/create_order_request.dart';
 import 'package:mopro_api/src/model/create_product_request.dart';
 import 'package:mopro_api/src/model/cursor_pagination_meta.dart';
 import 'package:mopro_api/src/model/delete_me_request.dart';
+import 'package:mopro_api/src/model/delivery_address.dart';
 import 'package:mopro_api/src/model/delivery_eta.dart';
 import 'package:mopro_api/src/model/device.dart';
 import 'package:mopro_api/src/model/error_envelope.dart';
@@ -132,6 +133,8 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return CursorPaginationMeta.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'DeleteMeRequest':
           return DeleteMeRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'DeliveryAddress':
+          return DeliveryAddress.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'DeliveryEta':
           return DeliveryEta.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Device':

@@ -2882,9 +2882,40 @@ components:
           type: string
           format: date-time
           nullable: true
+        delivery_address:
+          allOf:
+            - $ref: '#/components/schemas/DeliveryAddress'
+          nullable: true
+          description: |
+            Immutable ship-to snapshot captured at checkout (OR-02). Null for legacy
+            orders created before address capture. A frozen copy, NOT a live reference
+            to the user's (mutable) saved address.
         created_at:
           type: string
           format: date-time
+
+    DeliveryAddress:
+      type: object
+      description: Frozen as-of-purchase delivery-address snapshot on an order (OR-02).
+      required: [recipient_name, full_address, district, city]
+      properties:
+        label:
+          type: string
+          description: User's label for the address (e.g. "Ev", "İş").
+        recipient_name:
+          type: string
+        phone:
+          type: string
+        full_address:
+          type: string
+        neighborhood:
+          type: string
+        district:
+          type: string
+        city:
+          type: string
+        postal_code:
+          type: string
 
     ReturnRequest:
       type: object

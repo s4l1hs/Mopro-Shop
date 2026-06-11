@@ -25,9 +25,110 @@ import (
 	"github.com/mopro/platform/internal/attachments"
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/identity"
+	"github.com/mopro/platform/internal/order"
 	"github.com/mopro/platform/internal/seller"
 	"github.com/mopro/platform/pkg/mediaurl"
 )
+
+// stubReturnSvc is a no-op order.ReturnService for the GetOrder contract test.
+type stubReturnSvc struct{}
+
+func (stubReturnSvc) CreateReturn(context.Context, order.ReturnInput) (order.Return, []order.ReturnItem, error) {
+	return order.Return{}, nil, nil
+}
+func (stubReturnSvc) GetReturn(context.Context, int64, int64) (order.Return, []order.ReturnItem, error) {
+	return order.Return{}, nil, nil
+}
+func (stubReturnSvc) GetReturnHistory(context.Context, int64, int64) ([]order.ReturnStatusEvent, error) {
+	return nil, nil
+}
+func (stubReturnSvc) ListReturns(context.Context, int64, int, int) ([]order.Return, error) {
+	return nil, nil
+}
+func (stubReturnSvc) ComputeActions(context.Context, order.Order, []order.OrderItem) (order.OrderActions, error) {
+	return order.OrderActions{}, nil
+}
+func (stubReturnSvc) ListSellerReturns(context.Context, []int64, string, int, int) ([]order.Return, error) {
+	return nil, nil
+}
+func (stubReturnSvc) SellerApprove(context.Context, int64, []int64) (order.Return, error) {
+	return order.Return{}, nil
+}
+func (stubReturnSvc) SellerReject(context.Context, int64, []int64, string, string) (order.Return, error) {
+	return order.Return{}, nil
+}
+
+// stubOrderCatalog is a no-op orderCatalogResolver (the test order has no items, so
+// neither method is exercised).
+type stubOrderCatalog struct{}
+
+func (stubOrderCatalog) GetVariantByID(context.Context, int64) (catalog.Variant, error) {
+	return catalog.Variant{}, nil
+}
+func (stubOrderCatalog) ListProductsByIDs(context.Context, []int64, string, string) ([]catalog.ProductSummaryRow, error) {
+	return nil, nil
+}
+
+// TestContract_GetOrder_DeliveryAddress proves OR-02: GET /orders/{id} surfaces the
+// frozen delivery-address snapshot under order.delivery_address, conforming to the
+// DeliveryAddress schema.
+//
+// NOTE: we validate the delivery_address sub-object (the field OR-02 owns) against the
+// DeliveryAddress schema rather than the whole order against the Order schema — the
+// live order.Order serialization predates and diverges from the aspirational Order
+// schema (e.g. status="paid" is absent from the spec enum), a pre-existing drift this
+// vertical does not touch.
+func TestContract_GetOrder_DeliveryAddress(t *testing.T) {
+	doc := loadSpec(t)
+
+	orderSvc := &stubOrderSvc{
+		getOrderFn: func(_ context.Context, id int64) (order.Order, []order.OrderItem, error) {
+			return order.Order{
+				ID: id, UserID: 1, Status: order.StatusPaid, Currency: "TRY",
+				TotalMinor: 12990, CreatedAt: time.Date(2026, 1, 15, 10, 0, 0, 0, time.UTC),
+				DeliveryAddress: &order.OrderAddress{
+					Label: "Ev", RecipientName: "Ali Veli", Phone: "+905551112233",
+					FullAddress: "Atatürk Cad. No:1", Neighborhood: "Merkez Mah.",
+					District: "Kadıköy", City: "İstanbul", PostalCode: "34000",
+				},
+			}, nil, nil
+		},
+	}
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/orders/7", nil)
+	req.SetPathValue("id", "7")
+	handleGetOrder(orderSvc, stubReturnSvc{}, &stubPaymentRepo{}, stubOrderCatalog{}, "tr-TR")(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
+	}
+
+	var wrapper struct {
+		Order struct {
+			DeliveryAddress json.RawMessage `json:"delivery_address"`
+		} `json:"order"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &wrapper); err != nil {
+		t.Fatalf("decode envelope: %v", err)
+	}
+	if len(wrapper.Order.DeliveryAddress) == 0 || string(wrapper.Order.DeliveryAddress) == "null" {
+		t.Fatalf("delivery_address missing: %s", rec.Body.String())
+	}
+	assertConformsToSchema(t, doc, "DeliveryAddress", wrapper.Order.DeliveryAddress)
+
+	var addr struct {
+		RecipientName string `json:"recipient_name"`
+		City          string `json:"city"`
+		FullAddress   string `json:"full_address"`
+	}
+	if err := json.Unmarshal(wrapper.Order.DeliveryAddress, &addr); err != nil {
+		t.Fatalf("decode delivery_address: %v", err)
+	}
+	if addr.RecipientName != "Ali Veli" || addr.City != "İstanbul" || addr.FullAddress == "" {
+		t.Errorf("delivery_address mismatch: %+v", addr)
+	}
+}
 
 // loadSpec loads + validates api/openapi.yaml (../../api relative to this file).
 func loadSpec(t *testing.T) *openapi3.T {
