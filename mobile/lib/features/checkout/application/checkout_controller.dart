@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/di/providers.dart';
 import 'package:mopro/core/network/app_error.dart';
+import 'package:mopro/features/cart/application/cart_provider.dart';
 import 'package:mopro/features/checkout/data/checkout_repository.dart';
 import 'package:mopro/features/checkout/data/checkout_repository_impl.dart';
 import 'package:mopro/features/checkout/data/checkout_response_dto.dart';
@@ -130,6 +131,7 @@ class CheckoutController extends Notifier<CheckoutState> {
         buyerName: buyerName,
         buyerSurname: buyerSurname,
         idempotencyKey: idempotencyKey,
+        couponCode: ref.read(cartProvider).couponCode,
       );
       state = state.copyWith(
         isInitiating: false,

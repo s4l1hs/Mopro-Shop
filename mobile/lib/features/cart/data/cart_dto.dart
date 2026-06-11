@@ -10,6 +10,9 @@ class CartDto {
     required this.grandTotalMinor,
     required this.kdvIncludedMinor,
     this.basketDiscountMinor = 0,
+    this.couponCode = '',
+    this.couponDiscountMinor = 0,
+    this.couponMessage = '',
   });
 
   factory CartDto.fromJson(Map<String, dynamic> json) => CartDto(
@@ -30,6 +33,10 @@ class CartDto {
             (json['kdv_included_minor'] as num?)?.toInt() ?? 0,
         basketDiscountMinor:
             (json['basket_discount_minor'] as num?)?.toInt() ?? 0,
+        couponCode: (json['coupon_code'] ?? '') as String,
+        couponDiscountMinor:
+            (json['coupon_discount_minor'] as num?)?.toInt() ?? 0,
+        couponMessage: (json['coupon_message'] ?? '') as String,
       );
 
   factory CartDto.empty() => const CartDto(
@@ -50,8 +57,15 @@ class CartDto {
 
   /// CT-09: the seller-funded "Sepette indirim" total (Σ list − charged). 0 when
   /// no line carries a basket discount. grandTotalMinor is already discounted, so
-  /// the pre-discount subtotal = grandTotalMinor + basketDiscountMinor.
+  /// the pre-discount subtotal = grandTotalMinor + basketDiscountMinor + couponDiscountMinor.
   final int basketDiscountMinor;
+
+  /// CT-03 coupon: the applied code ('' when none/invalid), its discount slice
+  /// (folded into grandTotalMinor), and a reason string when an entered code was
+  /// NOT applied (e.g. 'expired', 'min_basket') so the UI can explain why.
+  final String couponCode;
+  final int couponDiscountMinor;
+  final String couponMessage;
 
   bool get isEmpty => lines.isEmpty;
   bool get isAboveTotalLimit => grandTotalMinor >= 5000000; // ₺50,000 in minor units
@@ -66,5 +80,8 @@ class CartDto {
         'grand_total_minor': grandTotalMinor,
         'kdv_included_minor': kdvIncludedMinor,
         'basket_discount_minor': basketDiscountMinor,
+        'coupon_code': couponCode,
+        'coupon_discount_minor': couponDiscountMinor,
+        'coupon_message': couponMessage,
       };
 }

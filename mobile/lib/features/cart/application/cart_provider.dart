@@ -39,18 +39,25 @@ class CartState {
   const CartState({
     this.cart = const AsyncLoading(),
     this.isMutating = false,
+    this.couponCode = '',
   });
 
   final AsyncValue<CartDto> cart;
   final bool isMutating;
 
+  /// CT-03: the coupon code the user applied; re-sent on every cart reload so the
+  /// displayed total stays coupon-discounted. '' = no coupon.
+  final String couponCode;
+
   CartState copyWith({
     AsyncValue<CartDto>? cart,
     bool? isMutating,
+    String? couponCode,
   }) =>
       CartState(
         cart: cart ?? this.cart,
         isMutating: isMutating ?? this.isMutating,
+        couponCode: couponCode ?? this.couponCode,
       );
 }
 
@@ -71,6 +78,14 @@ class CartNotifier extends Notifier<CartState> {
   }
 
   Future<void> refresh() => _load();
+
+  /// CT-03: apply (or clear, with '') a coupon code and reload the cart so the
+  /// displayed total reflects the coupon discount. The same code is read by the
+  /// checkout flow to charge the discounted total (display==charge).
+  Future<void> applyCoupon(String code) async {
+    state = state.copyWith(couponCode: code.trim());
+    await _load();
+  }
 
   Future<void> addItem({
     required int productId,
@@ -142,7 +157,7 @@ class CartNotifier extends Notifier<CartState> {
     state = state.copyWith(cart: const AsyncLoading());
     try {
       final repo = ref.read(cartRepositoryProvider);
-      final cart = await repo.getCart();
+      final cart = await repo.getCart(coupon: state.couponCode);
       state = state.copyWith(cart: AsyncData(cart));
     } on DioException catch (e, st) {
       final err = e.error;
