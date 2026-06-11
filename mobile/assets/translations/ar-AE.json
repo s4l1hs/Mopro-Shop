@@ -11,7 +11,8 @@
     "clear_recent": "مسح",
     "suggested_categories": "الفئات",
     "brands": "العلامات التجارية",
-    "products": "المنتجات"
+    "products": "المنتجات",
+    "refine_hint": "ابحث ضمن النتائج"
   },
   "nav": {
     "favorites": "المفضلة"

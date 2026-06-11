@@ -11,7 +11,8 @@
     "clear_recent": "Löschen",
     "suggested_categories": "Kategorien",
     "brands": "Marken",
-    "products": "Produkte"
+    "products": "Produkte",
+    "refine_hint": "In Ergebnissen suchen"
   },
   "nav": {
     "favorites": "Favoriten"

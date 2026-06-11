@@ -194,7 +194,8 @@
     "suggested_categories": "Kategoriler",
     "brands": "Markalar",
     "products": "Ürünler",
-    "web_placeholder": "Ürün, marka veya kategori ara…"
+    "web_placeholder": "Ürün, marka veya kategori ara…",
+    "refine_hint": "Sonuçlar içinde ara"
   },
   "mega_menu": {
     "empty_children": "Bu kategoride alt kategori bulunmuyor.",

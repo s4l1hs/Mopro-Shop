@@ -194,7 +194,8 @@
     "suggested_categories": "Categories",
     "brands": "Brands",
     "products": "Products",
-    "web_placeholder": "Search products, brands or categories…"
+    "web_placeholder": "Search products, brands or categories…",
+    "refine_hint": "Search within results"
   },
   "mega_menu": {
     "empty_children": "No subcategories in this section.",
