@@ -266,6 +266,16 @@ class _OrderItemRow extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    // OR-05: variant colour/size label (e.g. "Siyah, M").
+                    if (item.variantLabel.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        item.variantLabel,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Text(
                       'order.qty_x_price'.tr(namedArgs: {

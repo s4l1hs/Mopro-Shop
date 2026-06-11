@@ -608,7 +608,7 @@ func main() {
 		httpTrace(requireAuth(http.HandlerFunc(handleCreateOrder(orderSvc)))),
 	)
 	mux.Handle("GET /orders/{id}",
-		httpTrace(http.HandlerFunc(handleGetOrder(orderSvc, returnSvc, paymentRepo))),
+		httpTrace(http.HandlerFunc(handleGetOrder(orderSvc, returnSvc, paymentRepo, catalogSvc, defaultLocale))),
 	)
 	mux.Handle("GET /orders",
 		httpTrace(requireAuth(http.HandlerFunc(handleListOrders(orderSvc)))),
@@ -1238,7 +1238,7 @@ func handleCreateOrder(svc order.Service) http.HandlerFunc {
 	}
 }
 
-func handleGetOrder(svc order.Service, returnSvc order.ReturnService, paymentRepo payment.Repository) http.HandlerFunc {
+func handleGetOrder(svc order.Service, returnSvc order.ReturnService, paymentRepo payment.Repository, cat orderCatalogResolver, defaultLocale string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
@@ -1256,8 +1256,13 @@ func handleGetOrder(svc order.Service, returnSvc order.ReturnService, paymentRep
 			return
 		}
 
+		// OR-05: enrich the frozen items with title/variant_label/cover/price §5-safely
+		// (the raw snapshot has only variant_id/unit_price_minor; the mobile DTO needs
+		// the rich line). Same GetVariantByID carrier as the cart enrichment (#176).
+		enrichedItems := enrichOrderItems(r.Context(), items, cat, parseLocale(r, defaultLocale), o.Market)
+
 		// Server-computed eligibility + read-only refund visibility (§3.1/§3.4).
-		resp := map[string]any{"order": o, "items": items}
+		resp := map[string]any{"order": o, "items": enrichedItems}
 		if actions, aErr := returnSvc.ComputeActions(r.Context(), o, items); aErr != nil {
 			slog.Warn("order: ComputeActions", "err", aErr, "order_id", id)
 		} else {
