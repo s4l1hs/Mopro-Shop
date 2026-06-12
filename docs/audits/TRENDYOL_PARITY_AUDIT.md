@@ -451,7 +451,7 @@ Recommendation: part of `P5-1` — pick one discount-pill token and apply on bot
 ---
 
 ## §4.2 Navigation patterns findings
-`go_router` route structure is comprehensive (web mirrors it: `web/app/[locale]/...` has products/[id]/[slug], search, cart, checkout(+redirect), orders/[id], account/{security,cards,favorites,profile,addresses,cashback,orders}, categories/[slug], login). Deep-linking + back-stack PROBABLE (not exercised in this audit). No CONFIRMED gap. Tab scroll-restoration UNKNOWN → discovery item.
+`go_router` route structure is comprehensive, and since ADR-0005 the **web storefront is the same Flutter app** (one `go_router`, not a parallel Next.js route tree) — products/[id]/[slug], search, cart, checkout(+redirect), orders/[id], account/{security,cards,favorites,profile,addresses,cashback,orders}, categories/[slug], login all share one definition across mobile and web. Deep-linking + back-stack PROBABLE (not exercised in this audit). No CONFIRMED gap. Tab scroll-restoration UNKNOWN → discovery item.
 
 ## §4.3 Cross-cutting interactions findings
 - **Cart badge** — live (`web_header.dart:41/91` `cartCountProvider`). CONFIRMED ✓.

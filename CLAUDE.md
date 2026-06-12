@@ -38,7 +38,7 @@ Adding a 4th binary requires explicit human approval and an ADR file under `/doc
 
 - DO NOT split modules into separate microservices (no `cart-svc`, `wallet-svc`, `cashback-svc`, `seller-payout-svc` binaries).
 - DO NOT merge fin-svc into core-svc. fin-svc MUST stay a separate binary, separate DB, separate Docker network.
-- DO NOT introduce new programming languages. Backend is Go 1.22+ only. Mobile is Flutter only.
+- DO NOT introduce new programming languages. Backend is Go 1.22+ only. ALL client UI (mobile AND web) is Flutter/Dart only — the web storefront is the Flutter Web build (`flutter build web`), static-served by Caddy. There is no TypeScript/Next.js tier (removed per ADR-0005).
 - DO NOT replace PostgreSQL 16, Redis 7, Meilisearch v1.6, Caddy 2 without architecture review.
 - DO NOT add Kubernetes, service mesh, or any other orchestrator. Docker Compose only at this stage.
 - DO NOT introduce gRPC, Thrift, or other RPC frameworks without ADR.
@@ -286,7 +286,8 @@ Reserve ≥ 11 GB for OS + Linux page cache. See `INFRASTRUCTURE.md`. NEVER rais
 | Layer | Tool | Version |
 |---|---|---|
 | Backend language | Go | 1.22+ |
-| Mobile | Flutter | 3.x |
+| Mobile + Web UI | Flutter / Dart | 3.x |
+| Web delivery | `flutter build web` → Caddy `file_server` (ADR-0005) | n/a |
 | Database | PostgreSQL | 16 |
 | Cache + Streams | Redis | 7 |
 | Search | Meilisearch | v1.6 |

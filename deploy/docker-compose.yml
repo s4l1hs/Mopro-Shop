@@ -355,6 +355,10 @@ services:
       CADDY_EMAIL: "${CADDY_EMAIL}"
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Flutter Web storefront (ADR-0005), served at moproshop.com / web.localhost.
+      # Local: `make web-build` writes mobile/build/web. Prod: CI ships the build
+      # to this path on the VDS. Read-only — Caddy only file_serves it.
+      - ../mobile/build/web:/srv/web:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:

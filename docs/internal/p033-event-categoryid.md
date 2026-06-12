@@ -37,10 +37,11 @@ product**, so it always carries the **product's own category** regardless of how
 (deep-link, search result, recommended carousel). That is exactly the category P-031 wants to count — no
 `null` case, no source-surface ambiguity.
 
-**Web — no-op (documented).** `web/` (Next.js) does **not** emit `product_view` to the in-house analytics
-pipeline at all (no ingest POST / event emission found). So there is nothing to change for P-033. Whether
-web should participate in the in-house analytics pipeline is a separate, broader web/mobile parity gap —
-**not** filed as a finding here (out of P-033's scope; P-031 only needs the mobile stream + future
+**Web — now the Flutter build (ADR-0005).** The standalone Next.js `web/` app was removed; the web
+storefront is the same Flutter app as mobile (`flutter build web`), so it emits `product_view` through the
+**same** analytics path as mobile — no separate web emission to reconcile. (Historically the Next.js `web/`
+emitted nothing to the in-house pipeline; that gap is moot now that web and mobile share one client.) For
+P-033 there is nothing web-specific to change (P-031 needs the shared client stream + future
 clients, and web traffic simply won't contribute per-category counts until web analytics exists).
 
 ## 3. Consumer impact

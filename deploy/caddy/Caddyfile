@@ -137,9 +137,16 @@ seller.moproshop.com {
 }
 
 # ─── Production: moproshop.com + www.moproshop.com ──────────────────────────
+# Flutter Web (ADR-0005): the consumer storefront is the release `flutter build
+# web` output, static-served here (SPA fallback to index.html). The web client
+# calls the API at api.moproshop.com → core-svc, exactly like the mobile app.
+# The build is shipped to /srv/web on the VDS by CI (deploy cutover is gated).
 moproshop.com, www.moproshop.com {
 	import healthz_native
-	respond "Çok yakında / Coming soon" 200
+	root * /srv/web
+	encode gzip zstd
+	try_files {path} /index.html
+	file_server
 }
 
 # ─── Production: admin.moproshop.com ─────────────────────────────────────────
@@ -210,6 +217,19 @@ seller.localhost {
 
 	# Seller panel + transparency endpoint
 	reverse_proxy core-svc:8080
+}
+
+# ─── Dev: web.localhost — Flutter Web storefront (ADR-0005) ───────────────────
+# Serves the local `flutter build web` output (mounted at /srv/web). Run
+# `make web-build` first. SPA fallback to index.html.
+web.localhost {
+	tls internal
+
+	import healthz_native
+	root * /srv/web
+	encode gzip zstd
+	try_files {path} /index.html
+	file_server
 }
 
 # ─── Plain HTTP: localhost:80 ────────────────────────────────────────────────

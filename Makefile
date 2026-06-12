@@ -14,7 +14,7 @@ OPENAPI_GEN_IMAGE     := openapitools/openapi-generator-cli:$(OPENAPI_GEN_VERSIO
 # `make verify` explicitly), so this is a safe, friendlier default.
 .DEFAULT_GOAL := help
 
-.PHONY: help bootstrap verify verify-fast analyze soak fmt vet test lint govulncheck boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order \
+.PHONY: help bootstrap verify verify-fast analyze web-build soak fmt vet test lint govulncheck boundaries migration-check lint-discipline property-cashback property-payout property-ledger integration-wallet property-timex property-order \
         verify-image-manifest update-goldens audit audit-test i18n-check i18n-usage riverpod-check \
         pg-ledger-test-up pg-ledger-test-down \
         build-core build-fin build-jobs build-migrate build-mopro build-all run-local down-local \
@@ -53,6 +53,9 @@ verify-fast: fmt vet lint-discipline boundaries migration-check build-all test a
 # flutter analyze over the app — mirrors CI (green-on-compile; infos non-fatal).
 analyze: ## flutter analyze the mobile app (--no-fatal-infos, mirrors CI).
 	cd mobile && flutter analyze --no-fatal-infos
+
+web-build: ## Build the Flutter Web storefront (ADR-0005) → mobile/build/web, served by Caddy.
+	cd mobile && flutter build web --release
 
 # WCAG contrast check for the documented brand colour pairs. Fails if any
 # non-Backlog pair regresses below threshold. See lib/design/a11y_contrast.dart.

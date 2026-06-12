@@ -10,7 +10,7 @@
 - `.github/workflows/make-verify.yml` → `make verify` (every PR + main push).
 - `.github/workflows/nightly.yml` → `make soak` (wallet/payment/identity stress only).
 - `.github/workflows/openapi-ci.yml` → `go test -race ./...` (**no** integration tag → build-tagged files excluded) + `-tags=contract`.
-- `.github/workflows/e2e.yml` → Playwright (web/), unrelated to Go integration tests.
+- ~~`.github/workflows/e2e.yml` → Playwright (web/)~~ — retired with the Next.js web app (ADR-0005); the web storefront is now the Flutter build, covered by the Flutter suites.
 
 So "not in `make verify`" == "runs nowhere in CI."
 

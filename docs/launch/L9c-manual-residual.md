@@ -12,7 +12,7 @@
 - Staging SHA visible at `https://api-staging.moproshop.com/__version`
 
 **Cross-reference:** `docs/launch/L9-smoke-report-4e73f254617c.md` (definitive PASS report)  
-**Automated coverage:** `web/e2e/` — run `pnpm test:e2e --reporter=list` first; all passing before starting this checklist.
+**Automated coverage:** the Flutter widget/integration suites (`make verify`) — the Next.js `web/e2e/` Playwright suite was retired with the web app (ADR-0005). Run `make verify` green before starting this checklist.
 
 ---
 

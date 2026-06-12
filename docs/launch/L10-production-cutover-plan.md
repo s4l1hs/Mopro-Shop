@@ -19,7 +19,7 @@ Every line must be ✅ before scheduling the cutover window.
 - [ ] L5 — Backup pipeline operational (B2 backend, restic, systemd timers)
 - [ ] L9 — Backend smoke pass PASS verdict committed at `docs/launch/L9-smoke-report-*.md`
 - [ ] L9b — k6 load test all thresholds green
-- [ ] L9c-auto — Playwright suite green
+- [ ] L9c-auto — Flutter `make verify` suite green (the Next.js Playwright suite was retired, ADR-0005)
 - [ ] L9c-manual-residual — completed by Salih, no critical bugs filed
 
 ### External (waiting / in flight)
