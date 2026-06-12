@@ -102,6 +102,7 @@ class _FakeCheckoutRepo implements CheckoutRepository {
     required String buyerSurname,
     required String idempotencyKey,
     int? addressId,
+    int installments = 1,
     String returnUrl = 'mopro://checkout/result',
     String couponCode = '',
   }) async =>

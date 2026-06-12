@@ -17,10 +17,16 @@ final checkoutRepositoryProvider = Provider<CheckoutRepository>((ref) {
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
+/// Supported card-installment counts (PD-05, taksit). Mirrors the backend's
+/// allowed set; 1 = single charge (tek çekim). Interest-free: the charged
+/// total never changes with the count.
+const kInstallmentOptions = [1, 3, 6, 9, 12];
+
 class CheckoutState {
   const CheckoutState({
     this.selectedAddress,
     this.paymentMethod = 'card',
+    this.installments = 1,
     this.isInitiating = false,
     this.response,
     this.invoiceId,
@@ -30,6 +36,7 @@ class CheckoutState {
 
   final Address? selectedAddress;
   final String paymentMethod;
+  final int installments; // PD-05: chosen taksit count; 1 = single charge
   final bool isInitiating;
   final CheckoutResponseDto? response;
   final String? invoiceId;      // idempotency key sent; used as polling handle
@@ -42,6 +49,7 @@ class CheckoutState {
   CheckoutState copyWith({
     Address? selectedAddress,
     String? paymentMethod,
+    int? installments,
     bool? isInitiating,
     CheckoutResponseDto? response,
     String? invoiceId,
@@ -55,6 +63,7 @@ class CheckoutState {
       CheckoutState(
         selectedAddress: selectedAddress ?? this.selectedAddress,
         paymentMethod: paymentMethod ?? this.paymentMethod,
+        installments: installments ?? this.installments,
         isInitiating: isInitiating ?? this.isInitiating,
         response: clearResponse ? null : response ?? this.response,
         invoiceId: clearInvoiceId ? null : invoiceId ?? this.invoiceId,
@@ -86,6 +95,13 @@ class CheckoutController extends Notifier<CheckoutState> {
 
   void selectPaymentMethod(String method) {
     state = state.copyWith(paymentMethod: method, clearError: true);
+  }
+
+  /// PD-05: pick a card-installment count. Ignores unsupported values
+  /// (defensive — the UI only offers [kInstallmentOptions]).
+  void selectInstallments(int count) {
+    if (!kInstallmentOptions.contains(count)) return;
+    state = state.copyWith(installments: count, clearError: true);
   }
 
   void setPaymentError(String message) {
@@ -132,6 +148,7 @@ class CheckoutController extends Notifier<CheckoutState> {
         buyerSurname: buyerSurname,
         idempotencyKey: idempotencyKey,
         addressId: address.id, // OR-02: capture the ship-to snapshot on the order
+        installments: state.installments, // PD-05: taksit (interest-free)
         couponCode: ref.read(cartProvider).couponCode,
       );
       state = state.copyWith(
