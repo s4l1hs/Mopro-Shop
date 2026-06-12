@@ -400,7 +400,9 @@ class _TileGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return ColoredBox(
+    // Material (not ColoredBox) so the child ListTiles paint their background
+    // + ink splashes on this surface instead of being hidden by an opaque box.
+    return Material(
       color: theme.colorScheme.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -736,7 +738,9 @@ class _GuestMenu extends ConsumerWidget {
       showLoginRequiredSheet(context, reason: reason);
     }
 
-    return ColoredBox(
+    // Material (not ColoredBox) so the child ListTiles paint their background
+    // + ink splashes on this surface instead of being hidden by an opaque box.
+    return Material(
       color: cs.surface,
       child: Column(
         children: [

@@ -557,7 +557,9 @@ class _RowCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return ColoredBox(
+    // Material (not ColoredBox) so the ListTile paints its background + ink
+    // splashes on this surface instead of being hidden by an opaque box.
+    return Material(
       color: cs.surface,
       child: ListTile(
         contentPadding:
