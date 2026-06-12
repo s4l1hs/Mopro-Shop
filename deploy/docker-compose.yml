@@ -157,8 +157,8 @@ services:
   # ── PgBouncer (ecom side) ───────────────────────────────────────────────────
   # bitnami/pgbouncer is no longer on Docker Hub. Use pgbouncer/pgbouncer which
   # generates pgbouncer.ini from env vars at startup (DATABASES_HOST, etc.).
-  # The custom ini files in deploy/pgbouncer/ document the production target
-  # config; Phase 0.5 drives everything via env vars.
+  # The per-cluster reference configs live in deploy/pgbouncer-ecom/ and
+  # deploy/pgbouncer-ledger/; Phase 0.5 drives everything via env vars.
   # auth_type defaults to "any" (no client auth) — acceptable for local dev with
   # no host-exposed ports. Phase 1 TODO: switch to md5 + vault-injected userlist.
   pgbouncer-ecom:
