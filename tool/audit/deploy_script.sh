@@ -61,7 +61,12 @@ COMPOSE_FILE="$COMPOSE_DIR/docker-compose.prod.yml"
 echo "Working directory: $(pwd)"
 echo "Compose file:      $COMPOSE_FILE"
 echo
-dc() { sudo IMAGE_NS="$IMAGE_NS" VERSION="$VERSION" docker compose -f "$COMPOSE_FILE" "$@"; }
+# `sudo env VAR=… docker` (not `sudo VAR=… docker`): the host sudoers has
+# env_reset without SETENV, so sudo rejects inline env assignments outright
+# ("you are not allowed to set the following environment variables") — found by
+# the DEPLOY-EXEC-02 verify_only dry-run at STEP 0. `env` is an ordinary
+# permitted command, so this passes the vars without needing a sudoers change.
+dc() { sudo env IMAGE_NS="$IMAGE_NS" VERSION="$VERSION" docker compose -f "$COMPOSE_FILE" "$@"; }
 
 echo "===== STEP 0: PRE-DEPLOY STATE ====="
 dc ps

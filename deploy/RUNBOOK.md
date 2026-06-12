@@ -114,7 +114,7 @@ re-run the previous build pinned by tag, on-host:
 
 ```sh
 ssh -p 4625 mopro@195.85.207.92
-sudo IMAGE_NS=s4l1hs VERSION=<previous-full-sha> \
+sudo env IMAGE_NS=s4l1hs VERSION=<previous-full-sha> \
   docker compose -f /opt/mopro/deploy/docker-compose.prod.yml up -d core-svc fin-svc jobs-svc
 curl -s http://127.0.0.1:8080/__version   # confirm the rolled-back SHA
 ```
