@@ -219,7 +219,13 @@
     "explore": "Explore",
     "clear_all": "Clear all",
     "load_error": "Couldn't load your favourites.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "out_of_stock": "This product is out of stock",
+    "select_options": "This product has options — choose on the product page",
+    "sort_default": "Default",
+    "sort_discount": "Discount",
+    "filter_discounted": "Discounted",
+    "filter_empty": "No favourites match the filters"
   },
   "account": {
     "title": "My Account",
