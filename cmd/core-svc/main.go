@@ -166,6 +166,8 @@ func main() {
 	checkoutSessionRepo := order.NewCheckoutSessionRepository(pool)
 	returnRepo := order.NewReturnRepository(pool)
 	returnSvc := order.NewReturnService(orderRepo, returnRepo, orderOutbox)
+	// AC-05: membership tier — a derived read-model over the order schema.
+	membershipSvc := order.NewMembershipService(order.NewMembershipRepository(pool))
 	inboxSvc := inbox.NewService(inbox.NewRepository(pool))
 	helpSvc := help.NewService(help.NewRepository(pool), slog.Default())
 	supportSvc := support.NewService(support.NewRepository(pool))
@@ -616,6 +618,10 @@ func main() {
 	)
 	mux.Handle("GET /orders",
 		httpTrace(requireAuth(http.HandlerFunc(handleListOrders(orderSvc)))),
+	)
+	// AC-05: membership tier (read-only; tag [me] in the spec).
+	mux.Handle("GET /me/membership",
+		httpTrace(requireAuth(http.HandlerFunc(handleGetMyMembership(membershipSvc, market)))),
 	)
 	mux.Handle("POST /orders/{id}/status",
 		httpTrace(http.HandlerFunc(handleUpdateOrderStatus(orderSvc))),

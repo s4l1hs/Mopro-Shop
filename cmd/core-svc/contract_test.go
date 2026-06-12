@@ -494,3 +494,47 @@ func TestContract_ProductReviews_NameAndPhotos(t *testing.T) {
 		t.Errorf("photoUrls: want CDN-mapped %v, got %v", want, body.Items[0].PhotoURLs)
 	}
 }
+
+// ── AC-05: GET /me/membership live-handler conformance ───────────────────────
+
+type stubMembershipSvc struct{ m order.Membership }
+
+func (s stubMembershipSvc) GetMembershipTier(context.Context, int64, string) (order.Membership, error) {
+	return s.m, nil
+}
+
+// TestContract_GetMyMembership proves the live handler emits a Membership that
+// conforms to the spec schema — both mid-ladder (next_* present) and top-tier
+// (next_* omitted) shapes.
+func TestContract_GetMyMembership(t *testing.T) {
+	doc := loadSpec(t)
+	next := "elite"
+	nextSpend := int64(1000000)
+	nextOrders := 15
+
+	cases := []struct {
+		name string
+		m    order.Membership
+	}{
+		{"mid-ladder (next_* present)", order.Membership{
+			Tier: "gold", Rank: 2, WindowDays: 365, SpendMinor: 412000,
+			OrderCount: 7, Currency: "TRY",
+			NextTier: &next, NextMinSpendMinor: &nextSpend, NextMinOrders: &nextOrders,
+		}},
+		{"top tier (next_* omitted)", order.Membership{
+			Tier: "elite", Rank: 3, WindowDays: 365, SpendMinor: 2500000,
+			OrderCount: 31, Currency: "TRY",
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/me/membership", nil)
+			handleGetMyMembership(stubMembershipSvc{m: tc.m}, "TR")(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
+			}
+			assertConformsToSchema(t, doc, "Membership", rec.Body.Bytes())
+		})
+	}
+}
