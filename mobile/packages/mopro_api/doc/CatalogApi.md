@@ -13,6 +13,7 @@ Method | HTTP request | Description
 [**getCategoryCommission**](CatalogApi.md#getcategorycommission) | **GET** /categories/{id}/commission | Get live commission and KDV rates for a category + market pair
 [**getCategoryFacets**](CatalogApi.md#getcategoryfacets) | **GET** /categories/{id}/facets | Faceted attribute aggregation for a category (PLP-13)
 [**getProduct**](CatalogApi.md#getproduct) | **GET** /products/{id} | Get full product detail including variants and cashback preview
+[**getSizeRecommendation**](CatalogApi.md#getsizerecommendation) | **GET** /products/{id}/size-recommendation | Recommend a size for this product from the user&#39;s fit profile
 [**listCategories**](CatalogApi.md#listcategories) | **GET** /categories | List all 42 product categories (locale-resolved names)
 [**listProducts**](CatalogApi.md#listproducts) | **GET** /products | List products with category filter, price/brand/rating/shipping filters, pagination, and sort
 
@@ -187,6 +188,51 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**Product**](Product.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getSizeRecommendation**
+> SizeRecommendation getSizeRecommendation(id, xTraceId)
+
+Recommend a size for this product from the user's fit profile
+
+Size-fit phase 1. chart_approximate is ALWAYS true (representative seed charts + title-keyword garment classification — curation follow-up). Graceful statuses instead of errors: no_profile, incomplete_profile, no_chart. 
+
+### Example
+```dart
+import 'package:mopro_api/api.dart';
+
+final api = MoproApi().getCatalogApi();
+final int id = 789; // int | 
+final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+
+try {
+    final response = api.getSizeRecommendation(id, xTraceId);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling CatalogApi->getSizeRecommendation: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **id** | **int**|  | 
+ **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+
+### Return type
+
+[**SizeRecommendation**](SizeRecommendation.md)
 
 ### Authorization
 

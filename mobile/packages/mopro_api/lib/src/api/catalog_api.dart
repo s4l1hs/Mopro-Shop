@@ -16,6 +16,7 @@ import 'package:mopro_api/src/model/get_category_facets200_response.dart';
 import 'package:mopro_api/src/model/list_categories200_response.dart';
 import 'package:mopro_api/src/model/list_products200_response.dart';
 import 'package:mopro_api/src/model/product.dart';
+import 'package:mopro_api/src/model/size_recommendation.dart';
 
 class CatalogApi {
 
@@ -367,6 +368,86 @@ _responseData = rawData == null ? null : deserialize<Product, Product>(rawData, 
     }
 
     return Response<Product>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Recommend a size for this product from the user&#39;s fit profile
+  /// Size-fit phase 1. chart_approximate is ALWAYS true (representative seed charts + title-keyword garment classification — curation follow-up). Graceful statuses instead of errors: no_profile, incomplete_profile, no_chart. 
+  ///
+  /// Parameters:
+  /// * [id] 
+  /// * [xTraceId] - Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [SizeRecommendation] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<SizeRecommendation>> getSizeRecommendation({ 
+    required int id,
+    String? xTraceId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/products/{id}/size-recommendation'.replaceAll('{' r'id' '}', id.toString());
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        if (xTraceId != null) r'X-Trace-Id': xTraceId,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    SizeRecommendation? _responseData;
+
+    try {
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<SizeRecommendation, SizeRecommendation>(rawData, 'SizeRecommendation', growable: true);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<SizeRecommendation>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

@@ -623,6 +623,17 @@ func main() {
 	mux.Handle("GET /me/membership",
 		httpTrace(requireAuth(http.HandlerFunc(handleGetMyMembership(membershipSvc, market)))),
 	)
+	// Size-fit (phase 1): profile + recommendation, proxied to jobs-svc (§3.4).
+	sizefit := newSizefitClient()
+	mux.Handle("GET /me/fit-profile",
+		httpTrace(requireAuth(http.HandlerFunc(handleGetFitProfile(sizefit)))),
+	)
+	mux.Handle("PUT /me/fit-profile",
+		httpTrace(requireAuth(http.HandlerFunc(handlePutFitProfile(sizefit)))),
+	)
+	mux.Handle("GET /products/{id}/size-recommendation",
+		httpTrace(requireAuth(http.HandlerFunc(handleSizeRecommendation(sizefit, catalogSvc, defaultLocale)))),
+	)
 	mux.Handle("POST /orders/{id}/status",
 		httpTrace(http.HandlerFunc(handleUpdateOrderStatus(orderSvc))),
 	)

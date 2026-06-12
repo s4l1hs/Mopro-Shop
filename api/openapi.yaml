@@ -413,6 +413,49 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
+  /me/fit-profile:
+    get:
+      operationId: GetMyFitProfile
+      tags: [me]
+      summary: Get the authenticated user's size-fit profile (size-fit phase 1)
+      description: >
+        Measurements are integer millimetres and are stored encrypted at rest
+        (AES-GCM); a user without a profile gets 200 with exists=false.
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+      responses:
+        '200':
+          description: Fit profile envelope
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FitProfileEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    put:
+      operationId: PutMyFitProfile
+      tags: [me]
+      summary: Create or replace the size-fit profile (idempotent upsert)
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FitProfile'
+      responses:
+        '204':
+          description: Stored (encrypted at rest)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          description: A measurement is outside sane bounds
+        '500':
+          $ref: '#/components/responses/InternalError'
+
   /me/password:
     post:
       operationId: ChangePassword
@@ -905,6 +948,36 @@ paths:
           $ref: '#/components/responses/InternalError'
 
   # ── Search ────────────────────────────────────────────────────────────────────
+
+  /products/{id}/size-recommendation:
+    get:
+      operationId: GetSizeRecommendation
+      tags: [catalog]
+      summary: Recommend a size for this product from the user's fit profile
+      description: >
+        Size-fit phase 1. chart_approximate is ALWAYS true (representative seed
+        charts + title-keyword garment classification — curation follow-up).
+        Graceful statuses instead of errors: no_profile, incomplete_profile,
+        no_chart.
+      parameters:
+        - $ref: '#/components/parameters/TraceId'
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer, format: int64}
+      responses:
+        '200':
+          description: Recommendation (or a graceful non-ok status)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SizeRecommendation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
 
   /search/suggest:
     get:
@@ -2150,6 +2223,54 @@ components:
           example: 300
 
     # ── User / Identity ───────────────────────────────────────────────────────
+
+    FitProfile:
+      type: object
+      description: >
+        Size-fit measurements in integer MILLIMETRES (no floats). Stored only
+        as AES-GCM ciphertext server-side. Absent fields = not provided.
+      properties:
+        chest_mm: {type: integer}
+        waist_mm: {type: integer}
+        hip_mm: {type: integer}
+        inseam_mm: {type: integer}
+        height_mm: {type: integer}
+        fit_pref:
+          type: string
+          description: regular | loose | tight (between-sizes tiebreak).
+      required: [fit_pref]
+
+    FitProfileEnvelope:
+      type: object
+      required: [exists]
+      properties:
+        exists: {type: boolean}
+        profile:
+          $ref: '#/components/schemas/FitProfile'
+
+    SizeRecommendation:
+      type: object
+      description: >
+        Size-fit phase 1 output. chart_approximate is always true (seed charts
+        are representative, not curated).
+      required: [status, chart_approximate]
+      properties:
+        status:
+          type: string
+          description: ok | no_profile | incomplete_profile | no_chart
+        garment_type:
+          type: string
+          description: top | bottom | dress | skirt | outerwear (chart key).
+        size: {type: string}
+        signal:
+          type: string
+          description: true_to_size | between | size_up | size_down
+        between_lower: {type: string}
+        between_upper: {type: string}
+        missing:
+          type: array
+          items: {type: string}
+        chart_approximate: {type: boolean}
 
     Membership:
       type: object

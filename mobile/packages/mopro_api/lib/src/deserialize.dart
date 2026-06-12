@@ -28,6 +28,8 @@ import 'package:mopro_api/src/model/error_envelope_error.dart';
 import 'package:mopro_api/src/model/facet.dart';
 import 'package:mopro_api/src/model/facet_value.dart';
 import 'package:mopro_api/src/model/field_error.dart';
+import 'package:mopro_api/src/model/fit_profile.dart';
+import 'package:mopro_api/src/model/fit_profile_envelope.dart';
 import 'package:mopro_api/src/model/get_category_facets200_response.dart';
 import 'package:mopro_api/src/model/list_addresses200_response.dart';
 import 'package:mopro_api/src/model/list_banners200_response.dart';
@@ -61,6 +63,7 @@ import 'package:mopro_api/src/model/seller_binding.dart';
 import 'package:mopro_api/src/model/seller_order_breakdown.dart';
 import 'package:mopro_api/src/model/seller_order_breakdown_items_inner.dart';
 import 'package:mopro_api/src/model/seller_order_breakdown_totals.dart';
+import 'package:mopro_api/src/model/size_recommendation.dart';
 import 'package:mopro_api/src/model/step_up_request.dart';
 import 'package:mopro_api/src/model/step_up_token_response.dart';
 import 'package:mopro_api/src/model/suggest_response.dart';
@@ -150,6 +153,10 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return FacetValue.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'FieldError':
           return FieldError.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'FitProfile':
+          return FitProfile.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'FitProfileEnvelope':
+          return FitProfileEnvelope.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'GetCategoryFacets200Response':
           return GetCategoryFacets200Response.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ListAddresses200Response':
@@ -216,6 +223,8 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return SellerOrderBreakdownItemsInner.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'SellerOrderBreakdownTotals':
           return SellerOrderBreakdownTotals.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'SizeRecommendation':
+          return SizeRecommendation.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'StepUpRequest':
           return StepUpRequest.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'StepUpTokenResponse':

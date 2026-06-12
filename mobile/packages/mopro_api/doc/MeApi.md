@@ -12,7 +12,9 @@ Method | HTTP request | Description
 [**changePassword**](MeApi.md#changepassword) | **POST** /me/password | Change the authenticated user&#39;s password
 [**deleteMe**](MeApi.md#deleteme) | **DELETE** /me | Soft-delete the authenticated user account (KVKK / GDPR)
 [**getMe**](MeApi.md#getme) | **GET** /me | Get authenticated user profile
+[**getMyFitProfile**](MeApi.md#getmyfitprofile) | **GET** /me/fit-profile | Get the authenticated user&#39;s size-fit profile (size-fit phase 1)
 [**getMyMembership**](MeApi.md#getmymembership) | **GET** /me/membership | Get the authenticated user&#39;s membership tier (AC-05)
+[**putMyFitProfile**](MeApi.md#putmyfitprofile) | **PUT** /me/fit-profile | Create or replace the size-fit profile (idempotent upsert)
 [**registerDevice**](MeApi.md#registerdevice) | **POST** /me/devices | Register a device FCM token for push notifications
 [**unregisterDevice**](MeApi.md#unregisterdevice) | **DELETE** /me/devices/{id} | Remove a registered device (deregister push notifications)
 [**updateMe**](MeApi.md#updateme) | **PATCH** /me | Update user profile fields
@@ -151,6 +153,49 @@ Name | Type | Description  | Notes
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
+# **getMyFitProfile**
+> FitProfileEnvelope getMyFitProfile(xTraceId)
+
+Get the authenticated user's size-fit profile (size-fit phase 1)
+
+Measurements are integer millimetres and are stored encrypted at rest (AES-GCM); a user without a profile gets 200 with exists=false. 
+
+### Example
+```dart
+import 'package:mopro_api/api.dart';
+
+final api = MoproApi().getMeApi();
+final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+
+try {
+    final response = api.getMyFitProfile(xTraceId);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling MeApi->getMyFitProfile: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+
+### Return type
+
+[**FitProfileEnvelope**](FitProfileEnvelope.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
 # **getMyMembership**
 > Membership getMyMembership(xTraceId)
 
@@ -190,6 +235,48 @@ Name | Type | Description  | Notes
 ### HTTP request headers
 
  - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **putMyFitProfile**
+> putMyFitProfile(fitProfile, xTraceId)
+
+Create or replace the size-fit profile (idempotent upsert)
+
+### Example
+```dart
+import 'package:mopro_api/api.dart';
+
+final api = MoproApi().getMeApi();
+final FitProfile fitProfile = ; // FitProfile | 
+final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+
+try {
+    api.putMyFitProfile(fitProfile, xTraceId);
+} catch on DioException (e) {
+    print('Exception when calling MeApi->putMyFitProfile: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **fitProfile** | [**FitProfile**](FitProfile.md)|  | 
+ **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+
+### Return type
+
+void (empty response body)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: application/json
  - **Accept**: application/json
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
