@@ -21,6 +21,7 @@ import 'package:mopro/features/account/widgets/account_shell.dart';
 import 'package:mopro/features/cart/application/cart_count_provider.dart';
 import 'package:mopro/features/catalog/providers/category_tree_provider.dart';
 import 'package:mopro/features/catalog/screens/product_detail_screen.dart';
+import 'package:mopro/features/home/recently_viewed_provider.dart';
 import 'package:mopro/features/order/application/orders_provider.dart';
 import 'package:mopro/features/wallet/providers/cashback_plans_provider.dart';
 import 'package:mopro/features/wallet/providers/wallet_provider.dart';
@@ -51,6 +52,14 @@ class _FakeWallet extends WalletNotifier {
 class _FakeCashback extends CashbackPlansNotifier {
   @override
   CashbackPlansState build() => const CashbackPlansState(plans: AsyncData([]));
+}
+
+/// PD-10 mounted _RecentlyViewedRail on the PDP; the real notifier fires a raw
+/// Dio GET (authed+consented here) whose timeout Timer leaks past teardown
+/// ("Timer is still pending"). Empty data = rail renders zero space, no I/O.
+class _FakeRecentlyViewed extends RecentlyViewedNotifier {
+  @override
+  AsyncValue<List<ProductSummary>> build() => const AsyncData([]);
 }
 
 Product _product() => Product(
@@ -227,6 +236,7 @@ Future<void> pumpAuditConfig(WidgetTester tester, String config) async {
           cartCountProvider.overrideWithValue(0),
           categoryTreeProvider.overrideWithValue(const AsyncData([])),
           catalogApiProvider.overrideWithValue(_FakeCatalogApi()),
+          recentlyViewedProvider.overrideWith(_FakeRecentlyViewed.new),
         ],
         child: MaterialApp.router(
           theme: buildLightTheme(),
