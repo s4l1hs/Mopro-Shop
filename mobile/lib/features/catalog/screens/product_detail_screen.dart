@@ -24,6 +24,7 @@ import 'package:mopro/features/catalog/widgets/pdp/pdp_delivery_info.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_image_pager.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_price_block.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_seller_card.dart';
+import 'package:mopro/features/catalog/widgets/pdp/pdp_sticky_buy_bar.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_sticky_cta.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_variant_selector.dart';
 import 'package:mopro/features/catalog/widgets/pdp_image_gallery.dart';
@@ -33,6 +34,7 @@ import 'package:mopro/features/favorites/favorites_provider.dart';
 import 'package:mopro/features/growth/meta_tags_service.dart';
 import 'package:mopro/features/growth/seo_head.dart';
 import 'package:mopro/features/growth/structured_data_service.dart';
+import 'package:mopro/features/home/recently_viewed_provider.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 class ProductDetailScreen extends ConsumerWidget {
@@ -305,6 +307,13 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
       }
     });
 
+    // PD-09: the condensed buy-bar appears once the buy-box column has scrolled
+    // out of view (row top pad 16 + measured buy-box height). Until the post-
+    // frame measure lands, the threshold is unreachable → bar hidden.
+    final buyBoxBottom =
+        _buyBoxHeight == null ? double.infinity : 16 + _buyBoxHeight!;
+    final showBuyBar = _scrollOffset > buyBoxBottom;
+
     return Scaffold(
       appBar: AppBar(
         title:
@@ -321,82 +330,112 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
           const SizedBox(width: 4),
         ],
       ),
-      body: SingleChildScrollView(
-        controller: _wideScroll,
-        child: CenteredContentColumn(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
-              LayoutBuilder(
-                builder: (ctx, c) {
-                  final isDesktop = context.isDesktop;
-                  final buyBoxW = isDesktop ? 480.0 : 360.0;
-                  const gap = 32.0;
-                  final galleryW = (c.maxWidth - buyBoxW - gap)
-                      .clamp(280.0, isDesktop ? 600.0 : 480.0);
-                  final galleryH = galleryW + 84; // square image + thumb strip
-                  final contentH =
-                      math.max(galleryH, _buyBoxHeight ?? galleryH);
-                  final maxTop =
-                      (contentH - galleryH).clamp(0.0, double.infinity);
-                  final top = _scrollOffset.clamp(0.0, maxTop);
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            controller: _wideScroll,
+            child: CenteredContentColumn(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+                  LayoutBuilder(
+                    builder: (ctx, c) {
+                      final isDesktop = context.isDesktop;
+                      final buyBoxW = isDesktop ? 480.0 : 360.0;
+                      const gap = 32.0;
+                      final galleryW = (c.maxWidth - buyBoxW - gap)
+                          .clamp(280.0, isDesktop ? 600.0 : 480.0);
+                      final galleryH =
+                          galleryW + 84; // square image + thumb strip
+                      final contentH =
+                          math.max(galleryH, _buyBoxHeight ?? galleryH);
+                      final maxTop =
+                          (contentH - galleryH).clamp(0.0, double.infinity);
+                      final top = _scrollOffset.clamp(0.0, maxTop);
 
-                  // NOTE: the Row is NOT height-constrained — the buy-box must
-                  // measure its natural height (via _buyBoxKey) so contentH can
-                  // grow to it. Only the gallery cell is sized to contentH, so
-                  // the gallery can translate within the taller column.
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SizedBox(
-                        width: galleryW,
-                        height: contentH,
-                        child: Stack(
-                          children: [
-                            Positioned(
-                              top: top,
-                              left: 0,
-                              right: 0,
-                              height: galleryH,
-                              child: KeyedSubtree(
-                                key: wideGalleryKey,
-                                child: ValueListenableBuilder<LastPointerKind>(
-                                  valueListenable: PointerKindObserver.lastKind,
-                                  builder: (_, kind, __) => PdpImagePager(
-                                    imageUrls: _imageUrls,
-                                    enableHoverZoom: isDesktop &&
-                                        kind == LastPointerKind.mouse,
+                      // NOTE: the Row is NOT height-constrained — the buy-box
+                      // must measure its natural height (via _buyBoxKey) so
+                      // contentH can grow to it. Only the gallery cell is sized
+                      // to contentH, so the gallery can translate within the
+                      // taller column.
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: galleryW,
+                            height: contentH,
+                            child: Stack(
+                              children: [
+                                Positioned(
+                                  top: top,
+                                  left: 0,
+                                  right: 0,
+                                  height: galleryH,
+                                  child: KeyedSubtree(
+                                    key: wideGalleryKey,
+                                    child: ValueListenableBuilder<
+                                        LastPointerKind>(
+                                      valueListenable:
+                                          PointerKindObserver.lastKind,
+                                      builder: (_, kind, __) => PdpImagePager(
+                                        imageUrls: _imageUrls,
+                                        enableHoverZoom: isDesktop &&
+                                            kind == LastPointerKind.mouse,
+                                      ),
+                                    ),
                                   ),
                                 ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: gap),
+                          SizedBox(
+                            width: buyBoxW,
+                            child: KeyedSubtree(
+                              key: _buyBoxKey,
+                              child: _buildWideBuyBox(
+                                context,
+                                product,
+                                isMutating,
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: gap),
-                      SizedBox(
-                        width: buyBoxW,
-                        child: KeyedSubtree(
-                          key: _buyBoxKey,
-                          child: _buildWideBuyBox(context, product, isMutating),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  KeyedSubtree(
+                    key: wideTabsKey,
+                    child: _buildWideTabs(context, product),
+                  ),
+                  const SizedBox(height: 24),
+                  _SimilarProductsRail(productId: product.id),
+                  const SizedBox(height: 24),
+                  // PD-10: recently-viewed rail (zero space when empty).
+                  _RecentlyViewedRail(excludeProductId: product.id),
+                  const SizedBox(height: 32),
+                ],
               ),
-              const SizedBox(height: 24),
-              KeyedSubtree(
-                key: wideTabsKey,
-                child: _buildWideTabs(context, product),
-              ),
-              const SizedBox(height: 24),
-              _SimilarProductsRail(productId: product.id),
-              const SizedBox(height: 32),
-            ],
+            ),
           ),
-        ),
+          // PD-09: condensed sticky buy-bar, pinned over the scroll view once
+          // the buy-box column is out of view.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: PdpStickyBuyBar(
+              visible: showBuyBar,
+              title: product.title,
+              selectedVariant: _selectedVariant,
+              isMutating: isMutating,
+              imageUrl: _imageUrls.firstOrNull,
+              onAddToCart: () => _addToCart(context),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -855,8 +894,34 @@ class _DescriptionTab extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
+          // PD-10: recently-viewed rail (zero space when empty/ungated).
+          _RecentlyViewedRail(excludeProductId: productId),
+          const SizedBox(height: 16),
         ],
       ),
+    );
+  }
+}
+
+/// "Son baktıkların" rail on the PDP (PD-10), reusing the home surface's
+/// [recentlyViewedProvider] (auth+consent gated; error→empty) and
+/// [ProductListRail] (read-only ProductCard mount). The product being viewed is
+/// filtered out — echoing it back is noise. Zero space when empty.
+class _RecentlyViewedRail extends ConsumerWidget {
+  const _RecentlyViewedRail({required this.excludeProductId});
+
+  final int excludeProductId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final products =
+        ref.watch(recentlyViewedProvider).valueOrNull ?? const [];
+    final filtered =
+        products.where((p) => p.id != excludeProductId).toList();
+    if (filtered.isEmpty) return const SizedBox.shrink();
+    return ProductListRail(
+      products: filtered,
+      title: 'home.rails.recently_viewed.title'.tr(),
     );
   }
 }
