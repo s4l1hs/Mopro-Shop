@@ -232,3 +232,13 @@ INSERT INTO ref_schema.business_calendars (market, date, reason) VALUES
   ('TR', '2030-04-16', 'Kurban Bayramı 3. Günü')
 
 ON CONFLICT DO NOTHING;
+
+
+-- ── Membership tiers (AC-05; lockstep with migration 0094) ──────────────────
+INSERT INTO ref_schema.membership_tiers
+  (code, market, rank, currency, min_spend_minor, min_orders, active)
+VALUES
+  ('classic', 'TR', 1, 'TRY',       0,  0, TRUE),
+  ('gold',    'TR', 2, 'TRY',  250000,  5, TRUE),
+  ('elite',   'TR', 3, 'TRY', 1000000, 15, TRUE)
+ON CONFLICT (market, code) DO NOTHING;
