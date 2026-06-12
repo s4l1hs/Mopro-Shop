@@ -36,6 +36,12 @@ type initPayReq struct {
 	Name       string `json:"cc_holder_name"`
 	Email      string `json:"invoice_description"` // used as user reference
 	Market     string `json:"market"`
+	// Installments is the buyer-chosen taksit count (PD-05); "1" = single charge.
+	// INTEREST-FREE: total_amount is unchanged — the bank slices the buyer side.
+	Installments string `json:"installments_number"`
+	// HashKey is the documented paySmart3D request signature (SignPayment3D);
+	// it covers total + installment, so it is wired together with installments.
+	HashKey string `json:"hash_key"`
 }
 
 type initPayResp struct {
@@ -75,18 +81,35 @@ func (a *Adapter) InitiatePayment(ctx context.Context, req payment.InitiatePayme
 		cancelURL = a.cfg.CancelURL
 	}
 
+	// PD-05: validate/normalize the installment count (0 → 1). Interest-free —
+	// the charged total below is unchanged regardless of the count.
+	installments, err := payment.NormalizeInstallments(req.Installments)
+	if err != nil {
+		return payment.InitiatePaymentResponse{}, err
+	}
+	installmentsStr := strconv.Itoa(installments)
+
 	amountStr := strconv.FormatInt(req.AmountMinor, 10)
 	var resp initPayResp
 	if err := a.doJSON(ctx, "/ccpayment/api/paySmart3D", initPayReq{
-		InvoiceID:  req.IdempotencyKey,
-		Amount:     amountStr,
-		Currency:   req.Currency,
-		MerchantID: a.cfg.MerchantID,
-		ReturnURL:  returnURL,
-		CancelURL:  cancelURL,
-		Name:       req.BuyerName + " " + req.BuyerSurname,
-		Email:      req.BuyerEmail,
-		Market:     req.Market,
+		InvoiceID:    req.IdempotencyKey,
+		Amount:       amountStr,
+		Currency:     req.Currency,
+		MerchantID:   a.cfg.MerchantID,
+		ReturnURL:    returnURL,
+		CancelURL:    cancelURL,
+		Name:         req.BuyerName + " " + req.BuyerSurname,
+		Email:        req.BuyerEmail,
+		Market:       req.Market,
+		Installments: installmentsStr,
+		HashKey: SignPayment3D(Payment3DSignFields{
+			Total:        amountStr,
+			Installment:  installmentsStr,
+			CurrencyCode: req.Currency,
+			MerchantKey:  a.cfg.MerchantKey,
+			InvoiceID:    req.IdempotencyKey,
+			AppSecret:    a.cfg.AppSecret,
+		}),
 	}, &resp); err != nil {
 		return payment.InitiatePaymentResponse{}, err
 	}

@@ -141,9 +141,13 @@ type CheckoutSession struct {
 	AmountMinor   int64                 `json:"amount_minor"`
 	Currency      string                `json:"currency"`
 	ProviderRef   string                `json:"provider_ref,omitempty"`
-	ExpiresAt     time.Time             `json:"expires_at"`
-	CreatedAt     time.Time             `json:"created_at"`
-	UpdatedAt     time.Time             `json:"updated_at"`
+	// Installments is the buyer-chosen card-installment count (PD-05, taksit):
+	// 1 (single charge, default) or 3/6/9/12. INTEREST-FREE model — AmountMinor
+	// is the full unchanged total; the bank slices the buyer's payments.
+	Installments int       `json:"installments"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 // InitiateCheckoutRequest is the input for Service.InitiateCheckout.
@@ -155,6 +159,7 @@ type InitiateCheckoutRequest struct {
 	SessionID     string // from Idempotency-Key header; becomes checkout_session.id and PSP invoice_id
 	AddressID     int64  // selected delivery address (OR-02); 0 = none → no snapshot captured
 	CouponCode    string // optional coupon code (CHK-04); empty = none
+	Installments  int    // card-installment count (PD-05); 0 = unset → 1 (single charge)
 	BuyerName     string
 	BuyerSurname  string
 	BuyerEmail    string
