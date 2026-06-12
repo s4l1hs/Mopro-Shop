@@ -43,6 +43,7 @@ class _FakeCheckoutRepo implements CheckoutRepository {
     required String buyerSurname,
     required String idempotencyKey,
     int? addressId,
+    int installments = 1,
     String returnUrl = 'mopro://checkout/result',
     String couponCode = '',
   }) async =>
@@ -56,6 +57,7 @@ class _FailingCheckoutRepo implements CheckoutRepository {
     required String buyerSurname,
     required String idempotencyKey,
     int? addressId,
+    int installments = 1,
     String returnUrl = 'mopro://checkout/result',
     String couponCode = '',
   }) async =>
@@ -201,6 +203,43 @@ void main() {
     expect(surname, 'Yılmaz');
   });
 
+  // ── PD-05: installments (taksit) ──────────────────────────────────────────
+
+  test('installments default to 1 (single charge)', () {
+    final c = _container(_FakeCheckoutRepo());
+    addTearDown(c.dispose);
+    expect(c.read(checkoutControllerProvider).installments, 1);
+  });
+
+  test('selectInstallments updates state; unsupported counts ignored', () {
+    final c = _container(_FakeCheckoutRepo());
+    addTearDown(c.dispose);
+    final notifier = c.read(checkoutControllerProvider.notifier);
+
+    notifier.selectInstallments(6);
+    expect(c.read(checkoutControllerProvider).installments, 6);
+
+    notifier.selectInstallments(7); // not in kInstallmentOptions
+    expect(
+      c.read(checkoutControllerProvider).installments,
+      6,
+      reason: 'unsupported counts must be ignored',
+    );
+  });
+
+  test('placeOrder sends the chosen installments to the repository', () async {
+    final repo = _RecordingCheckoutRepo();
+    final c = _container(repo);
+    addTearDown(c.dispose);
+    final notifier = c.read(checkoutControllerProvider.notifier);
+    notifier.selectAddress(_fakeAddress());
+    notifier.selectInstallments(9);
+
+    await notifier.placeOrder();
+
+    expect(repo.recordedInstallments, 9);
+  });
+
   test('buyer name split: single word → name=Mopro, surname=empty', () {
     const fullName = 'Mopro';
     final parts = fullName.trim().split(RegExp(r'\s+'));
@@ -211,4 +250,23 @@ void main() {
     expect(name, 'Mopro');
     expect(surname, '');
   });
+}
+
+// _RecordingCheckoutRepo captures the installments arg placeOrder passes (PD-05).
+class _RecordingCheckoutRepo implements CheckoutRepository {
+  int? recordedInstallments;
+
+  @override
+  Future<CheckoutResponseDto> initiate({
+    required String buyerName,
+    required String buyerSurname,
+    required String idempotencyKey,
+    int? addressId,
+    int installments = 1,
+    String returnUrl = 'mopro://checkout/result',
+    String couponCode = '',
+  }) async {
+    recordedInstallments = installments;
+    return _successResponse();
+  }
 }

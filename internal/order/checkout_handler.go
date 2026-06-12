@@ -12,7 +12,8 @@ type checkoutInitiateRequest struct {
 	Market        string `json:"market,omitempty"`
 	Currency      string `json:"currency,omitempty"`
 	CouponCode    string `json:"coupon_code,omitempty"`
-	AddressID     int64  `json:"address_id,omitempty"` // selected delivery address (OR-02)
+	AddressID     int64  `json:"address_id,omitempty"`   // selected delivery address (OR-02)
+	Installments  int    `json:"installments,omitempty"` // card taksit count (PD-05); 0/1 = single charge
 	BuyerName     string `json:"buyer_name"`
 	BuyerSurname  string `json:"buyer_surname"`
 	BuyerEmail    string `json:"buyer_email"`
@@ -56,6 +57,7 @@ func HandleInitiateCheckout(svc Service, userIDFromContext func(*http.Request) (
 			CouponCode:    body.CouponCode,
 			SessionID:     sessionID,
 			AddressID:     body.AddressID,
+			Installments:  body.Installments,
 			BuyerName:     body.BuyerName,
 			BuyerSurname:  body.BuyerSurname,
 			BuyerEmail:    body.BuyerEmail,
@@ -87,6 +89,8 @@ func checkoutError(w http.ResponseWriter, err error) {
 		http.Error(w, `{"error":"payment provider not configured"}`, http.StatusInternalServerError)
 	case errors.Is(err, ErrCheckoutSessionRequired):
 		http.Error(w, `{"error":"Idempotency-Key header required"}`, http.StatusUnprocessableEntity)
+	case errors.Is(err, ErrInvalidInstallments):
+		http.Error(w, `{"error":"invalid installments; allowed: 1, 3, 6, 9, 12"}`, http.StatusUnprocessableEntity)
 	case errors.Is(err, ErrReservationExpired):
 		http.Error(w, `{"error":"reservation expired, please re-reserve"}`, http.StatusConflict)
 	default:

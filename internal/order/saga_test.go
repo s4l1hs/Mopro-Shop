@@ -476,3 +476,94 @@ func TestMarkPaid_WritesOutbox(t *testing.T) {
 		t.Errorf("event type: want ecom.order.paid.v1, got %q", capturedRow.EventType)
 	}
 }
+
+// ── PD-05: installments threading ─────────────────────────────────────────────
+
+// TestInitiateCheckout_InstallmentsThreaded proves the buyer-chosen taksit count
+// reaches the PSP request AND is recorded on the checkout session, while the
+// charged total stays the FULL amount (interest-free — no money-math change).
+func TestInitiateCheckout_InstallmentsThreaded(t *testing.T) {
+	var pspReq payment.InitiatePaymentRequest
+	psp := &mockPSP{
+		initiatePaymentFn: func(_ context.Context, req payment.InitiatePaymentRequest) (payment.InitiatePaymentResponse, error) {
+			pspReq = req
+			return payment.InitiatePaymentResponse{ProviderRef: req.IdempotencyKey, ThreeDSHTML: "<form/>"}, nil
+		},
+	}
+	var session order.CheckoutSession
+	sessionRepo := &mockSessionRepo{
+		insertFn: func(_ context.Context, _ pgx.Tx, s order.CheckoutSession) (order.CheckoutSession, error) {
+			session = s
+			return s, nil
+		},
+	}
+
+	svc := newSagaService(&mockRepo{}, sessionRepo, &mockCartSvc{}, &mockCatalogSvc{}, &mockOutbox{}, psp)
+	_, err := svc.InitiateCheckout(context.Background(), order.InitiateCheckoutRequest{
+		UserID: 1, SessionID: "sess-taksit", BuyerEmail: "a@b.c", Installments: 6,
+	})
+	if err != nil {
+		t.Fatalf("InitiateCheckout: %v", err)
+	}
+	if pspReq.Installments != 6 {
+		t.Errorf("PSP installments: want 6, got %d", pspReq.Installments)
+	}
+	if session.Installments != 6 {
+		t.Errorf("session installments: want 6, got %d", session.Installments)
+	}
+	// Default cart = variant 1 × qty 2 @10000 → the PSP charge must be the full
+	// total regardless of the installment count (interest-free invariant).
+	if pspReq.AmountMinor != session.AmountMinor || pspReq.AmountMinor == 0 {
+		t.Errorf("charged total must equal the session total: psp=%d session=%d",
+			pspReq.AmountMinor, session.AmountMinor)
+	}
+}
+
+// TestInitiateCheckout_InstallmentsDefaulted proves the unset count records as 1.
+func TestInitiateCheckout_InstallmentsDefaulted(t *testing.T) {
+	var session order.CheckoutSession
+	sessionRepo := &mockSessionRepo{
+		insertFn: func(_ context.Context, _ pgx.Tx, s order.CheckoutSession) (order.CheckoutSession, error) {
+			session = s
+			return s, nil
+		},
+	}
+	svc := newSagaService(&mockRepo{}, sessionRepo, &mockCartSvc{}, &mockCatalogSvc{}, &mockOutbox{}, &mockPSP{})
+	if _, err := svc.InitiateCheckout(context.Background(), order.InitiateCheckoutRequest{
+		UserID: 1, SessionID: "sess-default", BuyerEmail: "a@b.c",
+	}); err != nil {
+		t.Fatalf("InitiateCheckout: %v", err)
+	}
+	if session.Installments != 1 {
+		t.Errorf("unset installments must record as 1, got %d", session.Installments)
+	}
+}
+
+// TestInitiateCheckout_InstallmentsInvalid proves an unsupported count fails the
+// request BEFORE any persistence (no session, no orders, no PSP call).
+func TestInitiateCheckout_InstallmentsInvalid(t *testing.T) {
+	inserted := false
+	sessionRepo := &mockSessionRepo{
+		insertFn: func(_ context.Context, _ pgx.Tx, s order.CheckoutSession) (order.CheckoutSession, error) {
+			inserted = true
+			return s, nil
+		},
+	}
+	pspCalled := false
+	psp := &mockPSP{
+		initiatePaymentFn: func(_ context.Context, req payment.InitiatePaymentRequest) (payment.InitiatePaymentResponse, error) {
+			pspCalled = true
+			return payment.InitiatePaymentResponse{}, nil
+		},
+	}
+	svc := newSagaService(&mockRepo{}, sessionRepo, &mockCartSvc{}, &mockCatalogSvc{}, &mockOutbox{}, psp)
+	_, err := svc.InitiateCheckout(context.Background(), order.InitiateCheckoutRequest{
+		UserID: 1, SessionID: "sess-bad", BuyerEmail: "a@b.c", Installments: 7,
+	})
+	if !errors.Is(err, order.ErrInvalidInstallments) {
+		t.Fatalf("want ErrInvalidInstallments, got %v", err)
+	}
+	if inserted || pspCalled {
+		t.Errorf("invalid installments must fail before persistence/PSP (inserted=%v psp=%v)", inserted, pspCalled)
+	}
+}

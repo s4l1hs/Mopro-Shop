@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -805,5 +806,130 @@ func TestWebhookHandler_LegacyNoTimestampAccepted(t *testing.T) {
 	// Must NOT 401 — legacy webhooks without timestamp are allowed through.
 	if rr.Code == http.StatusUnauthorized {
 		t.Errorf("legacy webhook (no timestamp) must not return 401, got %d", rr.Code)
+	}
+}
+
+// ── PD-05: installments threading ─────────────────────────────────────────────
+
+// TestInitiatePayment_InstallmentsThreaded proves the buyer-chosen taksit count
+// reaches Sipay as installments_number with the documented paySmart3D hash_key
+// (SignPayment3D covers total + installment), and that total_amount is the FULL
+// unchanged total (interest-free model — no money-math change).
+func TestInitiatePayment_InstallmentsThreaded(t *testing.T) {
+	var got struct {
+		Total        string `json:"total_amount"`
+		Installments string `json:"installments_number"`
+		HashKey      string `json:"hash_key"`
+		InvoiceID    string `json:"invoice_id"`
+		Currency     string `json:"currency_code"`
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ccpayment/api/token", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"status_code": 100,
+			"data":        map[string]string{"token": "tok-abc"},
+		})
+	})
+	mux.HandleFunc("/ccpayment/api/paySmart3D", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&got)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status_code": 100,
+			"data": map[string]string{
+				"invoice_id": got.InvoiceID,
+				"ccform":     "<html>3DS</html>",
+			},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	cfg := testConfig(srv.URL)
+	adapter, err := sipay.NewAdapter(cfg, newStubRepo(), nil)
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+
+	_, err = adapter.InitiatePayment(context.Background(), payment.InitiatePaymentRequest{
+		OrderID:        1,
+		AmountMinor:    25000,
+		Currency:       "TRY",
+		IdempotencyKey: "idem-taksit",
+		BuyerEmail:     "a@b.c",
+		Market:         "TR",
+		Installments:   6,
+	})
+	if err != nil {
+		t.Fatalf("InitiatePayment: %v", err)
+	}
+
+	if got.Installments != "6" {
+		t.Errorf("installments_number: want \"6\", got %q", got.Installments)
+	}
+	if got.Total != "25000" {
+		t.Errorf("total_amount must be the full unchanged total: want \"25000\", got %q", got.Total)
+	}
+	wantHash := sipay.SignPayment3D(sipay.Payment3DSignFields{
+		Total:        "25000",
+		Installment:  "6",
+		CurrencyCode: "TRY",
+		MerchantKey:  cfg.MerchantKey,
+		InvoiceID:    "idem-taksit",
+		AppSecret:    cfg.AppSecret,
+	})
+	if got.HashKey != wantHash {
+		t.Errorf("hash_key mismatch: want %q, got %q", wantHash, got.HashKey)
+	}
+}
+
+// TestInitiatePayment_InstallmentsDefaulted proves the zero value normalizes to
+// a single charge ("1") rather than omitting or fabricating a plan.
+func TestInitiatePayment_InstallmentsDefaulted(t *testing.T) {
+	var gotInstallments string
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ccpayment/api/token", func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"status_code": 100,
+			"data":        map[string]string{"token": "tok-abc"},
+		})
+	})
+	mux.HandleFunc("/ccpayment/api/paySmart3D", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		gotInstallments, _ = body["installments_number"].(string)
+		json.NewEncoder(w).Encode(map[string]any{
+			"status_code": 100,
+			"data":        map[string]string{"invoice_id": "i", "ccform": "<f/>"},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	adapter, err := sipay.NewAdapter(testConfig(srv.URL), newStubRepo(), nil)
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+	if _, err = adapter.InitiatePayment(context.Background(), payment.InitiatePaymentRequest{
+		OrderID: 1, AmountMinor: 1000, Currency: "TRY", IdempotencyKey: "idem-default",
+	}); err != nil {
+		t.Fatalf("InitiatePayment: %v", err)
+	}
+	if gotInstallments != "1" {
+		t.Errorf("unset installments must normalize to \"1\", got %q", gotInstallments)
+	}
+}
+
+// TestInitiatePayment_InstallmentsInvalid proves an unsupported count is
+// rejected before any PSP call.
+func TestInitiatePayment_InstallmentsInvalid(t *testing.T) {
+	adapter, err := sipay.NewAdapter(testConfig("http://unreachable.invalid"), newStubRepo(), nil)
+	if err != nil {
+		t.Fatalf("NewAdapter: %v", err)
+	}
+	_, err = adapter.InitiatePayment(context.Background(), payment.InitiatePaymentRequest{
+		OrderID: 1, AmountMinor: 1000, Currency: "TRY", IdempotencyKey: "idem-bad",
+		Installments: 7,
+	})
+	if !errors.Is(err, payment.ErrInvalidInstallments) {
+		t.Fatalf("want ErrInvalidInstallments, got %v", err)
 	}
 }

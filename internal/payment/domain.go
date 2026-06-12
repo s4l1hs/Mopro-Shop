@@ -19,6 +19,25 @@ type InitiatePaymentRequest struct {
 	Market         string
 	ReturnURL      string // 3DS redirect on success
 	CancelURL      string // 3DS redirect on cancel
+	// Installments is the buyer-chosen card-installment count (PD-05, taksit):
+	// one of 1, 3, 6, 9, 12; 0 = unset → normalized to 1 (single charge).
+	// INTEREST-FREE model: AmountMinor is the full unchanged total — the bank
+	// slices the buyer's payments; no Mopro money-math involvement.
+	Installments int
+}
+
+// NormalizeInstallments validates a buyer-chosen installment count and maps the
+// zero value to 1 (single charge). Returns ErrInvalidInstallments for any count
+// outside the supported set {1, 3, 6, 9, 12}.
+func NormalizeInstallments(n int) (int, error) {
+	switch n {
+	case 0, 1:
+		return 1, nil
+	case 3, 6, 9, 12:
+		return n, nil
+	default:
+		return 0, ErrInvalidInstallments
+	}
 }
 
 // InitiatePaymentResponse is the payload returned to the caller.

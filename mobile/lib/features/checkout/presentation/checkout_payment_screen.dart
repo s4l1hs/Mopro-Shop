@@ -44,6 +44,18 @@ class CheckoutPaymentScreen extends ConsumerWidget {
                       .read(checkoutControllerProvider.notifier)
                       .selectPaymentMethod(m),
                 ),
+                // PD-05: installment (taksit) picker — card payments only.
+                // Interest-free: the total never changes with the count; an
+                // unsupported card/count combo is rejected by the bank in 3DS.
+                if (checkoutState.paymentMethod == 'card') ...[
+                  const SizedBox(height: 12),
+                  _InstallmentPicker(
+                    selected: checkoutState.installments,
+                    onSelect: (n) => ref
+                        .read(checkoutControllerProvider.notifier)
+                        .selectInstallments(n),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 _PaymentMethodTile(
                   method: 'bank_transfer',
@@ -174,6 +186,64 @@ class _Badge extends StatelessWidget {
               fontSize: 11,
               fontWeight: FontWeight.w600,
               color: cs.onPrimaryContainer,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// PD-05: taksit choice chips (1 = tek çekim, then 3/6/9/12). Interest-free —
+/// no per-option price math is shown because the total does not change.
+class _InstallmentPicker extends StatelessWidget {
+  const _InstallmentPicker({required this.selected, required this.onSelect});
+
+  final int selected;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'checkout.installments_title'.tr(),
+            style: theme.textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final n in kInstallmentOptions)
+                ChoiceChip(
+                  label: Text(
+                    n == 1
+                        ? 'checkout.installments_single'.tr()
+                        : 'checkout.installments_n'
+                            .tr(namedArgs: {'count': '$n'}),
+                  ),
+                  selected: selected == n,
+                  onSelected: (_) => onSelect(n),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'checkout.installments_note'.tr(),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
             ),
           ),
         ],

@@ -22,6 +22,11 @@ var (
 	// ErrInvalidAmount is returned when an amount is zero or negative.
 	ErrInvalidAmount = errors.New("payment: amount must be positive")
 
+	// ErrInvalidInstallments is returned when the requested card-installment count
+	// (PD-05, taksit) is not one of the supported values. 0 is tolerated as
+	// "unset" and normalized to 1 (single charge) by the adapter.
+	ErrInvalidInstallments = errors.New("payment: installments must be one of 1, 3, 6, 9, 12")
+
 	// ErrProviderRequired is returned by NewService when the provider name is empty
 	// (A-001: construction is now caller-injected + error-returning, not log.Fatal).
 	ErrProviderRequired = errors.New("payment: provider required (sipay|craftgate|iyzico)")

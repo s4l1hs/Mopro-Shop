@@ -20,15 +20,19 @@ func NewCheckoutSessionRepository(pool *pgxpool.Pool) CheckoutSessionRepository 
 }
 
 func (r *pgxCheckoutSessionRepository) InsertCheckoutSession(ctx context.Context, tx pgx.Tx, s CheckoutSession) (CheckoutSession, error) {
+	// Installments defaults to 1 (single charge) when the caller leaves it unset.
+	if s.Installments == 0 {
+		s.Installments = 1
+	}
 	err := tx.QueryRow(ctx, `
 		INSERT INTO order_schema.checkout_sessions
 		    (id, user_id, reservation_id, status, order_ids, amount_minor, currency,
-		     provider_ref, expires_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+		     provider_ref, installments, expires_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 		RETURNING created_at, updated_at`,
 		s.ID, s.UserID, s.ReservationID, string(s.Status),
 		s.OrderIDs, s.AmountMinor, s.Currency,
-		s.ProviderRef, s.ExpiresAt,
+		s.ProviderRef, s.Installments, s.ExpiresAt,
 	).Scan(&s.CreatedAt, &s.UpdatedAt)
 	if err != nil {
 		return CheckoutSession{}, fmt.Errorf("order.checkout_repo: InsertCheckoutSession: %w", err)
@@ -41,11 +45,13 @@ func (r *pgxCheckoutSessionRepository) FindCheckoutSessionByID(ctx context.Conte
 	var status string
 	err := r.pool.QueryRow(ctx, `
 		SELECT id, user_id, reservation_id, status, order_ids,
-		       amount_minor, currency, provider_ref, expires_at, created_at, updated_at
+		       amount_minor, currency, provider_ref, installments,
+		       expires_at, created_at, updated_at
 		FROM order_schema.checkout_sessions WHERE id = $1`, id,
 	).Scan(
 		&s.ID, &s.UserID, &s.ReservationID, &status, &s.OrderIDs,
-		&s.AmountMinor, &s.Currency, &s.ProviderRef, &s.ExpiresAt, &s.CreatedAt, &s.UpdatedAt,
+		&s.AmountMinor, &s.Currency, &s.ProviderRef, &s.Installments,
+		&s.ExpiresAt, &s.CreatedAt, &s.UpdatedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

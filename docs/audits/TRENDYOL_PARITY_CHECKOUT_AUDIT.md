@@ -36,12 +36,12 @@
 - **🧩 Shared backend cluster (lands on cart + checkout):** ~~CHK-04 coupon
   (=CT-03)~~ ✅ RESOLVED (seller-funded, migration 0092), ~~CHK-05 basket-discount
   (=CT-09)~~ ✅, CHK-06 free-shipping (=CT-02, NOT-ACTIONABLE: always-free cart).
-- **PROBABLE → resolved source-side** (`feat/checkout-probable-resolution`, no walk; `docs/internal/checkout-probable-resolution.md`): **CHK-07** saved-cards/installments → **NOT-ACTIONABLE** (PSP-hosted card entry + cashback is the installment analog — settled, §5.3). **CHK-09** validation/error states → **NEEDS-VISUAL** (a generic `failed` state exists; error-copy coverage/feel needs Salih's eyes). **0 CONFIRMED fixes.**
+- **PROBABLE → resolved source-side** (`feat/checkout-probable-resolution`, no walk; `docs/internal/checkout-probable-resolution.md`): **CHK-07** saved-cards/installments → saved-cards stays **NOT-ACTIONABLE** (PSP-hosted card entry); **installments ✅ RESOLVED** (`feat/installments` / PD-05 — Salih-confirmed **interest-free**: taksit picker 1/3/6/9/12 at the card step → Sipay `installments_number` + `SignPayment3D` hash, recorded on `checkout_sessions` (0094); **charged total unchanged — zero money-math**; unsupported combos bank-rejected in 3DS; `docs/internal/installments.md`). **CHK-09** validation/error states → **NEEDS-VISUAL** (a generic `failed` state exists; error-copy coverage/feel needs Salih's eyes).
 - ~~**PROBABLE (walk): 2**~~ (original) — CHK-07 saved-cards/installments, CHK-09
   validation/error states. *(Resolved above.)*
-- **NOT-ACTIONABLE: 5** — coin-redeem-as-payment (**disabled, deferred IA-02**),
-  cashback-earned note, PSP-hosted card entry, no installments (cashback is the
-  analog), brand tokens.
+- **NOT-ACTIONABLE: 4** — coin-redeem-as-payment (**disabled, deferred IA-02**),
+  cashback-earned note, PSP-hosted card entry, brand tokens. *(was 5 — "no
+  installments" dropped: shipped interest-free via `feat/installments`.)*
 - **Flow (§6):** reachable locally to the **payment/3DS** step (auth + cart +
   address); the PSP charge needs Sipay sandbox creds.
 
@@ -53,7 +53,7 @@
 |---|---|---|---|---|---|
 | — | Address: select saved + add + default | `CheckoutAddressScreen` — radio-select `addressesProvider`, `isDefault` badge, "add new" → `/profile/addresses/new`; empty-state CTA | — | **MATCHED** | — |
 | — | Delivery options/slots per seller + cargo | — (no delivery step; shipping auto-computed in totals) | **no delivery slot/option selection** | **CHK-03** | MED |
-| — | Payment: card + **saved cards** + **installments** + coin/wallet | `card` (→ **3DS Sipay webview**, PSP-hosted) · `bank_transfer` · `cashback` (**disabled**) | **no saved cards / no installments** (PSP-hosted; cashback is the Mopro analog) | **CHK-07** | PROBABLE |
+| — | Payment: card + **saved cards** + **installments** + coin/wallet | `card` (→ **3DS Sipay webview**, PSP-hosted) · **taksit picker** (1/3/6/9/12 `_InstallmentPicker`, card-only, interest-free note) · `bank_transfer` · `cashback` (**disabled**) | **installments ✅ RESOLVED** (`feat/installments` — interest-free; choice → Sipay `installments_number`, recorded on the session; total unchanged). Saved cards stay PSP-hosted (NOT-ACTIONABLE) | **CHK-07** (installments ✅; cards N-A) | — |
 | — | Order summary: lines + subtotal/shipping/coupon/basket-disc/KDV/cashback/**total** | `CheckoutReviewScreen` now renders the **full breakdown**: subtotal + shipping (free) + **total** + KDV note + monthly cashback (from `totals_by_seller`/`kdv_included` + `cartMonthlyCashbackProvider`) | **CHK-01 ✅ RESOLVED** (coupon/basket-disc still 🧩) | MED |
 | — | Per-seller grouping carried from cart | review groups lines **by seller** (header = `seller_name` + per-seller subtotal) | **CHK-02 ✅ RESOLVED** | MED |
 | — | Coupon/promo entry | coupon applied in cart (CT-03) flows into `/checkout/initiate` as `coupon_code` → the saga charges the coupon-discounted total | **CHK-04 ✅ RESOLVED** (**= CT-03**) — seller-funded percent coupon; the same code shown in the cart charges at checkout (**display==charge**), commission/cashback on the discounted price (snapshot does the work; fin-svc untouched). Idempotent redemption (migration 0092). Doc: `docs/internal/coupon.md` | **CHK-04 RESOLVED** | MED |

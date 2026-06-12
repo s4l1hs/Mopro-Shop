@@ -46,6 +46,14 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 		return InitiateCheckoutResponse{}, fmt.Errorf("order: CheckoutSessionRepository not configured")
 	}
 
+	// PD-05: validate the installment choice BEFORE any persistence so an invalid
+	// count fails the request cleanly (422), never a half-created session.
+	// Interest-free model — the charged total is unchanged by the count.
+	installments, err := payment.NormalizeInstallments(req.Installments)
+	if err != nil {
+		return InitiateCheckoutResponse{}, fmt.Errorf("%w: %d", ErrInvalidInstallments, req.Installments)
+	}
+
 	// 1. Idempotency check.
 	existing, err := s.sessionRepo.FindCheckoutSessionByID(ctx, req.SessionID)
 	if err == nil {
@@ -183,6 +191,7 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 		Status:        CheckoutSessionPending,
 		AmountMinor:   totalMinor,
 		Currency:      currency,
+		Installments:  installments, // PD-05: as-initiated record (interest-free)
 		ExpiresAt:     time.Now().Add(30 * time.Minute).UTC(),
 	}
 
@@ -265,7 +274,7 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 	}
 	pspResp, pspErr := s.psp.InitiatePayment(ctx, payment.InitiatePaymentRequest{
 		OrderID:        primaryOrderID,
-		AmountMinor:    totalMinor,
+		AmountMinor:    totalMinor, // unchanged by installments (interest-free, PD-05)
 		Currency:       currency,
 		IdempotencyKey: req.SessionID, // invoice_id == session_id
 		BuyerName:      req.BuyerName,
@@ -273,6 +282,7 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 		BuyerEmail:     req.BuyerEmail,
 		Market:         market,
 		ReturnURL:      req.ReturnURL,
+		Installments:   installments,
 	})
 
 	if pspErr != nil {
