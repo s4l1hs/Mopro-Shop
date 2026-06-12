@@ -61,16 +61,21 @@ echo "      → ${MOPRO_DIR}/migrations/ synced"
 echo "[3/4] Constructing DSN on VDS..."
 _ssh "
   set -euo pipefail
-  source /etc/mopro/.env 2>/dev/null || true
+  # /etc/mopro/.env is root-only (0600); a plain 'source' as the mopro user
+  # silently read nothing (the old '|| true' swallowed the EACCES) — found by
+  # DEPLOY-EXEC-02 §5. Read just the needed key via sudo grep (permitted),
+  # value never echoed.
 
   case '${DB}' in
     ecom)
-      PASS=\${ECOM_DB_PASSWORD:?ECOM_DB_PASSWORD not set in /etc/mopro/.env}
+      PASS=\$(sudo grep -m1 '^ECOM_DB_PASSWORD=' /etc/mopro/.env | cut -d= -f2-)
+      : \${PASS:?ECOM_DB_PASSWORD not set in /etc/mopro/.env}
       DSN=\"postgres://ecom_admin:\${PASS}@postgres-ecom:5432/mopro_ecom\"
       NETWORK=\"mopro_mopro-net\"
       ;;
     ledger)
-      PASS=\${LEDGER_DB_PASSWORD:?LEDGER_DB_PASSWORD not set in /etc/mopro/.env}
+      PASS=\$(sudo grep -m1 '^LEDGER_DB_PASSWORD=' /etc/mopro/.env | cut -d= -f2-)
+      : \${PASS:?LEDGER_DB_PASSWORD not set in /etc/mopro/.env}
       DSN=\"postgres://ledger_admin:\${PASS}@postgres-ledger:5432/mopro_ledger\"
       NETWORK=\"mopro_mopro-fin-net\"
       ;;
