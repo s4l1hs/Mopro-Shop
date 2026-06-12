@@ -142,6 +142,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
               child: _ResultCount(total: state.total!),
             ),
+          // SE-10: refine box — appending the term to the query narrows
+          // server-side (plainto_tsquery ANDs terms).
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+            child: _RefineBox(
+              onRefine: (term) => _applyQuery('$query $term'),
+            ),
+          ),
           Expanded(child: _shell(state, plpKey)),
         ],
       );
@@ -194,6 +202,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                 padding: const EdgeInsets.only(right: 8),
                                 child: _ResultCount(total: state.total!),
                               ),
+                            // SE-10: refine within results.
+                            SizedBox(
+                              width: 240,
+                              child: _RefineBox(
+                                onRefine: (term) =>
+                                    _applyQuery('$query $term'),
+                              ),
+                            ),
                             Expanded(child: PlpFilterChips(plpKey: plpKey)),
                           ],
                         ),
@@ -419,6 +435,64 @@ class _CategorySuggestions extends ConsumerWidget {
         );
       },
       orElse: () => const SizedBox.shrink(),
+    );
+  }
+}
+
+/// SE-10: "search within results" refine box. Submitting appends the term to
+/// the active query (the FTS backend ANDs terms → genuine server-side
+/// narrowing); the header input syncs to the combined query and this field
+/// clears for the next refinement.
+class _RefineBox extends StatefulWidget {
+  const _RefineBox({required this.onRefine});
+
+  final ValueChanged<String> onRefine;
+
+  @override
+  State<_RefineBox> createState() => _RefineBoxState();
+}
+
+class _RefineBoxState extends State<_RefineBox> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit(String raw) {
+    final term = raw.trim();
+    if (term.isEmpty) return;
+    _controller.clear();
+    widget.onRefine(term);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 36,
+      child: TextField(
+        key: const ValueKey('se10-refine'),
+        controller: _controller,
+        textInputAction: TextInputAction.search,
+        onSubmitted: _submit,
+        style: Theme.of(context).textTheme.bodySmall,
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: 'search.refine_hint'.tr(),
+          prefixIcon:
+              Icon(Icons.manage_search, size: 18, color: cs.onSurfaceVariant),
+          filled: true,
+          fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.6),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
     );
   }
 }

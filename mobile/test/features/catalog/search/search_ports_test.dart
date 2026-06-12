@@ -34,6 +34,7 @@ ProductSummary _p(int id) => ProductSummary(
 class _PagedSearchApi extends SearchApi {
   _PagedSearchApi() : super(Dio());
   final pages = <int>[];
+  String? lastQ; // SE-10: the refine test asserts the combined query.
 
   @override
   Future<Response<ListProducts200Response>> search({
@@ -60,6 +61,7 @@ class _PagedSearchApi extends SearchApi {
   }) async {
     final p = page ?? 1;
     pages.add(p);
+    lastQ = q;
     return Response(
       data: ListProducts200Response(
         data: [for (var i = 0; i < 8; i++) _p((p - 1) * 8 + i + 1)],
@@ -154,5 +156,17 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('plp-page-2')));
     await tester.pumpAndSettle();
     expect(api.pages.last, 2);
+  });
+
+  testWidgets('SE-10: refine box appends to the query (narrows server-side)',
+      (tester) async {
+    final api = await _pumpQuery(tester, width: 375);
+    await tester.enterText(find.byKey(const ValueKey('se10-refine')), 'air');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+    expect(api.lastQ, 'nike air');
+    // The header input now shows the combined query; the refine box cleared.
+    expect(find.widgetWithText(TextField, 'nike air'), findsOneWidget);
   });
 }
