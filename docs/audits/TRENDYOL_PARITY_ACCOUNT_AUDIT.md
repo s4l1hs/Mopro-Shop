@@ -44,7 +44,7 @@
     `onTap: () {}` now routes to the existing `/help` (`HelpIndexScreen`).
 - **2 CONFIRMED gaps (src):** **AC-03** no email-change in Security (password +
   phone/MFA only); **AC-04** no notification-preferences setting.
-- **PROBABLE → resolved source-side** (`feat/account-probable-resolution`, no walk; `docs/internal/account-probable-resolution.md`): **AC-05** → **NOT-ACTIONABLE** — Mopro's coin+plans stat tiles are the deliberate analog to Trendyol tier/points (settled coin/cashback divergence, §5.3); adopting a tier concept is a **NEEDS-DECISION (Salih)**, not a source gap. **0 CONFIRMED fixes.**
+- **AC-05 → ✅ RESOLVED (phase 1)** (`feat/membership-tier`; Salih decided to build the tier). Design-first (`docs/internal/membership-tier.md`): tier = *status* loyalty coexisting with the coin model behind a hard wall — a pure derived read-model (no ledger/balance/minting). Shipped: `ref_schema.membership_tiers` ladder (migration 0094, classic/gold/elite TR, AND-ed spend+orders thresholds, 365-day window) + `order.MembershipService` (§5-safe: own-schema aggregate + ref read; ReturnService-style separate interface) + `GET /me/membership` (spec/codegen, contract-tested both shapes) + Account badge/progress card (binding-constraint progress). **Later phases (design doc):** money benefits (free shipping / tier discounts / multipliers) = financial follow-ups (§4); benefit enforcement across surfaces.
 - ~~**PROBABLE (await walk): 1**~~ (original) — **AC-05** no membership tier/points display. *(Resolved above.)*
 - **NOT-ACTIONABLE: 3** — the Coin/cashback wallet hub (vs Trendyol coupons/wallet),
   coin+plans stats (vs Elite tier/points), brand-orange tokens.
