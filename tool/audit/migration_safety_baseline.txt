@@ -3,3 +3,10 @@
 # today (the 2 ALTER COLUMN ... DROP NOT NULL in 0063 RELAX constraints — safe —
 # and are not matched). --strict fails on any NEW DROP COLUMN/TABLE/CONSTRAINT or
 # SET NOT NULL in an *.up.sql.
+# DEPLOY-EXEC-02 0078 drift-tolerance (reviewed-safe): both SET NOT NULL run
+# ONLY inside the drift-path DO block, immediately AFTER the same block
+# backfills every NULL (and prod's drifted table was empty); on fresh DBs the
+# block never executes (CREATE TABLE already declared NOT NULL). Validated on
+# scratch DBs for both paths.
+migrations/ecom/0078_sellers.up.sql: ALTER TABLE seller_schema.sellers ALTER COLUMN display_name SET NOT NULL;
+migrations/ecom/0078_sellers.up.sql: ALTER TABLE seller_schema.sellers ALTER COLUMN slug SET NOT NULL;
