@@ -12,6 +12,7 @@ Method | HTTP request | Description
 [**changePassword**](MeApi.md#changepassword) | **POST** /me/password | Change the authenticated user&#39;s password
 [**deleteMe**](MeApi.md#deleteme) | **DELETE** /me | Soft-delete the authenticated user account (KVKK / GDPR)
 [**getMe**](MeApi.md#getme) | **GET** /me | Get authenticated user profile
+[**getMyMembership**](MeApi.md#getmymembership) | **GET** /me/membership | Get the authenticated user&#39;s membership tier (AC-05)
 [**registerDevice**](MeApi.md#registerdevice) | **POST** /me/devices | Register a device FCM token for push notifications
 [**unregisterDevice**](MeApi.md#unregisterdevice) | **DELETE** /me/devices/{id} | Remove a registered device (deregister push notifications)
 [**updateMe**](MeApi.md#updateme) | **PATCH** /me | Update user profile fields
@@ -138,6 +139,49 @@ Name | Type | Description  | Notes
 ### Return type
 
 [**User**](User.md)
+
+### Authorization
+
+[bearerAuth](../README.md#bearerAuth)
+
+### HTTP request headers
+
+ - **Content-Type**: Not defined
+ - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+# **getMyMembership**
+> Membership getMyMembership(xTraceId)
+
+Get the authenticated user's membership tier (AC-05)
+
+Derived read-model over the user's delivered-order history in the rolling window — never a stored balance. Tier codes come from ref_schema.membership_tiers (reference data; the client localizes display names). next_* fields are omitted at the top tier. 
+
+### Example
+```dart
+import 'package:mopro_api/api.dart';
+
+final api = MoproApi().getMeApi();
+final String xTraceId = 4f3a2b1c-e71a-4c3f-b99a-8c3f2a1b7d5e; // String | Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+
+try {
+    final response = api.getMyMembership(xTraceId);
+    print(response);
+} catch on DioException (e) {
+    print('Exception when calling MeApi->getMyMembership: $e\n');
+}
+```
+
+### Parameters
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **xTraceId** | **String**| Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent.  | [optional] 
+
+### Return type
+
+[**Membership**](Membership.md)
 
 ### Authorization
 

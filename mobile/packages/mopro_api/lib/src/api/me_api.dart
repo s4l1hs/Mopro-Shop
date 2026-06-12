@@ -13,6 +13,7 @@ import 'package:mopro_api/src/model/change_password_request.dart';
 import 'package:mopro_api/src/model/delete_me_request.dart';
 import 'package:mopro_api/src/model/device.dart';
 import 'package:mopro_api/src/model/error_envelope.dart';
+import 'package:mopro_api/src/model/membership.dart';
 import 'package:mopro_api/src/model/register_device_request.dart';
 import 'package:mopro_api/src/model/update_me_request.dart';
 import 'package:mopro_api/src/model/user.dart';
@@ -244,6 +245,84 @@ _responseData = rawData == null ? null : deserialize<User, User>(rawData, 'User'
     }
 
     return Response<User>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Get the authenticated user&#39;s membership tier (AC-05)
+  /// Derived read-model over the user&#39;s delivered-order history in the rolling window — never a stored balance. Tier codes come from ref_schema.membership_tiers (reference data; the client localizes display names). next_* fields are omitted at the top tier. 
+  ///
+  /// Parameters:
+  /// * [xTraceId] - Client-generated trace identifier (UUID or opaque string). Echoed in error responses as `error.trace_id`. Falls back to a server-generated UUID if absent. 
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [Membership] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<Membership>> getMyMembership({ 
+    String? xTraceId,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/me/membership';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{
+        if (xTraceId != null) r'X-Trace-Id': xTraceId,
+        ...?headers,
+      },
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {
+            'type': 'http',
+            'scheme': 'bearer',
+            'name': 'bearerAuth',
+          },
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    Membership? _responseData;
+
+    try {
+final rawData = _response.data;
+_responseData = rawData == null ? null : deserialize<Membership, Membership>(rawData, 'Membership', growable: true);
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<Membership>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

@@ -145,6 +145,7 @@ Class | Method | HTTP request | Description
 [*MeApi*](doc/MeApi.md) | [**changePassword**](doc/MeApi.md#changepassword) | **POST** /me/password | Change the authenticated user&#39;s password
 [*MeApi*](doc/MeApi.md) | [**deleteMe**](doc/MeApi.md#deleteme) | **DELETE** /me | Soft-delete the authenticated user account (KVKK / GDPR)
 [*MeApi*](doc/MeApi.md) | [**getMe**](doc/MeApi.md#getme) | **GET** /me | Get authenticated user profile
+[*MeApi*](doc/MeApi.md) | [**getMyMembership**](doc/MeApi.md#getmymembership) | **GET** /me/membership | Get the authenticated user&#39;s membership tier (AC-05)
 [*MeApi*](doc/MeApi.md) | [**registerDevice**](doc/MeApi.md#registerdevice) | **POST** /me/devices | Register a device FCM token for push notifications
 [*MeApi*](doc/MeApi.md) | [**unregisterDevice**](doc/MeApi.md#unregisterdevice) | **DELETE** /me/devices/{id} | Remove a registered device (deregister push notifications)
 [*MeApi*](doc/MeApi.md) | [**updateMe**](doc/MeApi.md#updateme) | **PATCH** /me | Update user profile fields
@@ -207,6 +208,7 @@ Class | Method | HTTP request | Description
  - [ListRecommendations200Response](doc/ListRecommendations200Response.md)
  - [ListReturns200Response](doc/ListReturns200Response.md)
  - [ListWalletTransactions200Response](doc/ListWalletTransactions200Response.md)
+ - [Membership](doc/Membership.md)
  - [ModelReturn](doc/ModelReturn.md)
  - [Order](doc/Order.md)
  - [OrderItem](doc/OrderItem.md)

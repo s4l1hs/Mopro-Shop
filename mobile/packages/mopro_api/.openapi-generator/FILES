@@ -51,6 +51,7 @@ doc/ListRecommendations200Response.md
 doc/ListReturns200Response.md
 doc/ListWalletTransactions200Response.md
 doc/MeApi.md
+doc/Membership.md
 doc/ModelReturn.md
 doc/Order.md
 doc/OrderItem.md
@@ -148,6 +149,7 @@ lib/src/model/list_products200_response.dart
 lib/src/model/list_recommendations200_response.dart
 lib/src/model/list_returns200_response.dart
 lib/src/model/list_wallet_transactions200_response.dart
+lib/src/model/membership.dart
 lib/src/model/model_return.dart
 lib/src/model/order.dart
 lib/src/model/order_item.dart

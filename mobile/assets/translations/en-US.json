@@ -267,7 +267,13 @@
     "softgate_orders": "Sign in to see your orders.",
     "softgate_wallet": "Sign in to see your wallet.",
     "softgate_addresses": "Sign in to manage your addresses.",
-    "menu_favorites": "My Favorites"
+    "menu_favorites": "My Favorites",
+    "tier_classic": "Classic",
+    "tier_gold": "Gold",
+    "tier_elite": "Elite",
+    "tier_current": "Your membership tier: {tier}",
+    "tier_next_progress": "For {tier}: {spend} / {targetSpend} · {orders} / {targetOrders} orders",
+    "tier_top": "You are at the top tier"
   },
   "address": {
     "list_title": "My Addresses",

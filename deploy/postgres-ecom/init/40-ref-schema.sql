@@ -62,3 +62,16 @@ CREATE TABLE IF NOT EXISTS ref_schema.business_calendars (
   reason           TEXT        NOT NULL,
   PRIMARY KEY (market, date)
 );
+
+-- AC-05: membership-tier ladder (reference data; lockstep with migration 0094).
+CREATE TABLE IF NOT EXISTS ref_schema.membership_tiers (
+  code            TEXT   NOT NULL,
+  market          TEXT   NOT NULL,
+  rank            INT    NOT NULL CHECK (rank >= 1),
+  currency        TEXT   NOT NULL,
+  min_spend_minor BIGINT NOT NULL DEFAULT 0 CHECK (min_spend_minor >= 0),
+  min_orders      INT    NOT NULL DEFAULT 0 CHECK (min_orders >= 0),
+  active          BOOL   NOT NULL DEFAULT TRUE,
+  PRIMARY KEY (market, code),
+  UNIQUE (market, rank)
+);

@@ -42,7 +42,13 @@
     "returns": "Meine Rücksendungen",
     "rail_reviews": "Meine Bewertungen",
     "rail_questions": "Meine Fragen",
-    "rail_privacy": "Privacy"
+    "rail_privacy": "Privacy",
+    "tier_classic": "Classic",
+    "tier_gold": "Gold",
+    "tier_elite": "Elite",
+    "tier_current": "Deine Mitgliedsstufe: {tier}",
+    "tier_next_progress": "Für {tier}: {spend} / {targetSpend} · {orders} / {targetOrders} Bestellungen",
+    "tier_top": "Du bist auf der höchsten Stufe"
   },
   "mega_menu": {
     "empty_children": "Keine Unterkategorien in diesem Bereich.",
