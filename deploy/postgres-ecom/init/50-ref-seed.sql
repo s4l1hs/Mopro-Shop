@@ -242,3 +242,42 @@ VALUES
   ('gold',    'TR', 2, 'TRY',  250000,  5, TRUE),
   ('elite',   'TR', 3, 'TRY', 1000000, 15, TRUE)
 ON CONFLICT (market, code) DO NOTHING;
+
+-- ── Size-fit charts (lockstep with 0096; APPROXIMATE — curate) ─────────────
+-- ── Representative standard charts (APPROXIMATE — see header) ───────────────
+INSERT INTO ref_schema.size_charts
+  (garment_type, size_label, sort_rank, measurement, min_mm, max_mm)
+VALUES
+  -- top: chest
+  ('top','XS',1,'chest', 820, 880),('top','S',2,'chest', 880, 940),
+  ('top','M',3,'chest', 940,1000),('top','L',4,'chest',1000,1080),
+  ('top','XL',5,'chest',1080,1160),('top','XXL',6,'chest',1160,1260),
+  -- bottom: waist + hip
+  ('bottom','XS',1,'waist', 660, 720),('bottom','S',2,'waist', 720, 780),
+  ('bottom','M',3,'waist', 780, 840),('bottom','L',4,'waist', 840, 920),
+  ('bottom','XL',5,'waist', 920,1000),('bottom','XXL',6,'waist',1000,1100),
+  ('bottom','XS',1,'hip', 860, 920),('bottom','S',2,'hip', 920, 980),
+  ('bottom','M',3,'hip', 980,1040),('bottom','L',4,'hip',1040,1120),
+  ('bottom','XL',5,'hip',1120,1200),('bottom','XXL',6,'hip',1200,1300),
+  -- dress: chest + waist + hip
+  ('dress','XS',1,'chest', 820, 880),('dress','S',2,'chest', 880, 940),
+  ('dress','M',3,'chest', 940,1000),('dress','L',4,'chest',1000,1080),
+  ('dress','XL',5,'chest',1080,1160),('dress','XXL',6,'chest',1160,1260),
+  ('dress','XS',1,'waist', 660, 720),('dress','S',2,'waist', 720, 780),
+  ('dress','M',3,'waist', 780, 840),('dress','L',4,'waist', 840, 920),
+  ('dress','XL',5,'waist', 920,1000),('dress','XXL',6,'waist',1000,1100),
+  ('dress','XS',1,'hip', 860, 920),('dress','S',2,'hip', 920, 980),
+  ('dress','M',3,'hip', 980,1040),('dress','L',4,'hip',1040,1120),
+  ('dress','XL',5,'hip',1120,1200),('dress','XXL',6,'hip',1200,1300),
+  -- skirt: waist + hip
+  ('skirt','XS',1,'waist', 660, 720),('skirt','S',2,'waist', 720, 780),
+  ('skirt','M',3,'waist', 780, 840),('skirt','L',4,'waist', 840, 920),
+  ('skirt','XL',5,'waist', 920,1000),('skirt','XXL',6,'waist',1000,1100),
+  ('skirt','XS',1,'hip', 860, 920),('skirt','S',2,'hip', 920, 980),
+  ('skirt','M',3,'hip', 980,1040),('skirt','L',4,'hip',1040,1120),
+  ('skirt','XL',5,'hip',1120,1200),('skirt','XXL',6,'hip',1200,1300),
+  -- outerwear: chest (cut roomier)
+  ('outerwear','XS',1,'chest', 860, 920),('outerwear','S',2,'chest', 920, 980),
+  ('outerwear','M',3,'chest', 980,1040),('outerwear','L',4,'chest',1040,1120),
+  ('outerwear','XL',5,'chest',1120,1200),('outerwear','XXL',6,'chest',1200,1300)
+ON CONFLICT (garment_type, size_label, measurement) DO NOTHING;

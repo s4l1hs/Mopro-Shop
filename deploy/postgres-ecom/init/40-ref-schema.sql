@@ -75,3 +75,15 @@ CREATE TABLE IF NOT EXISTS ref_schema.membership_tiers (
   PRIMARY KEY (market, code),
   UNIQUE (market, rank)
 );
+
+-- Size-fit standard charts (AC: size-fit phase 1; lockstep with migration 0096).
+CREATE TABLE IF NOT EXISTS ref_schema.size_charts (
+    garment_type TEXT NOT NULL,   -- top | bottom | dress | skirt | outerwear
+    size_label   TEXT NOT NULL,   -- XS … XXL
+    sort_rank    INT  NOT NULL,   -- ladder order (1 = smallest)
+    measurement  TEXT NOT NULL,   -- chest | waist | hip
+    min_mm       INT  NOT NULL CHECK (min_mm > 0),
+    max_mm       INT  NOT NULL CHECK (max_mm > min_mm),
+    PRIMARY KEY (garment_type, size_label, measurement)
+);
+
