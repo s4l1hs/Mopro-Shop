@@ -39,6 +39,7 @@ import 'package:mopro_api/src/model/list_products200_response.dart';
 import 'package:mopro_api/src/model/list_recommendations200_response.dart';
 import 'package:mopro_api/src/model/list_returns200_response.dart';
 import 'package:mopro_api/src/model/list_wallet_transactions200_response.dart';
+import 'package:mopro_api/src/model/membership.dart';
 import 'package:mopro_api/src/model/model_return.dart';
 import 'package:mopro_api/src/model/order.dart';
 import 'package:mopro_api/src/model/order_item.dart';
@@ -171,6 +172,8 @@ final _regMap = RegExp(r'^Map<String,(.*)>$');
           return ListReturns200Response.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ListWalletTransactions200Response':
           return ListWalletTransactions200Response.fromJson(value as Map<String, dynamic>) as ReturnType;
+        case 'Membership':
+          return Membership.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'ModelReturn':
           return ModelReturn.fromJson(value as Map<String, dynamic>) as ReturnType;
         case 'Order':
