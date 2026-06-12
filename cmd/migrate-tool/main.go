@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
@@ -67,6 +68,25 @@ func main() {
 		}
 		ver, dirty, _ := m.Version()
 		fmt.Printf("migrate-tool: down complete db=%s version=%d dirty=%v\n", *dbFlag, ver, dirty)
+
+	case "force":
+		// Clear a dirty flag after a failed migration was diagnosed + fixed
+		// (golang-migrate's documented remedy). Usage: --db <db> force <version>.
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "migrate-tool: force requires a version argument")
+			os.Exit(1)
+		}
+		v, err := strconv.Atoi(args[1])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "migrate-tool: force: invalid version %q\n", args[1])
+			os.Exit(1)
+		}
+		if err := m.Force(v); err != nil {
+			fmt.Fprintf(os.Stderr, "migrate-tool: force failed: %v\n", err)
+			os.Exit(1)
+		}
+		ver, dirty, _ := m.Version()
+		fmt.Printf("migrate-tool: force complete db=%s version=%d dirty=%v\n", *dbFlag, ver, dirty)
 
 	case "status":
 		ver, dirty, err := m.Version()
