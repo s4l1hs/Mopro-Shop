@@ -32,12 +32,21 @@ class CheckoutResultScreen extends ConsumerWidget {
       canPop: false,
       child: Scaffold(
         body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Spacer(),
+          // Anti-overflow: center the result when the viewport is tall enough,
+          // but scroll instead of overflowing on short/landscape screens or at
+          // max text scale (the Spacers + fixed buttons would otherwise blow the
+          // column height past the viewport → RenderFlex overflow).
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints:
+                    BoxConstraints(minHeight: constraints.maxHeight - 48),
+                child: IntrinsicHeight(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Spacer(),
                 Icon(
                   failed ? Icons.error_outline : Icons.check_circle_outline,
                   size: 80,
@@ -121,7 +130,10 @@ class CheckoutResultScreen extends ConsumerWidget {
                   },
                   child: Text('checkout.continue_shopping'.tr()),
                 ),
-              ],
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         ),

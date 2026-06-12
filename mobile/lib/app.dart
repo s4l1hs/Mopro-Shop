@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mopro/core/auth/auth_notifier.dart';
@@ -68,9 +69,41 @@ class MoproApp extends ConsumerWidget {
       darkTheme: buildDarkTheme(),
       themeMode: themeMode,
       routerConfig: router,
+      // Desktop-web fluidity: let mouse + trackpad drag-scroll the custom grids,
+      // FilterPanel rails, and horizontal carousels (wheel already works; the
+      // default web behaviour omits pointer-drag for mouse/trackpad).
+      scrollBehavior: const _AppScrollBehavior(),
+      // Layout safety: honour user text scaling but cap it at 1.3× so extreme
+      // accessibility sizes can't overflow tight cells (320 dp ProductCard,
+      // price blocks, bottom nav) into RenderFlex errors. Scaling down is
+      // unclamped.
+      builder: (context, child) {
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(
+            textScaler: mq.textScaler.clamp(maxScaleFactor: 1.3),
+          ),
+          child: child!,
+        );
+      },
       localizationsDelegates: context.localizationDelegates,
       supportedLocales: context.supportedLocales,
       locale: context.locale,
     );
   }
+}
+
+/// App-wide scroll behaviour. Adds mouse + trackpad (and keeps touch/stylus) to
+/// the set of devices that can drag-scroll, so the Flutter Web storefront feels
+/// native to desktop pointers across the multi-column grids and side rails.
+class _AppScrollBehavior extends MaterialScrollBehavior {
+  const _AppScrollBehavior();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+        PointerDeviceKind.touch,
+        PointerDeviceKind.mouse,
+        PointerDeviceKind.trackpad,
+        PointerDeviceKind.stylus,
+      };
 }
