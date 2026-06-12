@@ -47,3 +47,23 @@ if [ "$STRICT" -eq 1 ]; then
     exit 1
   fi
 fi
+
+# ── Duplicate version-number guard ───────────────────────────────────────────
+# Two parallel lanes can each add migration NNNN and both be green alone —
+# golang-migrate then fails on main with "duplicate migration version" (Batch B:
+# 0094_checkout_installments × 0094_membership_tiers). Catch the collision here
+# (this lint runs in verify-fast + CI), per-directory, on *.up.sql.
+dups=""
+for dir in migrations/ecom migrations/ledger; do
+  [ -d "$dir" ] || continue
+  d="$(ls "$dir"/*.up.sql 2>/dev/null | sed -E 's#.*/([0-9]+)_.*#\1#' | sort | uniq -d)"
+  [ -n "$d" ] && dups="$dups$dir: $(echo "$d" | tr '\n' ' ')\n"
+done
+if [ -n "$dups" ]; then
+  echo >&2
+  echo "migration-safety: DUPLICATE migration version numbers (golang-migrate will refuse to run):" >&2
+  printf "  %b" "$dups" >&2
+  echo "Renumber the later-merged migration to the next free version." >&2
+  exit 1
+fi
+echo "migration-safety: no duplicate version numbers."

@@ -1,4 +1,4 @@
--- 0094_checkout_installments.up.sql
+-- 0095_checkout_installments.up.sql
 -- PD-05: record the buyer's chosen card-installment count (taksit) on the
 -- checkout session — the as-initiated record written in the same tx as the
 -- per-seller orders. INTEREST-FREE model (Salih-confirmed): the charged
