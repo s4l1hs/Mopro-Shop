@@ -164,7 +164,8 @@
     "chip_price": "Fiyat: {min}–{max}",
     "chip_rating": "{rating}★ ve üzeri",
     "filter_price_history": "Fiyat Geçmişi",
-    "filter_price_dropped": "Fiyatı Düşenler"
+    "filter_price_dropped": "Fiyatı Düşenler",
+    "search_in_category": "Bu kategoride ara"
   },
   "catalog": {
     "categories": "Kategoriler",
@@ -193,7 +194,8 @@
     "suggested_categories": "Kategoriler",
     "brands": "Markalar",
     "products": "Ürünler",
-    "web_placeholder": "Ürün, marka veya kategori ara…"
+    "web_placeholder": "Ürün, marka veya kategori ara…",
+    "refine_hint": "Sonuçlar içinde ara"
   },
   "mega_menu": {
     "empty_children": "Bu kategoride alt kategori bulunmuyor.",

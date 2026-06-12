@@ -17,15 +17,26 @@ final filteredProductsProvider =
   FilteredProductsNotifier.new,
 );
 
+/// PLP-10: the inline "search in this category" query, keyed by the same plpKey
+/// as the filters. Lives OUTSIDE the notifier because filter changes rebuild
+/// `FilteredProductsNotifier` (build() watches plpFiltersProvider) — a notifier
+/// field would be wiped on every toggle. Empty string = normal category listing.
+final StateProviderFamily<String, String> plpInlineQueryProvider =
+    StateProvider.family<String, String>((ref, plpKey) => '');
+
 class FilteredProductsNotifier
     extends FamilyNotifier<ProductsState, String> {
   late int _categoryId;
   late PlpFilters _filters;
+  late String _query;
 
   @override
   ProductsState build(String arg) {
     _categoryId = int.parse(arg);
     _filters = ref.watch(plpFiltersProvider(arg));
+    // PLP-10: a non-empty inline query swaps the source from the category
+    // listing to the category-scoped search (same filters, same pagination).
+    _query = ref.watch(plpInlineQueryProvider(arg)).trim();
     // Defer the fetch: _load mutates `state`, which is illegal during build
     // (the notifier isn't mounted yet). The microtask runs once build returns.
     Future.microtask(() => _load(1, replace: true));
@@ -52,25 +63,42 @@ class FilteredProductsNotifier
       state = state.copyWith(products: const AsyncLoading(), page: 1);
     }
     try {
-      final api = ref.read(catalogApiProvider);
       final f = _filters;
       // PLP-13: flatten attrs (slug → values) into the wire `<slug>:<value>` list.
       final attr = f.attrs.entries
           .expand((e) => e.value.map((v) => '${e.key}:$v'))
           .toList();
-      final resp = await api.listProducts(
-        categoryId: _categoryId,
-        page: page,
-        sort: f.sort.token,
-        minPrice: f.priceMinMinor,
-        maxPrice: f.priceMaxMinor,
-        brand: f.brands.isEmpty ? null : f.brands,
-        rating: f.ratingMin,
-        freeShipping: f.freeShippingOnly ? true : null,
-        inStock: f.inStock ? true : null,
-        priceDropped: f.priceDropped ? true : null,
-        attr: attr.isEmpty ? null : attr,
-      );
+      // PLP-10: with an inline query, fetch via the category-scoped search —
+      // /search accepts category_id + the identical filter params, so sort,
+      // filters and pagination keep working inside the scoped results.
+      final resp = _query.isNotEmpty
+          ? await ref.read(searchApiProvider).search(
+                q: _query,
+                categoryId: _categoryId,
+                page: page,
+                sort: f.sort.token,
+                minPrice: f.priceMinMinor,
+                maxPrice: f.priceMaxMinor,
+                brand: f.brands.isEmpty ? null : f.brands,
+                rating: f.ratingMin,
+                freeShipping: f.freeShippingOnly ? true : null,
+                inStock: f.inStock ? true : null,
+                priceDropped: f.priceDropped ? true : null,
+                attr: attr.isEmpty ? null : attr,
+              )
+          : await ref.read(catalogApiProvider).listProducts(
+                categoryId: _categoryId,
+                page: page,
+                sort: f.sort.token,
+                minPrice: f.priceMinMinor,
+                maxPrice: f.priceMaxMinor,
+                brand: f.brands.isEmpty ? null : f.brands,
+                rating: f.ratingMin,
+                freeShipping: f.freeShippingOnly ? true : null,
+                inStock: f.inStock ? true : null,
+                priceDropped: f.priceDropped ? true : null,
+                attr: attr.isEmpty ? null : attr,
+              );
       final incoming = resp.data?.data ?? [];
       final meta = resp.data?.pagination;
       final existing =

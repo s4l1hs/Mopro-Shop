@@ -164,7 +164,8 @@
     "chip_price": "Price: {min}–{max}",
     "chip_rating": "{rating}★ and up",
     "filter_price_history": "Price History",
-    "filter_price_dropped": "Price Dropped"
+    "filter_price_dropped": "Price Dropped",
+    "search_in_category": "Search in this category"
   },
   "catalog": {
     "categories": "Categories",
@@ -193,7 +194,8 @@
     "suggested_categories": "Categories",
     "brands": "Brands",
     "products": "Products",
-    "web_placeholder": "Search products, brands or categories…"
+    "web_placeholder": "Search products, brands or categories…",
+    "refine_hint": "Search within results"
   },
   "mega_menu": {
     "empty_children": "No subcategories in this section.",

@@ -16,6 +16,8 @@ import 'package:mopro/features/catalog/plp/plp_filters_provider.dart';
 import 'package:mopro/features/catalog/plp/widgets/filter_panel.dart';
 import 'package:mopro/features/catalog/plp/widgets/plp_breadcrumb.dart';
 import 'package:mopro/features/catalog/plp/widgets/plp_filter_chips.dart';
+import 'package:mopro/features/catalog/plp/widgets/plp_inline_search_field.dart';
+import 'package:mopro/features/catalog/plp/widgets/plp_quick_pills.dart';
 import 'package:mopro/features/catalog/providers/filtered_products_provider.dart';
 import 'package:mopro/features/catalog/widgets/filter_sheet.dart';
 import 'package:mopro/features/catalog/widgets/sort_sheet.dart';
@@ -198,6 +200,12 @@ class _CategoryProductsScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // PLP-10: search within this category (swaps the grid source to the
+        // category-scoped /search; filters + pagination keep working).
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: PlpInlineSearchField(plpKey: _key),
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
           child: PlpBreadcrumb(categoryId: widget.categoryId),
@@ -206,6 +214,10 @@ class _CategoryProductsScreenState
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
           child: PlpResultCount(plpKey: _key),
         ),
+        // PLP-06: one-tap quick-filter pills (mobile-only — the wide layout
+        // exposes the same toggles in the always-visible FilterPanel sidebar).
+        PlpQuickPills(plpKey: _key),
+        const SizedBox(height: 4),
         Expanded(child: shell),
       ],
     );
@@ -260,6 +272,13 @@ class _CategoryProductsScreenState
                           Row(
                             children: [
                               Expanded(child: PlpFilterChips(plpKey: _key)),
+                              // PLP-10: search within this category (shares the
+                              // chips/sort row — zero extra column height).
+                              SizedBox(
+                                width: 260,
+                                child: PlpInlineSearchField(plpKey: _key),
+                              ),
+                              const SizedBox(width: 8),
                               _sortDropdown(),
                             ],
                           ),
