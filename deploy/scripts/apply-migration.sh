@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # deploy/scripts/apply-migration.sh — Run golang-migrate managed migrations on VDS.
 #
-# Usage: ./deploy/scripts/apply-migration.sh --db <ecom|ledger> <up|down|status>
+# Usage: ./deploy/scripts/apply-migration.sh --db <ecom|ledger> <up|down|status|force <version>>
 #
 # Builds a linux/amd64 static migrate-tool binary locally, copies it + the
 # migrations/ directory to VDS, then runs the tool as a one-shot Docker container
@@ -18,12 +18,13 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --db) DB="$2"; shift 2 ;;
     up|down|status) CMD="$1"; shift ;;
+    force) CMD="force $2"; shift 2 ;;
     *) echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
 
 if [[ -z "${DB}" ]] || [[ -z "${CMD}" ]]; then
-  echo "Usage: apply-migration.sh --db <ecom|ledger> <up|down|status>" >&2
+  echo "Usage: apply-migration.sh --db <ecom|ledger> <up|down|status|force <version>>" >&2
   exit 1
 fi
 
