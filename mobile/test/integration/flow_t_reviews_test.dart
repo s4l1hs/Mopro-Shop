@@ -226,6 +226,22 @@ void main() {
     final firstHelpful = find.byIcon(Icons.thumb_up_alt_outlined).first;
     await tester.ensureVisible(firstHelpful);
     await tester.pumpAndSettle();
+    // The PD-09 sticky buy-bar (64px, revealed once the buy-box scrolls away)
+    // half-covers the icon at its scrolled-to resting spot (center lands at
+    // exactly y=64, the bar's bottom edge) and the tab's scrollable is at max
+    // extent — the center can't be hit. Tap the icon's exposed lower half;
+    // the enclosing 40x40 button still receives it.
+    // PD-09 layout shift: ensureVisible rests targets at the viewport's top
+    // edge, where the revealed 64px sticky buy-bar overlays them — positional
+    // taps can't reach. Nudge the page scroll back ~100px from a clear point
+    // (y=500 — below the gallery PageView, which swallows drags) so the
+    // target sits under the bar's edge, then tap for real.
+    Future<void> nudgeClearOfBar() async {
+      await tester.dragFrom(const Offset(720, 500), const Offset(0, 100));
+      await tester.pumpAndSettle();
+    }
+
+    await nudgeClearOfBar();
     await tester.tap(firstHelpful);
     await tester.pumpAndSettle();
     expect(find.byType(LoginRequired), findsOneWidget);
@@ -245,6 +261,7 @@ void main() {
     // 8) Authed tap → optimistic vote + POST.
     await tester.ensureVisible(find.byIcon(Icons.thumb_up_alt_outlined).first);
     await tester.pumpAndSettle();
+    await nudgeClearOfBar();
     await tester.tap(find.byIcon(Icons.thumb_up_alt_outlined).first);
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -255,6 +272,7 @@ void main() {
     // 9) Tap again → toggle off (second POST).
     await tester.ensureVisible(find.byIcon(Icons.thumb_up_alt_outlined).first);
     await tester.pumpAndSettle();
+    await nudgeClearOfBar();
     await tester.tap(find.byIcon(Icons.thumb_up_alt_outlined).first);
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -265,6 +283,7 @@ void main() {
     // 10) Sort by "En yüksek puan" → refetch; first row rating is the max (5).
     await tester.ensureVisible(find.text('reviews.sort_newest'));
     await tester.pumpAndSettle();
+    await nudgeClearOfBar();
     await tester.tap(find.text('reviews.sort_newest'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('reviews.sort_highest').last);

@@ -104,6 +104,13 @@ class A11yAuditHarness {
     // ignore: avoid_positional_boolean_parameters
     void visit(Element el, bool insideTappable) {
       final widget = el.widget;
+      // Offstage subtrees are not painted, not hit-testable, and emit NO
+      // semantics — they are invisible to users and screen readers alike, so
+      // they are not an a11y surface. Without this skip, the first offstage
+      // interactive widget (the PD-09 sticky buy-bar, Offstage while hidden)
+      // false-positives as "tappable with no accessible label" because its
+      // label lives in semantics the offstage subtree never produces.
+      if (widget is Offstage && widget.offstage) return;
       var childrenInside = insideTappable;
       if (_hasTapHandler(widget) && !insideTappable) {
         childrenInside = true;
