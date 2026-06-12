@@ -184,16 +184,23 @@ class _CategoryProductsScreenState
   }
 
   // PLP-19: smooth grid breakpoints — 2 (mobile) / 3 (tablet) / 4 (desktop
-  // <1440) / 5 (ultra-wide ≥1440).
+  // <1440) / 5 (wide 1440–1759) / 6 (ultra-wide ≥1760, Trendyol-style dense
+  // desktop grid).
   int _gridColumns(BuildContext context) {
     if (context.isMobile) return 2;
     if (!context.isDesktop) return 3;
-    return MediaQuery.sizeOf(context).width >= 1440 ? 5 : 4;
+    final w = MediaQuery.sizeOf(context).width;
+    if (w >= 1760) return 6;
+    return w >= 1440 ? 5 : 4;
   }
 
-  // PLP-19: widen the desktop content clamp on ultra-wide screens so the grid
-  // uses more of the viewport (less outer-margin whitespace).
-  double _contentMaxWidth(double available) => available >= 1440 ? 1600 : 1240;
+  // PLP-19: widen the desktop content clamp on wide screens so the grid uses
+  // more of the viewport (less outer-margin whitespace). The ultra-wide tier
+  // (≥1760) clamps wide enough for the 6-column grid to breathe.
+  double _contentMaxWidth(double available) {
+    if (available >= 1760) return 1840;
+    return available >= 1440 ? 1600 : 1240;
+  }
 
   // Mobile: breadcrumb + result count (PLP-05 / PLP-04) above the scroller.
   Widget _buildMobile(BuildContext context, Widget shell) {

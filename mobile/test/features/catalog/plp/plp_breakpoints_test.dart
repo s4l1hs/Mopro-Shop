@@ -17,7 +17,8 @@ import 'package:mopro/features/catalog/widgets/product_grid.dart';
 import 'package:mopro_api/mopro_api.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// PLP-19: grid columns 2 (mobile) / 3 (tablet) / 4 (desktop <1440) / 5 (≥1440).
+// PLP-19: grid columns 2 (mobile) / 3 (tablet) / 4 (desktop <1440) / 5 (1440–
+// 1759) / 6 (ultra-wide ≥1760).
 
 ProductSummary _p(int id) => ProductSummary(
       id: id,
@@ -134,5 +135,6 @@ void main() {
   testWidgets('2 cols @375 (mobile)', (t) async => expect(await _columnsAt(t, 375), 2));
   testWidgets('3 cols @768 (tablet)', (t) async => expect(await _columnsAt(t, 768), 3));
   testWidgets('4 cols @1024 (desktop <1440)', (t) async => expect(await _columnsAt(t, 1024), 4));
-  testWidgets('5 cols @1440 (ultra-wide)', (t) async => expect(await _columnsAt(t, 1440), 5));
+  testWidgets('5 cols @1440 (wide)', (t) async => expect(await _columnsAt(t, 1440), 5));
+  testWidgets('6 cols @1760 (ultra-wide)', (t) async => expect(await _columnsAt(t, 1760), 6));
 }
