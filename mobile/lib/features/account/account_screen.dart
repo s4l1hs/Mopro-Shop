@@ -11,6 +11,7 @@ import 'package:mopro/design/theme_controller.dart';
 import 'package:mopro/design/tokens.dart';
 import 'package:mopro/features/account/widgets/account_left_rail.dart';
 import 'package:mopro/features/account/widgets/account_welcome_panel.dart';
+import 'package:mopro/features/account/widgets/membership_tier_card.dart';
 import 'package:mopro/features/order/application/orders_provider.dart';
 import 'package:mopro/features/wallet/providers/cashback_plans_provider.dart';
 import 'package:mopro/features/wallet/providers/wallet_provider.dart';
@@ -128,6 +129,8 @@ class _AccountMobileBody extends ConsumerWidget {
               activePlanCount: activePlanCount,
             ),
           ),
+          // AC-05: membership-tier badge + progress (derived read-model).
+          const SliverToBoxAdapter(child: MembershipTierCard()),
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
           // ── Quick actions row ───────────────────────────────────────────

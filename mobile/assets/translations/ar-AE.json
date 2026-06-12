@@ -42,7 +42,13 @@
     "returns": "مرتجعاتي",
     "rail_reviews": "تقييماتي",
     "rail_questions": "أسئلتي",
-    "rail_privacy": "Privacy"
+    "rail_privacy": "Privacy",
+    "tier_classic": "Classic",
+    "tier_gold": "Gold",
+    "tier_elite": "Elite",
+    "tier_current": "مستوى عضويتك: {tier}",
+    "tier_next_progress": "لمستوى {tier}: {spend} / {targetSpend} · {orders} / {targetOrders} طلبات",
+    "tier_top": "أنت في أعلى مستوى"
   },
   "mega_menu": {
     "empty_children": "لا توجد فئات فرعية في هذا القسم.",

@@ -270,7 +270,13 @@
     "softgate_orders": "Siparişlerini görmek için giriş yap.",
     "softgate_wallet": "Cüzdanını görmek için giriş yap.",
     "softgate_addresses": "Adreslerini yönetmek için giriş yap.",
-    "menu_favorites": "Favorilerim"
+    "menu_favorites": "Favorilerim",
+    "tier_classic": "Classic",
+    "tier_gold": "Gold",
+    "tier_elite": "Elite",
+    "tier_current": "Üyelik seviyen: {tier}",
+    "tier_next_progress": "{tier} için: {spend} / {targetSpend} · {orders} / {targetOrders} sipariş",
+    "tier_top": "En üst seviyedesin"
   },
   "address": {
     "list_title": "Adreslerim",
