@@ -38,7 +38,7 @@ REDIS_STREAM_MAXLEN_FIN_CASHBACK_PAYMENT_POSTED_V1=10000
 
 Implemented in `redis_bus.go::maxLenFor(topic)`. Default 10 000 if the override env var is absent or invalid.
 
-**Production recommendations (documented in `.env.example`):**
+**Production recommendations (documented in `.env`):**
 
 | Stream | Recommended MAXLEN | Reasoning |
 |---|---|---|

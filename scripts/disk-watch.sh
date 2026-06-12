@@ -3,7 +3,7 @@
 # Run every 5 minutes via cron: */5 * * * * /opt/mopro/scripts/disk-watch.sh
 set -euo pipefail
 
-source "$(dirname "$0")/../.env.local" 2>/dev/null || true
+source "$(dirname "$0")/../.env" 2>/dev/null || true
 
 DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' | tr -d '%')
 

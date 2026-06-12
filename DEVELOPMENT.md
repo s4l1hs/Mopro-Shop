@@ -23,17 +23,17 @@ Reflects PRD v6.0 (perpetual cashback) + v7 detail packs (PSP & kargo API'ları,
 ```bash
 git clone git@github.com:mopro/platform.git
 cd platform
-cp .env.example .env.local
-chmod 600 .env.local
+# Create your local .env (see § 3 below for the required variables)
+: > .env && chmod 600 .env
 ./scripts/install-hooks.sh
 go mod download
 ```
 
 ---
 
-## 3. .env.local — Required Variables
+## 3. .env — Required Variables
 
-NEVER commit `.env.local`. NEVER copy production values into it.
+NEVER commit `.env`. NEVER copy production values into it.
 
 ```bash
 # DB passwords — local only
@@ -139,9 +139,9 @@ ADMIN_INTERNAL_TOKEN=dev_admin_token
 ## 4. Bring Up the Local Stack
 
 ```bash
-docker compose --env-file .env.local up -d
-docker compose --env-file .env.local logs -f core-svc
-docker compose --env-file .env.local logs -f fin-svc
+docker compose --env-file .env up -d
+docker compose --env-file .env logs -f core-svc
+docker compose --env-file .env logs -f fin-svc
 curl -sf http://localhost/healthz
 docker compose down       # preserve volumes
 docker compose down -v    # WIPE volumes (carefully)
@@ -153,7 +153,7 @@ docker compose down -v    # WIPE volumes (carefully)
 
 ```bash
 docker compose stop core-svc
-export $(grep -v '^#' .env.local | xargs)
+export $(grep -v '^#' .env | xargs)
 go run ./cmd/core-svc
 ```
 
@@ -674,7 +674,7 @@ mopro calendar show TR --year 2026
    - `SIPAY_MERCHANT_ID`
    - `SIPAY_MERCHANT_KEY`
 3. The sandbox base URL is `https://provisioning.sipay.com.tr/ccpayment` (confirm with Sipay support — it may differ for sandbox vs. production).
-4. Add the following to `.env.local` (never commit this file):
+4. Add the following to `.env` (never commit this file):
 
 ```bash
 PSP_PROVIDER=sipay
@@ -688,7 +688,7 @@ SIPAY_CANCEL_URL=https://<your-tunnel-subdomain>/api/payment/cancel
 ```
 
 > **D2 guard**: If `GO_ENV=production` is set, the adapter rejects `SIPAY_MERCHANT_KEY` values
-> beginning with `test_` or `sandbox_`. Never set `GO_ENV=production` in your local `.env.local`.
+> beginning with `test_` or `sandbox_`. Never set `GO_ENV=production` in your local `.env`.
 
 ---
 
@@ -716,7 +716,7 @@ cloudflared tunnel run --url http://localhost:8080 mopro-dev
 ```
 
 The tunnel prints a public URL like `https://mopro-dev.abc123.trycloudflare.com`.
-Set this as `SIPAY_RETURN_URL` and `SIPAY_CANCEL_URL` base in `.env.local`.
+Set this as `SIPAY_RETURN_URL` and `SIPAY_CANCEL_URL` base in `.env`.
 
 Sipay webhook URL to register in the Sipay merchant portal:
 ```
@@ -954,7 +954,7 @@ All authenticated endpoints now require a Bearer JWT issued by the identity serv
 
 #### OTP flow in development
 
-Set `SMS_PROVIDER=mock` (default in `.env.local`). The mock provider logs the
+Set `SMS_PROVIDER=mock` (default in `.env`). The mock provider logs the
 6-digit OTP to stdout at INFO level — no SMS is sent:
 
 ```
@@ -972,7 +972,7 @@ docker compose logs core-svc 2>&1 | grep "sms mock"
 For automated local testing where you cannot read logs mid-request, set:
 
 ```bash
-DEV_OTP_ACCEPT_ANY=true  # .env.local only — NEVER production
+DEV_OTP_ACCEPT_ANY=true  # .env only — NEVER production
 ENV=development           # must NOT be "production"
 ```
 
@@ -988,7 +988,7 @@ a startup panic and fail the deployment.
 
 ```bash
 # 1. Start the stack
-docker compose --env-file .env.local up -d
+docker compose --env-file .env up -d
 
 # 2. Request OTP (mock SMS — code in logs)
 curl -s -X POST http://localhost/auth/otp/request \

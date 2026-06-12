@@ -70,7 +70,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
-    env_file: [../.env.local]
+    env_file: [../.env]
     environment:
       POSTGRES_DB: mopro_ecom
       POSTGRES_USER: ecom_admin
@@ -107,7 +107,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
-    env_file: [../.env.local]
+    env_file: [../.env]
     environment:
       POSTGRES_DB: mopro_ledger
       POSTGRES_USER: ledger_admin
@@ -134,7 +134,7 @@ services:
     image: postgres:16-alpine
     restart: "no"
     networks: [mopro-net, mopro-fin-net]
-    env_file: [../.env.local]
+    env_file: [../.env]
     depends_on:
       postgres-ecom:
         condition: service_healthy
@@ -240,7 +240,7 @@ services:
   # ── Redis 7 (cache + Streams event bus) ─────────────────────────────────────
   # Joins BOTH networks: core-svc (mopro-net) and fin-svc (mopro-fin-net) need it.
   # requirepass is NOT in redis.conf (Redis does not expand ${VAR}); passed via
-  # --requirepass arg so Docker Compose interpolates it from .env.local.
+  # --requirepass arg so Docker Compose interpolates it from .env.
   redis:
     container_name: redis
     image: redis:7-alpine
@@ -286,7 +286,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
-    env_file: [../.env.local]
+    env_file: [../.env]
     environment:
       MEILI_MASTER_KEY: "${MEILI_MASTER_KEY}"
       MEILI_ENV: production
@@ -317,7 +317,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
-    env_file: [../.env.local]
+    env_file: [../.env]
     environment:
       MINIO_ROOT_USER: "${STORAGE_ACCESS_KEY:-minioadmin}"
       MINIO_ROOT_PASSWORD: "${STORAGE_SECRET_KEY:-minioadmin}"
@@ -347,7 +347,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "20m", max-file: "5" }
-    env_file: [../.env.local]
+    env_file: [../.env]
     ports:
       - "80:80"
       - "443:443"
@@ -386,7 +386,7 @@ services:
       args:
         SERVICE: core-svc
         RUNTIME_BASE: alpine:3.19
-    env_file: [../.env.local]
+    env_file: [../.env]
     environment:
       SVC_NAME: core-svc
       MARKET: "${MARKET:-TR}"
@@ -394,7 +394,7 @@ services:
       DEFAULT_LOCALE: "${DEFAULT_LOCALE:-tr-TR}"
       DEFAULT_CASHBACK_CURRENCY: "${DEFAULT_CASHBACK_CURRENCY:-TRY_COIN}"
       PSP_PROVIDER: "${PSP_PROVIDER:-sipay}"
-      # Sipay sandbox defaults — override in .env.local with real credentials.
+      # Sipay sandbox defaults — override in .env with real credentials.
       SIPAY_BASE_URL: "${SIPAY_BASE_URL:-https://sandbox.sipay.com.tr/ccpayment}"
       SIPAY_MERCHANT_KEY: "${SIPAY_MERCHANT_KEY:-dev_merchant_key}"
       SIPAY_APP_ID: "${SIPAY_APP_ID:-dev_app_id}"
@@ -425,7 +425,7 @@ services:
       args:
         SERVICE: fin-svc
         RUNTIME_BASE: alpine:3.19
-    env_file: [../.env.local]
+    env_file: [../.env]
     environment:
       SVC_NAME: fin-svc
       MARKET: "${MARKET:-TR}"
@@ -458,7 +458,7 @@ services:
       args:
         SERVICE: jobs-svc
         RUNTIME_BASE: alpine:3.19
-    env_file: [../.env.local]
+    env_file: [../.env]
     environment:
       SVC_NAME: jobs-svc
       MARKET: "${MARKET:-TR}"
@@ -489,7 +489,7 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
-    env_file: [../.env.local]
+    env_file: [../.env]
     volumes:
       - ./grafana-agent/agent.yaml:/etc/agent/agent.yaml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro

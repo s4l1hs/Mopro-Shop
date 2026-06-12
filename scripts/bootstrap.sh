@@ -30,9 +30,8 @@ else warn "docker not found — needed for make verify integration suites: https
 
 # 2. Local env file (AUTOMATABLE, idempotent).
 echo "Environment:"
-if [ -f .env.local ]; then ok ".env.local exists"
-elif [ -f .env.example ]; then cp .env.example .env.local; chmod 600 .env.local; ok ".env.local created from .env.example (chmod 600)"; MANUAL+=("Fill real values in .env.local")
-else warn ".env.example missing — cannot scaffold .env.local"; fi
+if [ -f .env ]; then ok ".env exists"
+else : > .env; chmod 600 .env; ok ".env created (empty, chmod 600)"; MANUAL+=("Fill .env with the variables from DEVELOPMENT.md § 3"); fi
 
 # 3. Go deps + git hooks (AUTOMATABLE).
 echo "Backend:"

@@ -259,16 +259,16 @@ build-mopro:
 
 run-local: ## Start the full local stack (docker compose).
 	mkdir -p ./data/postgres-ecom ./data/postgres-ledger ./data/redis ./data/meili
-	$(COMPOSE) --env-file .env.local up -d --build
+	$(COMPOSE) --env-file .env up -d --build
 
 down-local: ## Stop the local stack.
-	$(COMPOSE) --env-file .env.local down
+	$(COMPOSE) --env-file .env down
 
 caddy-validate:
-	$(COMPOSE) --env-file .env.local exec caddy caddy validate --config /etc/caddy/Caddyfile
+	$(COMPOSE) --env-file .env exec caddy caddy validate --config /etc/caddy/Caddyfile
 
 caddy-reload:
-	$(COMPOSE) --env-file .env.local exec caddy caddy reload --config /etc/caddy/Caddyfile
+	$(COMPOSE) --env-file .env exec caddy caddy reload --config /etc/caddy/Caddyfile
 
 # ── Production build (local mirror of build-images.yml) ──────────────────────
 # F-DH-RESIDUAL: the tarball deploy path (release/deploy/deploy-staging/rollback

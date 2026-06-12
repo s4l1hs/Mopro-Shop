@@ -3,7 +3,7 @@
 # Run monthly: 0 4 1 * * /opt/mopro/scripts/restore-drill.sh
 set -euo pipefail
 
-source /opt/mopro/.env 2>/dev/null || source "$(dirname "$0")/../.env.local" 2>/dev/null || true
+source /opt/mopro/.env 2>/dev/null || source "$(dirname "$0")/../.env" 2>/dev/null || true
 
 log() { echo "[restore-drill] $(date -u +%FT%TZ) $*"; }
 

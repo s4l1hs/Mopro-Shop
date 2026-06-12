@@ -8,7 +8,7 @@ from disk — this doc + `scripts/dev/local-walk-seed.sh` replace it.
 ## Stack bring-up
 
 - **Compose:** `make run-local` → `docker compose -f deploy/docker-compose.yml
-  --env-file .env.local up -d --build`. `.env.local` lives in the repo root
+  --env-file .env up -d --build`. `.env` lives in the repo root
   (gitignored; dev secrets — `JWT_SIGNING_KEY`, `PII_KEK_BASE64`, per-module DB
   passwords, `MARKET=TR`, `DEFAULT_LOCALE=tr-TR`, `PSP_PROVIDER=sipay`).
 - **Services:** `core-svc` (:8080), `fin-svc` (:8081), `jobs-svc` (:8080) behind

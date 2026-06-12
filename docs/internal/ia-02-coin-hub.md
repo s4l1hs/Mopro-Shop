@@ -66,7 +66,7 @@ login) in the router; but `/coin` is a **tab** — a redirect-on-tap is jarring.
 Use a **soft in-screen gate** (`features/auth/widgets/login_required.dart` /
 `core/widgets/login_required_sheet.dart` + `authNotifierProvider`): guests see a
 "log in to see your coins" state; authed users see the hub. Dev login works via
-`DEV_OTP_ACCEPT_ANY=true` (.env.local).
+`DEV_OTP_ACCEPT_ANY=true` (.env).
 
 ## Dev seed
 

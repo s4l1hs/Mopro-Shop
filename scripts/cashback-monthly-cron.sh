@@ -4,7 +4,7 @@
 # fin-svc runs this automatically via its internal cron; this script is the external health-check wrapper.
 set -euo pipefail
 
-source /opt/mopro/.env 2>/dev/null || source "$(dirname "$0")/../.env.local" 2>/dev/null || true
+source /opt/mopro/.env 2>/dev/null || source "$(dirname "$0")/../.env" 2>/dev/null || true
 
 log() { echo "[cashback-cron] $(date -u +%FT%TZ) $*"; }
 

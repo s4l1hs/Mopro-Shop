@@ -1,6 +1,5 @@
 # Secrets — NEVER commit
 .env*
-!.env.example
 
 # Local data volumes (populated by docker compose)
 /data/

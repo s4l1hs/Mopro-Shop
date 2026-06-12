@@ -19,7 +19,7 @@ $ git grep -nE 'os\.Getenv' -- internal/ ':!*_test.go'
 
 ### eventbus is NOT an A-003 violation (§2.2)
 `maxLenFor`/`envInt` read **optional runtime tuning overrides with defaults**, documented
-in **ADR-0003** + `.env.example` (per-stream MAXLEN). That's the intended operational-tuning
+in **ADR-0003** + `.env` (per-stream MAXLEN). That's the intended operational-tuning
 pattern, not startup config that should be injected — and it's already testable (defaults apply
 when env is unset). Reclassified as intentional; left as-is.
 

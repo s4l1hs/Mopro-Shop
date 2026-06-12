@@ -665,7 +665,7 @@ func (b *RedisBus) sendAttempt(row AttemptRow) {
 // Override env key: REDIS_STREAM_MAXLEN_<STREAM_UPPER_DOTS_TO_UNDERSCORES>
 // Example: REDIS_STREAM_MAXLEN_ECOM_ORDER_DELIVERED_V1=25000
 // Default: 10000 (≈1.6 hours buffer at 100 events/min).
-// See ADR-0003 and .env.example for production recommendations.
+// See ADR-0003 and .env for production recommendations.
 func (b *RedisBus) maxLenFor(topic string) int64 {
 	envKey := "REDIS_STREAM_MAXLEN_" + strings.ReplaceAll(strings.ToUpper(topic), ".", "_")
 	if v := os.Getenv(envKey); v != "" {

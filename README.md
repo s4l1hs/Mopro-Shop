@@ -8,9 +8,9 @@ Architecture: 3-binary Hybrid Modular Monolith · Go 1.25 · PostgreSQL 16 · Re
 ## Quick Start (local)
 
 ```bash
-cp .env.example .env.local
-chmod 600 .env.local
-# fill in .env.local with dev values
+# Create your local .env (see DEVELOPMENT.md § 3 for the required variables)
+: > .env && chmod 600 .env
+# fill in .env with dev values
 ./scripts/install-hooks.sh
 go mod download
 make verify

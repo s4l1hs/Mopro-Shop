@@ -105,7 +105,6 @@ CREATE THESE PATHS (exact list):
 /.editorconfig
 /Makefile
 /go.mod
-/.env.example
 /README.md
 
 For each /internal/<name>/ directory, create five empty Go files:
@@ -136,11 +135,11 @@ scripts/check-module-boundaries.sh: body from DEVELOPMENT.md § 10 verbatim (inc
 
 scripts/install-hooks.sh: installs pre-push hook running `make verify`.
 
-.gitignore: .env*, !.env.example, /data/, /tmp/, /vendor/, *.test, coverage.out, .DS_Store, .idea/, .vscode/.
+.gitignore: .env*, /data/, /tmp/, /vendor/, *.test, coverage.out, .DS_Store, .idea/, .vscode/.
 
 .dockerignore: .git/, .github/, *.md, docs/, deploy/, test/, testdata/, **/*.test, coverage.out, node_modules/, .local/.
 
-.env.example: every variable from DEVELOPMENT.md § 3 with placeholder values like "REPLACE_ME". Never commit real secrets.
+.env: the single local env file (gitignored). Its required variables are documented in DEVELOPMENT.md § 3. Never commit real secrets.
 
 After creating the skeleton:
   1. Run `go mod tidy`.
