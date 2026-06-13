@@ -962,5 +962,31 @@
     "login_required_title": "Coinlerin için giriş yap",
     "login_required_body": "Mopro Coin bakiyen ve hareketlerin hesabına özeldir.",
     "login_cta": "Giriş yap"
+  },
+  "fit": {
+    "title": "Beden Profilim",
+    "intro": "Vücut ölçülerini gir, sana en uygun bedeni önerelim.",
+    "privacy_note": "Ölçülerin şifrelenerek saklanır; yalnızca beden önerisi için kullanılır.",
+    "cm": "cm",
+    "chest": "Göğüs",
+    "waist": "Bel",
+    "hip": "Kalça",
+    "inseam": "İç bacak",
+    "height": "Boy",
+    "pref_label": "Kalıp tercihi",
+    "pref_tight": "Dar",
+    "pref_regular": "Normal",
+    "pref_loose": "Bol",
+    "save": "Kaydet",
+    "saved": "Beden profilin kaydedildi.",
+    "save_failed": "Kaydedilemedi. Lütfen tekrar dene.",
+    "your_size": "Önerilen beden: {size}",
+    "approximate": "(yaklaşık)",
+    "signal_true_to_size": "Ölçülerine göre kalıbı uygun.",
+    "signal_between": "{lower} ile {upper} arasındasın.",
+    "signal_size_up": "Üst sınıra yakınsın; bol sevenler bir üst bedeni düşünebilir.",
+    "signal_size_down": "Alt sınıra yakınsın; dar sevenler bir alt bedeni düşünebilir.",
+    "cta_complete_profile": "Beden önerisi için ölçülerini ekle.",
+    "cta_button": "Ölçü gir"
   }
 }

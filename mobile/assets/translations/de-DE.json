@@ -325,5 +325,31 @@
   },
   "plp": {
     "search_in_category": "In dieser Kategorie suchen"
+  },
+  "fit": {
+    "title": "Mein Größenprofil",
+    "intro": "Gib deine Maße ein, wir empfehlen die passende Größe.",
+    "privacy_note": "Maße werden verschlüsselt gespeichert und nur für Größenempfehlungen verwendet.",
+    "cm": "cm",
+    "chest": "Brust",
+    "waist": "Taille",
+    "hip": "Hüfte",
+    "inseam": "Innenbein",
+    "height": "Größe",
+    "pref_label": "Passform",
+    "pref_tight": "Eng",
+    "pref_regular": "Normal",
+    "pref_loose": "Locker",
+    "save": "Speichern",
+    "saved": "Dein Größenprofil wurde gespeichert.",
+    "save_failed": "Speichern fehlgeschlagen. Bitte erneut versuchen.",
+    "your_size": "Deine Größe: {size}",
+    "approximate": "(ca.)",
+    "signal_true_to_size": "Fällt für deine Maße normal aus.",
+    "signal_between": "Du liegst zwischen {lower} und {upper}.",
+    "signal_size_up": "Nah an der Obergrenze; für lockeren Sitz eine Größe größer.",
+    "signal_size_down": "Nah an der Untergrenze; für engen Sitz eine Größe kleiner.",
+    "cta_complete_profile": "Füge deine Maße für eine Größenempfehlung hinzu.",
+    "cta_button": "Maße eingeben"
   }
 }
