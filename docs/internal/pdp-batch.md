@@ -73,3 +73,31 @@ wired to a source that actually serves the data — no fabrication.
   regen (this lane owns the Wave-1 regen).
 - **i18n:** `pdp.*` namespace; PD-03 (finance) gets DE/AR too, PD-02/04/09 TR/EN
   (per the #218 precedent: finance copy is 4-locale, console/UI copy TR/EN).
+
+## Shipped
+
+All four landed in this lane (one commit per item, on top of the scoping note):
+
+- **PD-02** (FE-only): `pdp_colour_swatch.dart` colour-name→hex map → swatch on the
+  variant `FilterChip` avatar; unknown names stay text-only. Test: known→1 swatch,
+  unknown→none.
+- **PD-03** (backend+codegen, no migration): `Product.basket_discount_pct` (spec +
+  `catalog.Product` + `GetByID` + DTO) → "Sepette %X" pill on `PdpPriceBlock`
+  (reuses `product.basket_discount` + the card's pill). display==charge (same
+  CT-09 snapshot). Tests: display==charge + omitted-when-0 (handler) + pill (widget).
+  i18n: +DE/AR. Reused the existing key (was TR/EN).
+- **PD-04** (backend+codegen, no migration): `Product.seller_rating_avg/_count`
+  resolved via the existing `SellerReviewSummary` aggregate (narrow
+  `sellerRatingReader` carrier — catalog read, no cross-schema JOIN). `PdpSellerCard`
+  renders star+avg+count; empty state (count 0) → no rating. Reused
+  `product.review_count`. Tests: surfaced + empty (handler + widget).
+- **PD-09** (FE-only): `PdpStickyCta` surfaced + elevated (z-order) with
+  `SafeArea(top:false)`; no occlusion (bottomNavigationBar reserves height). No
+  sticky-gallery-vs-buy-box redesign.
+
+**Discovery shifts:** PD-02 was doable FE-only (real `color` + name→hex), not blocked
+on PLP-13 Ph2; PD-04's aggregate already existed (audit "no aggregate" stale);
+**zero migrations** (block 0100–0102 unused); PD-03 stayed a display-of-charged-snapshot
+(no §12 split). Goldens: PDP visuals changed (pill/rating/bar) → regenerate on the
+Linux rebaseline bot (local macOS runs hit the platform guard; behaviour covered by
+widget tests).
