@@ -37,6 +37,16 @@ import 'package:mopro/features/growth/structured_data_service.dart';
 import 'package:mopro/features/home/recently_viewed_provider.dart';
 import 'package:mopro_api/mopro_api.dart';
 
+/// FAV-07: the price to snapshot when favoriting from the PDP — the cheapest
+/// variant, matching the "from" price `ProductSummary.priceMinor` the favorites
+/// grid renders, so the later live-vs-snapshot compare is apples-to-apples.
+/// `null` (no variants) ⇒ no snapshot ⇒ no price-drop cue.
+int? _favSnapshotPrice(Product product) => product.variants.isEmpty
+    ? null
+    : product.variants
+        .map((v) => v.priceMinor)
+        .reduce((a, b) => a < b ? a : b);
+
 class ProductDetailScreen extends ConsumerWidget {
   const ProductDetailScreen({required this.productId, super.key});
 
@@ -192,8 +202,9 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
                 tooltip: isFav
                     ? 'product.remove_from_favorites'.tr()
                     : 'product.add_to_favorites'.tr(),
-                onPressed: () =>
-                    ref.read(favoritesProvider.notifier).toggle(product.id),
+                onPressed: () => ref
+                    .read(favoritesProvider.notifier)
+                    .toggle(product.id, priceMinor: _favSnapshotPrice(product)),
               ),
               MoproShareButton(
                 url: '${ref.watch(webBaseUrlProvider)}/products/${product.id}',
@@ -324,8 +335,9 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
             tooltip: isFav
                 ? 'product.remove_from_favorites'.tr()
                 : 'product.add_to_favorites'.tr(),
-            onPressed: () =>
-                ref.read(favoritesProvider.notifier).toggle(product.id),
+            onPressed: () => ref
+                .read(favoritesProvider.notifier)
+                .toggle(product.id, priceMinor: _favSnapshotPrice(product)),
           ),
           const SizedBox(width: 4),
         ],
@@ -551,8 +563,9 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
         SizedBox(
           width: double.infinity,
           child: OutlinedButton(
-            onPressed: () =>
-                ref.read(favoritesProvider.notifier).toggle(product.id),
+            onPressed: () => ref
+                .read(favoritesProvider.notifier)
+                .toggle(product.id, priceMinor: _favSnapshotPrice(product)),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
               side: BorderSide(color: cs.primary),
