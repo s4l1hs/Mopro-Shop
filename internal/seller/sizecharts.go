@@ -225,3 +225,22 @@ func (s *service) DetachProductChart(ctx context.Context, sellerID, productID in
 func (s *service) SizeChartForProduct(ctx context.Context, productID int64) (SizeChart, bool, error) {
 	return s.repo.SizeChartForProduct(ctx, productID)
 }
+
+// StandardSizeChart returns the EN baseline chart for the copy-from-standard
+// prefill. ErrInvalidChart on bad params, ErrChartNotFound when absent.
+func (s *service) StandardSizeChart(ctx context.Context, garment, gender, sizeSystem string) (SizeChart, error) {
+	if chartRequiredMeasurements(garment) == nil || !validGender(gender) || !validSizeSystem(sizeSystem) {
+		return SizeChart{}, fmt.Errorf("%w: standard chart params", ErrInvalidChart)
+	}
+	rows, err := s.repo.StandardChartRows(ctx, garment, gender, sizeSystem)
+	if err != nil {
+		return SizeChart{}, err
+	}
+	if len(rows) == 0 {
+		return SizeChart{}, ErrChartNotFound
+	}
+	return SizeChart{
+		GarmentType: garment, Gender: gender, SizeSystem: sizeSystem,
+		Source: "standard", Rows: rows,
+	}, nil
+}

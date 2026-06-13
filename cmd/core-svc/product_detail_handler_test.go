@@ -69,6 +69,9 @@ func (s *stubSellerSvc) DetachProductChart(_ context.Context, _, _ int64) error 
 func (s *stubSellerSvc) SizeChartForProduct(_ context.Context, _ int64) (seller.SizeChart, bool, error) {
 	return seller.SizeChart{}, false, nil
 }
+func (s *stubSellerSvc) StandardSizeChart(_ context.Context, _, _, _ string) (seller.SizeChart, error) {
+	return seller.SizeChart{}, nil
+}
 
 func newProductDetailRequest(productID string) *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/products/"+productID, nil)

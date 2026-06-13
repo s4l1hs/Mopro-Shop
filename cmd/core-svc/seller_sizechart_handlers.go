@@ -86,6 +86,31 @@ func handleListSizeCharts(sellerSvc seller.Service) http.HandlerFunc {
 	}
 }
 
+// handleStandardSizeChart: GET /seller/size-charts/standard?garment_type=&gender=
+// &size_system= — the EN baseline rows for the copy-from-standard prefill.
+func handleStandardSizeChart(sellerSvc seller.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		sizeSystem := q.Get("size_system")
+		if sizeSystem == "" {
+			sizeSystem = "alpha"
+		}
+		chart, err := sellerSvc.StandardSizeChart(r.Context(),
+			q.Get("garment_type"), q.Get("gender"), sizeSystem)
+		switch {
+		case err == nil:
+			jsonOK(w, http.StatusOK, map[string]any{"chart": chart})
+		case errors.Is(err, seller.ErrInvalidChart):
+			jsonError(w, "invalid garment_type/gender/size_system", http.StatusBadRequest)
+		case errors.Is(err, seller.ErrChartNotFound):
+			jsonError(w, "no standard chart for that combination", http.StatusNotFound)
+		default:
+			slog.Error("seller: StandardSizeChart", "err", err)
+			jsonError(w, "internal error", http.StatusInternalServerError)
+		}
+	}
+}
+
 // sellerOwnsProduct confirms the authenticated seller owns the product (§5
 // in-process catalog read). 404 on any mismatch — never leak another seller's
 // product.

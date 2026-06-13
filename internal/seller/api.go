@@ -40,6 +40,10 @@ type Service interface {
 	DetachProductChart(ctx context.Context, sellerID, productID int64) error
 	// SizeChartForProduct resolves a product's attached chart for the match path.
 	SizeChartForProduct(ctx context.Context, productID int64) (SizeChart, bool, error)
+	// StandardSizeChart returns the EN 13402-3 baseline chart (ref_schema) for a
+	// garment type + gender + size system — the seller console's copy-from-standard
+	// prefill. ErrChartNotFound when the baseline has no such combination.
+	StandardSizeChart(ctx context.Context, garment, gender, sizeSystem string) (SizeChart, error)
 }
 
 // Repository is the seller_schema persistence boundary.
@@ -59,4 +63,7 @@ type Repository interface {
 	AttachProductChart(ctx context.Context, productID, chartID, sellerID int64) error
 	DetachProductChart(ctx context.Context, productID, sellerID int64) error
 	SizeChartForProduct(ctx context.Context, productID int64) (SizeChart, bool, error)
+	// StandardChartRows reads the EN baseline rows from ref_schema (the §5 shared
+	// read) for the copy-from-standard prefill.
+	StandardChartRows(ctx context.Context, garment, gender, sizeSystem string) ([]SizeChartRow, error)
 }

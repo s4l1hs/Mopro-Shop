@@ -16,9 +16,11 @@ import (
 // fakeChartSvc is a seller.Service whose chart methods are configurable; the rest
 // return zero values (the handlers only touch the chart surface).
 type fakeChartSvc struct {
-	createID  int64
-	createErr error
-	attachErr error
+	createID      int64
+	createErr     error
+	attachErr     error
+	standardChart seller.SizeChart
+	standardErr   error
 }
 
 func (f *fakeChartSvc) GetBySlug(context.Context, string) (seller.Seller, error) {
@@ -54,6 +56,9 @@ func (f *fakeChartSvc) AttachProductChart(context.Context, int64, int64, int64) 
 func (f *fakeChartSvc) DetachProductChart(context.Context, int64, int64) error { return nil }
 func (f *fakeChartSvc) SizeChartForProduct(context.Context, int64) (seller.SizeChart, bool, error) {
 	return seller.SizeChart{}, false, nil
+}
+func (f *fakeChartSvc) StandardSizeChart(context.Context, string, string, string) (seller.SizeChart, error) {
+	return f.standardChart, f.standardErr
 }
 
 func sellerReq(method, target string, body any) *http.Request {
@@ -139,5 +144,41 @@ func TestAttachProductChart_OK(t *testing.T) {
 	handleAttachProductChart(&fakeChartSvc{}, cat)(w, r)
 	if w.Code != http.StatusOK {
 		t.Fatalf("attach → 200, got %d (%s)", w.Code, w.Body.String())
+	}
+}
+
+func TestStandardSizeChart_OK(t *testing.T) {
+	svc := &fakeChartSvc{standardChart: seller.SizeChart{
+		GarmentType: "dress", Gender: "female", SizeSystem: "alpha", Source: "standard",
+		Rows: []seller.SizeChartRow{{SizeLabel: "M", SortRank: 3, Measurement: "chest", MinMM: 900, MaxMM: 980}},
+	}}
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/seller/size-charts/standard?garment_type=dress&gender=female", nil)
+	handleStandardSizeChart(svc)(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("standard → 200, got %d (%s)", w.Code, w.Body.String())
+	}
+	var resp map[string]any
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+	if resp["chart"] == nil {
+		t.Fatalf("expected chart in body, got %v", resp)
+	}
+}
+
+func TestStandardSizeChart_NotFound(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/seller/size-charts/standard?garment_type=dress&gender=male", nil)
+	handleStandardSizeChart(&fakeChartSvc{standardErr: seller.ErrChartNotFound})(w, r)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("absent combo → 404, got %d", w.Code)
+	}
+}
+
+func TestStandardSizeChart_BadParams(t *testing.T) {
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/seller/size-charts/standard?garment_type=hat&gender=female", nil)
+	handleStandardSizeChart(&fakeChartSvc{standardErr: seller.ErrInvalidChart})(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("bad params → 400, got %d", w.Code)
 	}
 }

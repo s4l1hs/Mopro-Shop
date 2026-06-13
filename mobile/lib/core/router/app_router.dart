@@ -55,7 +55,10 @@ import 'package:mopro/features/order/presentation/order_return_flow_screen.dart'
 import 'package:mopro/features/order/presentation/return_detail_screen.dart';
 import 'package:mopro/features/order/presentation/returns_list_screen.dart';
 import 'package:mopro/features/seller/data/seller_repository.dart';
+import 'package:mopro/features/seller/data/seller_size_chart_repository.dart';
 import 'package:mopro/features/seller/screens/seller_dashboard_screen.dart';
+import 'package:mopro/features/seller/screens/seller_size_chart_editor_screen.dart';
+import 'package:mopro/features/seller/screens/seller_size_charts_screen.dart';
 import 'package:mopro/features/seller/screens/seller_question_detail_screen.dart';
 import 'package:mopro/features/seller/screens/seller_questions_inbox_screen.dart';
 import 'package:mopro/features/seller/screens/seller_return_detail_screen.dart';
@@ -114,6 +117,8 @@ String moproPageTitle(String location, {String? name}) {
         ? withBrand('router_title.return'.tr())
         : withBrand('router_title.return_numbered'.tr(namedArgs: {'n': name}));
   }
+  if (location == '/seller/size-charts') return withBrand('router_title.size_charts'.tr());
+  if (location.startsWith('/seller/size-charts/')) return withBrand('router_title.size_chart'.tr());
   if (location == '/seller/questions') return withBrand('router_title.questions'.tr());
   if (location.startsWith('/seller/questions/')) return withBrand('router_title.question'.tr());
   if (location.startsWith('/sellers/')) {
@@ -434,6 +439,30 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           );
         },
+      ),
+      GoRoute(
+        path: '/seller/size-charts',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, __) =>
+            _titledLoc('/seller/size-charts', const SellerSizeChartsScreen()),
+      ),
+      GoRoute(
+        path: '/seller/size-charts/new',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, __) => _titledLoc(
+            '/seller/size-charts/new', const SellerSizeChartEditorScreen()),
+      ),
+      GoRoute(
+        path: '/seller/size-charts/:id',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (_, state) => _titledLoc(
+          '/seller/size-charts/${state.pathParameters['id']}',
+          SellerSizeChartEditorScreen(
+            chart: state.extra is SellerSizeChart
+                ? state.extra! as SellerSizeChart
+                : null,
+          ),
+        ),
       ),
       // Public Q&A: standalone questions list + single-question thread. Reads
       // are open to guests; the ask/answer CTAs gate via the login presenter.

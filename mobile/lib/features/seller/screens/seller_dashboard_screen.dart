@@ -193,6 +193,11 @@ class _QuickActions extends StatelessWidget {
           icon: const Icon(Icons.help_outline_rounded, size: 18),
           label: Text('seller.answer_questions'.tr()),
         ),
+        OutlinedButton.icon(
+          onPressed: () => context.go('/seller/size-charts'),
+          icon: const Icon(Icons.straighten, size: 18),
+          label: Text('seller.go_to_charts'.tr()),
+        ),
         if (slug != null && slug!.isNotEmpty)
           TextButton.icon(
             onPressed: () => context.push('/sellers/$slug'),

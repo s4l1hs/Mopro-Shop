@@ -137,13 +137,25 @@ error, not a warning):
 - **Monotonic non-decreasing** across `sort_rank` per measurement: a larger
   size's min_mm/max_mm ≥ the previous size's (M ≥ S on every dimension).
 
-## Seller UX (PR #2 — split per §4)
+## Seller UX (PR #2 — ✅ SHIPPED)
 
-Seller console → "Beden tablosu": create chart (name + garment/gender/system),
-enter rows by alpha and/or EU; **copy-from-standard** prefill (the
-`/standard` endpoint) so sellers start from the EN baseline; attach to product(s);
-edit is live. PDP optionally shows a "satıcı beden tablosu" (sized by seller) chip
-when `source == seller`. i18n TR+EN; goldens on-branch.
+Seller console → "Beden tabloları" (`/seller/size-charts`): list + create/edit
+(`/seller/size-charts/new` and `/{id}`) with garment/gender/system selectors, a
+per-size min/max (mm) grid, **copy-from-standard** prefill (the
+`GET /seller/size-charts/standard` endpoint — a §5 ref_schema read), inline 422
+validation errors (the server's reason: which size/dimension failed), and an
+attach-to-product picker (the seller's storefront products). Dashboard quick-
+action links to it. PDP shows a subtle "satıcı beden tablosu" (sized by seller)
+chip when `source == seller`; the approximate flag now shows only for the
+standard baseline, and **neither suppresses the BASIC warning**.
+
+**Discovery (PR #2):** DE/AR mirror the `fit` object but NOT the `seller`/
+`router_title` console objects (launch-pending markets) — so `seller.*` chart
+strings are TR+EN, while `fit.sized_by_seller` is all 4 (consistent with the
+existing fit copy). The `--strict` i18n gate only fails on EXTRA keys; missing
+in DE/AR is by-design. Goldens for the new screens are deferred to the Linux
+rebaseline bot (local macOS goldens skew vs CI; the golden job is informational/
+non-required) — behaviour is covered by widget tests instead.
 
 ## §5 / §6 / boundaries
 
@@ -178,8 +190,15 @@ domain/validation/repo (CRUD + attach + `SizeChartForProduct`), `sizefinder`
 the recommend resolver (core → jobs value object), `source` on the specced
 `SizeRecommendation` + Go/Dart regen. Tests: validation table, sizefinder
 precedence (seller→standard→none, BASIC-still-warned), handler status/ownership.
-Migration round-trip + ON DELETE CASCADE verified on PG16. **PR #2 = seller
-console UI (copy-from-standard) + PDP "sized by seller" chip + i18n + goldens.**
+Migration round-trip + ON DELETE CASCADE verified on PG16.
+
+## Shipped — UI (PR #2)
+`GET /seller/size-charts/standard` (ref_schema read backing copy-from-standard);
+the seller console list + create/edit screens (copy-from-standard prefill, inline
+422 errors, attach-to-product picker); the PDP "sized by seller" chip; i18n
+(seller.*/router_title.* TR+EN, fit.sized_by_seller ×4). Tests: PDP chip
+present/absent/basic-still-warned, editor 422-surfacing + prefill, standard
+endpoint 200/404/400. **Size-fit is now feature-complete.**
 
 ## Out of scope / follow-ups
 - Multiple charts per product / variant-level charts (v1 is one chart per product).

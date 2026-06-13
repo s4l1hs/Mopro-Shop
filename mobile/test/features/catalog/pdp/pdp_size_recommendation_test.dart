@@ -47,13 +47,16 @@ SizeRecommendation _rec(
   String? size,
   String? signal,
   String? confidence,
+  String? source,
+  bool chartApproximate = true,
 }) =>
     SizeRecommendation(
       status: status,
       size: size,
       signal: signal,
       confidence: confidence,
-      chartApproximate: true,
+      source_: source,
+      chartApproximate: chartApproximate,
     );
 
 void main() {
@@ -104,6 +107,48 @@ void main() {
     );
     expect(find.textContaining('fit.your_size'), findsOneWidget);
     expect(find.textContaining('fit.basic_warning'), findsNothing);
+  });
+
+  testWidgets('source seller → "sized by seller" chip, no approximate flag',
+      (tester) async {
+    await _pump(
+      tester,
+      authed: true,
+      rec: _rec('ok',
+          size: 'M',
+          signal: 'true_to_size',
+          source: 'seller',
+          chartApproximate: false),
+    );
+    expect(find.textContaining('fit.sized_by_seller'), findsOneWidget);
+    expect(find.textContaining('fit.approximate'), findsNothing);
+  });
+
+  testWidgets('source standard → approximate flag, no seller chip',
+      (tester) async {
+    await _pump(
+      tester,
+      authed: true,
+      rec: _rec('ok', size: 'M', signal: 'true_to_size', source: 'standard'),
+    );
+    expect(find.textContaining('fit.approximate'), findsOneWidget);
+    expect(find.textContaining('fit.sized_by_seller'), findsNothing);
+  });
+
+  testWidgets('source seller + basic → seller chip AND basic warning both show',
+      (tester) async {
+    await _pump(
+      tester,
+      authed: true,
+      rec: _rec('ok',
+          size: 'M',
+          signal: 'true_to_size',
+          confidence: 'basic',
+          source: 'seller',
+          chartApproximate: false),
+    );
+    expect(find.textContaining('fit.sized_by_seller'), findsOneWidget);
+    expect(find.textContaining('fit.basic_warning'), findsOneWidget);
   });
 
   testWidgets('no_profile → shows complete-profile CTA', (tester) async {

@@ -207,3 +207,27 @@ func (r *pgxRepository) SizeChartForProduct(ctx context.Context, productID int64
 	}
 	return c, true, nil
 }
+
+// StandardChartRows reads the EN baseline rows from ref_schema (the §5 shared
+// read — ref_schema grants SELECT to PUBLIC) for the copy-from-standard prefill.
+func (r *pgxRepository) StandardChartRows(ctx context.Context, garment, gender, sizeSystem string) ([]SizeChartRow, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT size_label, sort_rank, measurement, min_mm, max_mm
+		   FROM ref_schema.size_charts
+		  WHERE garment_type = $1 AND gender = $2 AND size_system = $3
+		  ORDER BY sort_rank, measurement`,
+		garment, gender, sizeSystem)
+	if err != nil {
+		return nil, fmt.Errorf("seller.repo: StandardChartRows: %w", err)
+	}
+	defer rows.Close()
+	var out []SizeChartRow
+	for rows.Next() {
+		var row SizeChartRow
+		if err := rows.Scan(&row.SizeLabel, &row.SortRank, &row.Measurement, &row.MinMM, &row.MaxMM); err != nil {
+			return nil, fmt.Errorf("seller.repo: StandardChartRows scan: %w", err)
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
