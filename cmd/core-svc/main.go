@@ -766,6 +766,9 @@ func main() {
 	mux.Handle("GET /seller/size-charts",
 		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleListSizeCharts(sellerSvc))))),
 	)
+	mux.Handle("GET /seller/size-charts/standard",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleStandardSizeChart(sellerSvc))))),
+	)
 	mux.Handle("PUT /seller/size-charts/{id}",
 		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleUpdateSizeChart(sellerSvc))))),
 	)
