@@ -81,7 +81,10 @@ class ErrorBanner extends StatelessWidget {
       SystemReadOnlyError() => 'error.system_read_only'.tr(),
       ValidationError() => 'error.validation'.tr(),
       NotFoundError() => 'error.not_found'.tr(args: [error.resource]),
-      ConflictError() => 'error.conflict'.tr(args: [error.message]),
+      // Don't surface the raw backend message to the user (it's English server
+      // text, e.g. a 409 stock/price conflict at checkout). Show clean, localized,
+      // action-guiding copy; error.message is still kept on the object for logs.
+      ConflictError() => 'error.conflict'.tr(),
       _ => 'auth.unknown_error'.tr(),
     };
   }
