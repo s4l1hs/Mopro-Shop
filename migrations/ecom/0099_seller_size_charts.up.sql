@@ -1,27 +1,20 @@
--- 80-seller-schema.sql — minimal seller_schema.sellers table for phase 2.3 test setup.
--- The full seller module (profile, bank accounts, IBAN, KYC) is built in Phase 3.
--- fin-svc never reads postgres-ecom; this table is used only for core-svc and integration tests.
+-- 0099_seller_size_charts.up.sql
+-- Seller-entered size charts (docs/internal/seller-size-charts.md). Sellers author
+-- their own per-garment chart; the match prefers it over the EN 13402-3 standard
+-- baseline (seller → standard → none). All in seller_schema (owned by
+-- internal/seller) so resolution is a single-schema query — NO cross-schema JOIN
+-- (§5). product_id / seller_id are plain BIGINT soft references (no cross-schema
+-- FK), matching the sellers.id ↔ products.seller_id soft-ref pattern (0078).
+--
+-- Seller charts are PRODUCT data, NOT PII → plaintext integer millimetres (the
+-- money-type discipline applied to lengths), unlike fit *profiles* which stay
+-- AES-GCM encrypted (§6 unchanged). seller_schema has ALTER DEFAULT PRIVILEGES →
+-- seller_user CRUD (30-grants.sql) → no grant block needed (the 0078/0096
+-- precedent). IDEMPOTENT. Init lockstep: 80-seller-schema.sql.
 
-CREATE TABLE IF NOT EXISTS seller_schema.sellers (
-  id             BIGSERIAL PRIMARY KEY,
-  name           TEXT NOT NULL,
-  psp_member_id  TEXT,                   -- Sipay marketplace member ID; populated after PSP onboarding
-  market         TEXT NOT NULL DEFAULT 'TR',
-  status         TEXT NOT NULL DEFAULT 'active'
-    CHECK (status IN ('active','suspended','pending')),
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS sellers_status_idx ON seller_schema.sellers(status);
-
--- ── Seller-entered size charts (lockstep with migration 0099) ────────────────
--- Sellers author per-garment charts; the match prefers them over the EN 13402-3
--- standard baseline. Product data (plaintext mm), all in seller_schema (no §5
--- JOIN). product_id/seller_id are soft refs (no cross-schema FK).
 CREATE TABLE IF NOT EXISTS seller_schema.seller_size_charts (
     id           BIGSERIAL   PRIMARY KEY,
-    seller_id    BIGINT      NOT NULL,
+    seller_id    BIGINT      NOT NULL,                       -- soft ref → sellers.id
     name         TEXT        NOT NULL,
     garment_type TEXT        NOT NULL
                  CHECK (garment_type IN ('top','bottom','dress','skirt','outerwear')),
@@ -46,11 +39,12 @@ CREATE TABLE IF NOT EXISTS seller_schema.seller_size_chart_rows (
     PRIMARY KEY (chart_id, size_label, measurement)
 );
 
+-- One chart per product (v1). product_id is a soft ref → catalog product.
 CREATE TABLE IF NOT EXISTS seller_schema.product_size_charts (
-    product_id BIGINT      PRIMARY KEY,
+    product_id BIGINT      PRIMARY KEY,                      -- soft ref → products.id
     chart_id   BIGINT      NOT NULL
                REFERENCES seller_schema.seller_size_charts(id) ON DELETE CASCADE,
-    seller_id  BIGINT      NOT NULL,
+    seller_id  BIGINT      NOT NULL,                         -- soft ref → sellers.id
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS product_size_charts_chart_idx
