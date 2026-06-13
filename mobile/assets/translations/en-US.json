@@ -422,8 +422,8 @@
     "secure_payment": "3D Secure Payment",
     "result_success_title": "Order Placed!",
     "result_success_body": "{count} order(s) successfully created.",
-    "result_failed_title": "Payment Failed",
-    "result_failed_body": "Payment could not be processed. Please try again.",
+    "result_failed_title": "Payment Not Completed",
+    "result_failed_body": "Your payment couldn't be completed and your card was not charged. Review your cart and try again, or choose a different payment method.",
     "back_to_cart": "Back to Cart",
     "retry": "Try Again",
     "view_orders": "View My Orders",
@@ -607,7 +607,7 @@
   "error": {
     "unauthorized": "Your session has expired. Please sign in again.",
     "not_found": "{resource} not found.",
-    "conflict": "{message}",
+    "conflict": "Your request conflicted with the current state. An item's stock or price may have changed. Please review your cart and try again.",
     "rate_limited": "Too many requests. Please wait.",
     "system_read_only": "System is under maintenance. Please try again later.",
     "validation": "Please check your input."

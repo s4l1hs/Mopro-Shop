@@ -21,8 +21,10 @@ class ProductGrid extends StatelessWidget {
     return SliverGrid.builder(
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
+        // Even 12px rhythm: inter-card gutters match the grid's 12px page margin
+        // (was 8px gutters inside a 12px margin → uneven). Aspect ratio unchanged.
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
         childAspectRatio: 0.68,
       ),
       itemCount: products.length,

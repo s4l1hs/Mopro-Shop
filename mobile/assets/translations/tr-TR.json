@@ -437,8 +437,8 @@
     "secure_payment": "3D Güvenli Ödeme",
     "result_success_title": "Siparişiniz Alındı!",
     "result_success_body": "{count} siparişiniz başarıyla oluşturuldu.",
-    "result_failed_title": "Ödeme Başarısız",
-    "result_failed_body": "Ödeme işlemi tamamlanamadı. Lütfen tekrar deneyin.",
+    "result_failed_title": "Ödeme Tamamlanamadı",
+    "result_failed_body": "Ödemeniz alınamadı ve kartınızdan herhangi bir tutar çekilmedi. Sepetinizi kontrol edip tekrar deneyebilir veya farklı bir ödeme yöntemi seçebilirsiniz.",
     "back_to_cart": "Sepete Dön",
     "retry": "Tekrar Dene",
     "view_orders": "Siparişlerimi Gör",
@@ -643,7 +643,7 @@
   "error": {
     "unauthorized": "Oturum süreniz doldu. Lütfen tekrar giriş yapın.",
     "not_found": "{resource} bulunamadı.",
-    "conflict": "{message}",
+    "conflict": "İşleminiz şu anki durumla çakıştı. Bir ürünün stok durumu veya fiyatı değişmiş olabilir. Lütfen sepetinizi kontrol edip tekrar deneyin.",
     "rate_limited": "Çok fazla istek gönderildi. Lütfen bekleyin.",
     "system_read_only": "Sistem şu anda bakımdadır. Lütfen daha sonra tekrar deneyin.",
     "validation": "Lütfen girdiğiniz bilgileri kontrol edin."
