@@ -5,49 +5,72 @@ import (
 	"testing"
 )
 
+// chartKey is (garment, resolved-gender) — the fake mirrors the gendered
+// ref_schema.size_charts the live repo queries (alpha system only).
+type chartKey struct {
+	g      GarmentType
+	gender string
+}
+
 type fakeRepo struct {
 	profile    FitProfile
 	profileErr error
-	charts     map[GarmentType][]ChartRow
+	charts     map[chartKey][]ChartRow
 }
 
 func (f *fakeRepo) UpsertProfile(context.Context, FitProfile) error { return nil }
 func (f *fakeRepo) GetProfile(context.Context, int64) (FitProfile, error) {
 	return f.profile, f.profileErr
 }
-func (f *fakeRepo) ChartFor(_ context.Context, g GarmentType) ([]ChartRow, error) {
-	return f.charts[g], nil
+func (f *fakeRepo) ChartFor(_ context.Context, g GarmentType, gender string) ([]ChartRow, error) {
+	return f.charts[chartKey{g, gender}], nil
 }
 
 func mm(v int) *int { return &v }
 
-// topChart mirrors the 0096 seed for tops.
-func topChart() []ChartRow {
-	ranges := [][3]int{{1, 820, 880}, {2, 880, 940}, {3, 940, 1000}, {4, 1000, 1080}, {5, 1080, 1160}, {6, 1160, 1260}}
+// chartRows builds an XS…XXL ladder for one measurement from {rank,min,max} mm
+// triples (EN 13402-3 alpha bands).
+func chartRows(g GarmentType, measurement string, ranges [][3]int) []ChartRow {
 	labels := []string{"XS", "S", "M", "L", "XL", "XXL"}
-	out := make([]ChartRow, 0, 6)
+	out := make([]ChartRow, 0, len(ranges))
 	for i, r := range ranges {
-		out = append(out, ChartRow{GarmentType: GarmentTop, SizeLabel: labels[i], SortRank: r[0], Measurement: "chest", MinMM: r[1], MaxMM: r[2]})
+		out = append(out, ChartRow{
+			GarmentType: g, SizeLabel: labels[i], SortRank: r[0],
+			Measurement: measurement, MinMM: r[1], MaxMM: r[2],
+		})
 	}
 	return out
 }
 
-func bottomChart() []ChartRow {
-	labels := []string{"XS", "S", "M", "L", "XL", "XXL"}
-	waist := [][3]int{{1, 660, 720}, {2, 720, 780}, {3, 780, 840}, {4, 840, 920}, {5, 920, 1000}, {6, 1000, 1100}}
-	hip := [][3]int{{1, 860, 920}, {2, 920, 980}, {3, 980, 1040}, {4, 1040, 1120}, {5, 1120, 1200}, {6, 1200, 1300}}
+// EN 13402-3 alpha bands (mm) used across the unit tests.
+var (
+	womenBust  = [][3]int{{1, 740, 820}, {2, 820, 900}, {3, 900, 980}, {4, 980, 1060}, {5, 1070, 1190}, {6, 1190, 1310}}
+	womenWaist = [][3]int{{1, 580, 660}, {2, 660, 740}, {3, 740, 820}, {4, 820, 910}, {5, 910, 1030}, {6, 1030, 1150}}
+	womenHip   = [][3]int{{1, 820, 900}, {2, 900, 980}, {3, 980, 1060}, {4, 1060, 1150}, {5, 1150, 1250}, {6, 1250, 1350}}
+	menChest   = [][3]int{{1, 780, 860}, {2, 860, 940}, {3, 940, 1020}, {4, 1020, 1100}, {5, 1100, 1180}, {6, 1180, 1290}}
+)
+
+func concat(rows ...[]ChartRow) []ChartRow {
 	var out []ChartRow
-	for i := range labels {
-		out = append(out,
-			ChartRow{GarmentType: GarmentBottom, SizeLabel: labels[i], SortRank: waist[i][0], Measurement: "waist", MinMM: waist[i][1], MaxMM: waist[i][2]},
-			ChartRow{GarmentType: GarmentBottom, SizeLabel: labels[i], SortRank: hip[i][0], Measurement: "hip", MinMM: hip[i][1], MaxMM: hip[i][2]})
+	for _, r := range rows {
+		out = append(out, r...)
 	}
 	return out
 }
 
+// newTestSvc wires a fake with the gendered EN charts the tests exercise:
+// women top/bottom/dress + men top.
 func newTestSvc(p FitProfile, perr error) Service {
 	return NewService(&fakeRepo{profile: p, profileErr: perr,
-		charts: map[GarmentType][]ChartRow{GarmentTop: topChart(), GarmentBottom: bottomChart()}})
+		charts: map[chartKey][]ChartRow{
+			{GarmentTop, GenderFemale}:    chartRows(GarmentTop, "chest", womenBust),
+			{GarmentBottom, GenderFemale}: concat(chartRows(GarmentBottom, "waist", womenWaist), chartRows(GarmentBottom, "hip", womenHip)),
+			{GarmentDress, GenderFemale}: concat(
+				chartRows(GarmentDress, "chest", womenBust),
+				chartRows(GarmentDress, "waist", womenWaist),
+				chartRows(GarmentDress, "hip", womenHip)),
+			{GarmentTop, GenderMale}: chartRows(GarmentTop, "chest", menChest),
+		}})
 }
 
 func TestClassifyTitle(t *testing.T) {
@@ -108,15 +131,16 @@ func rec(t *testing.T, p FitProfile, title string) Recommendation {
 }
 
 func TestRecommend_MidRange(t *testing.T) {
-	r := rec(t, FitProfile{ChestMM: mm(970)}, "Basic Tişört")
+	// women bust M = 900–980; 940 is mid-band → true to size.
+	r := rec(t, FitProfile{ChestMM: mm(940)}, "Basic Tişört")
 	if r.Status != StatusOK || r.Size != "M" || r.Signal != SignalTrueToSize {
 		t.Fatalf("got %+v", r)
 	}
 }
 
 func TestRecommend_BoundaryRegular(t *testing.T) {
-	// chest 1000 = M max / L min → between; regular picks the lower (M).
-	r := rec(t, FitProfile{ChestMM: mm(1000), FitPref: FitRegular}, "Basic Tişört")
+	// chest 980 = M max / L min → between; regular picks the lower (M).
+	r := rec(t, FitProfile{ChestMM: mm(980), FitPref: FitRegular}, "Basic Tişört")
 	if r.Signal != SignalBetween {
 		t.Fatalf("signal: got %+v", r)
 	}
@@ -126,22 +150,23 @@ func TestRecommend_BoundaryRegular(t *testing.T) {
 }
 
 func TestRecommend_BoundaryLoose(t *testing.T) {
-	r := rec(t, FitProfile{ChestMM: mm(1000), FitPref: FitLoose}, "Basic Tişört")
+	r := rec(t, FitProfile{ChestMM: mm(980), FitPref: FitLoose}, "Basic Tişört")
 	if r.Signal != SignalBetween || r.Size != "L" {
 		t.Fatalf("got %+v", r)
 	}
 }
 
 func TestRecommend_NearBoundaryBetween(t *testing.T) {
-	// Contiguous charts: 992 is 8mm from L's min → within the 25mm between band.
-	r := rec(t, FitProfile{ChestMM: mm(992)}, "Basic Tişört")
+	// 972 is 8mm below L's min (980) → within the 25mm between band; regular → M.
+	r := rec(t, FitProfile{ChestMM: mm(972)}, "Basic Tişört")
 	if r.Signal != SignalBetween || r.Size != "M" {
 		t.Fatalf("got %+v", r)
 	}
 }
 
 func TestRecommend_MultiMeasurementBottom(t *testing.T) {
-	r := rec(t, FitProfile{WaistMM: mm(810), HipMM: mm(1010)}, "Slim Fit Pantolon")
+	// women bottom M: waist 740–820, hip 980–1060.
+	r := rec(t, FitProfile{WaistMM: mm(800), HipMM: mm(1010)}, "Slim Fit Pantolon")
 	if r.Status != StatusOK || r.Size != "M" {
 		t.Fatalf("got %+v", r)
 	}
@@ -156,7 +181,7 @@ func TestRecommend_SplitMeasurements(t *testing.T) {
 }
 
 func TestRecommend_PartialBottomProfile(t *testing.T) {
-	r := rec(t, FitProfile{WaistMM: mm(810)}, "Slim Fit Pantolon")
+	r := rec(t, FitProfile{WaistMM: mm(800)}, "Slim Fit Pantolon")
 	if r.Status != StatusOK || r.Size != "M" {
 		t.Fatalf("status/size: got %+v", r)
 	}
@@ -166,6 +191,7 @@ func TestRecommend_PartialBottomProfile(t *testing.T) {
 }
 
 func TestRecommend_BelowSmallest(t *testing.T) {
+	// women bust XS starts at 740; 700 falls below → nearest is XS, true to size.
 	r := rec(t, FitProfile{ChestMM: mm(700)}, "Basic Tişört")
 	if r.Status != StatusOK || r.Size != "XS" || r.Signal != SignalTrueToSize {
 		t.Fatalf("got %+v", r)

@@ -30,17 +30,26 @@ gender-specific linear approximations, then run the **existing** `scoreSizes` /
   to curate in lockstep.
 - Reuses the shipped match end-to-end (between-sizes, edge hints, statuses).
 
-**Estimation formulas (illustrative — APPROXIMATE, curate alongside the charts).**
-Circumference in mm scales mainly with weight, with a small height term and a
-gender base. Fit-only; no BMI, no health/judgment framing.
-```
-kg = weight_g/1000 ; dh = (height_mm/10) - 170   // cm above/below 170
-female: chest = 6600 +? ...   (see basic_estimate.go constants)
-```
-Coefficients chosen so average inputs land mid-chart (e.g. male 80 kg/180 cm →
-~L, female 60 kg/165 cm → ~S/M). They are deliberately rough — the BASIC warning
-says so, and curation replaces them with proper anthropometric tables.
+**Estimation method (APPROXIMATE BY DESIGN — band lookup, not coefficients).**
+Curated to the dataset §5a/§5b **retail height/weight→size BAND tables** (NOT
+EN 13402 — EN does not map weight to size). The estimator (`basic_estimate.go`):
+1. **Band lookup** — find the alpha size from (gender, height, weight). Weight is
+   the primary circumference signal (nearest weight-band centre); height nudges
+   **up** one size on a one-size disagreement (the dataset's "return the larger"
+   bias — under-tight drives more returns). The bands **overlap on purpose** and
+   are kept verbatim — that overlap is *why BASIC is warned*, not a data bug.
+2. **Midpoint** — read that size's EN chart midpoint (mm) for the measurement, so
+   the estimate threads back through the same gendered chart match (one source of
+   truth; partial profiles handled for free).
+
+Fit-only; no BMI, no health/judgment framing. Men have no hip column (EN sizes
+men's bottoms on waist) → male hip is not estimable (degrades to waist).
 inseam is not chart-used in phase 1, so basic mode estimates only chest/waist/hip.
+
+> **Provenance.** Bands tagged in code `source: retail height/weight bands
+> (approximate)` — deliberately distinct from the `EN 13402-3 (standard
+> reference)` detailed charts (size-fit.md §Curation). BASIC is approximate by
+> construction; curation makes the *numbers* citable, NOT BASIC "accurate".
 
 ## Confidence rule
 DETAILED iff every relevant measurement for the garment was a real profile
@@ -88,5 +97,9 @@ to jobs-svc; no cross-schema JOIN.
 Migration 0097 (weight_enc + gender), basic-estimate tier + confidence in the
 match service (estimate-then-match), spec/codegen (confidence/estimated/weight_g/
 gender), PDP approximate warning (BASIC only), fit-form basic fields. Tests cover
-detailed/basic/partial/none. Estimation coefficients remain **illustrative** —
-curate alongside the charts.
+detailed/basic/partial/none.
+
+**Curation (migration 0098).** The illustrative linear coefficients were replaced
+with the dataset §5a/§5b height/weight→size band lookup (overlaps + warning
+intact); the warning copy was refreshed to the dataset §6 wording (TR/EN, fit-
+only). Detailed charts are now EN 13402-3 — see size-fit.md §Curation.

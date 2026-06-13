@@ -144,13 +144,15 @@ func (r *pgxRepository) GetProfile(ctx context.Context, userID int64) (FitProfil
 	return p, nil
 }
 
-func (r *pgxRepository) ChartFor(ctx context.Context, g GarmentType) ([]ChartRow, error) {
+func (r *pgxRepository) ChartFor(ctx context.Context, g GarmentType, gender string) ([]ChartRow, error) {
+	// Match consumes the alpha-system rows for the resolved gender; the EU-numeric
+	// rows (size_system='eu') are a parallel reference axis, not matched against.
 	rows, err := r.pool.Query(ctx,
 		`SELECT garment_type, size_label, sort_rank, measurement, min_mm, max_mm
 		 FROM ref_schema.size_charts
-		 WHERE garment_type = $1
+		 WHERE garment_type = $1 AND gender = $2 AND size_system = 'alpha'
 		 ORDER BY sort_rank ASC, measurement ASC`,
-		string(g),
+		string(g), gender,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("sizefinder.repo: ChartFor: %w", err)

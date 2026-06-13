@@ -358,6 +358,6 @@
     "gender_male": "Männlich",
     "gender_unspecified": "Keine Angabe",
     "basic_hint": "Ohne genaue Maße schätzen wir aus Größe + Gewicht + Geschlecht.",
-    "basic_warning": "Dies ist eine Schätzung aus Größe/Gewicht/Geschlecht und kann ungenau sein."
+    "basic_warning": "Dies ist eine ungefähre Schätzung allein aus Größe, Gewicht und Geschlecht und kann ungenau sein. Für ein zuverlässigeres Ergebnis gib deine Maße ein (Brust, Taille, Hüfte)."
   }
 }

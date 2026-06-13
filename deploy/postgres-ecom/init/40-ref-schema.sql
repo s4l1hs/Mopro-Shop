@@ -76,14 +76,21 @@ CREATE TABLE IF NOT EXISTS ref_schema.membership_tiers (
   UNIQUE (market, rank)
 );
 
--- Size-fit standard charts (AC: size-fit phase 1; lockstep with migration 0096).
+-- Size-fit standard charts (AC: size-fit phase 1; lockstep with migrations
+-- 0096 + 0098). EN 13402-3 standard-reference baseline: gendered (women bust ≠
+-- men chest), two size systems (alpha + EU numeric), provenance per row.
 CREATE TABLE IF NOT EXISTS ref_schema.size_charts (
     garment_type TEXT NOT NULL,   -- top | bottom | dress | skirt | outerwear
-    size_label   TEXT NOT NULL,   -- XS … XXL
+    gender       TEXT NOT NULL DEFAULT 'female'
+                 CHECK (gender IN ('female','male')),
+    size_system  TEXT NOT NULL DEFAULT 'alpha'
+                 CHECK (size_system IN ('alpha','eu')),
+    size_label   TEXT NOT NULL,   -- XS … XXL (alpha) | 32 … 58 (eu)
     sort_rank    INT  NOT NULL,   -- ladder order (1 = smallest)
     measurement  TEXT NOT NULL,   -- chest | waist | hip
     min_mm       INT  NOT NULL CHECK (min_mm > 0),
     max_mm       INT  NOT NULL CHECK (max_mm > min_mm),
-    PRIMARY KEY (garment_type, size_label, measurement)
+    source       TEXT NOT NULL DEFAULT 'EN 13402-3 (standard reference)',
+    PRIMARY KEY (garment_type, gender, size_system, size_label, measurement)
 );
 
