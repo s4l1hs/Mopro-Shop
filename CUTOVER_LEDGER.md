@@ -11,6 +11,12 @@
 
 ---
 
+## 0b. Main-drift forensics + gate hardening — ✅ (`chore/main-drift-forensics`)
+
+Post banked-engineering wave, `main` carried red `gofmt` + `build_runner`/gen-sync. **Forensics verdict: OVERRIDE** — #217/#218/#221/#223 each merged with ≥1 **required** check **red at the merged head SHA** (#223 merged with `verify`+`build_runner`+`flutter test` all red, 14s after #222 fixed the prior instance). Ruled out: GATE-GAP (the checks ARE required) and STALE-BRANCH-as-cause (checks were red *at head*, not green-behind; `strict=false` is only a latent secondary weakness). #222 (membership) was the one clean merge and incidentally fixed #221's drift. **Main was STILL red** at investigation — and broader than codegen: #223 left (a) stale `return_request*.g.dart`, (b) a `returns_integration_test` 42703 (test schema missing the RT-05 `reason`/`note` columns), and (c) two flutter tests (`buildRequest` dropped the notes→description fold; `flow_w` asserted the removed `returns.tracking_no`). **All fixed forward here** — the full blast radius of one overridden merge. Hardening: discipline documented in CONTRIBUTING ("Merging & branch protection" — never override a deterministic red `verify`/`build_runner`/`flutter test`) + the **mandatory post-batch main-green check**. **`enforce_admins=true` flagged for Salih's decision** (closes the override hole but removes the escape hatch) — NOT flipped; no branch-protection API change made (before-state recorded as `protection_before.json` in the PR). Full evidence: `docs/internal/main-drift-forensics.md`.
+
+---
+
 ## 1. Deferred production deploy (the staged runway)
 
 **Trigger:** when Phase B+C are done, execute DEPLOY-EXEC-01 (host-prep → backup → dry-run → migrations → deploy → health → purge).

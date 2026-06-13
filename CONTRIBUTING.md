@@ -159,6 +159,41 @@ Examples:
 - [ ] Financial changes: run `go test -tags=integration -run Property ./internal/...`
   and verify all property tests pass
 
+## Merging & branch protection
+
+`main` requires a set of status checks (incl. `verify`, `build_runner (verify
+generated files up-to-date)`, `Generated files in sync`, `flutter test`). Admin
+override exists (`enforce_admins=false`) **only as an escape hatch for confirmed
+infra flakes** — a runner that died, a transient network/registry failure, a known
+upstream outage.
+
+**NEVER override a red `verify`/`gofmt`, `build_runner`/gen-sync, or `flutter
+test`.** These are **deterministic**: red means the branch is wrong (unformatted
+code, stale generated `.g.dart`, a failing test), not that the runner is flaky.
+Overriding them lands broken code on `main`. This actually happened across
+#217/#218/#221/#223 (stale `.g.dart` + a gofmt misalignment merged over red
+required checks) — see `docs/internal/main-drift-forensics.md`. If a required check
+is red, **fix the branch**; if you genuinely believe it is a flake, re-run it and
+get a second opinion before any override.
+
+### Mandatory post-batch main-green check
+
+After **any wave of parallel-lane merges**, immediately verify `main` on a clean
+checkout of `origin/main`:
+
+```bash
+make verify
+( cd mobile/packages/mopro_api && dart run build_runner build --delete-conflicting-outputs ) && git status --short  # must be EMPTY
+gofmt -l .   # must be EMPTY
+```
+
+Two lanes can each be green alone yet break `main` when combined — a *combined-test*
+interaction (precedent #208) or a *combined-codegen / gofmt* drift (precedent
+#217/#218/#221/#223). Red here means a cross-lane interaction: **fix forward
+immediately**, never leave `main` red. Coordinate migration version numbers and
+codegen-touching lanes across parallel branches (only one lane regenerates at a
+time; the second to merge rebases + regenerates).
+
 ## Module boundary enforcement
 
 `./scripts/check-module-boundaries.sh` verifies that:

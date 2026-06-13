@@ -36,6 +36,9 @@ CREATE TABLE order_schema.return_items (
   id BIGSERIAL PRIMARY KEY,
   return_id BIGINT NOT NULL REFERENCES order_schema.returns(id) ON DELETE CASCADE,
   order_id BIGINT NOT NULL, order_item_id BIGINT NOT NULL, quantity INT NOT NULL CHECK (quantity >= 1),
+  -- RT-05 per-item reason/note (migration 0103): the repo INSERT writes these, so
+  -- the hand-rolled test schema must carry them or scans error 42703.
+  reason TEXT, note TEXT NOT NULL DEFAULT '',
   CONSTRAINT return_items_order_item_uniq UNIQUE (order_id, order_item_id));
 
 CREATE TABLE order_schema.return_status_history (
