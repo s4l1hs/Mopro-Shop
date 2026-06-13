@@ -82,18 +82,25 @@ class PdpSizeRecommendation extends ConsumerWidget {
           children: [
             Icon(Icons.straighten, size: 20, color: cs.primary),
             const SizedBox(width: 8),
-            Text(
-              'fit.your_size'.tr(namedArgs: {'size': rec.size ?? ''}),
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
+            Flexible(
+              child: Text(
+                'fit.your_size'.tr(namedArgs: {'size': rec.size ?? ''}),
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
             ),
             const SizedBox(width: 8),
-            // Phase-1 honesty: the chart is approximate, always say so.
-            Text(
-              'fit.approximate'.tr(),
-              style: theme.textTheme.labelSmall
-                  ?.copyWith(color: cs.onSurfaceVariant),
-            ),
+            // Provenance: a seller chart is the actual garment's table (per-brand
+            // truth) → "sized by seller"; the standard baseline is approximate.
+            // Never suppresses the BASIC warning below.
+            if (rec.source_ == 'seller')
+              _SellerChip(label: 'fit.sized_by_seller'.tr())
+            else if (rec.chartApproximate)
+              Text(
+                'fit.approximate'.tr(),
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: cs.onSurfaceVariant),
+              ),
           ],
         ),
         const SizedBox(height: 4),
@@ -125,5 +132,42 @@ class PdpSizeRecommendation extends ConsumerWidget {
         ],
       ],
     ),);
+  }
+}
+
+/// A subtle "sized by seller" badge shown when the recommendation came from a
+/// seller-entered chart (source == seller). Informational only.
+class _SellerChip extends StatelessWidget {
+  const _SellerChip({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: cs.secondaryContainer,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.verified_outlined,
+            size: 12,
+            color: cs.onSecondaryContainer,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .labelSmall
+                ?.copyWith(color: cs.onSecondaryContainer),
+          ),
+        ],
+      ),
+    );
   }
 }
