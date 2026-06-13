@@ -25,6 +25,19 @@ const (
 	FitTight   = "tight"
 )
 
+// Gender categories (basic-estimation input; not a measurement).
+const (
+	GenderFemale      = "female"
+	GenderMale        = "male"
+	GenderUnspecified = "unspecified"
+)
+
+// Confidence of a recommendation.
+const (
+	ConfidenceDetailed = "detailed" // every relevant measurement was real
+	ConfidenceBasic    = "basic"    // >=1 measurement was estimated
+)
+
 // FitProfile is a user's measurements in mm. Nil pointer = not provided.
 type FitProfile struct {
 	UserID    int64     `json:"user_id"`
@@ -33,6 +46,8 @@ type FitProfile struct {
 	HipMM     *int      `json:"hip_mm,omitempty"`
 	InseamMM  *int      `json:"inseam_mm,omitempty"`
 	HeightMM  *int      `json:"height_mm,omitempty"`
+	WeightG   *int      `json:"weight_g,omitempty"` // grams (encrypted at rest)
+	Gender    string    `json:"gender"`             // female | male | unspecified
 	FitPref   string    `json:"fit_pref"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -66,14 +81,20 @@ const (
 // Recommendation is the match output. ChartApproximate is ALWAYS true in
 // phase 1 — the seed charts are representative, not curated.
 type Recommendation struct {
-	Status           string      `json:"status"`
-	GarmentType      GarmentType `json:"garment_type,omitempty"`
-	Size             string      `json:"size,omitempty"`
-	Signal           string      `json:"signal,omitempty"`
-	BetweenLower     string      `json:"between_lower,omitempty"`
-	BetweenUpper     string      `json:"between_upper,omitempty"`
-	Missing          []string    `json:"missing,omitempty"`
-	ChartApproximate bool        `json:"chart_approximate"`
+	Status       string      `json:"status"`
+	GarmentType  GarmentType `json:"garment_type,omitempty"`
+	Size         string      `json:"size,omitempty"`
+	Signal       string      `json:"signal,omitempty"`
+	BetweenLower string      `json:"between_lower,omitempty"`
+	BetweenUpper string      `json:"between_upper,omitempty"`
+	Missing      []string    `json:"missing,omitempty"`
+	// Confidence: detailed (all real) | basic (>=1 estimated). Empty for
+	// non-ok statuses.
+	Confidence string `json:"confidence,omitempty"`
+	// Estimated names the relevant measurements that were synthesized from
+	// height/weight/gender (drives the "approximate" warning).
+	Estimated        []string `json:"estimated,omitempty"`
+	ChartApproximate bool     `json:"chart_approximate"`
 }
 
 // relevantMeasurements per garment type. Bottoms/skirts use waist+hip; inseam
@@ -102,4 +123,17 @@ func measurementValue(p FitProfile, name string) *int {
 		return p.HipMM
 	}
 	return nil
+}
+
+// setMeasurement writes a named measurement onto a profile copy (used to fold
+// basic estimates into an effective profile before matching).
+func setMeasurement(p *FitProfile, name string, mm int) {
+	switch name {
+	case "chest":
+		p.ChestMM = &mm
+	case "waist":
+		p.WaistMM = &mm
+	case "hip":
+		p.HipMM = &mm
+	}
 }

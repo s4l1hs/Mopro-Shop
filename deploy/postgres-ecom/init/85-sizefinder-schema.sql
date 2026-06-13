@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS sizefinder_schema.fit_profiles (
     hip_enc    TEXT,
     inseam_enc TEXT,
     height_enc TEXT,
+    weight_enc TEXT,
+    gender     TEXT        NOT NULL DEFAULT 'unspecified'
+               CHECK (gender IN ('female','male','unspecified')),
     fit_pref   TEXT        NOT NULL DEFAULT 'regular'
                CHECK (fit_pref IN ('regular','loose','tight')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
