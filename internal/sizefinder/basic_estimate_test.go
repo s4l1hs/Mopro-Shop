@@ -31,7 +31,7 @@ func TestEstimateMeasurement(t *testing.T) {
 // rb runs Recommend (basic-mode helper, mirrors rec()).
 func rb(t *testing.T, p FitProfile, title string) Recommendation {
 	t.Helper()
-	r, err := newTestSvc(p, nil).Recommend(context.Background(), 1, title)
+	r, err := newTestSvc(p, nil).Recommend(context.Background(), 1, title, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -77,16 +77,27 @@ type sizeScore struct {
 	edgePerMille int
 }
 
-func (s *service) Recommend(ctx context.Context, userID int64, productTitle string) (Recommendation, error) {
-	// Honest about its limits: every response carries chart_approximate=true —
-	// the charts are an EN 13402-3 standard baseline (not per-brand) and the
-	// garment is classified from the title by keyword.
-	rec := Recommendation{ChartApproximate: true}
-
-	garment, ok := ClassifyTitle(productTitle)
-	if !ok {
-		rec.Status = StatusNoChart
-		return rec, nil
+func (s *service) Recommend(ctx context.Context, userID int64, productTitle string, sellerChart *SellerChart) (Recommendation, error) {
+	// Precedence: seller chart (per-garment truth) → EN standard baseline → none.
+	rec := Recommendation{}
+	var garment GarmentType
+	var sellerRows []ChartRow
+	if sellerChart != nil && len(sellerChart.Rows) > 0 {
+		garment = sellerChart.GarmentType
+		sellerRows = sellerChart.Rows
+		rec.Source = SourceSeller
+		rec.ChartApproximate = false // the actual garment's chart
+	} else {
+		// Standard baseline: classify the title; chart_approximate=true (not per-brand).
+		g, ok := ClassifyTitle(productTitle)
+		if !ok {
+			rec.Status = StatusNoChart
+			rec.ChartApproximate = true
+			return rec, nil
+		}
+		garment = g
+		rec.Source = SourceStandard
+		rec.ChartApproximate = true
 	}
 	rec.GarmentType = garment
 
@@ -100,9 +111,14 @@ func (s *service) Recommend(ctx context.Context, userID int64, productTitle stri
 		return Recommendation{}, err
 	}
 
-	chart, err := s.repo.ChartFor(ctx, garment, genderForChart(garment, profile.Gender))
-	if err != nil {
-		return Recommendation{}, err
+	// Seller rows are used as-is (already gendered by the seller); the standard
+	// baseline is resolved by garment + the profile's gender.
+	chart := sellerRows
+	if chart == nil {
+		chart, err = s.repo.ChartFor(ctx, garment, genderForChart(garment, profile.Gender))
+		if err != nil {
+			return Recommendation{}, err
+		}
 	}
 	if len(chart) == 0 {
 		rec.Status = StatusNoChart

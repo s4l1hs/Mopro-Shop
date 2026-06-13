@@ -11,10 +11,11 @@ type Service interface {
 	UpsertProfile(ctx context.Context, p FitProfile) error
 	// GetProfile returns the decrypted profile; ErrProfileNotFound when absent.
 	GetProfile(ctx context.Context, userID int64) (FitProfile, error)
-	// Recommend classifies the product title, loads the chart, and matches the
-	// user's profile to a size. Never errors for absent profile / unclassifiable
-	// title — those are statuses on the Recommendation.
-	Recommend(ctx context.Context, userID int64, productTitle string) (Recommendation, error)
+	// Recommend matches the user's profile to a size. Precedence: a non-nil
+	// sellerChart (per-garment truth) wins; otherwise it classifies the product
+	// title and uses the EN standard baseline. Never errors for absent profile /
+	// unclassifiable title — those are statuses on the Recommendation.
+	Recommend(ctx context.Context, userID int64, productTitle string, sellerChart *SellerChart) (Recommendation, error)
 }
 
 // Repository is the storage interface of the sizefinder module.
