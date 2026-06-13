@@ -96,61 +96,80 @@ func TestRecommend_Statuses(t *testing.T) {
 	})
 }
 
-func TestRecommend_Match(t *testing.T) {
-	ctx := context.Background()
+// rec is a tiny helper so each match case is a flat table row, keeping per-test
+// cyclomatic complexity low.
+func rec(t *testing.T, p FitProfile, title string) Recommendation {
+	t.Helper()
+	r, err := newTestSvc(p, nil).Recommend(context.Background(), 1, title)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	return r
+}
 
-	t.Run("mid-range chest → M true_to_size", func(t *testing.T) {
-		rec, _ := newTestSvc(FitProfile{ChestMM: mm(970)}, nil).Recommend(ctx, 1, "Basic Tişört")
-		if rec.Status != StatusOK || rec.Size != "M" || rec.Signal != SignalTrueToSize {
-			t.Fatalf("got %+v", rec)
-		}
-	})
-	t.Run("boundary chest 1000 (M max / L min) → between, regular picks lower", func(t *testing.T) {
-		rec, _ := newTestSvc(FitProfile{ChestMM: mm(1000), FitPref: FitRegular}, nil).Recommend(ctx, 1, "Basic Tişört")
-		if rec.Signal != SignalBetween || rec.BetweenLower != "M" || rec.BetweenUpper != "L" || rec.Size != "M" {
-			t.Fatalf("got %+v", rec)
-		}
-	})
-	t.Run("boundary + loose pref → upper size", func(t *testing.T) {
-		rec, _ := newTestSvc(FitProfile{ChestMM: mm(1000), FitPref: FitLoose}, nil).Recommend(ctx, 1, "Basic Tişört")
-		if rec.Signal != SignalBetween || rec.Size != "L" {
-			t.Fatalf("got %+v", rec)
-		}
-	})
-	t.Run("near top of range (not boundary) → size_up hint", func(t *testing.T) {
-		// M chest 940-1000; 995 is in the top 15% (>=991) but 5mm from L → not between.
-		// Wait: distance to L (min 1000) is 5mm ≤ 25 threshold → between fires first.
-		// Use a wider gap: top chart is contiguous, so emulate with 992 → L distance 8 ≤ 25.
-		// Contiguous charts make pure edge hints rare — assert the between behavior instead.
-		rec, _ := newTestSvc(FitProfile{ChestMM: mm(992)}, nil).Recommend(ctx, 1, "Basic Tişört")
-		if rec.Signal != SignalBetween || rec.Size != "M" {
-			t.Fatalf("got %+v", rec)
-		}
-	})
-	t.Run("multi-measurement bottom: waist M + hip M → M", func(t *testing.T) {
-		rec, _ := newTestSvc(FitProfile{WaistMM: mm(810), HipMM: mm(1010)}, nil).Recommend(ctx, 1, "Slim Fit Pantolon")
-		if rec.Status != StatusOK || rec.Size != "M" {
-			t.Fatalf("got %+v", rec)
-		}
-	})
-	t.Run("split measurements (waist M, hip L) → least-total-distance wins deterministically", func(t *testing.T) {
-		rec, _ := newTestSvc(FitProfile{WaistMM: mm(800), HipMM: mm(1080)}, nil).Recommend(ctx, 1, "Slim Fit Pantolon")
-		if rec.Status != StatusOK || (rec.Size != "M" && rec.Size != "L") {
-			t.Fatalf("got %+v", rec)
-		}
-	})
-	t.Run("partial bottom profile (waist only) → ok + missing hip", func(t *testing.T) {
-		rec, _ := newTestSvc(FitProfile{WaistMM: mm(810)}, nil).Recommend(ctx, 1, "Slim Fit Pantolon")
-		if rec.Status != StatusOK || rec.Size != "M" || len(rec.Missing) != 1 || rec.Missing[0] != "hip" {
-			t.Fatalf("got %+v", rec)
-		}
-	})
-	t.Run("below smallest size → XS true_to_size (nearest)", func(t *testing.T) {
-		rec, _ := newTestSvc(FitProfile{ChestMM: mm(700)}, nil).Recommend(ctx, 1, "Basic Tişört")
-		if rec.Status != StatusOK || rec.Size != "XS" || rec.Signal != SignalTrueToSize {
-			t.Fatalf("got %+v", rec)
-		}
-	})
+func TestRecommend_MidRange(t *testing.T) {
+	r := rec(t, FitProfile{ChestMM: mm(970)}, "Basic Tişört")
+	if r.Status != StatusOK || r.Size != "M" || r.Signal != SignalTrueToSize {
+		t.Fatalf("got %+v", r)
+	}
+}
+
+func TestRecommend_BoundaryRegular(t *testing.T) {
+	// chest 1000 = M max / L min → between; regular picks the lower (M).
+	r := rec(t, FitProfile{ChestMM: mm(1000), FitPref: FitRegular}, "Basic Tişört")
+	if r.Signal != SignalBetween {
+		t.Fatalf("signal: got %+v", r)
+	}
+	if r.BetweenLower != "M" || r.BetweenUpper != "L" || r.Size != "M" {
+		t.Fatalf("between: got %+v", r)
+	}
+}
+
+func TestRecommend_BoundaryLoose(t *testing.T) {
+	r := rec(t, FitProfile{ChestMM: mm(1000), FitPref: FitLoose}, "Basic Tişört")
+	if r.Signal != SignalBetween || r.Size != "L" {
+		t.Fatalf("got %+v", r)
+	}
+}
+
+func TestRecommend_NearBoundaryBetween(t *testing.T) {
+	// Contiguous charts: 992 is 8mm from L's min → within the 25mm between band.
+	r := rec(t, FitProfile{ChestMM: mm(992)}, "Basic Tişört")
+	if r.Signal != SignalBetween || r.Size != "M" {
+		t.Fatalf("got %+v", r)
+	}
+}
+
+func TestRecommend_MultiMeasurementBottom(t *testing.T) {
+	r := rec(t, FitProfile{WaistMM: mm(810), HipMM: mm(1010)}, "Slim Fit Pantolon")
+	if r.Status != StatusOK || r.Size != "M" {
+		t.Fatalf("got %+v", r)
+	}
+}
+
+func TestRecommend_SplitMeasurements(t *testing.T) {
+	// waist→M, hip→L: least total distance wins deterministically (M or L).
+	r := rec(t, FitProfile{WaistMM: mm(800), HipMM: mm(1080)}, "Slim Fit Pantolon")
+	if r.Status != StatusOK || (r.Size != "M" && r.Size != "L") {
+		t.Fatalf("got %+v", r)
+	}
+}
+
+func TestRecommend_PartialBottomProfile(t *testing.T) {
+	r := rec(t, FitProfile{WaistMM: mm(810)}, "Slim Fit Pantolon")
+	if r.Status != StatusOK || r.Size != "M" {
+		t.Fatalf("status/size: got %+v", r)
+	}
+	if len(r.Missing) != 1 || r.Missing[0] != "hip" {
+		t.Fatalf("missing: got %+v", r)
+	}
+}
+
+func TestRecommend_BelowSmallest(t *testing.T) {
+	r := rec(t, FitProfile{ChestMM: mm(700)}, "Basic Tişört")
+	if r.Status != StatusOK || r.Size != "XS" || r.Signal != SignalTrueToSize {
+		t.Fatalf("got %+v", r)
+	}
 }
 
 func TestUpsertProfile_Validation(t *testing.T) {

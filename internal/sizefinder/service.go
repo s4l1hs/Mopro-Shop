@@ -58,6 +58,15 @@ func (s *service) GetProfile(ctx context.Context, userID int64) (FitProfile, err
 	return s.repo.GetProfile(ctx, userID)
 }
 
+// sizeScore is one candidate size's fit against the user's measurements.
+type sizeScore struct {
+	label string
+	rank  int
+	score int // Σ distance-to-range over present measurements (mm)
+	// edge position of the binding measurement: -1 unknown, else per-mille (0..1000).
+	edgePerMille int
+}
+
 func (s *service) Recommend(ctx context.Context, userID int64, productTitle string) (Recommendation, error) {
 	// Phase 1 is honest about its limits: every response carries
 	// chart_approximate=true (representative seed charts + keyword classifier).
@@ -89,34 +98,41 @@ func (s *service) Recommend(ctx context.Context, userID int64, productTitle stri
 		return rec, nil
 	}
 
-	relevant := relevantMeasurements(garment)
-	var present, missing []string
-	for _, m := range relevant {
-		if measurementValue(profile, m) != nil {
-			present = append(present, m)
-		} else {
-			missing = append(missing, m)
-		}
-	}
+	present, missing := splitMeasurements(profile, relevantMeasurements(garment))
 	if len(present) == 0 {
 		rec.Status = StatusIncompleteProfile
 		rec.Missing = missing
 		return rec, nil
 	}
 
-	// Group the chart by size, scoring only the measurements the user provided.
-	type sizeScore struct {
-		label string
-		rank  int
-		score int // Σ distance-to-range over present measurements (mm)
-		// edge position of the binding (largest-range-share) measurement:
-		// -1 unknown, else 0..1000 (per-mille within the range).
-		edgePerMille int
+	scores := scoreSizes(chart, profile)
+	rec.Status = StatusOK
+	rec.Size = scores[0].label
+	rec.Missing = missing
+	applySignal(&rec, scores, profile.FitPref)
+	return rec, nil
+}
+
+// splitMeasurements partitions the relevant measurements into those the profile
+// provides and those it lacks.
+func splitMeasurements(p FitProfile, relevant []string) (present, missing []string) {
+	for _, m := range relevant {
+		if measurementValue(p, m) != nil {
+			present = append(present, m)
+		} else {
+			missing = append(missing, m)
+		}
 	}
+	return present, missing
+}
+
+// scoreSizes groups the chart by size, scoring only the measurements the user
+// provided, and returns the sizes ordered best-fit first (score asc, rank asc).
+func scoreSizes(chart []ChartRow, profile FitProfile) []*sizeScore {
 	bySize := map[string]*sizeScore{}
 	for _, row := range chart {
-		ss, okSize := bySize[row.SizeLabel]
-		if !okSize {
+		ss, ok := bySize[row.SizeLabel]
+		if !ok {
 			ss = &sizeScore{label: row.SizeLabel, rank: row.SortRank, edgePerMille: -1}
 			bySize[row.SizeLabel] = ss
 		}
@@ -130,11 +146,8 @@ func (s *service) Recommend(ctx context.Context, userID int64, productTitle stri
 		case *v > row.MaxMM:
 			ss.score += *v - row.MaxMM
 		default:
-			// In range: track where within the range (for edge hints).
-			span := row.MaxMM - row.MinMM
-			if span > 0 {
-				pm := (*v - row.MinMM) * 1000 / span
-				if pm > ss.edgePerMille {
+			if span := row.MaxMM - row.MinMM; span > 0 {
+				if pm := (*v - row.MinMM) * 1000 / span; pm > ss.edgePerMille {
 					ss.edgePerMille = pm
 				}
 			}
@@ -150,13 +163,14 @@ func (s *service) Recommend(ctx context.Context, userID int64, productTitle stri
 		}
 		return scores[i].rank < scores[j].rank
 	})
+	return scores
+}
 
+// applySignal sets the recommendation's size + signal: between-sizes (rank-
+// adjacent runner-up within the threshold; fit_pref tiebreak) wins, else the
+// edge hint for the best in-range size.
+func applySignal(rec *Recommendation, scores []*sizeScore, fitPref string) {
 	best := scores[0]
-	rec.Status = StatusOK
-	rec.Size = best.label
-	rec.Missing = missing
-
-	// Between-sizes: the runner-up is rank-adjacent and both fit nearly as well.
 	if len(scores) > 1 {
 		second := scores[1]
 		rankAdjacent := second.rank == best.rank+1 || second.rank == best.rank-1
@@ -168,27 +182,23 @@ func (s *service) Recommend(ctx context.Context, userID int64, productTitle stri
 			rec.Signal = SignalBetween
 			rec.BetweenLower = lower.label
 			rec.BetweenUpper = upper.label
-			// fit_pref tiebreak: loose → the larger size, tight/regular → smaller.
-			if profile.FitPref == FitLoose {
+			// fit_pref tiebreak: loose → larger size, tight/regular → smaller.
+			if fitPref == FitLoose {
 				rec.Size = upper.label
 			} else {
 				rec.Size = lower.label
 			}
-			return rec, nil
+			return
 		}
 	}
-
-	// Edge hints: near the top of the range → consider sizing up; near the
-	// bottom → down. Only meaningful when the best size actually fit (score 0).
 	switch {
 	case best.score > 0:
 		rec.Signal = SignalTrueToSize // nearest size (out of every range)
-	case best.edgePerMille >= 0 && best.edgePerMille >= int(1000*(1-edgeFraction)):
+	case best.edgePerMille >= int(1000*(1-edgeFraction)):
 		rec.Signal = SignalSizeUp
 	case best.edgePerMille >= 0 && best.edgePerMille <= int(1000*edgeFraction):
 		rec.Signal = SignalSizeDown
 	default:
 		rec.Signal = SignalTrueToSize
 	}
-	return rec, nil
 }
