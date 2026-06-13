@@ -287,8 +287,9 @@ class _SkeletonGrid extends StatelessWidget {
     return SliverGrid.builder(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
+        // Lockstep with ProductGrid so the skeleton→loaded swap doesn't shift.
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
         childAspectRatio: 0.68,
       ),
       itemCount: 6,
