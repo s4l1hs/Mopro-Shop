@@ -1,8 +1,9 @@
 # Size-Fit Recommendation — design (Phase C, design-first)
 
 Users enter body measurements → the PDP recommends the size ("your size: M") with
-a fit signal, across all apparel. Standard curated charts only (no seller
-tooling); seed charts are **representative + explicitly flagged approximate**.
+a fit signal, across all apparel. Standard charts only (no seller tooling yet);
+charts are the **EN 13402-3 standard reference** (a baseline, NOT per-brand —
+still flagged `chart_approximate`). See *Curation* below.
 
 ## Discovery shifts (vs the prompt's assumptions)
 
@@ -33,13 +34,13 @@ tooling); seed charts are **representative + explicitly flagged approximate**.
 
 - **`ref_schema.size_charts`** (readable by every module — the §5 shared-read
   exception; seeded reference data):
-  `garment_type TEXT · size_label TEXT · sort_rank INT · measurement TEXT
-   (chest|waist|hip|inseam) · min_mm INT · max_mm INT`
-  PK (garment_type, size_label, measurement). **Seeded for 5 garment types ×
-  6 sizes (XS–XXL) × their relevant measurements, values from common TR/EU
-  standard tables — REPRESENTATIVE ONLY, header-flagged "approximate — curate
-  before relying on it for returns-reduction claims."** Integer millimetres
-  (no floats — the money-type discipline applied to lengths).
+  `garment_type TEXT · gender TEXT (female|male) · size_system TEXT (alpha|eu) ·
+   size_label TEXT · sort_rank INT · measurement TEXT (chest|waist|hip) ·
+   min_mm INT · max_mm INT · source TEXT`
+  PK (garment_type, gender, size_system, size_label, measurement). Originally
+  seeded approximate (0096); **curated to the EN 13402-3 standard reference in
+  0098** — see *Curation* below. Integer millimetres (no floats — the money-type
+  discipline applied to lengths).
 - **`sizefinder_schema.fit_profiles`** (owned by `internal/sizefinder`,
   jobs-svc, postgres-ecom; schema already reserved in the boundary map):
   `user_id BIGINT PK (soft ref) · chest_enc/waist_enc/hip_enc/inseam_enc/
@@ -92,8 +93,49 @@ profile: distance = 0 if value ∈ [min,max], else distance to the nearest bound
 5. Mobile: Account fit form + PDP CTA + i18n + tests.
 6. Audit/feature doc + ledger.
 
+## Curation — EN 13402-3 standard reference (migration 0098)
+
+Replaces the phase-1 representative seed with the **EN 13402-3** standard —
+the European clothing-size standard (body dimensions in cm; the correct baseline
+for a TR/EU-sizing market). What changed:
+
+- **Garment → dimension map = EN 13402-2.** No drift: the match's
+  `relevantMeasurements` already matched EN (tops→bust/chest; women's
+  bottoms→waist+hip; men's bottoms→waist; dresses→bust+waist+hip; skirts→
+  waist+hip). EN's gender asymmetry on bottoms is honoured at the *chart* level —
+  men's bottom charts carry waist only (no hip rows), so a man's hip simply isn't
+  scored (degrades to waist).
+- **Gender axis added** (`gender` column): EN women's **bust** bands ≠ men's
+  **chest** bands, and women's bottoms add hip. `genderForChart` resolves women-
+  only garments (dress/skirt) to female, otherwise male-iff-male-else-female
+  (the default for unspecified). The repo queries `gender` + `size_system`.
+- **Two size systems** (`size_system` column): **alpha** (S–XXL) is what the
+  match returns; **EU numeric** (32–58) is seeded as a parallel reference set
+  (women dress + men top) proving the numeric axis is representable. The match
+  consumes alpha only (repo filters `size_system='alpha'`); EU is reference data
+  for future numeric-label products.
+- **Provenance** (`source` column): every curated row is
+  `EN 13402-3 (standard reference)`. The basic-mode bands are tagged separately
+  in code as `retail height/weight bands (approximate)` (see size-fit-basic.md).
+- **Inseam/height** (EN 13402-3 §3c/§4) are secondary, height-driven length
+  bands — documented here but **not** seeded as size_charts rows (the match has
+  no length axis; inseam is collected on the profile but unused in phase 1).
+
+**Honesty unchanged.** This is a **standard baseline, NOT per-brand truth** —
+real garments vary by brand/cut/fabric. The API still flags every response
+`chart_approximate: true`; the basic-mode warning is untouched. **Seller-entered
+charts that override this baseline per product are the next item** — the `source`
+column is the seam they plug into.
+
+> **Provenance / licence.** EN 13402-1/-2/-3 via the OnlineConversion EN 13402
+> reproduction (GFDL, derived from Wikipedia's EN 13402 article); supplementary
+> height/weight→size bands from published retail fit charts. The EN values are an
+> industry standard, not proprietary brand data; the reproduction is GFDL.
+
 ## Out of scope / follow-ups (flagged)
-- **Chart curation** (content/ops): replace seed ranges with authoritative
-  per-market tables; optionally per-brand charts later.
+- **Seller-entered charts** that override the standard baseline per product
+  (the attribute write-path) — *next item*; plugs into the `source` seam.
+- Fuller EU-numeric seeding (all garments/sizes) — schema already supports it
+  via `size_system='eu'`; only a representative sample is seeded today.
 - Attribute-driven `garment_type` (curation via PLP-13 write-path) replacing the
-  keyword classifier; seller-entered charts; card-level fit chips.
+  keyword classifier; card-level fit chips.
