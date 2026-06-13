@@ -744,7 +744,11 @@ type ReturnRequest struct {
 		// reason applies.
 		Reason *ReturnRequestItemsReason `json:"reason,omitempty"`
 	} `json:"items,omitempty"`
-	Reason ReturnRequestReason `json:"reason"`
+
+	// PhotoKeys RT-03: evidence photo storage keys (from POST /uploads/photos). Stored
+	// on the return; the detail serves them back as CDN urls (photo_urls).
+	PhotoKeys *[]string           `json:"photo_keys,omitempty"`
+	Reason    ReturnRequestReason `json:"reason"`
 }
 
 // ReturnRequestItemsReason RT-05: optional per-line return reason. When omitted the header

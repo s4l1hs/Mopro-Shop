@@ -3176,6 +3176,13 @@ components:
                 type: string
                 description: |
                   RT-05: optional per-line free-text note.
+        photo_keys:
+          type: array
+          items:
+            type: string
+          description: |
+            RT-03: evidence photo storage keys (from POST /uploads/photos). Stored
+            on the return; the detail serves them back as CDN urls (photo_urls).
 
     Return:
       type: object

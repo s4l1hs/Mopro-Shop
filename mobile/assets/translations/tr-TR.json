@@ -748,6 +748,7 @@
     "return_no": "İade No",
     "items_count": "{} ürün",
     "item_line": "{qty} adet · {reason}",
+    "photos": "Fotoğraflar",
     "original_order": "Siparişe git",
     "detail_title": "İade #{}"
   },

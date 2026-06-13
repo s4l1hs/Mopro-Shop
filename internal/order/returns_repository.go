@@ -65,6 +65,35 @@ func (r *pgxReturnRepository) InsertReturnItem(ctx context.Context, tx pgx.Tx, i
 	return it, nil
 }
 
+func (r *pgxReturnRepository) InsertReturnPhoto(ctx context.Context, tx pgx.Tx, returnID int64, photoKey string, sortRank int) error {
+	_, err := tx.Exec(ctx,
+		`INSERT INTO order_schema.return_photos (return_id, photo_key, sort_rank)
+		 VALUES ($1,$2,$3)`, returnID, photoKey, sortRank)
+	if err != nil {
+		return fmt.Errorf("order.returns.repo: insert photo: %w", err)
+	}
+	return nil
+}
+
+func (r *pgxReturnRepository) ListReturnPhotos(ctx context.Context, returnID int64) ([]string, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT photo_key FROM order_schema.return_photos
+		   WHERE return_id = $1 ORDER BY sort_rank, id`, returnID)
+	if err != nil {
+		return nil, fmt.Errorf("order.returns.repo: list photos: %w", err)
+	}
+	defer rows.Close()
+	var keys []string
+	for rows.Next() {
+		var k string
+		if err := rows.Scan(&k); err != nil {
+			return nil, fmt.Errorf("order.returns.repo: scan photo: %w", err)
+		}
+		keys = append(keys, k)
+	}
+	return keys, rows.Err()
+}
+
 func (r *pgxReturnRepository) InsertReturnStatusHistory(ctx context.Context, tx pgx.Tx, returnID int64, status, note string) error {
 	_, err := tx.Exec(ctx,
 		`INSERT INTO order_schema.return_status_history (return_id, status, note)

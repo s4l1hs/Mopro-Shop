@@ -118,6 +118,7 @@ class ReturnDetailDto {
     this.description = '',
     this.items = const [],
     this.history = const [],
+    this.photoUrls = const [],
     this.refund,
   });
 
@@ -135,6 +136,9 @@ class ReturnDetailDto {
         history: (json['history'] as List<dynamic>? ?? [])
             .map((e) => ReturnStatusEventDto.fromJson(e as Map<String, dynamic>))
             .toList(),
+        photoUrls: (json['photo_urls'] as List<dynamic>? ?? [])
+            .map((e) => e as String)
+            .toList(),
         refund: json['refund'] is Map<String, dynamic>
             ? RefundInfo.fromJson(json['refund'] as Map<String, dynamic>)
             : null,
@@ -151,6 +155,9 @@ class ReturnDetailDto {
   /// RT-04: the append-only status timeline; empty for pre-history returns →
   /// the detail falls back to the status-derived timeline.
   final List<ReturnStatusEventDto> history;
+
+  /// RT-03: evidence photo CDN urls (empty when none / capture not yet wired).
+  final List<String> photoUrls;
   final RefundInfo? refund;
 }
 
@@ -161,6 +168,7 @@ class CreateReturnRequest {
     required this.reason,
     this.description = '',
     this.items = const [],
+    this.photoKeys = const [],
   });
 
   final int orderId;
@@ -168,9 +176,14 @@ class CreateReturnRequest {
   final String description;
   final List<ReturnItemDto> items;
 
+  /// RT-03: evidence photo storage keys. Populated once the capture step (mobile
+  /// picker + upload) lands — gated on storage provisioning.
+  final List<String> photoKeys;
+
   Map<String, dynamic> toJson() => {
         'reason': reason,
         if (description.isNotEmpty) 'description': description,
+        if (photoKeys.isNotEmpty) 'photo_keys': photoKeys,
         if (items.isNotEmpty)
           'items': [
             for (final i in items)

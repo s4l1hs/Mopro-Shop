@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -120,6 +121,35 @@ class _Body extends StatelessWidget {
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
+        ],
+        // RT-03: evidence photos (shown when present; capture step gated on
+        // storage provisioning).
+        if (ret.photoUrls.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text('returns.photos'.tr(), style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 80,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: ret.photoUrls.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: CachedNetworkImage(
+                  imageUrl: ret.photoUrls[i],
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => Container(
+                    width: 80,
+                    height: 80,
+                    color: theme.colorScheme.surfaceContainerHighest,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
         if (ret.refund != null) ...[
           const SizedBox(height: 24),

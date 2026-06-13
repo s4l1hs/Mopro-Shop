@@ -712,6 +712,7 @@
     "return_no": "Return No",
     "items_count": "{} items",
     "item_line": "{qty} × {reason}",
+    "photos": "Photos",
     "original_order": "View order",
     "detail_title": "Return #{}"
   },
