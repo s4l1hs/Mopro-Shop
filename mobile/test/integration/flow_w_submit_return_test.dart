@@ -54,10 +54,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(currentLocation(tester), contains('step=review'));
 
-    // Submit → confirmation with the return tracking number.
+    // Submit → confirmation with the RT-02 cargo drop-off code (replaced the old
+    // fake tracking number).
     await tester.tap(find.text('returns.submit'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('returns.tracking_no'), findsOneWidget);
+    expect(find.textContaining('returns.cargo_code_label'), findsOneWidget);
 
     // İadelerim → the new return is in the list.
     await tester.tap(find.text('returns.my_returns_cta'));

@@ -83,6 +83,9 @@ class FakeOrderLoopRepo with _Unused implements OrderRepository {
       description: req.description,
       createdAt: DateTime(2026, 5, 2),
       items: req.items,
+      // RT-02: createReturn returns the derived cargo drop-off code (replaces the
+      // old fake tracking_no); the confirmation step renders it.
+      shipping: const ReturnShippingDto(code: 'IADE-0000500', carrier: 'Aras Kargo'),
     );
   }
 

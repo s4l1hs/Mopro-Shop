@@ -131,9 +131,14 @@ class ReturnFlowNotifier extends FamilyNotifier<ReturnFlowState, int> {
     ];
     final firstId = state.selected.keys.first;
     final reason = state.reasons[firstId] ?? ReturnReason.other;
+    // Backward-compat header description = the per-item notes folded together
+    // (RT-05 also carries them per-line). #223 dropped this fold, silently
+    // emptying the header description; restored.
+    final description = state.notes.values.where((n) => n.isNotEmpty).join(' · ');
     return CreateReturnRequest(
       orderId: orderId,
       reason: reason,
+      description: description,
       items: items,
     );
   }
