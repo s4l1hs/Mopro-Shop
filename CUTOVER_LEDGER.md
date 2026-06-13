@@ -183,6 +183,16 @@ Four banked PDP items in one lane (they share the PDP screen widget). Scoped fro
 
 ---
 
+## 4o. Returns batch — RT-02 · RT-03 · RT-05 — ✅ SHIPPED (`feat/returns-batch`)
+
+The three banked returns items, re-scoped from the audits (`docs/internal/returns-batch.md`). **§4/§12: none are money-path** — the RT-01 refund amount/ledger is untouched (logistics + request metadata only) → no ADR trigger.
+- **RT-05 per-item reasons** — migration **0103** (`return_items.reason/note`); `CreateReturn` stores per-line reason (header fallback + valid-enum guard), detail surfaces them. Spec `ReturnRequest.items[]` += reason/note (Go+Dart regen). Tests: stored / fallback / invalid-line.
+- **RT-03 return photos** — migration **0104** (`return_photos`); keys stored in-tx, `GetReturnPhotos` (ownership-scoped) → `photo_urls` (CDN), detail renders them; spec `ReturnRequest.photo_keys` (regen). **Capture step (mobile picker+upload) DEFERRED** — gated on storage provisioning (`STORAGE_ENABLED`); not faked. Tests: stored/listed/ownership.
+- **RT-02 return cargo code** — **no migration/codegen**: derived `IADE-%07d` code + carrier (`RETURN_CARRIER` env, default Aras Kargo) in `returnJSON.shipping`; confirm step + detail show code+carrier+i18n drop-off, replacing the return-id-as-`tracking_no` placeholder (dead key removed ×4 locales). Live carrier label/tracking = follow-up vertical. Tests: code format + default carrier.
+- **Discovery:** the mobile returns flow is **hand-written raw-Dio** (`return_dto.dart`, both create + detail; `GET /returns/{id}` not specced) → codegen limited to the specced `ReturnRequest`. **Gates:** `go test ./...` + `-tags contract` + golangci + boundaries/migration-check/lint-discipline/i18n(916, 0 dead/0 missing)/analyze green; migration round-trip + ON DELETE CASCADE verified on PG16. Doc: `docs/internal/returns-batch.md`.
+
+---
+
 ## 5. CI / branch-protection
 
 - **F-022b (#138)** made `flutter analyze` green-on-compile (`--no-fatal-infos`; errors/warnings still fatal).

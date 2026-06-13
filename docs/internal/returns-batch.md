@@ -75,5 +75,33 @@ does **not** use the codegen client for returns. So:
 - **Codegen: `ReturnRequest` only** (request fields); detail responses stay
   hand-written. The mobile consumes via its own `return_dto.dart`.
 - **§12 triggers: none.** RT-01 refund invariants preserved (not touched).
-- **i18n:** `returns.*`; RT-02 drop-off + any refund/money copy gets DE/AR, the
-  rest TR/EN (the #218 precedent).
+- **i18n:** `returns.*`; all three are operational UI (not refund/money) → TR/EN,
+  per the #218 precedent (none are finance strings; the refund copy already exists
+  from RT-01 and is untouched).
+
+## Shipped
+
+All three landed (one commit per item, on top of the scoping note); refund path
+(RT-01) untouched throughout.
+
+- **RT-05** — migration 0103 (`return_items.reason/note`); `ReturnItem(Input)` +
+  `CreateReturn` store per-line reason (header fallback + valid-enum guard); detail
+  shows per-line reason. Spec `ReturnRequest.items[]` += reason/note (Go+Dart regen).
+  Tests: per-line stored, header fallback, invalid-line-reason.
+- **RT-03** — migration 0104 (`return_photos`); `CreateReturn` stores photo keys
+  (in-tx), `GetReturnPhotos` (ownership-scoped) → `photo_urls` (CDN); detail renders
+  photos. Spec `ReturnRequest.photo_keys` (regen). **Capture step (mobile picker +
+  upload) DEFERRED** — gated on storage provisioning (`STORAGE_ENABLED`;
+  `project_photo_consumer_blocked`); not faked. Tests: stored + listed + ownership.
+- **RT-02** — no migration/codegen: derived `IADE-%07d` cargo code + carrier
+  (`RETURN_CARRIER` env) in `returnJSON.shipping`; confirm step + detail show the
+  code + carrier + i18n drop-off, replacing the return-id-as-tracking_no
+  placeholder (dead `returns.tracking_no` removed from all 4 locales). Live carrier
+  label/tracking = follow-up cargo-adapter vertical. Tests: code format + default
+  carrier.
+
+**Migrations: 0103 + 0104.** **§12 triggers: none** — refund amount/ledger
+unchanged. Migration round-trip + ON DELETE CASCADE verified on PG16. Goldens
+(returns screens changed) → Linux rebaseline bot; behaviour covered by unit/widget
+tests. The mobile returns flow stays hand-written raw-Dio; codegen limited to the
+specced `ReturnRequest`.
