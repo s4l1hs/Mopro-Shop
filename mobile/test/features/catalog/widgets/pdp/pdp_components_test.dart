@@ -88,6 +88,25 @@ void main() {
       );
       expect(find.textContaining('product.lowest_30d'), findsNothing);
     });
+
+    // PD-03: the "Sepette %X" basket-discount pill (reuses the card's i18n key).
+    testWidgets('shows the basket-discount pill when pct > 0', (tester) async {
+      await _pump(
+        tester,
+        const PdpPriceBlock(priceMinor: 12900, basketDiscountPct: 10),
+      );
+      expect(find.textContaining('product.basket_discount'), findsOneWidget);
+    });
+
+    testWidgets('hides the basket-discount pill when null or 0', (tester) async {
+      await _pump(tester, const PdpPriceBlock(priceMinor: 12900));
+      expect(find.textContaining('product.basket_discount'), findsNothing);
+      await _pump(
+        tester,
+        const PdpPriceBlock(priceMinor: 12900, basketDiscountPct: 0),
+      );
+      expect(find.textContaining('product.basket_discount'), findsNothing);
+    });
   });
 
   group('PdpVariantSelector', () {

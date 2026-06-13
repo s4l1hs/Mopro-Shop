@@ -51,6 +51,8 @@ class Product {
      this.deliveryEta,
 
     required  this.createdAt,
+
+     this.basketDiscountPct,
   });
 
   @JsonKey(
@@ -239,6 +241,19 @@ class Product {
 
 
 
+      /// PD-03: the whole-percent seller-funded \"Sepette %X İndirim\" (CT-09). The SAME products.basket_discount_pct snapshotted onto the order at checkout → display==charge. Omitted/null when 0 (no discount). 
+  @JsonKey(
+    
+    name: r'basket_discount_pct',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final int? basketDiscountPct;
+
+
+
 
 
     @override
@@ -257,7 +272,8 @@ class Product {
       other.attributes == attributes &&
       other.cashbackPreview == cashbackPreview &&
       other.deliveryEta == deliveryEta &&
-      other.createdAt == createdAt;
+      other.createdAt == createdAt &&
+      other.basketDiscountPct == basketDiscountPct;
 
     @override
     int get hashCode =>
@@ -275,7 +291,8 @@ class Product {
         attributes.hashCode +
         cashbackPreview.hashCode +
         deliveryEta.hashCode +
-        createdAt.hashCode;
+        createdAt.hashCode +
+        basketDiscountPct.hashCode;
 
   factory Product.fromJson(Map<String, dynamic> json) => _$ProductFromJson(json);
 

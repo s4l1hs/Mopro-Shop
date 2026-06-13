@@ -133,7 +133,8 @@
   "product": {
     "remove_from_favorites": "إزالة من المفضلة",
     "decrease_qty": "تقليل الكمية",
-    "increase_qty": "زيادة الكمية"
+    "increase_qty": "زيادة الكمية",
+    "basket_discount": "خصم {pct}% في السلة"
   },
   "status": {
     "return_requested": "تم طلب الإرجاع",

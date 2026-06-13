@@ -462,6 +462,13 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 			attributes = []catalog.ProductAttribute{} // spec-required array — never null
 		}
 
+		// PD-03: surface the CT-09 basket discount only when set (>0). It is the same
+		// products.basket_discount_pct the order charges → display==charge.
+		var basketDiscountPct *int
+		if p.BasketDiscountPct != nil && *p.BasketDiscountPct > 0 {
+			basketDiscountPct = p.BasketDiscountPct
+		}
+
 		// Flat, spec-conformant Product (PD-06): the previous {product, variants,
 		// translations, …} envelope did not match the OpenAPI Product schema (nor
 		// the generated mobile client), so the PDP could not parse it.
@@ -478,9 +485,10 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 			Description:     description,
 			Variants:        variantsOut,
 			Attributes:      attributes,
-			CashbackPreview: cashbackPreview,
-			DeliveryEta:     deliveryETA,
-			CreatedAt:       p.CreatedAt.Format(time.RFC3339),
+			CashbackPreview:   cashbackPreview,
+			DeliveryEta:       deliveryETA,
+			CreatedAt:         p.CreatedAt.Format(time.RFC3339),
+			BasketDiscountPct: basketDiscountPct,
 		})
 	}
 }
@@ -504,6 +512,9 @@ type productDetailJSON struct {
 	CashbackPreview *cashbackPreviewJSON       `json:"cashback_preview"`
 	DeliveryEta     *deliveryEtaJSON           `json:"delivery_eta"`
 	CreatedAt       string                     `json:"created_at"`
+	// BasketDiscountPct surfaces the CT-09 seller-funded "Sepette %X" on the PDP
+	// (PD-03). Same snapshot the order charges → display==charge. Omitted when 0.
+	BasketDiscountPct *int `json:"basket_discount_pct,omitempty"`
 }
 
 // variantDetailJSON is the spec Variant: image_urls is the CDN-resolved gallery
