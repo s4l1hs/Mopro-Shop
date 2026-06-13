@@ -72,70 +72,93 @@ func validSizeSystem(s string) bool { return s == "alpha" || s == "eu" }
 // validateChart hard-rejects a malformed seller chart (a non-monotonic or
 // incomplete chart is a data error, not a warning).
 func validateChart(c SizeChart) error {
-	if c.Name == "" {
-		return fmt.Errorf("%w: name required", ErrInvalidChart)
+	required, err := validateChartMeta(c)
+	if err != nil {
+		return err
 	}
-	required := chartRequiredMeasurements(c.GarmentType)
-	if required == nil {
-		return fmt.Errorf("%w: garment_type %q", ErrInvalidChart, c.GarmentType)
-	}
-	if !validGender(c.Gender) {
-		return fmt.Errorf("%w: gender %q", ErrInvalidChart, c.Gender)
-	}
-	if !validSizeSystem(c.SizeSystem) {
-		return fmt.Errorf("%w: size_system %q", ErrInvalidChart, c.SizeSystem)
-	}
-
-	byMeasure := map[string][]SizeChartRow{}
-	for _, r := range c.Rows {
-		if r.MinMM < chartMinMM || r.MaxMM <= r.MinMM || r.MaxMM > chartMaxMM {
-			return fmt.Errorf("%w: row %s/%s out of bounds (%d–%d mm)",
-				ErrInvalidChart, r.SizeLabel, r.Measurement, r.MinMM, r.MaxMM)
-		}
-		byMeasure[r.Measurement] = append(byMeasure[r.Measurement], r)
+	byMeasure, err := groupRowsInBounds(c.Rows)
+	if err != nil {
+		return err
 	}
 	// Measurements must be EXACTLY the garment's required set (no missing, no extra).
 	if len(byMeasure) != len(required) {
 		return fmt.Errorf("%w: %s needs measurements %v", ErrInvalidChart, c.GarmentType, required)
 	}
-	var labelSet0 []string
+	var ladder []string
 	for i, m := range required {
-		rows, ok := byMeasure[m]
-		if !ok {
-			return fmt.Errorf("%w: missing measurement %q", ErrInvalidChart, m)
+		labels, err := validateMeasurementRows(m, byMeasure[m])
+		if err != nil {
+			return err
 		}
-		if len(rows) < 2 {
-			return fmt.Errorf("%w: measurement %q needs ≥2 sizes", ErrInvalidChart, m)
-		}
-		sort.Slice(rows, func(a, b int) bool { return rows[a].SortRank < rows[b].SortRank })
-		// unique labels + strictly increasing rank + monotonic non-decreasing ranges.
-		seen := map[string]bool{}
-		labels := make([]string, 0, len(rows))
-		for j, r := range rows {
-			if seen[r.SizeLabel] {
-				return fmt.Errorf("%w: duplicate size %q for %q", ErrInvalidChart, r.SizeLabel, m)
-			}
-			seen[r.SizeLabel] = true
-			labels = append(labels, r.SizeLabel)
-			if j > 0 {
-				prev := rows[j-1]
-				if r.SortRank <= prev.SortRank {
-					return fmt.Errorf("%w: sort_rank not increasing for %q", ErrInvalidChart, m)
-				}
-				if r.MinMM < prev.MinMM || r.MaxMM < prev.MaxMM {
-					return fmt.Errorf("%w: %q not monotonic at %s (must grow with size)",
-						ErrInvalidChart, m, r.SizeLabel)
-				}
-			}
-		}
-		// every measurement must share the same size ladder.
 		if i == 0 {
-			labelSet0 = labels
-		} else if !sameLabels(labelSet0, labels) {
+			ladder = labels
+		} else if !sameLabels(ladder, labels) {
 			return fmt.Errorf("%w: size ladder differs across measurements", ErrInvalidChart)
 		}
 	}
 	return nil
+}
+
+// validateChartMeta checks the header enums and returns the garment's required
+// measurement set.
+func validateChartMeta(c SizeChart) ([]string, error) {
+	if c.Name == "" {
+		return nil, fmt.Errorf("%w: name required", ErrInvalidChart)
+	}
+	required := chartRequiredMeasurements(c.GarmentType)
+	if required == nil {
+		return nil, fmt.Errorf("%w: garment_type %q", ErrInvalidChart, c.GarmentType)
+	}
+	if !validGender(c.Gender) {
+		return nil, fmt.Errorf("%w: gender %q", ErrInvalidChart, c.Gender)
+	}
+	if !validSizeSystem(c.SizeSystem) {
+		return nil, fmt.Errorf("%w: size_system %q", ErrInvalidChart, c.SizeSystem)
+	}
+	return required, nil
+}
+
+// groupRowsInBounds bounds-checks every row and groups by measurement.
+func groupRowsInBounds(rows []SizeChartRow) (map[string][]SizeChartRow, error) {
+	byMeasure := map[string][]SizeChartRow{}
+	for _, r := range rows {
+		if r.MinMM < chartMinMM || r.MaxMM <= r.MinMM || r.MaxMM > chartMaxMM {
+			return nil, fmt.Errorf("%w: row %s/%s out of bounds (%d–%d mm)",
+				ErrInvalidChart, r.SizeLabel, r.Measurement, r.MinMM, r.MaxMM)
+		}
+		byMeasure[r.Measurement] = append(byMeasure[r.Measurement], r)
+	}
+	return byMeasure, nil
+}
+
+// validateMeasurementRows checks one measurement's ladder (≥2 unique sizes,
+// strictly increasing rank, monotonic non-decreasing ranges) and returns its
+// size labels in ladder order.
+func validateMeasurementRows(m string, rows []SizeChartRow) ([]string, error) {
+	if len(rows) < 2 {
+		return nil, fmt.Errorf("%w: measurement %q needs ≥2 sizes", ErrInvalidChart, m)
+	}
+	sort.Slice(rows, func(a, b int) bool { return rows[a].SortRank < rows[b].SortRank })
+	seen := map[string]bool{}
+	labels := make([]string, 0, len(rows))
+	for j, r := range rows {
+		if seen[r.SizeLabel] {
+			return nil, fmt.Errorf("%w: duplicate size %q for %q", ErrInvalidChart, r.SizeLabel, m)
+		}
+		seen[r.SizeLabel] = true
+		labels = append(labels, r.SizeLabel)
+		if j > 0 {
+			prev := rows[j-1]
+			if r.SortRank <= prev.SortRank {
+				return nil, fmt.Errorf("%w: sort_rank not increasing for %q", ErrInvalidChart, m)
+			}
+			if r.MinMM < prev.MinMM || r.MaxMM < prev.MaxMM {
+				return nil, fmt.Errorf("%w: %q not monotonic at %s (must grow with size)",
+					ErrInvalidChart, m, r.SizeLabel)
+			}
+		}
+	}
+	return labels, nil
 }
 
 func sameLabels(a, b []string) bool {
