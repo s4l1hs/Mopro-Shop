@@ -24,15 +24,20 @@ ReturnRequest _$ReturnRequestFromJson(Map<String, dynamic> json) =>
               )
               .toList(),
         ),
+        photoKeys: $checkedConvert(
+          'photo_keys',
+          (v) => (v as List<dynamic>?)?.map((e) => e as String).toList(),
+        ),
       );
       return val;
-    });
+    }, fieldKeyMap: const {'photoKeys': 'photo_keys'});
 
 Map<String, dynamic> _$ReturnRequestToJson(ReturnRequest instance) =>
     <String, dynamic>{
       'reason': _$ReturnRequestReasonEnumEnumMap[instance.reason]!,
       'description': ?instance.description,
       'items': ?instance.items?.map((e) => e.toJson()).toList(),
+      'photo_keys': ?instance.photoKeys,
     };
 
 const _$ReturnRequestReasonEnumEnumMap = {
