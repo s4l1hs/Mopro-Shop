@@ -131,7 +131,12 @@ class _OrderSummaryCardState extends ConsumerState<OrderSummaryCard> {
           if (couponMessage.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              'cart.coupon_invalid'.tr(),
+              // A tier-exclusive coupon entered by an ineligible member gets a
+              // specific message (membership benefit, migration 0106); every other
+              // invalid reason keeps the generic copy.
+              couponMessage == 'tier_locked'
+                  ? 'membership.coupon_tier_locked'.tr()
+                  : 'cart.coupon_invalid'.tr(),
               style: theme.textTheme.labelSmall?.copyWith(color: cs.error),
             ),
           ],
