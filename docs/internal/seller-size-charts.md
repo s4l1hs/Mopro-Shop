@@ -98,7 +98,14 @@ Fresh-DB init lockstep: the `seller_schema` init file (mirror the migration DDL)
 `sizefinder` never imports seller/catalog; it receives a value object. Boundary
 integrity preserved.
 
-## Write API (core-svc, role-gated `requireAuth + requireSellerRole`; spec + codegen)
+## Write API (core-svc, role-gated `requireAuth + requireSellerRole`)
+
+> **Discovery:** the seller console endpoints are **hand-written raw-Dio, NOT in
+> the OpenAPI spec** (only `/seller/orders/{id}/breakdown` is specced; returns,
+> Q&A, variant-price are all hand-written — the favorites/reviews pattern). The
+> seller chart writes follow that convention → no codegen for them. The **only**
+> spec/codegen change is `source` on `SizeRecommendation` (a specced consumer
+> endpoint). The mobile seller console (PR #2) consumes these via raw Dio.
 
 All writes require an `Idempotency-Key` (the existing `requireIdempotencyKey`).
 Ownership is enforced in the seller repository (not-found, never an existence
@@ -114,6 +121,7 @@ leak — the `handleUpdateVariantPrice` pattern).
   AND chart ownership). `DELETE` to detach → falls back to the standard baseline.
 - `GET  /seller/size-charts/standard?garment_type=&gender=` — the EN baseline rows
   as a **copy-from-standard** starting point (read-through to `ref_schema`).
+  **Deferred to PR #2** (a UI-prefill affordance; not needed for the match path).
 
 ## Validation (hard-reject → 422; `internal/seller`)
 
@@ -162,6 +170,16 @@ Backend (steps 2–6) = one mergeable PR. Seller UI + PDP provenance = PR #2. If
 granularity balloons, ship per-product attach first and flag reusable templates
 as a follow-up (already minimal here). Never bypass validation; never JOIN across
 schemas.
+
+## Shipped — backend (PR #1)
+Steps 2–6 of the build plan: migration 0099 (+init lockstep), `internal/seller`
+domain/validation/repo (CRUD + attach + `SizeChartForProduct`), `sizefinder`
+`SellerChart` precedence + `source` on `Recommendation`, core write endpoints +
+the recommend resolver (core → jobs value object), `source` on the specced
+`SizeRecommendation` + Go/Dart regen. Tests: validation table, sizefinder
+precedence (seller→standard→none, BASIC-still-warned), handler status/ownership.
+Migration round-trip + ON DELETE CASCADE verified on PG16. **PR #2 = seller
+console UI (copy-from-standard) + PDP "sized by seller" chip + i18n + goldens.**
 
 ## Out of scope / follow-ups
 - Multiple charts per product / variant-level charts (v1 is one chart per product).
