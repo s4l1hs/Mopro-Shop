@@ -225,7 +225,8 @@
     "sort_default": "Varsayılan",
     "sort_discount": "İndirim Oranı",
     "filter_discounted": "İndirimli",
-    "filter_empty": "Filtreyle eşleşen favori yok"
+    "filter_empty": "Filtreyle eşleşen favori yok",
+    "price_dropped": "Fiyatı düştü −%{pct}"
   },
   "account": {
     "title": "Hesabım",

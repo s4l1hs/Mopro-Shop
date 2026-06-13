@@ -274,9 +274,18 @@ class _FavCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final busy = ref.watch(_atcBusyProvider).contains(product.id);
+    // FAV-07: "fiyatı düştü since you favorited" cue — live price below the
+    // price snapshotted when this item was favorited. No snapshot (favorited
+    // before FAV-07, or no price captured) ⇒ no badge.
+    final snapshot =
+        ref.read(favoritesProvider.notifier).priceAtFavorite(product.id);
+    final droppedPct = (snapshot != null && product.priceMinor < snapshot)
+        ? (((snapshot - product.priceMinor) * 100) / snapshot).round()
+        : 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (droppedPct > 0) _PriceDropBadge(pct: droppedPct),
         Expanded(
           child: ProductCard(
             product: product,
@@ -365,6 +374,50 @@ class _FavCard extends ConsumerWidget {
     } finally {
       busy.state = {...busy.state}..remove(product.id);
     }
+  }
+}
+
+/// FAV-07: the "fiyatı düştü since favorited" cue. A thin pill above the card
+/// (not inside the shared [ProductCard] — §3), distinct from the card's generic
+/// lowest-30d strikethrough: this fires only when the live price is below what
+/// the user saw when they saved the item.
+class _PriceDropBadge extends StatelessWidget {
+  const _PriceDropBadge({required this.pct});
+
+  final int pct;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: cs.tertiaryContainer,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.trending_down_rounded,
+                size: 14, color: cs.onTertiaryContainer),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                'favorites.price_dropped'.tr(namedArgs: {'pct': '$pct'}),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: cs.onTertiaryContainer,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
