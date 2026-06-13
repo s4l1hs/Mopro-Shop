@@ -732,7 +732,6 @@
     "submit": "İade Talebi Oluştur",
     "confirm_title": "İade talebin alındı",
     "confirm_subcopy": "Talebin inceleniyor. Onaylandığında iaden 10 iş günü içinde yapılacak.",
-    "tracking_no": "İade No: #{}",
     "my_returns_cta": "İadelerim",
     "back_home": "Ana sayfaya dön",
     "abandon_title": "Çıkmak istediğine emin misin?",
@@ -749,6 +748,9 @@
     "items_count": "{} ürün",
     "item_line": "{qty} adet · {reason}",
     "photos": "Fotoğraflar",
+    "cargo_code_label": "İade Kargo Kodu",
+    "cargo_carrier": "{carrier} ile gönderin",
+    "dropoff_instructions": "Ürünü kutusuyla birlikte en yakın şubeye bu kodu vererek ücretsiz teslim edin.",
     "original_order": "Siparişe git",
     "detail_title": "İade #{}"
   },

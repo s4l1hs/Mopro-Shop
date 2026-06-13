@@ -122,6 +122,27 @@ class _Body extends StatelessWidget {
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
         ],
+        // RT-02: the return cargo code + carrier so the buyer can ship the item
+        // back (replaces the old return-id-as-tracking-no placeholder).
+        if (ret.shipping != null && ret.shipping!.code.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(
+            'returns.cargo_code_label'.tr(),
+            style: theme.textTheme.titleSmall,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            ret.shipping!.code,
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          Text(
+            'returns.cargo_carrier'
+                .tr(namedArgs: {'carrier': ret.shipping!.carrier}),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ],
         // RT-03: evidence photos (shown when present; capture step gated on
         // storage provisioning).
         if (ret.photoUrls.isNotEmpty) ...[

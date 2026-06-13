@@ -30,6 +30,7 @@ class ReturnFlowState {
     this.notes = const {},
     this.submitting = false,
     this.createdReturnId,
+    this.createdShipping,
     this.error,
   });
 
@@ -39,6 +40,9 @@ class ReturnFlowState {
   final Map<int, String> notes; // orderItemId -> free-text note
   final bool submitting;
   final int? createdReturnId;
+
+  /// RT-02: the created return's cargo code + carrier (for the confirm step).
+  final ReturnShippingDto? createdShipping;
   final String? error;
 
   bool get hasSelection => selected.isNotEmpty;
@@ -52,6 +56,7 @@ class ReturnFlowState {
     Map<int, String>? notes,
     bool? submitting,
     int? createdReturnId,
+    ReturnShippingDto? createdShipping,
     String? error,
     bool clearError = false,
   }) =>
@@ -62,6 +67,7 @@ class ReturnFlowState {
         notes: notes ?? this.notes,
         submitting: submitting ?? this.submitting,
         createdReturnId: createdReturnId ?? this.createdReturnId,
+        createdShipping: createdShipping ?? this.createdShipping,
         error: clearError ? null : (error ?? this.error),
       );
 }
@@ -141,6 +147,7 @@ class ReturnFlowNotifier extends FamilyNotifier<ReturnFlowState, int> {
       state = state.copyWith(
         submitting: false,
         createdReturnId: created.id,
+        createdShipping: created.shipping,
         step: ReturnStep.confirm,
       );
     } catch (_) {

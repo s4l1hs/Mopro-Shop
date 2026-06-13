@@ -137,7 +137,10 @@ class _OrderReturnFlowScreenState extends ConsumerState<OrderReturnFlowScreen> {
           flow: flow,
           onSubmit: () => notifier.submit(widget.orderId),
         ),
-      ReturnStep.confirm => _ConfirmStep(returnId: flow.createdReturnId),
+      ReturnStep.confirm => _ConfirmStep(
+          returnId: flow.createdReturnId,
+          shipping: flow.createdShipping,
+        ),
     };
   }
 }
@@ -509,8 +512,9 @@ class _ReviewStep extends StatelessWidget {
 
 // ── Step 4: confirmation ───────────────────────────────────────────────────────
 class _ConfirmStep extends StatelessWidget {
-  const _ConfirmStep({required this.returnId});
+  const _ConfirmStep({required this.returnId, this.shipping});
   final int? returnId;
+  final ReturnShippingDto? shipping;
 
   @override
   Widget build(BuildContext context) {
@@ -538,11 +542,44 @@ class _ConfirmStep extends StatelessWidget {
               style: theme.textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
-            if (returnId != null) ...[
-              const SizedBox(height: 12),
+            // RT-02: the real return cargo code + carrier + drop-off guidance
+            // (replaces the old return-id-as-tracking-no placeholder).
+            if (shipping != null && shipping!.code.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'returns.cargo_code_label'.tr(),
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      shipping!.code,
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'returns.cargo_carrier'
+                          .tr(namedArgs: {'carrier': shipping!.carrier}),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
               Text(
-                'returns.tracking_no'.tr(args: ['$returnId']),
-                style: theme.textTheme.titleSmall,
+                'returns.dropoff_instructions'.tr(),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                textAlign: TextAlign.center,
               ),
             ],
             const SizedBox(height: 24),

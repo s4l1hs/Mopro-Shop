@@ -2,8 +2,10 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -12,6 +14,26 @@ import (
 	"github.com/mopro/platform/internal/payment"
 	"github.com/mopro/platform/pkg/mediaurl"
 )
+
+// defaultReturnCarrier is the platform's return-leg carrier when RETURN_CARRIER
+// is unset. Not a market constant (a carrier display name) — overridable by env.
+const defaultReturnCarrier = "Aras Kargo"
+
+// returnShipping is the RT-02 return cargo block: a deterministic return cargo
+// code derived from the return id (a real, stable identifier WE own — clearly
+// "İade Kargo Kodu", not a carrier tracking number) + the return carrier. The
+// drop-off instructions are rendered client-side (i18n). NOTE: a live carrier
+// label/tracking integration is a follow-up cargo-adapter vertical.
+func returnShipping(r order.Return) map[string]any {
+	carrier := os.Getenv("RETURN_CARRIER")
+	if carrier == "" {
+		carrier = defaultReturnCarrier
+	}
+	return map[string]any{
+		"code":    fmt.Sprintf("IADE-%07d", r.ID),
+		"carrier": carrier,
+	}
+}
 
 // cdnURLsFromKeys maps storage keys to CDN urls (RT-03 evidence photos); nil/empty
 // → nil so returnJSON omits the key.
@@ -111,6 +133,7 @@ func returnJSON(r order.Return, items []order.ReturnItem, refund *refundView, hi
 		"created_at":  r.CreatedAt,
 		"items":       items,
 		"refund":      refund,
+		"shipping":    returnShipping(r), // RT-02: return cargo code + carrier
 	}
 	if history != nil {
 		out["history"] = history

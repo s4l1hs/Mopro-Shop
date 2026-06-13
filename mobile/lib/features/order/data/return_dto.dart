@@ -107,6 +107,21 @@ class ReturnListItemDto {
   final DateTime createdAt;
 }
 
+/// RT-02: the return cargo block — a stable return cargo code (İade Kargo Kodu,
+/// our own id-derived code, not a live carrier tracking number) + the carrier.
+class ReturnShippingDto {
+  const ReturnShippingDto({required this.code, required this.carrier});
+
+  factory ReturnShippingDto.fromJson(Map<String, dynamic> json) =>
+      ReturnShippingDto(
+        code: (json['code'] as String?) ?? '',
+        carrier: (json['carrier'] as String?) ?? '',
+      );
+
+  final String code;
+  final String carrier;
+}
+
 /// Full return detail (matches GET /returns/{id} and the POST /returns response).
 class ReturnDetailDto {
   const ReturnDetailDto({
@@ -119,6 +134,7 @@ class ReturnDetailDto {
     this.items = const [],
     this.history = const [],
     this.photoUrls = const [],
+    this.shipping,
     this.refund,
   });
 
@@ -139,6 +155,9 @@ class ReturnDetailDto {
         photoUrls: (json['photo_urls'] as List<dynamic>? ?? [])
             .map((e) => e as String)
             .toList(),
+        shipping: json['shipping'] is Map<String, dynamic>
+            ? ReturnShippingDto.fromJson(json['shipping'] as Map<String, dynamic>)
+            : null,
         refund: json['refund'] is Map<String, dynamic>
             ? RefundInfo.fromJson(json['refund'] as Map<String, dynamic>)
             : null,
@@ -158,6 +177,9 @@ class ReturnDetailDto {
 
   /// RT-03: evidence photo CDN urls (empty when none / capture not yet wired).
   final List<String> photoUrls;
+
+  /// RT-02: the return cargo code + carrier (null on pre-RT-02 responses).
+  final ReturnShippingDto? shipping;
   final RefundInfo? refund;
 }
 
