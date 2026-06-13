@@ -959,6 +959,6 @@
     "gender_male": "Male",
     "gender_unspecified": "Unspecified",
     "basic_hint": "Without detailed measurements, we estimate from height + weight + gender.",
-    "basic_warning": "This is an approximate estimate from height/weight/gender and may not be exact."
+    "basic_warning": "This is an approximate estimate based only on your height, weight and gender, and may be inaccurate. For a more reliable result, enter your measurements (chest/bust, waist, hip)."
   }
 }
