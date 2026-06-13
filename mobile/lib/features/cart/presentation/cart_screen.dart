@@ -183,7 +183,12 @@ class CartScreen extends ConsumerWidget {
   // then remove it from the cart.
   void _moveToFavorites(BuildContext context, WidgetRef ref, CartLineDto line) {
     if (!ref.read(isFavoriteProvider(line.productId))) {
-      ref.read(favoritesProvider.notifier).toggle(line.productId);
+      // FAV-07: snapshot the list (pre-basket-discount) unit price — the
+      // apples-to-apples baseline for the favorites grid's catalog price.
+      ref.read(favoritesProvider.notifier).toggle(
+            line.productId,
+            priceMinor: line.listPriceMinor,
+          );
     }
     ref.read(cartProvider.notifier).removeLine(lineId: line.id);
     ScaffoldMessenger.of(context).showSnackBar(

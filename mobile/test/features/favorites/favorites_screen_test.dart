@@ -168,11 +168,18 @@ Future<void> _pump(
   WidgetTester tester, {
   required Size size,
   required Set<int> favIds,
+  List<ProductSummary>? products,
+  Map<String, Object> extraPrefs = const {},
 }) async {
   _filterOverflow(tester);
   await _setView(tester, size);
-  final dio =
-      await _prepare(tester, products: [for (final id in favIds) _p(id)]);
+  final list = products ?? [for (final id in favIds) _p(id)];
+  SharedPreferences.setMockInitialValues({
+    if (list.isNotEmpty)
+      'mopro_favorites': list.map((p) => p.id.toString()).toList(),
+    ...extraPrefs,
+  });
+  final dio = Dio()..httpClientAdapter = _FakeApiAdapter(list);
   final prefs = await SharedPreferences.getInstance();
 
   await tester.pumpWidget(
@@ -438,5 +445,48 @@ void main() {
     expect(find.text('favorites.filter_empty'), findsOneWidget);
     // The true empty state is NOT shown — favorites are intact.
     expect(find.text('favorites.empty_title'), findsNothing);
+  });
+
+  // ── FAV-07: "fiyatı düştü since favorited" cue ──────────────────────────────
+
+  testWidgets('FAV-07: badge shows when the live price is below the snapshot',
+      (tester) async {
+    // Snapshot 30000, live 20000 → dropped.
+    await _pump(
+      tester,
+      size: const Size(375, 900),
+      favIds: const {1},
+      products: [_p(1, priceMinor: 20000)],
+      extraPrefs: {
+        'mopro_favorite_prices': jsonEncode({'1': 30000}),
+      },
+    );
+    expect(find.text('favorites.price_dropped'), findsOneWidget);
+  });
+
+  testWidgets('FAV-07: no badge without a snapshot (pre-FAV-07 favorite)',
+      (tester) async {
+    await _pump(
+      tester,
+      size: const Size(375, 900),
+      favIds: const {1},
+      products: [_p(1, priceMinor: 20000)],
+      // no mopro_favorite_prices entry
+    );
+    expect(find.text('favorites.price_dropped'), findsNothing);
+  });
+
+  testWidgets('FAV-07: no badge when the live price is at/above the snapshot',
+      (tester) async {
+    await _pump(
+      tester,
+      size: const Size(375, 900),
+      favIds: const {1},
+      products: [_p(1, priceMinor: 20000)],
+      extraPrefs: {
+        'mopro_favorite_prices': jsonEncode({'1': 20000}), // unchanged
+      },
+    );
+    expect(find.text('favorites.price_dropped'), findsNothing);
   });
 }

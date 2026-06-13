@@ -120,7 +120,12 @@ class ProductCard extends ConsumerWidget {
                       isFav: isFav,
                       onToggle: () {
                         // Guests can toggle locally; server sync happens on auth.
-                        ref.read(favoritesProvider.notifier).toggle(product.id);
+                        // FAV-07: snapshot the price the user sees, for the
+                        // favorites "fiyatı düştü" cue.
+                        ref.read(favoritesProvider.notifier).toggle(
+                              product.id,
+                              priceMinor: product.priceMinor,
+                            );
                       },
                     ),
                   ),

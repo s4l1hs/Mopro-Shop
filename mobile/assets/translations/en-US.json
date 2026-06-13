@@ -225,7 +225,8 @@
     "sort_default": "Default",
     "sort_discount": "Discount",
     "filter_discounted": "Discounted",
-    "filter_empty": "No favourites match the filters"
+    "filter_empty": "No favourites match the filters",
+    "price_dropped": "Price dropped −{pct}%"
   },
   "account": {
     "title": "My Account",
