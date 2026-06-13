@@ -632,7 +632,7 @@ func main() {
 		httpTrace(requireAuth(http.HandlerFunc(handlePutFitProfile(sizefit)))),
 	)
 	mux.Handle("GET /products/{id}/size-recommendation",
-		httpTrace(requireAuth(http.HandlerFunc(handleSizeRecommendation(sizefit, catalogSvc, defaultLocale)))),
+		httpTrace(requireAuth(http.HandlerFunc(handleSizeRecommendation(sizefit, catalogSvc, sellerSvc, defaultLocale)))),
 	)
 	mux.Handle("POST /orders/{id}/status",
 		httpTrace(http.HandlerFunc(handleUpdateOrderStatus(orderSvc))),
@@ -758,6 +758,22 @@ func main() {
 	// P-032: a seller updates the price of a variant they own; #92 trigger logs history.
 	mux.Handle("PUT /seller/variants/{id}/price",
 		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleUpdateVariantPrice(catalogSvc))))),
+	)
+	// Seller-entered size charts: the match prefers them over the EN standard baseline.
+	mux.Handle("POST /seller/size-charts",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleCreateSizeChart(sellerSvc))))),
+	)
+	mux.Handle("GET /seller/size-charts",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleListSizeCharts(sellerSvc))))),
+	)
+	mux.Handle("PUT /seller/size-charts/{id}",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleUpdateSizeChart(sellerSvc))))),
+	)
+	mux.Handle("POST /seller/products/{id}/size-chart",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleAttachProductChart(sellerSvc, catalogSvc))))),
+	)
+	mux.Handle("DELETE /seller/products/{id}/size-chart",
+		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleDetachProductChart(sellerSvc, catalogSvc))))),
 	)
 	mux.Handle("GET /seller/questions",
 		httpTrace(requireAuth(requireSellerRole(http.HandlerFunc(handleSellerQuestions(storefrontReader, ugcSvc))))),

@@ -13,8 +13,31 @@ import (
 
 	"github.com/mopro/platform/internal/catalog"
 	"github.com/mopro/platform/internal/identity/middleware"
+	"github.com/mopro/platform/internal/seller"
 	"github.com/mopro/platform/internal/sizefinder"
 )
+
+// toSellerChart maps a resolved seller.SizeChart to the value object sizefinder
+// consumes (passed over the internal recommend body — jobs-svc never reads
+// seller_schema, §5).
+func toSellerChart(c seller.SizeChart) *sizefinder.SellerChart {
+	rows := make([]sizefinder.ChartRow, len(c.Rows))
+	for i, r := range c.Rows {
+		rows[i] = sizefinder.ChartRow{
+			GarmentType: sizefinder.GarmentType(c.GarmentType),
+			SizeLabel:   r.SizeLabel,
+			SortRank:    r.SortRank,
+			Measurement: r.Measurement,
+			MinMM:       r.MinMM,
+			MaxMM:       r.MaxMM,
+		}
+	}
+	return &sizefinder.SellerChart{
+		GarmentType: sizefinder.GarmentType(c.GarmentType),
+		Gender:      c.Gender,
+		Rows:        rows,
+	}
+}
 
 // Size-fit consumer API (docs/internal/size-fit.md). The sizefinder module is
 // constitutionally jobs-svc, so these handlers are thin auth-gated proxies over
@@ -126,7 +149,7 @@ func handlePutFitProfile(client *sizefitClient) http.HandlerFunc {
 
 // handleSizeRecommendation serves GET /products/{id}/size-recommendation.
 // Core resolves the product title (server-authoritative) then asks jobs-svc.
-func handleSizeRecommendation(client *sizefitClient, svc catalog.Service, defaultLocale string) http.HandlerFunc {
+func handleSizeRecommendation(client *sizefitClient, svc catalog.Service, sellerSvc seller.Service, defaultLocale string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
@@ -140,8 +163,16 @@ func handleSizeRecommendation(client *sizefitClient, svc catalog.Service, defaul
 			return
 		}
 		title, _ := resolveTranslation(translations, parseLocale(r, defaultLocale), defaultLocale)
-		status, body, err := client.do(http.MethodPost, "/internal/sizefit/recommend",
-			map[string]any{"user_id": userID, "title": title})
+		// Precedence resolution (§5-safe, in-process): a seller chart attached to
+		// this product wins over the standard baseline. Core reads seller_schema
+		// and hands jobs-svc a value object; jobs-svc never touches seller_schema.
+		payload := map[string]any{"user_id": userID, "title": title}
+		if chart, ok, cerr := sellerSvc.SizeChartForProduct(r.Context(), id); cerr == nil && ok {
+			payload["seller_chart"] = toSellerChart(chart)
+		} else if cerr != nil {
+			slog.Error("sizefit: resolve seller chart", "product_id", id, "err", cerr)
+		}
+		status, body, err := client.do(http.MethodPost, "/internal/sizefit/recommend", payload)
 		if err != nil || status != http.StatusOK {
 			slog.Error("sizefit: jobs-svc recommend", "err", err, "status", status)
 			jsonError(w, "internal error", http.StatusInternalServerError)
