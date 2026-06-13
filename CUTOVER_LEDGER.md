@@ -93,7 +93,18 @@
 - **PLP-17 + PD-04** — Trendyol's "Resmi Satıcı" badge, absent on both the PLP card and the PDP seller card; gated on a non-existent seller flag. Migration **0090** adds `seller_schema.sellers.is_official` (sellers 1,3 seeded official — content data for the walk; 2 stays plain so the difference shows). `Seller.IsOfficial` + `seller.Service.OfficialSellerIDs(ids)` (a single-schema batch lookup).
 - **The §5 crux (no cross-schema JOIN).** The flag is `seller_schema`; the card/product is `catalog`. Two §5-safe carriers, both in-process: **PDP (PD-04)** reuses the existing `sellerSvc.GetByID` in `handleGetProductDetail` → `Product.seller_official`. **PLP card (PLP-17)** app-merges in the handler — `handleListProducts`/`handleSearch` collect the page's distinct `SellerID`s, call `OfficialSellerIDs`, and set `ProductSummary.is_official_seller`. The merge lives in `cmd/core-svc` (legally uses both `catalog` + `seller` Services); **`internal/catalog` never imports `seller`** — boundary checker green, no JOIN. Mirrors the P-029 bestseller app-merge.
 - **Spec + codegen:** `Product.seller_official` + `ProductSummary.is_official_seller`; Go + Dart regenerated (drift gate green). **Contract test** asserts `seller_official=true` for an official seller; **seller integration test** verifies 0090 + the `OfficialSellerIDs` set (excludes non-official + absent ids). UI: blue "Resmi Satıcı" verified ribbon on the card (top-left stack) + a verified check on `PdpSellerCard`. Discovery: `docs/internal/plp-17.md`.
-- **PD-04 is partial:** the official badge is done; the **seller rating** half stays open (no seller-rating aggregate yet).
+- **PD-04 is partial:** the official badge is done; the **seller rating** half stays open (no seller-rating aggregate yet). → **✅ RESOLVED in the PDP batch** (below).
+
+---
+
+## 4g. PDP feature batch — PD-02 · PD-03 · PD-04 · PD-09 — ✅ SHIPPED (`feat/pdp-batch`)
+
+Four banked PDP items in one lane (they share the PDP screen widget). Scoped from the audits first (`docs/internal/pdp-batch.md`).
+- **PD-02 swatches (FE-only):** variant colour dot on the PDP chips via a TR/EN colour-name→hex map over the already-served `Variant.color`; unknown names stay text-only. **Discovery:** doable FE-only — not blocked on PLP-13 Ph2 (full per-variant colour-attribute model stays future for non-name colours).
+- **PD-03 basket-discount (backend+codegen, NO migration):** `Product.basket_discount_pct` (spec + `catalog.Product` + `GetByID` + DTO) → "Sepette %X" pill on `PdpPriceBlock`. **§4:** display==charge — the SAME `products.basket_discount_pct` CT-09 charges (migration 0091); no client recompute → not a §12 trigger. Contract/handler test asserts display==charge + omitted-when-0. i18n `product.basket_discount` +DE/AR.
+- **PD-04 seller rating (backend+codegen, NO migration):** `Product.seller_rating_avg/_count` via the existing `SellerReviewSummary` aggregate (narrow `sellerRatingReader` carrier — §5-safe catalog read, no JOIN). `PdpSellerCard` star+avg+count + empty state. **Discovery:** the aggregate already existed (storefront) — the "no aggregate" defer was stale.
+- **PD-09 sticky bar (FE-only polish):** `PdpStickyCta` surfaced + elevated (z-order) + `SafeArea(top:false)`; no occlusion (bottomNavigationBar reserves height). No sticky-gallery redesign (NEEDS-DECISION untouched).
+- **Footprint:** **zero migrations** (block 0100–0102 unused — both data sources pre-existed); codegen added 3 `Product` fields (Go+Dart regen, this lane owned it). Goldens (PDP visuals changed) → Linux rebaseline bot; behaviour covered by widget tests. Doc: `docs/internal/pdp-batch.md`.
 
 ---
 

@@ -114,14 +114,14 @@ func (r *pgxRepository) GetByID(ctx context.Context, id int64) (Product, []Varia
 	var p Product
 	err := r.pool.QueryRow(ctx,
 		`SELECT id, seller_id, category_id, brand, default_currency, default_locale,
-		        status, created_at, updated_at
+		        status, created_at, updated_at, basket_discount_pct
 		FROM catalog_schema.products
 		WHERE id = $1`,
 		id,
 	).Scan(
 		&p.ID, &p.SellerID, &p.CategoryID, &p.Brand,
 		&p.DefaultCurrency, &p.DefaultLocale,
-		&p.Status, &p.CreatedAt, &p.UpdatedAt,
+		&p.Status, &p.CreatedAt, &p.UpdatedAt, &p.BasketDiscountPct,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

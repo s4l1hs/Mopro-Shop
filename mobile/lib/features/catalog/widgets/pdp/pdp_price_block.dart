@@ -17,6 +17,7 @@ class PdpPriceBlock extends StatelessWidget {
     this.currency,
     this.originalPriceMinor,
     this.lowestIn30DaysMinor,
+    this.basketDiscountPct,
     super.key,
   });
 
@@ -24,6 +25,10 @@ class PdpPriceBlock extends StatelessWidget {
   final String? currency;
   final int? originalPriceMinor;
   final int? lowestIn30DaysMinor;
+
+  /// PD-03: the CT-09 seller-funded "Sepette %X İndirim" — the SAME snapshot the
+  /// order charges (display==charge). Null/0 → no pill.
+  final int? basketDiscountPct;
 
   bool get _hasDiscount =>
       originalPriceMinor != null && originalPriceMinor! > priceMinor;
@@ -63,6 +68,12 @@ class PdpPriceBlock extends StatelessWidget {
             color: cs.primary,
           ),
         ),
+        // PD-03: "Sepette %X İndirim" — the CT-09 charged basket discount, surfaced
+        // on the PDP (display==charge; same products.basket_discount_pct).
+        if (basketDiscountPct != null && basketDiscountPct! > 0) ...[
+          const SizedBox(height: 4),
+          _BasketDiscountPill(percent: basketDiscountPct!),
+        ],
         // P-030: show the lowest-30-day price only on a discounted variant whose
         // current price is NOT the 30-day low — the consumer-protection signal.
         // The `_hasDiscount &&` guard aligns this with the product card's
@@ -84,6 +95,35 @@ class PdpPriceBlock extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// "Sepette %X İndirim" pill (mirrors the product card's), brand-orange tint.
+class _BasketDiscountPill extends StatelessWidget {
+  const _BasketDiscountPill({required this.percent});
+  final int percent;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: cs.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        'product.basket_discount'.tr(namedArgs: {'pct': '$percent'}),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        softWrap: false,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: cs.primary,
+        ),
+      ),
     );
   }
 }

@@ -133,7 +133,8 @@
   "product": {
     "remove_from_favorites": "Aus Favoriten entfernen",
     "decrease_qty": "Menge verringern",
-    "increase_qty": "Menge erhöhen"
+    "increase_qty": "Menge erhöhen",
+    "basket_discount": "{pct}% Rabatt im Warenkorb"
   },
   "status": {
     "return_requested": "Rücksendung angefragt",

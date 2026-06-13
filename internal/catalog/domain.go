@@ -51,6 +51,10 @@ type Product struct {
 	Status          string    `json:"status"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
+	// BasketDiscountPct is the whole-percent seller-funded "Sepette %X İndirim"
+	// (products.basket_discount_pct, CT-09 migration 0091) — the SAME snapshot the
+	// order charges (order_items.basket_discount_pct) → display==charge. 0/nil = none.
+	BasketDiscountPct *int `json:"basket_discount_pct,omitempty"`
 }
 
 // Variant is a single SKU within a product (color/size/price combination).

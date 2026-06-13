@@ -345,7 +345,14 @@ type deliveryEstimator interface {
 	EstimateETA(ctx context.Context, market, originCity string, destCity *string) (shipping.ETAResult, error)
 }
 
-func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSvc deliveryEstimator, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
+// sellerRatingReader is the narrow slice of catalog.SellerStorefrontReader the
+// PDP needs for PD-04 — the seller's aggregate review rating. Kept minimal so
+// tests stub one method, not the whole reader.
+type sellerRatingReader interface {
+	SellerReviewSummary(ctx context.Context, sellerID int64) (avg float64, count int, err error)
+}
+
+func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, ratingReader sellerRatingReader, etaSvc deliveryEstimator, defaultLocale, defaultMarket, cashbackCurrency string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {
@@ -423,6 +430,21 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 			slog.Error("catalog: resolve seller for product", "seller_id", p.SellerID, "err", sErr)
 		}
 
+		// PD-04: the seller's aggregate review rating for the PDP seller card. §5-safe
+		// — a catalog read (reviews live in catalog), no cross-schema JOIN. Empty
+		// state (count 0 → nil avg) renders no rating. A failure never fails the PDP.
+		var sellerRatingAvg *float64
+		var sellerRatingCount int
+		if ratingReader != nil {
+			if avg, cnt, rErr := ratingReader.SellerReviewSummary(r.Context(), p.SellerID); rErr != nil {
+				slog.Error("catalog: seller review summary", "seller_id", p.SellerID, "err", rErr)
+			} else if cnt > 0 {
+				a := avg
+				sellerRatingAvg = &a
+				sellerRatingCount = cnt
+			}
+		}
+
 		// Pre-purchase delivery estimate (P-034). dest_city is optional — the
 		// client passes the user's selected delivery city when known; absent (a
 		// guest) yields the conservative national fallback. A failure here never
@@ -462,6 +484,13 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 			attributes = []catalog.ProductAttribute{} // spec-required array — never null
 		}
 
+		// PD-03: surface the CT-09 basket discount only when set (>0). It is the same
+		// products.basket_discount_pct the order charges → display==charge.
+		var basketDiscountPct *int
+		if p.BasketDiscountPct != nil && *p.BasketDiscountPct > 0 {
+			basketDiscountPct = p.BasketDiscountPct
+		}
+
 		// Flat, spec-conformant Product (PD-06): the previous {product, variants,
 		// translations, …} envelope did not match the OpenAPI Product schema (nor
 		// the generated mobile client), so the PDP could not parse it.
@@ -478,9 +507,12 @@ func handleGetProductDetail(svc catalog.Service, sellerSvc seller.Service, etaSv
 			Description:     description,
 			Variants:        variantsOut,
 			Attributes:      attributes,
-			CashbackPreview: cashbackPreview,
-			DeliveryEta:     deliveryETA,
-			CreatedAt:       p.CreatedAt.Format(time.RFC3339),
+			CashbackPreview:   cashbackPreview,
+			DeliveryEta:       deliveryETA,
+			CreatedAt:         p.CreatedAt.Format(time.RFC3339),
+			BasketDiscountPct: basketDiscountPct,
+			SellerRatingAvg:   sellerRatingAvg,
+			SellerRatingCount: sellerRatingCount,
 		})
 	}
 }
@@ -504,6 +536,13 @@ type productDetailJSON struct {
 	CashbackPreview *cashbackPreviewJSON       `json:"cashback_preview"`
 	DeliveryEta     *deliveryEtaJSON           `json:"delivery_eta"`
 	CreatedAt       string                     `json:"created_at"`
+	// BasketDiscountPct surfaces the CT-09 seller-funded "Sepette %X" on the PDP
+	// (PD-03). Same snapshot the order charges → display==charge. Omitted when 0.
+	BasketDiscountPct *int `json:"basket_discount_pct,omitempty"`
+	// SellerRatingAvg/Count: the seller's aggregate review rating (PD-04). Avg is
+	// null + count 0 when the seller has no reviews → the card shows no rating.
+	SellerRatingAvg   *float64 `json:"seller_rating_avg"`
+	SellerRatingCount int      `json:"seller_rating_count"`
 }
 
 // variantDetailJSON is the spec Variant: image_urls is the CDN-resolved gallery

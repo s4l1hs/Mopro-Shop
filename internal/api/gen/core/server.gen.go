@@ -552,7 +552,12 @@ type Product struct {
 	// slug + locale-resolved name + value(s). Empty array when the product
 	// has no attributes.
 	Attributes []ProductAttribute `json:"attributes"`
-	Brand      string             `json:"brand"`
+
+	// BasketDiscountPct PD-03: the whole-percent seller-funded "Sepette %X İndirim" (CT-09).
+	// The SAME products.basket_discount_pct snapshotted onto the order at
+	// checkout → display==charge. Omitted/null when 0 (no discount).
+	BasketDiscountPct *int   `json:"basket_discount_pct"`
+	Brand             string `json:"brand"`
 
 	// CashbackPreview Preview of the perpetual monthly cashback amount for a product.
 	// Computed handler-layer using the formula:
@@ -577,6 +582,13 @@ type Product struct {
 	// "Resmi Satıcı" badge on the PDP seller card (PD-04). From
 	// seller_schema.sellers.is_official, resolved in-process (no JOIN, §5).
 	SellerOfficial *bool `json:"seller_official,omitempty"`
+
+	// SellerRatingAvg PD-04: the seller's aggregate review rating (mean of their products'
+	// reviews). Null when the seller has no reviews → the card shows no rating.
+	SellerRatingAvg *float32 `json:"seller_rating_avg"`
+
+	// SellerRatingCount PD-04: number of reviews backing seller_rating_avg (0 = none).
+	SellerRatingCount *int `json:"seller_rating_count,omitempty"`
 
 	// SellerSlug URL-safe identifier for the seller; used to deep-link to the seller
 	// storefront at /sellers/:slug. Null when the product's seller_id does

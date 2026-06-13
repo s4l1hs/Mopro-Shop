@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mopro/design/theme.dart';
+import 'package:mopro/features/catalog/widgets/pdp/pdp_colour_swatch.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_price_block.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_seller_card.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_sticky_cta.dart';
@@ -88,6 +89,25 @@ void main() {
       );
       expect(find.textContaining('product.lowest_30d'), findsNothing);
     });
+
+    // PD-03: the "Sepette %X" basket-discount pill (reuses the card's i18n key).
+    testWidgets('shows the basket-discount pill when pct > 0', (tester) async {
+      await _pump(
+        tester,
+        const PdpPriceBlock(priceMinor: 12900, basketDiscountPct: 10),
+      );
+      expect(find.textContaining('product.basket_discount'), findsOneWidget);
+    });
+
+    testWidgets('hides the basket-discount pill when null or 0', (tester) async {
+      await _pump(tester, const PdpPriceBlock(priceMinor: 12900));
+      expect(find.textContaining('product.basket_discount'), findsNothing);
+      await _pump(
+        tester,
+        const PdpPriceBlock(priceMinor: 12900, basketDiscountPct: 0),
+      );
+      expect(find.textContaining('product.basket_discount'), findsNothing);
+    });
   });
 
   group('PdpVariantSelector', () {
@@ -148,6 +168,22 @@ void main() {
       final oosLabel = tester.widget<Text>(find.text('Mavi'));
       expect(oosLabel.style?.decoration, TextDecoration.lineThrough);
     });
+
+    // PD-02: a known colour name renders a swatch; an unknown name stays text-only.
+    testWidgets('renders a colour swatch only for recognised colours',
+        (tester) async {
+      await _pump(
+        tester,
+        PdpVariantSelector(
+          variants: [_v(1, color: 'Kırmızı'), _v(2, color: 'Galaktik')],
+          selected: _v(1, color: 'Kırmızı'),
+          onChanged: (_) {},
+        ),
+      );
+      expect(find.byType(FilterChip), findsNWidgets(2));
+      // Only "Kırmızı" maps to a colour → exactly one swatch.
+      expect(find.byType(ColourSwatch), findsOneWidget);
+    });
   });
 
   group('PdpSellerCard', () {
@@ -166,6 +202,28 @@ void main() {
     testWidgets('omits the link when onTap is null', (tester) async {
       await _pump(tester, const PdpSellerCard(sellerName: 'Acme Store'));
       expect(find.byType(TextButton), findsNothing);
+    });
+
+    // PD-04: seller rating renders when the seller has reviews.
+    testWidgets('shows the rating when ratingCount > 0', (tester) async {
+      await _pump(
+        tester,
+        const PdpSellerCard(
+            sellerName: 'Acme Store', ratingAvg: 4.5, ratingCount: 23),
+      );
+      expect(find.byIcon(Icons.star), findsOneWidget);
+      expect(find.text('4.5'), findsOneWidget);
+      expect(find.textContaining('product.review_count'), findsOneWidget);
+    });
+
+    // PD-04 empty state: no reviews → no star/rating.
+    testWidgets('hides the rating when ratingCount is 0', (tester) async {
+      await _pump(
+        tester,
+        const PdpSellerCard(sellerName: 'Acme Store', ratingCount: 0),
+      );
+      expect(find.byIcon(Icons.star), findsNothing);
+      expect(find.textContaining('product.review_count'), findsNothing);
     });
   });
 

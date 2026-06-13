@@ -24,40 +24,51 @@ class PdpStickyCta extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: Row(
-          children: [
-            if (selectedVariant != null) ...[
-              Text(
-                MoneyUtils.formatMinor(selectedVariant!.priceMinor),
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.colorScheme.primary,
+    // PD-09 polish: a surfaced, elevated bar so it reads as a distinct overlay
+    // above the scrolling content (z-order shadow), not floating text on the
+    // scaffold. SafeArea(top:false) — this is a bottom bar, so only the bottom
+    // inset (home indicator / gesture nav) applies; the body already reserves
+    // this bar's height (mounted as bottomNavigationBar) → no content occlusion.
+    return Material(
+      color: theme.colorScheme.surface,
+      elevation: 8,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Row(
+            children: [
+              if (selectedVariant != null) ...[
+                Text(
+                  MoneyUtils.formatMinor(selectedVariant!.priceMinor),
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: FilledButton(
+                  onPressed: selectedVariant != null && !isMutating
+                      ? onAddToCart
+                      : null,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(52),
+                  ),
+                  child: isMutating
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text('product.add_to_cart'.tr()),
                 ),
               ),
-              const SizedBox(width: 12),
             ],
-            Expanded(
-              child: FilledButton(
-                onPressed:
-                    selectedVariant != null && !isMutating ? onAddToCart : null,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(52),
-                ),
-                child: isMutating
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text('product.add_to_cart'.tr()),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
