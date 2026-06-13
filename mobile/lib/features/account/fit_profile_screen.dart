@@ -24,8 +24,10 @@ class _FitProfileScreenState extends ConsumerState<FitProfileScreen> {
     'hip': TextEditingController(),
     'inseam': TextEditingController(),
     'height': TextEditingController(),
+    'weight': TextEditingController(),
   };
   String _fitPref = 'regular';
+  String _gender = 'unspecified';
   bool _hydrated = false;
   bool _saving = false;
 
@@ -51,6 +53,8 @@ class _FitProfileScreenState extends ConsumerState<FitProfileScreen> {
     set('hip', p.hipMm);
     set('inseam', p.inseamMm);
     set('height', p.heightMm);
+    if (p.weightG != null) _controllers['weight']!.text = '${p.weightG! ~/ 1000}';
+    _gender = p.gender ?? 'unspecified';
     _fitPref = p.fitPref;
   }
 
@@ -59,6 +63,13 @@ class _FitProfileScreenState extends ConsumerState<FitProfileScreen> {
     if (t.isEmpty) return null;
     final cm = int.tryParse(t);
     return cm == null ? null : cm * 10;
+  }
+
+  int? _grams(String key) {
+    final t = _controllers[key]!.text.trim();
+    if (t.isEmpty) return null;
+    final kg = int.tryParse(t);
+    return kg == null ? null : kg * 1000;
   }
 
   Future<void> _save() async {
@@ -71,6 +82,8 @@ class _FitProfileScreenState extends ConsumerState<FitProfileScreen> {
               hipMm: _mm('hip'),
               inseamMm: _mm('inseam'),
               heightMm: _mm('height'),
+              weightG: _grams('weight'),
+              gender: _gender,
               fitPref: _fitPref,
             ),
           );
@@ -135,7 +148,48 @@ class _FitProfileScreenState extends ConsumerState<FitProfileScreen> {
                 field('hip', 'fit.hip'.tr()),
                 field('inseam', 'fit.inseam'.tr()),
                 field('height', 'fit.height'.tr()),
-                const SizedBox(height: 4),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: TextField(
+                    controller: _controllers['weight'],
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: InputDecoration(
+                      labelText: 'fit.weight'.tr(),
+                      suffixText: 'fit.kg'.tr(),
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                Text('fit.gender_label'.tr(), style: theme.textTheme.titleSmall),
+                const SizedBox(height: 8),
+                SegmentedButton<String>(
+                  segments: [
+                    ButtonSegment(
+                      value: 'female',
+                      label: Text('fit.gender_female'.tr()),
+                    ),
+                    ButtonSegment(
+                      value: 'male',
+                      label: Text('fit.gender_male'.tr()),
+                    ),
+                    ButtonSegment(
+                      value: 'unspecified',
+                      label: Text('fit.gender_unspecified'.tr()),
+                    ),
+                  ],
+                  selected: {_gender},
+                  onSelectionChanged: (sel) =>
+                      setState(() => _gender = sel.first),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'fit.basic_hint'.tr(),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 16),
                 Text('fit.pref_label'.tr(), style: theme.textTheme.titleSmall),
                 const SizedBox(height: 8),
                 SegmentedButton<String>(

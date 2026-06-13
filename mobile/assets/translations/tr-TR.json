@@ -987,6 +987,14 @@
     "signal_size_up": "Üst sınıra yakınsın; bol sevenler bir üst bedeni düşünebilir.",
     "signal_size_down": "Alt sınıra yakınsın; dar sevenler bir alt bedeni düşünebilir.",
     "cta_complete_profile": "Beden önerisi için ölçülerini ekle.",
-    "cta_button": "Ölçü gir"
+    "cta_button": "Ölçü gir",
+    "weight": "Kilo",
+    "kg": "kg",
+    "gender_label": "Cinsiyet",
+    "gender_female": "Kadın",
+    "gender_male": "Erkek",
+    "gender_unspecified": "Belirtilmemiş",
+    "basic_hint": "Detaylı ölçü yoksa boy + kilo + cinsiyet ile yaklaşık bir tahmin yapılır.",
+    "basic_warning": "Bu öneri boy/kilo/cinsiyete dayalı yaklaşık bir tahmindir; kesin olmayabilir."
   }
 }
