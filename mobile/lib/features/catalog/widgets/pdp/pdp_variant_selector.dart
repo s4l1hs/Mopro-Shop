@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:mopro/features/catalog/widgets/pdp/pdp_colour_swatch.dart';
 import 'package:mopro_api/mopro_api.dart';
 
 /// Variant chips for the PDP buy-box. The catalog API returns a flat
@@ -42,7 +43,11 @@ class PdpVariantSelector extends StatelessWidget {
           runSpacing: 8,
           children: variants.map((v) {
             final inStock = v.stock > 0;
+            // PD-02: show a colour swatch when the variant's real `color` name maps
+            // to a known colour; unknown names stay text-only (no fake swatch).
+            final swatch = colourForName(v.color);
             return FilterChip(
+              avatar: swatch != null ? ColourSwatch(colour: swatch) : null,
               label: Text(
                 variantLabel(v),
                 style: inStock

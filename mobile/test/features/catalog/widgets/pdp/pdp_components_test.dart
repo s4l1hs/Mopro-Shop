@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mopro/design/theme.dart';
+import 'package:mopro/features/catalog/widgets/pdp/pdp_colour_swatch.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_price_block.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_seller_card.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_sticky_cta.dart';
@@ -166,6 +167,22 @@ void main() {
       expect(inStockChip.onSelected, isNotNull);
       final oosLabel = tester.widget<Text>(find.text('Mavi'));
       expect(oosLabel.style?.decoration, TextDecoration.lineThrough);
+    });
+
+    // PD-02: a known colour name renders a swatch; an unknown name stays text-only.
+    testWidgets('renders a colour swatch only for recognised colours',
+        (tester) async {
+      await _pump(
+        tester,
+        PdpVariantSelector(
+          variants: [_v(1, color: 'Kırmızı'), _v(2, color: 'Galaktik')],
+          selected: _v(1, color: 'Kırmızı'),
+          onChanged: (_) {},
+        ),
+      );
+      expect(find.byType(FilterChip), findsNWidgets(2));
+      // Only "Kırmızı" maps to a colour → exactly one swatch.
+      expect(find.byType(ColourSwatch), findsOneWidget);
     });
   });
 
