@@ -711,6 +711,7 @@
     "go_orders": "Go to my orders",
     "return_no": "Return No",
     "items_count": "{} items",
+    "item_line": "{qty} × {reason}",
     "original_order": "View order",
     "detail_title": "Return #{}"
   },

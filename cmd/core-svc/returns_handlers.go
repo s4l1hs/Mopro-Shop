@@ -119,8 +119,10 @@ func handleCreateReturn(returnSvc order.ReturnService) http.HandlerFunc {
 			Reason      string `json:"reason"`
 			Description string `json:"description"`
 			Items       []struct {
-				OrderItemID int64 `json:"order_item_id"`
-				Quantity    int   `json:"quantity"`
+				OrderItemID int64  `json:"order_item_id"`
+				Quantity    int    `json:"quantity"`
+				Reason      string `json:"reason"` // RT-05: optional per-line reason
+				Note        string `json:"note"`   // RT-05: optional per-line note
 			} `json:"items"`
 		}
 		if err := decodeJSON(w, r, &body); err != nil {
@@ -133,7 +135,12 @@ func handleCreateReturn(returnSvc order.ReturnService) http.HandlerFunc {
 			Description: body.Description,
 		}
 		for _, it := range body.Items {
-			in.Items = append(in.Items, order.ReturnItemInput{OrderItemID: it.OrderItemID, Quantity: it.Quantity})
+			in.Items = append(in.Items, order.ReturnItemInput{
+				OrderItemID: it.OrderItemID,
+				Quantity:    it.Quantity,
+				Reason:      order.ReturnReason(it.Reason),
+				Note:        it.Note,
+			})
 		}
 
 		rec, items, err := returnSvc.CreateReturn(r.Context(), in)

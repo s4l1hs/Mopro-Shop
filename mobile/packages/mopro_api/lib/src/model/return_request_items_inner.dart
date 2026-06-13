@@ -21,6 +21,10 @@ class ReturnRequestItemsInner {
     required  this.orderItemId,
 
     required  this.quantity,
+
+     this.reason,
+
+     this.note,
   });
 
   @JsonKey(
@@ -48,17 +52,47 @@ class ReturnRequestItemsInner {
 
 
 
+      /// RT-05: optional per-line return reason. When omitted the header reason applies. 
+  @JsonKey(
+    
+    name: r'reason',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final ReturnRequestItemsInnerReasonEnum? reason;
+
+
+
+      /// RT-05: optional per-line free-text note. 
+  @JsonKey(
+    
+    name: r'note',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final String? note;
+
+
+
 
 
     @override
     bool operator ==(Object other) => identical(this, other) || other is ReturnRequestItemsInner &&
       other.orderItemId == orderItemId &&
-      other.quantity == quantity;
+      other.quantity == quantity &&
+      other.reason == reason &&
+      other.note == note;
 
     @override
     int get hashCode =>
         orderItemId.hashCode +
-        quantity.hashCode;
+        quantity.hashCode +
+        reason.hashCode +
+        note.hashCode;
 
   factory ReturnRequestItemsInner.fromJson(Map<String, dynamic> json) => _$ReturnRequestItemsInnerFromJson(json);
 
@@ -70,4 +104,34 @@ class ReturnRequestItemsInner {
   }
 
 }
+
+/// RT-05: optional per-line return reason. When omitted the header reason applies. 
+enum ReturnRequestItemsInnerReasonEnum {
+    /// RT-05: optional per-line return reason. When omitted the header reason applies. 
+@JsonValue(r'wrong_product')
+wrongProduct(r'wrong_product'),
+    /// RT-05: optional per-line return reason. When omitted the header reason applies. 
+@JsonValue(r'not_as_described')
+notAsDescribed(r'not_as_described'),
+    /// RT-05: optional per-line return reason. When omitted the header reason applies. 
+@JsonValue(r'damaged')
+damaged(r'damaged'),
+    /// RT-05: optional per-line return reason. When omitted the header reason applies. 
+@JsonValue(r'size_issue')
+sizeIssue(r'size_issue'),
+    /// RT-05: optional per-line return reason. When omitted the header reason applies. 
+@JsonValue(r'changed_mind')
+changedMind(r'changed_mind'),
+    /// RT-05: optional per-line return reason. When omitted the header reason applies. 
+@JsonValue(r'other')
+other(r'other');
+
+const ReturnRequestItemsInnerReasonEnum(this.value);
+
+final String value;
+
+@override
+String toString() => value;
+}
+
 

@@ -233,6 +233,47 @@ func TestCreateReturn_HappyPath(t *testing.T) {
 	}
 }
 
+// RT-05: per-line reasons are stored; a line without one falls back to the header.
+func TestCreateReturn_PerItemReasons(t *testing.T) {
+	o := deliveredOrder(1)
+	items := []OrderItem{{ID: 10, Qty: 1, UnitPriceMinor: 5000}, {ID: 11, Qty: 1, UnitPriceMinor: 3000}}
+	s := svcWith(o, items, &fakeReturnRepo{})
+	_, ri, err := s.CreateReturn(context.Background(), ReturnInput{
+		OrderID: 1, UserID: 7, Reason: ReasonDamaged,
+		Items: []ReturnItemInput{
+			{OrderItemID: 10, Quantity: 1, Reason: ReasonSizeIssue, Note: "too small"},
+			{OrderItemID: 11, Quantity: 1}, // no line reason → header fallback
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byItem := map[int64]ReturnItem{}
+	for _, it := range ri {
+		byItem[it.OrderItemID] = it
+	}
+	if byItem[10].Reason != ReasonSizeIssue || byItem[10].Note != "too small" {
+		t.Errorf("line 10: reason=%q note=%q", byItem[10].Reason, byItem[10].Note)
+	}
+	if byItem[11].Reason != ReasonDamaged {
+		t.Errorf("line 11 fallback: reason=%q want %q", byItem[11].Reason, ReasonDamaged)
+	}
+}
+
+// RT-05: a supplied (non-empty) line reason must be a valid enum value.
+func TestCreateReturn_InvalidLineReason(t *testing.T) {
+	o := deliveredOrder(1)
+	items := []OrderItem{{ID: 10, Qty: 1, UnitPriceMinor: 5000}}
+	s := svcWith(o, items, &fakeReturnRepo{})
+	_, _, err := s.CreateReturn(context.Background(), ReturnInput{
+		OrderID: 1, UserID: 7, Reason: ReasonDamaged,
+		Items: []ReturnItemInput{{OrderItemID: 10, Quantity: 1, Reason: ReturnReason("bogus")}},
+	})
+	if !errors.Is(err, ErrInvalidReturnReason) {
+		t.Fatalf("want ErrInvalidReturnReason, got %v", err)
+	}
+}
+
 func TestCreateReturn_Rejections(t *testing.T) {
 	o := deliveredOrder(1)
 	items := []OrderItem{{ID: 10, Qty: 2, UnitPriceMinor: 5000}}

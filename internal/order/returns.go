@@ -77,13 +77,16 @@ type Return struct {
 	UpdatedAt         time.Time    `json:"updated_at"`
 }
 
-// ReturnItem is one order item + quantity within a return.
+// ReturnItem is one order item + quantity within a return. Reason/Note are the
+// RT-05 per-line return reason (empty Reason → the header reason applies).
 type ReturnItem struct {
-	ID          int64 `json:"id"`
-	ReturnID    int64 `json:"return_id"`
-	OrderID     int64 `json:"order_id"`
-	OrderItemID int64 `json:"order_item_id"`
-	Quantity    int   `json:"quantity"`
+	ID          int64        `json:"id"`
+	ReturnID    int64        `json:"return_id"`
+	OrderID     int64        `json:"order_id"`
+	OrderItemID int64        `json:"order_item_id"`
+	Quantity    int          `json:"quantity"`
+	Reason      ReturnReason `json:"reason,omitempty"`
+	Note        string       `json:"note,omitempty"`
 }
 
 // ReturnStatusEvent is one append-only status-history row (RT-04). The audit
@@ -95,10 +98,13 @@ type ReturnStatusEvent struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// ReturnItemInput is a requested item to return.
+// ReturnItemInput is a requested item to return. Reason/Note are the RT-05
+// per-line reason (optional; empty Reason falls back to the header reason).
 type ReturnItemInput struct {
 	OrderItemID int64
 	Quantity    int
+	Reason      ReturnReason
+	Note        string
 }
 
 // ReturnInput is the validated input to CreateReturn.
@@ -307,11 +313,21 @@ func (s *returnService) CreateReturn(ctx context.Context, in ReturnInput) (Retur
 			return e
 		}
 		for _, ri := range reqItems {
+			// RT-05: per-line reason; empty falls back to the header reason. A
+			// supplied line reason must be a valid enum value.
+			lineReason := ri.Reason
+			if lineReason == "" {
+				lineReason = in.Reason
+			} else if !lineReason.valid() {
+				return ErrInvalidReturnReason
+			}
 			item, e := s.returns.InsertReturnItem(ctx, tx, ReturnItem{
 				ReturnID:    rec.ID,
 				OrderID:     o.ID,
 				OrderItemID: ri.OrderItemID,
 				Quantity:    ri.Quantity,
+				Reason:      lineReason,
+				Note:        ri.Note,
 			})
 			if e != nil {
 				return e

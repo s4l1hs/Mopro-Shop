@@ -101,6 +101,26 @@ class _Body extends StatelessWidget {
           'returns.items_count'.tr(args: ['${ret.items.length}']),
           style: theme.textTheme.bodyMedium,
         ),
+        // RT-05: per-line reason (+ note). Falls back to the header reason for
+        // pre-RT-05 returns whose lines carry no reason.
+        for (final it in ret.items) ...[
+          const SizedBox(height: 4),
+          Text(
+            'returns.item_line'.tr(
+              namedArgs: {
+                'qty': '${it.quantity}',
+                'reason': ReturnReason.label(it.reason ?? ret.reason),
+              },
+            ),
+            style: theme.textTheme.bodySmall,
+          ),
+          if (it.note.isNotEmpty)
+            Text(
+              it.note,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+        ],
         if (ret.refund != null) ...[
           const SizedBox(height: 24),
           RefundStatusCard(refund: ret.refund!),

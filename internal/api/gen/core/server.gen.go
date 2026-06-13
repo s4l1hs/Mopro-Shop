@@ -95,6 +95,16 @@ const (
 	ReturnStatusRejected ReturnStatus = "rejected"
 )
 
+// Defines values for ReturnRequestItemsReason.
+const (
+	ReturnRequestItemsReasonChangedMind    ReturnRequestItemsReason = "changed_mind"
+	ReturnRequestItemsReasonDamaged        ReturnRequestItemsReason = "damaged"
+	ReturnRequestItemsReasonNotAsDescribed ReturnRequestItemsReason = "not_as_described"
+	ReturnRequestItemsReasonOther          ReturnRequestItemsReason = "other"
+	ReturnRequestItemsReasonSizeIssue      ReturnRequestItemsReason = "size_issue"
+	ReturnRequestItemsReasonWrongProduct   ReturnRequestItemsReason = "wrong_product"
+)
+
 // Defines values for ReturnRequestReason.
 const (
 	ReturnRequestReasonChangedMind    ReturnRequestReason = "changed_mind"
@@ -147,11 +157,11 @@ const (
 
 // Defines values for DeleteMeJSONBodyReason.
 const (
-	DeleteMeJSONBodyReasonBadExperience     DeleteMeJSONBodyReason = "bad_experience"
-	DeleteMeJSONBodyReasonNoLongerNeeded    DeleteMeJSONBodyReason = "no_longer_needed"
-	DeleteMeJSONBodyReasonOther             DeleteMeJSONBodyReason = "other"
-	DeleteMeJSONBodyReasonPrivacyConcern    DeleteMeJSONBodyReason = "privacy_concern"
-	DeleteMeJSONBodyReasonSwitchingPlatform DeleteMeJSONBodyReason = "switching_platform"
+	BadExperience     DeleteMeJSONBodyReason = "bad_experience"
+	NoLongerNeeded    DeleteMeJSONBodyReason = "no_longer_needed"
+	Other             DeleteMeJSONBodyReason = "other"
+	PrivacyConcern    DeleteMeJSONBodyReason = "privacy_concern"
+	SwitchingPlatform DeleteMeJSONBodyReason = "switching_platform"
 )
 
 // Defines values for ListOrdersParamsStatus.
@@ -725,11 +735,21 @@ type ReturnRequest struct {
 
 	// Items Specific items and quantities to return. If absent, full order return.
 	Items *[]struct {
-		OrderItemId int64 `json:"order_item_id"`
-		Quantity    int   `json:"quantity"`
+		// Note RT-05: optional per-line free-text note.
+		Note        *string `json:"note,omitempty"`
+		OrderItemId int64   `json:"order_item_id"`
+		Quantity    int     `json:"quantity"`
+
+		// Reason RT-05: optional per-line return reason. When omitted the header
+		// reason applies.
+		Reason *ReturnRequestItemsReason `json:"reason,omitempty"`
 	} `json:"items,omitempty"`
 	Reason ReturnRequestReason `json:"reason"`
 }
+
+// ReturnRequestItemsReason RT-05: optional per-line return reason. When omitted the header
+// reason applies.
+type ReturnRequestItemsReason string
 
 // ReturnRequestReason defines model for ReturnRequest.Reason.
 type ReturnRequestReason string

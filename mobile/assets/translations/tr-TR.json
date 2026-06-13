@@ -747,6 +747,7 @@
     "go_orders": "Siparişlerime git",
     "return_no": "İade No",
     "items_count": "{} ürün",
+    "item_line": "{qty} adet · {reason}",
     "original_order": "Siparişe git",
     "detail_title": "İade #{}"
   },

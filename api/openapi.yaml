@@ -3166,6 +3166,16 @@ components:
               quantity:
                 type: integer
                 minimum: 1
+              reason:
+                type: string
+                enum: [wrong_product, not_as_described, damaged, size_issue, changed_mind, other]
+                description: |
+                  RT-05: optional per-line return reason. When omitted the header
+                  reason applies.
+              note:
+                type: string
+                description: |
+                  RT-05: optional per-line free-text note.
 
     Return:
       type: object

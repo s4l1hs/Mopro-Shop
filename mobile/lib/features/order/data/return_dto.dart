@@ -52,17 +52,27 @@ class ReturnStatusEventDto {
   final DateTime createdAt;
 }
 
-/// One requested item line within a return.
+/// One item line within a return. RT-05: carries an optional per-line reason +
+/// note (null/empty reason → the header reason applies).
 class ReturnItemDto {
-  const ReturnItemDto({required this.orderItemId, required this.quantity});
+  const ReturnItemDto({
+    required this.orderItemId,
+    required this.quantity,
+    this.reason,
+    this.note = '',
+  });
 
   factory ReturnItemDto.fromJson(Map<String, dynamic> json) => ReturnItemDto(
         orderItemId: (json['order_item_id'] as num).toInt(),
         quantity: (json['quantity'] as num).toInt(),
+        reason: json['reason'] as String?,
+        note: (json['note'] as String?) ?? '',
       );
 
   final int orderItemId;
   final int quantity;
+  final String? reason;
+  final String note;
 }
 
 /// Compact return for the "İadelerim" list (matches GET /returns data[]).
@@ -164,7 +174,13 @@ class CreateReturnRequest {
         if (items.isNotEmpty)
           'items': [
             for (final i in items)
-              {'order_item_id': i.orderItemId, 'quantity': i.quantity},
+              {
+                'order_item_id': i.orderItemId,
+                'quantity': i.quantity,
+                // RT-05: per-line reason + note (omitted when empty → header applies).
+                if (i.reason != null && i.reason!.isNotEmpty) 'reason': i.reason,
+                if (i.note.isNotEmpty) 'note': i.note,
+              },
           ],
       };
 }

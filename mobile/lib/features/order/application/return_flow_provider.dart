@@ -110,23 +110,24 @@ class ReturnFlowNotifier extends FamilyNotifier<ReturnFlowState, int> {
     state = state.copyWith(notes: notes);
   }
 
-  /// Builds the POST body from the current selection. The OpenAPI contract takes
-  /// a single return-level reason; we use the first selected item's reason and
-  /// fold any per-item notes into the description.
+  /// Builds the POST body from the current selection. RT-05: each line carries
+  /// its own reason + note; the header reason stays the first item's (backward
+  /// compat with the single-reason contract + the list/header view).
   CreateReturnRequest buildRequest(int orderId) {
     final items = [
       for (final entry in state.selected.entries)
-        ReturnItemDto(orderItemId: entry.key, quantity: entry.value),
+        ReturnItemDto(
+          orderItemId: entry.key,
+          quantity: entry.value,
+          reason: state.reasons[entry.key],
+          note: state.notes[entry.key] ?? '',
+        ),
     ];
     final firstId = state.selected.keys.first;
     final reason = state.reasons[firstId] ?? ReturnReason.other;
-    final description = state.notes.values
-        .where((n) => n.trim().isNotEmpty)
-        .join(' · ');
     return CreateReturnRequest(
       orderId: orderId,
       reason: reason,
-      description: description,
       items: items,
     );
   }

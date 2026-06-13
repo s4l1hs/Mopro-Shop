@@ -46,10 +46,15 @@ func (r *pgxReturnRepository) InsertReturn(ctx context.Context, tx pgx.Tx, rec R
 }
 
 func (r *pgxReturnRepository) InsertReturnItem(ctx context.Context, tx pgx.Tx, it ReturnItem) (ReturnItem, error) {
+	var reason *string
+	if it.Reason != "" {
+		s := string(it.Reason)
+		reason = &s
+	}
 	row := tx.QueryRow(ctx,
-		`INSERT INTO order_schema.return_items (return_id, order_id, order_item_id, quantity)
-		 VALUES ($1,$2,$3,$4) RETURNING id`,
-		it.ReturnID, it.OrderID, it.OrderItemID, it.Quantity)
+		`INSERT INTO order_schema.return_items (return_id, order_id, order_item_id, quantity, reason, note)
+		 VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`,
+		it.ReturnID, it.OrderID, it.OrderItemID, it.Quantity, reason, it.Note)
 	if err := row.Scan(&it.ID); err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
@@ -110,7 +115,7 @@ func (r *pgxReturnRepository) GetReturn(ctx context.Context, returnID int64) (Re
 	rec.Reason = ReturnReason(reason)
 
 	rows, err := r.pool.Query(ctx,
-		`SELECT id, return_id, order_id, order_item_id, quantity
+		`SELECT id, return_id, order_id, order_item_id, quantity, reason, note
 		   FROM order_schema.return_items WHERE return_id = $1 ORDER BY id ASC`, returnID)
 	if err != nil {
 		return Return{}, nil, fmt.Errorf("order.returns.repo: get items: %w", err)
@@ -119,8 +124,12 @@ func (r *pgxReturnRepository) GetReturn(ctx context.Context, returnID int64) (Re
 	var items []ReturnItem
 	for rows.Next() {
 		var it ReturnItem
-		if err := rows.Scan(&it.ID, &it.ReturnID, &it.OrderID, &it.OrderItemID, &it.Quantity); err != nil {
+		var reason *string
+		if err := rows.Scan(&it.ID, &it.ReturnID, &it.OrderID, &it.OrderItemID, &it.Quantity, &reason, &it.Note); err != nil {
 			return Return{}, nil, fmt.Errorf("order.returns.repo: scan item: %w", err)
+		}
+		if reason != nil {
+			it.Reason = ReturnReason(*reason)
 		}
 		items = append(items, it)
 	}
