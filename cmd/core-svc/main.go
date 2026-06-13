@@ -229,6 +229,7 @@ func main() {
 		&redisDiskPanicChecker{rc: rc},
 		bizM,
 		identityAddressResolver{get: func() identity.Service { return identitySvc }},
+		membershipSvc, // tier-exclusive coupon gating (migration 0106); in-module, §5-safe
 	)
 
 	// ── Outbox publisher — drains order_schema.outbox → Redis Streams ───────

@@ -317,11 +317,11 @@ func (r *pgxOrderRepository) GetCouponByCode(ctx context.Context, code, market s
 	var c Coupon
 	err := r.pool.QueryRow(ctx,
 		`SELECT id, code, kind, percent_off, min_basket_minor, max_redemptions,
-		        starts_at, expires_at, active, market
+		        starts_at, expires_at, active, market, min_tier_rank
 		 FROM order_schema.coupons
 		 WHERE upper(code) = upper($1) AND market = $2`, code, market,
 	).Scan(&c.ID, &c.Code, &c.Kind, &c.PercentOff, &c.MinBasketMinor, &c.MaxRedemptions,
-		&c.StartsAt, &c.ExpiresAt, &c.Active, &c.Market)
+		&c.StartsAt, &c.ExpiresAt, &c.Active, &c.Market, &c.MinTierRank)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Coupon{}, ErrCouponNotFound

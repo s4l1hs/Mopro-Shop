@@ -125,7 +125,7 @@ func (s *orderService) InitiateCheckout(ctx context.Context, req InitiateCheckou
 
 	// Resolve the optional coupon once (seller-funded; applied per unit on top of
 	// the basket discount). Same resolve logic the cart used ⇒ display==charge.
-	couponPct, coupon := s.resolveCouponForCharge(ctx, req.CouponCode, market, basketSubtotal)
+	couponPct, coupon := s.resolveCouponForCharge(ctx, req.CouponCode, market, basketSubtotal, req.UserID)
 
 	// Phase 2: build per-seller groups with the coupon applied per unit.
 	for _, ln := range lines {

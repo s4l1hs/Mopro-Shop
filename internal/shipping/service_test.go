@@ -40,7 +40,7 @@ func (s *stubOrderSvc) InitiateCheckout(_ context.Context, _ order.InitiateCheck
 	return order.InitiateCheckoutResponse{}, nil
 }
 func (s *stubOrderSvc) MarkPaid(_ context.Context, _ int64) error { return nil }
-func (s *stubOrderSvc) ValidateCoupon(_ context.Context, _ string, _ int64, _ string) (order.CouponValidation, error) {
+func (s *stubOrderSvc) ValidateCoupon(_ context.Context, _ string, _ int64, _ string, _ int64) (order.CouponValidation, error) {
 	return order.CouponValidation{}, nil
 }
 

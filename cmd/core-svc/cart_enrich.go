@@ -30,7 +30,7 @@ type cartSellerNamer interface {
 // (CT-03). order.Service satisfies it. The SAME resolve logic the order build uses,
 // so the displayed coupon discount can never diverge from the charged one.
 type cartCouponValidator interface {
-	ValidateCoupon(ctx context.Context, code string, subtotalMinor int64, market string) (order.CouponValidation, error)
+	ValidateCoupon(ctx context.Context, code string, subtotalMinor int64, market string, userID int64) (order.CouponValidation, error)
 }
 
 // cartLineJSON / sellerTotalJSON / cartJSON mirror the mobile CartLineDto /
@@ -170,7 +170,7 @@ func enrichCart(ctx context.Context, c cart.Cart, cat cartCatalogResolver, namer
 	}
 	couponPct := 0
 	if couponCode != "" && coupons != nil {
-		if res, err := coupons.ValidateCoupon(ctx, couponCode, basketSubtotal, market); err != nil {
+		if res, err := coupons.ValidateCoupon(ctx, couponCode, basketSubtotal, market, c.UserID); err != nil {
 			slog.Warn("cart: coupon validate", "err", err)
 		} else if res.Valid {
 			couponPct = res.PercentOff

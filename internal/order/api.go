@@ -31,9 +31,11 @@ type Service interface {
 	CancelOrder(ctx context.Context, orderID int64, reason string) error
 
 	// ValidateCoupon resolves a coupon code against a basket-discounted subtotal
-	// (read-only preview; CT-03/CHK-04). An unknown/invalid code returns a
-	// CouponValidation with Valid=false + a Reason — never an error.
-	ValidateCoupon(ctx context.Context, code string, subtotalMinor int64, market string) (CouponValidation, error)
+	// for the given buyer (read-only preview; CT-03/CHK-04). userID gates
+	// tier-exclusive coupons (migration 0106); 0/guest ⇒ rank 1 (classic). An
+	// unknown/invalid code (incl. tier_locked) returns Valid=false + a Reason —
+	// never an error.
+	ValidateCoupon(ctx context.Context, code string, subtotalMinor int64, market string, userID int64) (CouponValidation, error)
 }
 
 // Repository is the storage interface used only by service.go.

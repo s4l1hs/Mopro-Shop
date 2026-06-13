@@ -153,7 +153,7 @@ type fakeCouponValidator struct {
 	invalidReason string
 }
 
-func (f fakeCouponValidator) ValidateCoupon(_ context.Context, code string, subtotalMinor int64, _ string) (order.CouponValidation, error) {
+func (f fakeCouponValidator) ValidateCoupon(_ context.Context, code string, subtotalMinor int64, _ string, _ int64) (order.CouponValidation, error) {
 	if f.invalidReason != "" {
 		return order.CouponValidation{Code: code, Reason: f.invalidReason}, nil
 	}

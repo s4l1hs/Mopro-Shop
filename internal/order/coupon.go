@@ -20,6 +20,10 @@ type Coupon struct {
 	ExpiresAt      *time.Time // nil = no expiry
 	Active         bool
 	Market         string
+	// MinTierRank is the membership tier rank required to apply this coupon
+	// (1 = classic/base = everyone; migration 0106). It gates ELIGIBILITY only —
+	// it never changes the discount amount — so display==charge is unaffected.
+	MinTierRank int
 }
 
 // CouponRedemption records that an order consumed a coupon. Idempotent at the
@@ -40,7 +44,7 @@ type CouponValidation struct {
 	Code          string
 	PercentOff    int
 	DiscountMinor int64
-	Reason        string // "", "not_found", "inactive", "not_started", "expired", "min_basket", "exhausted"
+	Reason        string // "", "not_found", "inactive", "not_started", "expired", "min_basket", "exhausted", "tier_locked"
 }
 
 // NormalizeCouponCode trims + uppercases a code for case-insensitive matching.
@@ -49,10 +53,16 @@ func NormalizeCouponCode(code string) string {
 }
 
 // resolveCoupon validates a coupon against a basket-discounted subtotal at time
-// now, given the current redemption count. It is pure (no IO) so it is identically
-// reusable by the cart-display path and the order-build (charge) path — which is
-// what guarantees display==charge. A nil coupon yields an invalid result.
-func resolveCoupon(c *Coupon, subtotalMinor int64, redemptions int, now time.Time) CouponValidation {
+// now, given the current redemption count and the buyer's membership tier rank
+// (1 = classic/base = everyone). It is pure (no IO) so it is identically reusable
+// by the cart-display path and the order-build (charge) path — which is what
+// guarantees display==charge, including for the tier-eligibility decision. A nil
+// coupon yields an invalid result.
+//
+// The tier gate (migration 0106) is ELIGIBILITY only: it runs BEFORE Valid=true
+// and can only WITHHOLD the coupon (reason "tier_locked"), never alter the
+// amount, so it adds no discount channel and leaves composition unchanged.
+func resolveCoupon(c *Coupon, subtotalMinor int64, redemptions, userTierRank int, now time.Time) CouponValidation {
 	if c == nil {
 		return CouponValidation{Reason: "not_found"}
 	}
@@ -68,6 +78,8 @@ func resolveCoupon(c *Coupon, subtotalMinor int64, redemptions int, now time.Tim
 		out.Reason = "min_basket"
 	case c.MaxRedemptions != nil && redemptions >= *c.MaxRedemptions:
 		out.Reason = "exhausted"
+	case userTierRank < c.MinTierRank:
+		out.Reason = "tier_locked"
 	default:
 		out.Valid = true
 		// Discount preview on the whole basket; the actual charge applies the same
