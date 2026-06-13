@@ -53,6 +53,10 @@ inconclusive (PLP-07), or pure visual (§9). The big PLP gaps (PLP-01/03/04/05/1
 were already resolved in prior sprints.
 
 ## Salih's residue (PLP)
-- **NEEDS-VISUAL:** PLP-07 (facet counts on live Trendyol), §9 spacing/rhythm.
+- **NEEDS-VISUAL:** PLP-07 (facet counts on live Trendyol). ~~§9 spacing/rhythm~~
+  **✅ RESOLVED** (`chore/fe-polish`): the product grid used 8px inter-card
+  gutters inside a 12px page margin (cards read tighter to each other than to
+  the screen edge) → both gutters unified to **12px** for an even rhythm
+  (skeleton grid in lockstep; card structure + aspect ratio untouched).
 - **NEEDS-DECISION:** PLP-06 (quick-filter pills — which set), PLP-10 (inline PLP
   search bar vs. dedicated search surface).

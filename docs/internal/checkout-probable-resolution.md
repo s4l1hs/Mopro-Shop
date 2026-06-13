@@ -33,5 +33,12 @@ Home method: Mopro from code (fact) × Trendyol convention (provisional, ~May 20
 (deferred IA-02), cashback-earned note, PSP-hosted card entry, no-installments.
 
 ## Salih's residue (Checkout)
-- **NEEDS-VISUAL:** CHK-09 — checkout error/validation copy (does the failed-state
-  copy read well + cover stock-changed/payment-fail?).
+- ~~**NEEDS-VISUAL:** CHK-09 — checkout error/validation copy~~ **✅ RESOLVED**
+  (`chore/fe-polish`, FE+arb only): the result-failed body now tells the user
+  what happened + what to do (card **not** charged; review cart / retry / use
+  another payment method) and the title is reframed "Payment Not Completed".
+  `ErrorBanner` no longer surfaces the raw backend message for a 409
+  (`error.conflict` was a bare `{message}` passthrough) → clean localized
+  stock/price-conflict copy. Validation (422) already had clean localized copy
+  (`error.validation`); the stock-changed-at-capture *flow* still needs backend
+  re-validation (out of scope here — copy only). TR+EN (DE/AR EN-fallback).
