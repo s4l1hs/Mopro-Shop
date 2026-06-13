@@ -2235,6 +2235,14 @@ components:
         hip_mm: {type: integer}
         inseam_mm: {type: integer}
         height_mm: {type: integer}
+        weight_g:
+          type: integer
+          description: Weight in grams (basic-estimation input; encrypted at rest).
+        gender:
+          type: string
+          description: >
+            female | male | unspecified (basic-estimation input, NOT a
+            measurement). unspecified disables basic estimation for the user.
         fit_pref:
           type: string
           description: regular | loose | tight (between-sizes tiebreak).
@@ -2269,6 +2277,16 @@ components:
         between_upper: {type: string}
         missing:
           type: array
+          items: {type: string}
+        confidence:
+          type: string
+          description: >
+            detailed (every relevant measurement was a real profile value) |
+            basic (>=1 was estimated from height/weight/gender → show the
+            approximate warning). Empty for non-ok statuses.
+        estimated:
+          type: array
+          description: Relevant measurements synthesized from height/weight/gender.
           items: {type: string}
         chart_approximate: {type: boolean}
 

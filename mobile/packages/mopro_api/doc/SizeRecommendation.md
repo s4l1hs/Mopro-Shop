@@ -15,6 +15,8 @@ Name | Type | Description | Notes
 **betweenLower** | **String** |  | [optional] 
 **betweenUpper** | **String** |  | [optional] 
 **missing** | **List&lt;String&gt;** |  | [optional] 
+**confidence** | **String** | detailed (every relevant measurement was a real profile value) | basic (>=1 was estimated from height/weight/gender → show the approximate warning). Empty for non-ok statuses.  | [optional] 
+**estimated** | **List&lt;String&gt;** | Relevant measurements synthesized from height/weight/gender. | [optional] 
 **chartApproximate** | **bool** |  | 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)

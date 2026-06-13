@@ -23,6 +23,11 @@ SizeRecommendation _$SizeRecommendationFromJson(Map<String, dynamic> json) =>
             'missing',
             (v) => (v as List<dynamic>?)?.map((e) => e as String).toList(),
           ),
+          confidence: $checkedConvert('confidence', (v) => v as String?),
+          estimated: $checkedConvert(
+            'estimated',
+            (v) => (v as List<dynamic>?)?.map((e) => e as String).toList(),
+          ),
           chartApproximate: $checkedConvert(
             'chart_approximate',
             (v) => v as bool,
@@ -47,5 +52,7 @@ Map<String, dynamic> _$SizeRecommendationToJson(SizeRecommendation instance) =>
       'between_lower': ?instance.betweenLower,
       'between_upper': ?instance.betweenUpper,
       'missing': ?instance.missing,
+      'confidence': ?instance.confidence,
+      'estimated': ?instance.estimated,
       'chart_approximate': instance.chartApproximate,
     };

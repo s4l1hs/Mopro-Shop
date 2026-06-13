@@ -102,6 +102,27 @@ class PdpSizeRecommendation extends ConsumerWidget {
           style: theme.textTheme.bodySmall
               ?.copyWith(color: cs.onSurfaceVariant),
         ),
+        // BASIC tier (or any rec with estimated measurements): a clear
+        // approximate warning — the estimate came from height/weight/gender,
+        // not real measurements. DETAILED renders without this.
+        if (rec.confidence == 'basic' ||
+            (rec.estimated?.isNotEmpty ?? false)) ...[
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline, size: 14, color: cs.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'fit.basic_warning'.tr(),
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
     ),);
   }

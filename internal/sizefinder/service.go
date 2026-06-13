@@ -18,10 +18,12 @@ func NewService(repo Repository) Service {
 
 // Sane human bounds (mm) — reject typos like cm-vs-mm slips early.
 const (
-	minMeasurementMM = 300  // 30 cm
-	maxMeasurementMM = 2500 // 250 cm
-	minHeightMM      = 800  // 80 cm
-	maxHeightMM      = 2500 // 250 cm
+	minMeasurementMM = 300    // 30 cm
+	maxMeasurementMM = 2500   // 250 cm
+	minHeightMM      = 800    // 80 cm
+	maxHeightMM      = 2500   // 250 cm
+	minWeightG       = 20000  // 20 kg
+	maxWeightG       = 400000 // 400 kg
 )
 
 // betweenThresholdMM: two adjacent sizes within this total distance of each
@@ -44,11 +46,19 @@ func (s *service) UpsertProfile(ctx context.Context, p FitProfile) error {
 	default:
 		return fmt.Errorf("%w: fit_pref %q", ErrInvalidMeasurement, p.FitPref)
 	}
+	switch p.Gender {
+	case "", GenderUnspecified:
+		p.Gender = GenderUnspecified
+	case GenderFemale, GenderMale:
+	default:
+		return fmt.Errorf("%w: gender %q", ErrInvalidMeasurement, p.Gender)
+	}
 	if !validRange(p.ChestMM, minMeasurementMM, maxMeasurementMM) ||
 		!validRange(p.WaistMM, minMeasurementMM, maxMeasurementMM) ||
 		!validRange(p.HipMM, minMeasurementMM, maxMeasurementMM) ||
 		!validRange(p.InseamMM, minMeasurementMM, maxMeasurementMM) ||
-		!validRange(p.HeightMM, minHeightMM, maxHeightMM) {
+		!validRange(p.HeightMM, minHeightMM, maxHeightMM) ||
+		!validRange(p.WeightG, minWeightG, maxWeightG) {
 		return ErrInvalidMeasurement
 	}
 	return s.repo.UpsertProfile(ctx, p)
@@ -98,17 +108,41 @@ func (s *service) Recommend(ctx context.Context, userID int64, productTitle stri
 		return rec, nil
 	}
 
-	present, missing := splitMeasurements(profile, relevantMeasurements(garment))
+	// Tier resolution: fill any missing relevant measurement with a basic
+	// estimate from height/weight/gender. effective = real values + estimates;
+	// `estimated` names the synthesized ones (→ BASIC confidence + warning).
+	relevant := relevantMeasurements(garment)
+	effective := profile
+	var missing, estimated []string
+	for _, m := range relevant {
+		if measurementValue(profile, m) != nil {
+			continue
+		}
+		if v, ok := estimateMeasurement(profile, m); ok {
+			setMeasurement(&effective, m, v)
+			estimated = append(estimated, m)
+		} else {
+			missing = append(missing, m)
+		}
+	}
+	// NONE: no real measurement AND nothing estimable → prompt, never fabricate.
+	present, _ := splitMeasurements(effective, relevant)
 	if len(present) == 0 {
 		rec.Status = StatusIncompleteProfile
-		rec.Missing = missing
+		rec.Missing = relevant
 		return rec, nil
 	}
 
-	scores := scoreSizes(chart, profile)
+	scores := scoreSizes(chart, effective)
 	rec.Status = StatusOK
 	rec.Size = scores[0].label
 	rec.Missing = missing
+	rec.Estimated = estimated
+	if len(estimated) > 0 {
+		rec.Confidence = ConfidenceBasic
+	} else {
+		rec.Confidence = ConfidenceDetailed
+	}
 	applySignal(&rec, scores, profile.FitPref)
 	return rec, nil
 }

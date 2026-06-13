@@ -32,6 +32,10 @@ class SizeRecommendation {
 
      this.missing,
 
+     this.confidence,
+
+     this.estimated,
+
     required  this.chartApproximate,
   });
 
@@ -122,6 +126,32 @@ class SizeRecommendation {
 
 
 
+      /// detailed (every relevant measurement was a real profile value) | basic (>=1 was estimated from height/weight/gender → show the approximate warning). Empty for non-ok statuses. 
+  @JsonKey(
+    
+    name: r'confidence',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final String? confidence;
+
+
+
+      /// Relevant measurements synthesized from height/weight/gender.
+  @JsonKey(
+    
+    name: r'estimated',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final List<String>? estimated;
+
+
+
   @JsonKey(
     
     name: r'chart_approximate',
@@ -145,6 +175,8 @@ class SizeRecommendation {
       other.betweenLower == betweenLower &&
       other.betweenUpper == betweenUpper &&
       other.missing == missing &&
+      other.confidence == confidence &&
+      other.estimated == estimated &&
       other.chartApproximate == chartApproximate;
 
     @override
@@ -156,6 +188,8 @@ class SizeRecommendation {
         betweenLower.hashCode +
         betweenUpper.hashCode +
         missing.hashCode +
+        confidence.hashCode +
+        estimated.hashCode +
         chartApproximate.hashCode;
 
   factory SizeRecommendation.fromJson(Map<String, dynamic> json) => _$SizeRecommendationFromJson(json);

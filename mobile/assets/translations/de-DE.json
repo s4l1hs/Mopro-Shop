@@ -350,6 +350,14 @@
     "signal_size_up": "Nah an der Obergrenze; für lockeren Sitz eine Größe größer.",
     "signal_size_down": "Nah an der Untergrenze; für engen Sitz eine Größe kleiner.",
     "cta_complete_profile": "Füge deine Maße für eine Größenempfehlung hinzu.",
-    "cta_button": "Maße eingeben"
+    "cta_button": "Maße eingeben",
+    "weight": "Gewicht",
+    "kg": "kg",
+    "gender_label": "Geschlecht",
+    "gender_female": "Weiblich",
+    "gender_male": "Männlich",
+    "gender_unspecified": "Keine Angabe",
+    "basic_hint": "Ohne genaue Maße schätzen wir aus Größe + Gewicht + Geschlecht.",
+    "basic_warning": "Dies ist eine Schätzung aus Größe/Gewicht/Geschlecht und kann ungenau sein."
   }
 }

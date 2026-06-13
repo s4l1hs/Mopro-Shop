@@ -42,11 +42,17 @@ Future<void> _pump(
   await tester.pump();
 }
 
-SizeRecommendation _rec(String status, {String? size, String? signal}) =>
+SizeRecommendation _rec(
+  String status, {
+  String? size,
+  String? signal,
+  String? confidence,
+}) =>
     SizeRecommendation(
       status: status,
       size: size,
       signal: signal,
+      confidence: confidence,
       chartApproximate: true,
     );
 
@@ -77,6 +83,27 @@ void main() {
     );
     expect(find.textContaining('fit.your_size'), findsOneWidget);
     expect(find.textContaining('fit.approximate'), findsOneWidget);
+  });
+
+  testWidgets('ok + basic confidence → shows the approximate warning',
+      (tester) async {
+    await _pump(
+      tester,
+      authed: true,
+      rec: _rec('ok', size: 'M', signal: 'true_to_size', confidence: 'basic'),
+    );
+    expect(find.textContaining('fit.your_size'), findsOneWidget);
+    expect(find.textContaining('fit.basic_warning'), findsOneWidget);
+  });
+
+  testWidgets('ok + detailed confidence → NO basic warning', (tester) async {
+    await _pump(
+      tester,
+      authed: true,
+      rec: _rec('ok', size: 'M', signal: 'true_to_size', confidence: 'detailed'),
+    );
+    expect(find.textContaining('fit.your_size'), findsOneWidget);
+    expect(find.textContaining('fit.basic_warning'), findsNothing);
   });
 
   testWidgets('no_profile → shows complete-profile CTA', (tester) async {

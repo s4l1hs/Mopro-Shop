@@ -74,19 +74,30 @@ func (r *pgxRepository) UpsertProfile(ctx context.Context, p FitProfile) error {
 	if err != nil {
 		return fmt.Errorf("sizefinder.repo: encrypt height: %w", err)
 	}
+	weight, err := encMM(p.WeightG) // grams, same EncryptPII envelope
+	if err != nil {
+		return fmt.Errorf("sizefinder.repo: encrypt weight: %w", err)
+	}
+	gender := p.Gender
+	if gender == "" {
+		gender = GenderUnspecified
+	}
 	_, err = r.pool.Exec(ctx,
 		`INSERT INTO sizefinder_schema.fit_profiles
-		   (user_id, chest_enc, waist_enc, hip_enc, inseam_enc, height_enc, fit_pref, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+		   (user_id, chest_enc, waist_enc, hip_enc, inseam_enc, height_enc,
+		    weight_enc, gender, fit_pref, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
 		 ON CONFLICT (user_id) DO UPDATE SET
 		   chest_enc = EXCLUDED.chest_enc,
 		   waist_enc = EXCLUDED.waist_enc,
 		   hip_enc = EXCLUDED.hip_enc,
 		   inseam_enc = EXCLUDED.inseam_enc,
 		   height_enc = EXCLUDED.height_enc,
+		   weight_enc = EXCLUDED.weight_enc,
+		   gender = EXCLUDED.gender,
 		   fit_pref = EXCLUDED.fit_pref,
 		   updated_at = now()`,
-		p.UserID, chest, waist, hip, inseam, height, p.FitPref,
+		p.UserID, chest, waist, hip, inseam, height, weight, gender, p.FitPref,
 	)
 	if err != nil {
 		return fmt.Errorf("sizefinder.repo: UpsertProfile: %w", err)
@@ -96,15 +107,16 @@ func (r *pgxRepository) UpsertProfile(ctx context.Context, p FitProfile) error {
 
 func (r *pgxRepository) GetProfile(ctx context.Context, userID int64) (FitProfile, error) {
 	var (
-		p                                 FitProfile
-		chest, waist, hip, inseam, height *string
+		p                                         FitProfile
+		chest, waist, hip, inseam, height, weight *string
 	)
 	p.UserID = userID
 	err := r.pool.QueryRow(ctx,
-		`SELECT chest_enc, waist_enc, hip_enc, inseam_enc, height_enc, fit_pref, updated_at
+		`SELECT chest_enc, waist_enc, hip_enc, inseam_enc, height_enc, weight_enc,
+		        gender, fit_pref, updated_at
 		 FROM sizefinder_schema.fit_profiles WHERE user_id = $1`,
 		userID,
-	).Scan(&chest, &waist, &hip, &inseam, &height, &p.FitPref, &p.UpdatedAt)
+	).Scan(&chest, &waist, &hip, &inseam, &height, &weight, &p.Gender, &p.FitPref, &p.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return FitProfile{}, ErrProfileNotFound
 	}
@@ -125,6 +137,9 @@ func (r *pgxRepository) GetProfile(ctx context.Context, userID int64) (FitProfil
 	}
 	if p.HeightMM, err = decMM(height); err != nil {
 		return FitProfile{}, fmt.Errorf("sizefinder.repo: decrypt height: %w", err)
+	}
+	if p.WeightG, err = decMM(weight); err != nil {
+		return FitProfile{}, fmt.Errorf("sizefinder.repo: decrypt weight: %w", err)
 	}
 	return p, nil
 }
