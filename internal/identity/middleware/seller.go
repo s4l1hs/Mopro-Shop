@@ -60,3 +60,9 @@ func SellerIDFromCtx(ctx context.Context) int64 {
 	}
 	return 0
 }
+
+// ContextWithSellerID injects a resolved seller ID (mirrors ContextWithUserID).
+// Primarily for tests that exercise role-gated handlers without the middleware.
+func ContextWithSellerID(ctx context.Context, sellerID int64) context.Context {
+	return context.WithValue(ctx, ctxKeySellerID, sellerID)
+}

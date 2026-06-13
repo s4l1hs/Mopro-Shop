@@ -761,7 +761,7 @@ type SellerOrderBreakdown struct {
 	UnlockAt time.Time `json:"unlock_at"`
 }
 
-// SizeRecommendation Size-fit phase 1 output. chart_approximate is always true (seed charts are representative, not curated).
+// SizeRecommendation Size-fit output. source distinguishes a per-garment seller chart (highest accuracy) from the EN 13402-3 standard baseline; chart_approximate is true for the standard baseline and false for a seller chart. confidence (detailed|basic) is orthogonal — a BASIC profile stays warned regardless.
 type SizeRecommendation struct {
 	BetweenLower     *string `json:"between_lower,omitempty"`
 	BetweenUpper     *string `json:"between_upper,omitempty"`
@@ -780,6 +780,9 @@ type SizeRecommendation struct {
 	// Signal true_to_size | between | size_up | size_down
 	Signal *string `json:"signal,omitempty"`
 	Size   *string `json:"size,omitempty"`
+
+	// Source seller (a seller-entered chart for the actual garment) | standard (the EN 13402-3 baseline). Empty for no_chart.
+	Source *string `json:"source,omitempty"`
 
 	// Status ok | no_profile | incomplete_profile | no_chart
 	Status string `json:"status"`

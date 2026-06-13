@@ -78,9 +78,24 @@ const (
 	SignalSizeDown   = "size_down"
 )
 
-// Recommendation is the match output. ChartApproximate is ALWAYS true: the
-// charts are an EN 13402-3 STANDARD reference baseline, not per-brand truth —
-// seller-entered charts will override it per product later.
+// Chart provenance behind a recommendation.
+const (
+	SourceSeller   = "seller"   // a seller-entered chart for the actual garment
+	SourceStandard = "standard" // the EN 13402-3 standard baseline
+)
+
+// SellerChart is a seller-authored chart handed to the match. Core resolves it
+// from seller_schema and passes it in; sizefinder never reads seller storage
+// (§5 boundary). When present it takes precedence over the standard baseline.
+type SellerChart struct {
+	GarmentType GarmentType `json:"garment_type"`
+	Gender      string      `json:"gender"`
+	Rows        []ChartRow  `json:"rows"`
+}
+
+// Recommendation is the match output. Source distinguishes a per-garment seller
+// chart (highest accuracy) from the EN 13402-3 standard baseline; ChartApproximate
+// is true for the standard baseline (not per-brand) and FALSE for a seller chart.
 type Recommendation struct {
 	Status       string      `json:"status"`
 	GarmentType  GarmentType `json:"garment_type,omitempty"`
@@ -90,12 +105,15 @@ type Recommendation struct {
 	BetweenUpper string      `json:"between_upper,omitempty"`
 	Missing      []string    `json:"missing,omitempty"`
 	// Confidence: detailed (all real) | basic (>=1 estimated). Empty for
-	// non-ok statuses.
+	// non-ok statuses. Orthogonal to Source — a BASIC profile stays warned
+	// regardless of which chart backed it.
 	Confidence string `json:"confidence,omitempty"`
 	// Estimated names the relevant measurements that were synthesized from
 	// height/weight/gender (drives the "approximate" warning).
-	Estimated        []string `json:"estimated,omitempty"`
-	ChartApproximate bool     `json:"chart_approximate"`
+	Estimated []string `json:"estimated,omitempty"`
+	// Source: seller | standard. Empty for no_chart.
+	Source           string `json:"source,omitempty"`
+	ChartApproximate bool   `json:"chart_approximate"`
 }
 
 // relevantMeasurements per garment type. Bottoms/skirts use waist+hip; inseam

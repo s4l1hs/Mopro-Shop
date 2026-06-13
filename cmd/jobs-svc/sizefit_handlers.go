@@ -71,14 +71,15 @@ func registerSizefitRoutes(mux *http.ServeMux, svc sizefinder.Service) {
 
 	mux.HandleFunc("POST /internal/sizefit/recommend", guard(func(w http.ResponseWriter, r *http.Request) {
 		var req struct {
-			UserID int64  `json:"user_id"`
-			Title  string `json:"title"`
+			UserID      int64                   `json:"user_id"`
+			Title       string                  `json:"title"`
+			SellerChart *sizefinder.SellerChart `json:"seller_chart,omitempty"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.UserID == 0 {
 			http.Error(w, `{"error":"bad_request"}`, http.StatusBadRequest)
 			return
 		}
-		rec, err := svc.Recommend(r.Context(), req.UserID, req.Title)
+		rec, err := svc.Recommend(r.Context(), req.UserID, req.Title, req.SellerChart)
 		if err != nil {
 			slog.Error("sizefit: recommend", "err", err)
 			http.Error(w, `{"error":"internal"}`, http.StatusInternalServerError)

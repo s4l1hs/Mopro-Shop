@@ -100,19 +100,19 @@ func TestRecommend_Statuses(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("non-apparel → no_chart", func(t *testing.T) {
-		rec, err := newTestSvc(FitProfile{}, nil).Recommend(ctx, 1, "Blender 600W")
+		rec, err := newTestSvc(FitProfile{}, nil).Recommend(ctx, 1, "Blender 600W", nil)
 		if err != nil || rec.Status != StatusNoChart || !rec.ChartApproximate {
 			t.Fatalf("got %+v err=%v", rec, err)
 		}
 	})
 	t.Run("no profile → no_profile + missing list", func(t *testing.T) {
-		rec, err := newTestSvc(FitProfile{}, ErrProfileNotFound).Recommend(ctx, 1, "Basic Tişört")
+		rec, err := newTestSvc(FitProfile{}, ErrProfileNotFound).Recommend(ctx, 1, "Basic Tişört", nil)
 		if err != nil || rec.Status != StatusNoProfile || len(rec.Missing) != 1 || rec.Missing[0] != "chest" {
 			t.Fatalf("got %+v err=%v", rec, err)
 		}
 	})
 	t.Run("profile without relevant measurement → incomplete", func(t *testing.T) {
-		rec, err := newTestSvc(FitProfile{WaistMM: mm(800)}, nil).Recommend(ctx, 1, "Basic Tişört")
+		rec, err := newTestSvc(FitProfile{WaistMM: mm(800)}, nil).Recommend(ctx, 1, "Basic Tişört", nil)
 		if err != nil || rec.Status != StatusIncompleteProfile {
 			t.Fatalf("got %+v err=%v", rec, err)
 		}
@@ -123,7 +123,7 @@ func TestRecommend_Statuses(t *testing.T) {
 // cyclomatic complexity low.
 func rec(t *testing.T, p FitProfile, title string) Recommendation {
 	t.Helper()
-	r, err := newTestSvc(p, nil).Recommend(context.Background(), 1, title)
+	r, err := newTestSvc(p, nil).Recommend(context.Background(), 1, title, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

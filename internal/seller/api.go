@@ -24,6 +24,22 @@ type Service interface {
 	// GetBindingForUser returns the user's seller binding (id+slug+name+role) for
 	// the bound active seller, if any. (false, nil) when the user is not a seller.
 	GetBindingForUser(ctx context.Context, userID int64) (Binding, bool, error)
+
+	// ── Seller size charts (docs/internal/seller-size-charts.md) ──────────────
+	// CreateSizeChart validates + stores a seller chart, returning its id (422 on
+	// ErrInvalidChart).
+	CreateSizeChart(ctx context.Context, sellerID int64, c SizeChart) (int64, error)
+	// UpdateSizeChart replaces a chart the seller owns (ErrChartNotFound if not).
+	UpdateSizeChart(ctx context.Context, sellerID, chartID int64, c SizeChart) error
+	// ListSizeCharts returns the seller's charts (with rows).
+	ListSizeCharts(ctx context.Context, sellerID int64) ([]SizeChart, error)
+	// AttachProductChart links a product to one of the seller's charts (chart
+	// ownership verified here; product ownership is the caller's responsibility).
+	AttachProductChart(ctx context.Context, sellerID, productID, chartID int64) error
+	// DetachProductChart removes a product's chart → falls back to the standard.
+	DetachProductChart(ctx context.Context, sellerID, productID int64) error
+	// SizeChartForProduct resolves a product's attached chart for the match path.
+	SizeChartForProduct(ctx context.Context, productID int64) (SizeChart, bool, error)
 }
 
 // Repository is the seller_schema persistence boundary.
@@ -34,4 +50,13 @@ type Repository interface {
 	SellerNamesByIDs(ctx context.Context, ids []int64) (map[int64]string, error)
 	SellerIDForUser(ctx context.Context, userID int64) (int64, bool, error)
 	BindingForUser(ctx context.Context, userID int64) (Binding, bool, error)
+
+	// Seller size charts.
+	InsertSizeChart(ctx context.Context, c SizeChart) (int64, error)
+	ReplaceSizeChart(ctx context.Context, sellerID, chartID int64, c SizeChart) error
+	ListSizeChartsBySeller(ctx context.Context, sellerID int64) ([]SizeChart, error)
+	ChartOwnedBy(ctx context.Context, sellerID, chartID int64) (bool, error)
+	AttachProductChart(ctx context.Context, productID, chartID, sellerID int64) error
+	DetachProductChart(ctx context.Context, productID, sellerID int64) error
+	SizeChartForProduct(ctx context.Context, productID int64) (SizeChart, bool, error)
 }

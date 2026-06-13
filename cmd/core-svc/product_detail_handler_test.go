@@ -55,6 +55,20 @@ func (s *stubSellerSvc) OfficialSellerIDs(_ context.Context, _ []int64) (map[int
 func (s *stubSellerSvc) SellerNamesByIDs(_ context.Context, _ []int64) (map[int64]string, error) {
 	return map[int64]string{}, nil
 }
+func (s *stubSellerSvc) CreateSizeChart(_ context.Context, _ int64, _ seller.SizeChart) (int64, error) {
+	return 0, nil
+}
+func (s *stubSellerSvc) UpdateSizeChart(_ context.Context, _, _ int64, _ seller.SizeChart) error {
+	return nil
+}
+func (s *stubSellerSvc) ListSizeCharts(_ context.Context, _ int64) ([]seller.SizeChart, error) {
+	return nil, nil
+}
+func (s *stubSellerSvc) AttachProductChart(_ context.Context, _, _, _ int64) error { return nil }
+func (s *stubSellerSvc) DetachProductChart(_ context.Context, _, _ int64) error    { return nil }
+func (s *stubSellerSvc) SizeChartForProduct(_ context.Context, _ int64) (seller.SizeChart, bool, error) {
+	return seller.SizeChart{}, false, nil
+}
 
 func newProductDetailRequest(productID string) *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/products/"+productID, nil)

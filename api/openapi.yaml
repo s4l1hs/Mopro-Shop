@@ -2259,8 +2259,10 @@ components:
     SizeRecommendation:
       type: object
       description: >
-        Size-fit phase 1 output. chart_approximate is always true (seed charts
-        are representative, not curated).
+        Size-fit output. source distinguishes a per-garment seller chart (highest
+        accuracy) from the EN 13402-3 standard baseline; chart_approximate is true
+        for the standard baseline and false for a seller chart. confidence
+        (detailed|basic) is orthogonal — a BASIC profile stays warned regardless.
       required: [status, chart_approximate]
       properties:
         status:
@@ -2288,6 +2290,11 @@ components:
           type: array
           description: Relevant measurements synthesized from height/weight/gender.
           items: {type: string}
+        source:
+          type: string
+          description: >
+            seller (a seller-entered chart for the actual garment) | standard
+            (the EN 13402-3 baseline). Empty for no_chart.
         chart_approximate: {type: boolean}
 
     Membership:
