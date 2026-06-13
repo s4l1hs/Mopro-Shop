@@ -583,6 +583,13 @@ type Product struct {
 	// seller_schema.sellers.is_official, resolved in-process (no JOIN, §5).
 	SellerOfficial *bool `json:"seller_official,omitempty"`
 
+	// SellerRatingAvg PD-04: the seller's aggregate review rating (mean of their products'
+	// reviews). Null when the seller has no reviews → the card shows no rating.
+	SellerRatingAvg *float32 `json:"seller_rating_avg"`
+
+	// SellerRatingCount PD-04: number of reviews backing seller_rating_avg (0 = none).
+	SellerRatingCount *int `json:"seller_rating_count,omitempty"`
+
 	// SellerSlug URL-safe identifier for the seller; used to deep-link to the seller
 	// storefront at /sellers/:slug. Null when the product's seller_id does
 	// not resolve to an active seller (legacy/platform-direct or suspended).

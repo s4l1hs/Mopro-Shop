@@ -227,7 +227,7 @@ func TestContract_GetProductDetail_LiveHandler(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/products/7", nil)
 	req.SetPathValue("id", "7")
-	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, req)
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubRatingReader{}, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
@@ -334,7 +334,7 @@ func TestContract_GetProductDetail_SellerOfficial(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/products/7", nil)
 	req.SetPathValue("id", "7")
-	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, req)
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubRatingReader{}, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
@@ -407,7 +407,7 @@ func TestContract_GetProductDetail_AttributesArray(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/products/7", nil)
 	req.SetPathValue("id", "7")
-	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, req)
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubRatingReader{}, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: want 200 got %d", rec.Code)

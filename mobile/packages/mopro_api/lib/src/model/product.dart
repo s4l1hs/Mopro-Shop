@@ -53,6 +53,10 @@ class Product {
     required  this.createdAt,
 
      this.basketDiscountPct,
+
+     this.sellerRatingAvg,
+
+     this.sellerRatingCount,
   });
 
   @JsonKey(
@@ -254,6 +258,32 @@ class Product {
 
 
 
+      /// PD-04: the seller's aggregate review rating (mean of their products' reviews). Null when the seller has no reviews → the card shows no rating. 
+  @JsonKey(
+    
+    name: r'seller_rating_avg',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final double? sellerRatingAvg;
+
+
+
+      /// PD-04: number of reviews backing seller_rating_avg (0 = none). 
+  @JsonKey(
+    
+    name: r'seller_rating_count',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final int? sellerRatingCount;
+
+
+
 
 
     @override
@@ -273,7 +303,9 @@ class Product {
       other.cashbackPreview == cashbackPreview &&
       other.deliveryEta == deliveryEta &&
       other.createdAt == createdAt &&
-      other.basketDiscountPct == basketDiscountPct;
+      other.basketDiscountPct == basketDiscountPct &&
+      other.sellerRatingAvg == sellerRatingAvg &&
+      other.sellerRatingCount == sellerRatingCount;
 
     @override
     int get hashCode =>
@@ -292,7 +324,9 @@ class Product {
         cashbackPreview.hashCode +
         deliveryEta.hashCode +
         createdAt.hashCode +
-        basketDiscountPct.hashCode;
+        basketDiscountPct.hashCode +
+        sellerRatingAvg.hashCode +
+        sellerRatingCount.hashCode;
 
   factory Product.fromJson(Map<String, dynamic> json) => _$ProductFromJson(json);
 

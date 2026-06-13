@@ -73,6 +73,16 @@ func (s *stubSellerSvc) StandardSizeChart(_ context.Context, _, _, _ string) (se
 	return seller.SizeChart{}, nil
 }
 
+// stubRatingReader stubs the PD-04 seller-rating carrier (default: no reviews).
+type stubRatingReader struct {
+	avg   float64
+	count int
+}
+
+func (s *stubRatingReader) SellerReviewSummary(_ context.Context, _ int64) (float64, int, error) {
+	return s.avg, s.count, nil
+}
+
 func newProductDetailRequest(productID string) *http.Request {
 	r := httptest.NewRequest(http.MethodGet, "/products/"+productID, nil)
 	r.SetPathValue("id", productID)
@@ -86,8 +96,10 @@ type productDetailBody struct {
 	ID                int64   `json:"id"`
 	SellerID          int64   `json:"seller_id"`
 	SellerName        string  `json:"seller_name"`
-	SellerSlug        *string `json:"seller_slug"`
-	BasketDiscountPct *int    `json:"basket_discount_pct"`
+	SellerSlug        *string  `json:"seller_slug"`
+	BasketDiscountPct *int     `json:"basket_discount_pct"`
+	SellerRatingAvg   *float64 `json:"seller_rating_avg"`
+	SellerRatingCount int      `json:"seller_rating_count"`
 	DeliveryEta       *struct {
 		MinDays      int     `json:"min_days"`
 		MaxDays      int     `json:"max_days"`
@@ -110,7 +122,7 @@ func TestProductDetail_BasketDiscount_DisplayEqualsCharge(t *testing.T) {
 		return seller.Seller{ID: 1, Slug: "s", DisplayName: "S"}, nil
 	}}
 	rec := httptest.NewRecorder()
-	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubRatingReader{}, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
 	var body productDetailBody
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("decode: %v", err)
@@ -132,11 +144,48 @@ func TestProductDetail_BasketDiscount_OmittedWhenZero(t *testing.T) {
 		return seller.Seller{ID: 1, Slug: "s", DisplayName: "S"}, nil
 	}}
 	rec := httptest.NewRecorder()
-	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubRatingReader{}, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
 	var body productDetailBody
 	_ = json.Unmarshal(rec.Body.Bytes(), &body)
 	if body.BasketDiscountPct != nil {
 		t.Fatalf("basket_discount_pct must be omitted when 0, got %v", *body.BasketDiscountPct)
+	}
+}
+
+// PD-04: the seller's aggregate rating is surfaced on the PDP via the §5-safe
+// SellerReviewSummary carrier.
+func TestProductDetail_SellerRating_Surfaced(t *testing.T) {
+	catalogSvc := &stubCatalogSvc{getByIDFn: func(id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error) {
+		return catalog.Product{ID: id, SellerID: 1, Status: "active"}, nil, nil, nil
+	}}
+	sellerSvc := &stubSellerSvc{getByIDFn: func(int64) (seller.Seller, error) {
+		return seller.Seller{ID: 1, Slug: "s", DisplayName: "S"}, nil
+	}}
+	rec := httptest.NewRecorder()
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubRatingReader{avg: 4.5, count: 23}, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+	var body productDetailBody
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.SellerRatingAvg == nil || *body.SellerRatingAvg != 4.5 || body.SellerRatingCount != 23 {
+		t.Fatalf("rating: want 4.5/23 got %v/%d", body.SellerRatingAvg, body.SellerRatingCount)
+	}
+}
+
+// PD-04 empty state: no reviews → null avg + 0 count (the card renders no rating).
+func TestProductDetail_SellerRating_EmptyState(t *testing.T) {
+	catalogSvc := &stubCatalogSvc{getByIDFn: func(id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error) {
+		return catalog.Product{ID: id, SellerID: 1, Status: "active"}, nil, nil, nil
+	}}
+	sellerSvc := &stubSellerSvc{getByIDFn: func(int64) (seller.Seller, error) {
+		return seller.Seller{ID: 1, Slug: "s", DisplayName: "S"}, nil
+	}}
+	rec := httptest.NewRecorder()
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubRatingReader{}, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+	var body productDetailBody
+	_ = json.Unmarshal(rec.Body.Bytes(), &body)
+	if body.SellerRatingAvg != nil || body.SellerRatingCount != 0 {
+		t.Fatalf("empty state: want nil/0 got %v/%d", body.SellerRatingAvg, body.SellerRatingCount)
 	}
 }
 
@@ -156,7 +205,7 @@ func TestProductDetail_ResolvesSellerSlugAndName(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubRatingReader{}, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
@@ -187,7 +236,7 @@ func TestProductDetail_UnresolvedSellerYieldsNullSlug(t *testing.T) {
 	sellerSvc := &stubSellerSvc{} // GetByID → ErrSellerNotFound
 
 	rec := httptest.NewRecorder()
-	handleGetProductDetail(catalogSvc, sellerSvc, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubRatingReader{}, &stubETASvc{}, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
@@ -234,7 +283,7 @@ func TestProductDetail_IncludesDeliveryEta(t *testing.T) {
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/products/7?dest_city=ankara", nil)
 	req.SetPathValue("id", "7")
-	handleGetProductDetail(catalogSvc, sellerSvc, etaSvc, "tr-TR", "TR", "TRY_COIN")(rec, req)
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubRatingReader{}, etaSvc, "tr-TR", "TR", "TRY_COIN")(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
@@ -270,7 +319,7 @@ func TestProductDetail_OmitsDeliveryEtaWhenNoData(t *testing.T) {
 	etaSvc := &stubETASvc{} // returns ETAResult{} → MaxDays 0
 
 	rec := httptest.NewRecorder()
-	handleGetProductDetail(catalogSvc, sellerSvc, etaSvc, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
+	handleGetProductDetail(catalogSvc, sellerSvc, &stubRatingReader{}, etaSvc, "tr-TR", "TR", "TRY_COIN")(rec, newProductDetailRequest("7"))
 
 	var body productDetailBody
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {

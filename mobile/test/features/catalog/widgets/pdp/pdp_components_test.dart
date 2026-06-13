@@ -186,6 +186,28 @@ void main() {
       await _pump(tester, const PdpSellerCard(sellerName: 'Acme Store'));
       expect(find.byType(TextButton), findsNothing);
     });
+
+    // PD-04: seller rating renders when the seller has reviews.
+    testWidgets('shows the rating when ratingCount > 0', (tester) async {
+      await _pump(
+        tester,
+        const PdpSellerCard(
+            sellerName: 'Acme Store', ratingAvg: 4.5, ratingCount: 23),
+      );
+      expect(find.byIcon(Icons.star), findsOneWidget);
+      expect(find.text('4.5'), findsOneWidget);
+      expect(find.textContaining('product.review_count'), findsOneWidget);
+    });
+
+    // PD-04 empty state: no reviews → no star/rating.
+    testWidgets('hides the rating when ratingCount is 0', (tester) async {
+      await _pump(
+        tester,
+        const PdpSellerCard(sellerName: 'Acme Store', ratingCount: 0),
+      );
+      expect(find.byIcon(Icons.star), findsNothing);
+      expect(find.textContaining('product.review_count'), findsNothing);
+    });
   });
 
   group('PdpStickyCta', () {

@@ -24,6 +24,8 @@ Name | Type | Description | Notes
 **deliveryEta** | [**DeliveryEta**](DeliveryEta.md) | Pre-purchase delivery estimate (P-034). Null when no estimate is available. Not a delivery SLA — `confident=false` ranges are fallback estimates the UI hedges as \"tahmini\".  | [optional] 
 **createdAt** | [**DateTime**](DateTime.md) |  | 
 **basketDiscountPct** | **int** | PD-03: the whole-percent seller-funded \"Sepette %X İndirim\" (CT-09). The SAME products.basket_discount_pct snapshotted onto the order at checkout → display==charge. Omitted/null when 0 (no discount).  | [optional] 
+**sellerRatingAvg** | **double** | PD-04: the seller's aggregate review rating (mean of their products' reviews). Null when the seller has no reviews → the card shows no rating.  | [optional] 
+**sellerRatingCount** | **int** | PD-04: number of reviews backing seller_rating_avg (0 = none).  | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

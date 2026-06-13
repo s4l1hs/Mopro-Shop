@@ -527,6 +527,8 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
         PdpSellerCard(
           sellerName: product.sellerName,
           isOfficial: product.sellerOfficial ?? false,
+          ratingAvg: product.sellerRatingAvg,
+          ratingCount: product.sellerRatingCount ?? 0,
           // Route to the seller storefront only when the slug resolved; a null
           // slug (legacy/platform-direct or suspended seller) hides the link.
           onTap: (product.sellerSlug != null && product.sellerSlug!.isNotEmpty)
