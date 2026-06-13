@@ -22,9 +22,16 @@ but was **not** the proximate cause here.
 | `gofmt -l .` | ✅ clean (fixed by #222 commit `5acd9dec`) |
 | `go build ./...` | ✅ clean |
 | `build_runner` (fresh regen + `git status`) | ❌ **STILL DRIFTED** — `return_request.g.dart` + `return_request_items_inner.g.dart` regenerate (RT-05 `reason`/`note`, RT-03 `photo_keys` missing from committed gen). 23 insertions, additive. |
+| `verify` (full, DB integration) | ❌ **RED** — `returns_integration_test` 42703 `column "reason" of relation "return_items" does not exist` (the hand-rolled test schema lacked the RT-05 columns migration 0103 adds in prod). |
+| `flutter test` | ❌ **RED** — (a) `return_flow_provider` `buildRequest` stopped folding per-item notes into the header `description` (the RT-05 commit dropped the line); (b) `flow_w` asserted the removed `returns.tracking_no` (RT-02 replaced it with the cargo drop-off code). |
 
-→ **Fixed forward** in this PR (commit regen). The drift class **recurred one PR
-after #222 fixed the previous instance** — #223 re-introduced it 14s later.
+→ **All fixed forward in this PR.** Crucially, the breakage was **broader than
+codegen**: #223 merged with `verify` **and** `flutter test` red too (consistent
+with the §2 evidence — #223's head had all three red). The gen-drift class also
+**recurred one PR after #222 fixed the previous instance** — #223 re-introduced it
+14s later. This is the full blast radius of one overridden merge: a stale generated
+file, a stale test schema, a dropped feature line, and a stale test assertion — none
+of which a green-required-checks merge would have allowed.
 
 ## §2 — Branch-protection config (`main`, captured to PR as `protection_before.json`)
 
