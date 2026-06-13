@@ -78,8 +78,9 @@ type sizeScore struct {
 }
 
 func (s *service) Recommend(ctx context.Context, userID int64, productTitle string) (Recommendation, error) {
-	// Phase 1 is honest about its limits: every response carries
-	// chart_approximate=true (representative seed charts + keyword classifier).
+	// Honest about its limits: every response carries chart_approximate=true —
+	// the charts are an EN 13402-3 standard baseline (not per-brand) and the
+	// garment is classified from the title by keyword.
 	rec := Recommendation{ChartApproximate: true}
 
 	garment, ok := ClassifyTitle(productTitle)
@@ -99,7 +100,7 @@ func (s *service) Recommend(ctx context.Context, userID int64, productTitle stri
 		return Recommendation{}, err
 	}
 
-	chart, err := s.repo.ChartFor(ctx, garment)
+	chart, err := s.repo.ChartFor(ctx, garment, genderForChart(garment, profile.Gender))
 	if err != nil {
 		return Recommendation{}, err
 	}

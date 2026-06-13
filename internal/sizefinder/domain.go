@@ -78,8 +78,9 @@ const (
 	SignalSizeDown   = "size_down"
 )
 
-// Recommendation is the match output. ChartApproximate is ALWAYS true in
-// phase 1 — the seed charts are representative, not curated.
+// Recommendation is the match output. ChartApproximate is ALWAYS true: the
+// charts are an EN 13402-3 STANDARD reference baseline, not per-brand truth —
+// seller-entered charts will override it per product later.
 type Recommendation struct {
 	Status       string      `json:"status"`
 	GarmentType  GarmentType `json:"garment_type,omitempty"`
@@ -110,6 +111,21 @@ func relevantMeasurements(g GarmentType) []string {
 		return []string{"chest", "waist", "hip"}
 	}
 	return nil
+}
+
+// genderForChart resolves which gendered chart to match against (EN 13402-3
+// separates women's bust bands from men's chest bands). Women-only garments
+// (dress, skirt) always use the female chart; otherwise male iff the profile
+// says male, else female — the default for female AND unspecified.
+func genderForChart(g GarmentType, profileGender string) string {
+	switch g {
+	case GarmentDress, GarmentSkirt:
+		return GenderFemale
+	}
+	if profileGender == GenderMale {
+		return GenderMale
+	}
+	return GenderFemale
 }
 
 // measurementValue resolves a named measurement from the profile (nil = absent).

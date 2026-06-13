@@ -21,5 +21,8 @@ type Service interface {
 type Repository interface {
 	UpsertProfile(ctx context.Context, p FitProfile) error
 	GetProfile(ctx context.Context, userID int64) (FitProfile, error)
-	ChartFor(ctx context.Context, g GarmentType) ([]ChartRow, error)
+	// ChartFor returns the alpha-system rows of the standard chart for a garment
+	// type and gender (EN 13402-3: women bust ≠ men chest). EU-numeric rows are
+	// reference-only and never returned here.
+	ChartFor(ctx context.Context, g GarmentType, gender string) ([]ChartRow, error)
 }
