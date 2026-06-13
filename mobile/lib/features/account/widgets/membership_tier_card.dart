@@ -101,6 +101,31 @@ class MembershipTierCard extends ConsumerWidget {
                   ?.copyWith(color: cs.onSurfaceVariant),
             ),
           ],
+          // Membership benefits (migration 0106). Non-financial surfacing of what
+          // the tier unlocks. Today's shipped benefit is tier-exclusive coupons,
+          // available above the base (classic, rank 1) tier; the actual eligibility
+          // is enforced server-side at coupon apply (display==charge).
+          if (m.rank > 1) ...[
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.local_activity_outlined,
+                  size: 16,
+                  color: cs.primary,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'membership.benefit_exclusive_coupons'.tr(),
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

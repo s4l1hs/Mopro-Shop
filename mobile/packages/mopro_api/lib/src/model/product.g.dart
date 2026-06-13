@@ -69,6 +69,18 @@ Product _$ProductFromJson(Map<String, dynamic> json) => $checkedCreate(
         'created_at',
         (v) => DateTime.parse(v as String),
       ),
+      basketDiscountPct: $checkedConvert(
+        'basket_discount_pct',
+        (v) => (v as num?)?.toInt(),
+      ),
+      sellerRatingAvg: $checkedConvert(
+        'seller_rating_avg',
+        (v) => (v as num?)?.toDouble(),
+      ),
+      sellerRatingCount: $checkedConvert(
+        'seller_rating_count',
+        (v) => (v as num?)?.toInt(),
+      ),
     );
     return val;
   },
@@ -81,6 +93,9 @@ Product _$ProductFromJson(Map<String, dynamic> json) => $checkedCreate(
     'cashbackPreview': 'cashback_preview',
     'deliveryEta': 'delivery_eta',
     'createdAt': 'created_at',
+    'basketDiscountPct': 'basket_discount_pct',
+    'sellerRatingAvg': 'seller_rating_avg',
+    'sellerRatingCount': 'seller_rating_count',
   },
 );
 
@@ -100,6 +115,9 @@ Map<String, dynamic> _$ProductToJson(Product instance) => <String, dynamic>{
   'cashback_preview': instance.cashbackPreview.toJson(),
   'delivery_eta': ?instance.deliveryEta?.toJson(),
   'created_at': instance.createdAt.toIso8601String(),
+  'basket_discount_pct': ?instance.basketDiscountPct,
+  'seller_rating_avg': ?instance.sellerRatingAvg,
+  'seller_rating_count': ?instance.sellerRatingCount,
 };
 
 const _$ProductStatusEnumEnumMap = {

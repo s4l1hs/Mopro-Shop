@@ -361,5 +361,9 @@
     "basic_hint": "Ohne genaue Maße schätzen wir aus Größe + Gewicht + Geschlecht.",
     "basic_warning": "Dies ist eine ungefähre Schätzung allein aus Größe, Gewicht und Geschlecht und kann ungenau sein. Für ein zuverlässigeres Ergebnis gib deine Maße ein (Brust, Taille, Hüfte).",
     "sized_by_seller": "vom Verkäufer angegeben"
+  },
+  "membership": {
+    "benefit_exclusive_coupons": "Exklusive Gutscheine für deine Mitgliedschaft",
+    "coupon_tier_locked": "Dieser Gutschein gilt nur für höhere Mitgliedschaftsstufen."
   }
 }
