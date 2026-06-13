@@ -77,13 +77,16 @@ type Return struct {
 	UpdatedAt         time.Time    `json:"updated_at"`
 }
 
-// ReturnItem is one order item + quantity within a return.
+// ReturnItem is one order item + quantity within a return. Reason/Note are the
+// RT-05 per-line return reason (empty Reason → the header reason applies).
 type ReturnItem struct {
-	ID          int64 `json:"id"`
-	ReturnID    int64 `json:"return_id"`
-	OrderID     int64 `json:"order_id"`
-	OrderItemID int64 `json:"order_item_id"`
-	Quantity    int   `json:"quantity"`
+	ID          int64        `json:"id"`
+	ReturnID    int64        `json:"return_id"`
+	OrderID     int64        `json:"order_id"`
+	OrderItemID int64        `json:"order_item_id"`
+	Quantity    int          `json:"quantity"`
+	Reason      ReturnReason `json:"reason,omitempty"`
+	Note        string       `json:"note,omitempty"`
 }
 
 // ReturnStatusEvent is one append-only status-history row (RT-04). The audit
@@ -95,19 +98,24 @@ type ReturnStatusEvent struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// ReturnItemInput is a requested item to return.
+// ReturnItemInput is a requested item to return. Reason/Note are the RT-05
+// per-line reason (optional; empty Reason falls back to the header reason).
 type ReturnItemInput struct {
 	OrderItemID int64
 	Quantity    int
+	Reason      ReturnReason
+	Note        string
 }
 
-// ReturnInput is the validated input to CreateReturn.
+// ReturnInput is the validated input to CreateReturn. PhotoKeys are RT-03
+// evidence photo storage keys (from the POST /uploads/photos pipeline).
 type ReturnInput struct {
 	OrderID     int64
 	UserID      int64
 	Reason      ReturnReason
 	Description string
 	Items       []ReturnItemInput
+	PhotoKeys   []string
 }
 
 // ReturnableItem reports how much of an order item may still be returned.
@@ -147,6 +155,10 @@ type ReturnRepository interface {
 	// ListReturnStatusHistory reads the append-only status audit trail, oldest
 	// first (RT-04).
 	ListReturnStatusHistory(ctx context.Context, returnID int64) ([]ReturnStatusEvent, error)
+	// InsertReturnPhoto stores one RT-03 evidence photo key (within the tx).
+	InsertReturnPhoto(ctx context.Context, tx pgx.Tx, returnID int64, photoKey string, sortRank int) error
+	// ListReturnPhotos returns a return's evidence photo keys, ordered (RT-03).
+	ListReturnPhotos(ctx context.Context, returnID int64) ([]string, error)
 }
 
 // ReturnService is the public return surface. Kept separate from Service so the
@@ -158,6 +170,9 @@ type ReturnService interface {
 	// GetReturnHistory returns the append-only status timeline for a return the
 	// user owns (RT-04). Ownership-scoped: non-owners get ErrReturnNotFound.
 	GetReturnHistory(ctx context.Context, userID, returnID int64) ([]ReturnStatusEvent, error)
+	// GetReturnPhotos returns the RT-03 evidence photo storage keys for a return
+	// the user owns. Ownership-scoped: non-owners get ErrReturnNotFound.
+	GetReturnPhotos(ctx context.Context, userID, returnID int64) ([]string, error)
 	ListReturns(ctx context.Context, userID int64, limit, offset int) ([]Return, error)
 	// ComputeActions derives the eligibility block for an order + its items.
 	ComputeActions(ctx context.Context, o Order, items []OrderItem) (OrderActions, error)
@@ -307,11 +322,21 @@ func (s *returnService) CreateReturn(ctx context.Context, in ReturnInput) (Retur
 			return e
 		}
 		for _, ri := range reqItems {
+			// RT-05: per-line reason; empty falls back to the header reason. A
+			// supplied line reason must be a valid enum value.
+			lineReason := ri.Reason
+			if lineReason == "" {
+				lineReason = in.Reason
+			} else if !lineReason.valid() {
+				return ErrInvalidReturnReason
+			}
 			item, e := s.returns.InsertReturnItem(ctx, tx, ReturnItem{
 				ReturnID:    rec.ID,
 				OrderID:     o.ID,
 				OrderItemID: ri.OrderItemID,
 				Quantity:    ri.Quantity,
+				Reason:      lineReason,
+				Note:        ri.Note,
 			})
 			if e != nil {
 				return e
@@ -320,6 +345,15 @@ func (s *returnService) CreateReturn(ctx context.Context, in ReturnInput) (Retur
 		}
 		if e := s.returns.InsertReturnStatusHistory(ctx, tx, rec.ID, string(ReturnPending), "submitted"); e != nil {
 			return e
+		}
+		// RT-03: store evidence photo keys (if any) on the same tx.
+		for i, key := range in.PhotoKeys {
+			if key == "" {
+				continue
+			}
+			if e := s.returns.InsertReturnPhoto(ctx, tx, rec.ID, key, i); e != nil {
+				return e
+			}
 		}
 		out = rec
 		return nil
@@ -355,6 +389,18 @@ func (s *returnService) GetReturnHistory(ctx context.Context, userID, returnID i
 		return nil, ErrReturnNotFound // ownership scoping
 	}
 	return s.returns.ListReturnStatusHistory(ctx, returnID)
+}
+
+// GetReturnPhotos returns the RT-03 evidence photo keys for an owned return.
+func (s *returnService) GetReturnPhotos(ctx context.Context, userID, returnID int64) ([]string, error) {
+	r, _, err := s.returns.GetReturn(ctx, returnID)
+	if err != nil {
+		return nil, err
+	}
+	if r.UserID != userID {
+		return nil, ErrReturnNotFound // ownership scoping
+	}
+	return s.returns.ListReturnPhotos(ctx, returnID)
 }
 
 func (s *returnService) ListReturns(ctx context.Context, userID int64, limit, offset int) ([]Return, error) {

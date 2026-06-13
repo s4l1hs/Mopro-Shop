@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -101,6 +102,76 @@ class _Body extends StatelessWidget {
           'returns.items_count'.tr(args: ['${ret.items.length}']),
           style: theme.textTheme.bodyMedium,
         ),
+        // RT-05: per-line reason (+ note). Falls back to the header reason for
+        // pre-RT-05 returns whose lines carry no reason.
+        for (final it in ret.items) ...[
+          const SizedBox(height: 4),
+          Text(
+            'returns.item_line'.tr(
+              namedArgs: {
+                'qty': '${it.quantity}',
+                'reason': ReturnReason.label(it.reason ?? ret.reason),
+              },
+            ),
+            style: theme.textTheme.bodySmall,
+          ),
+          if (it.note.isNotEmpty)
+            Text(
+              it.note,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+        ],
+        // RT-02: the return cargo code + carrier so the buyer can ship the item
+        // back (replaces the old return-id-as-tracking-no placeholder).
+        if (ret.shipping != null && ret.shipping!.code.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text(
+            'returns.cargo_code_label'.tr(),
+            style: theme.textTheme.titleSmall,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            ret.shipping!.code,
+            style: theme.textTheme.titleMedium
+                ?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          Text(
+            'returns.cargo_carrier'
+                .tr(namedArgs: {'carrier': ret.shipping!.carrier}),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ],
+        // RT-03: evidence photos (shown when present; capture step gated on
+        // storage provisioning).
+        if (ret.photoUrls.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text('returns.photos'.tr(), style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 80,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: ret.photoUrls.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) => ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: CachedNetworkImage(
+                  imageUrl: ret.photoUrls[i],
+                  width: 80,
+                  height: 80,
+                  fit: BoxFit.cover,
+                  errorWidget: (_, __, ___) => Container(
+                    width: 80,
+                    height: 80,
+                    color: theme.colorScheme.surfaceContainerHighest,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
         if (ret.refund != null) ...[
           const SizedBox(height: 24),
           RefundStatusCard(refund: ret.refund!),

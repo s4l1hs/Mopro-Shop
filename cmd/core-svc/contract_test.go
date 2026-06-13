@@ -43,6 +43,9 @@ func (stubReturnSvc) GetReturn(context.Context, int64, int64) (order.Return, []o
 func (stubReturnSvc) GetReturnHistory(context.Context, int64, int64) ([]order.ReturnStatusEvent, error) {
 	return nil, nil
 }
+func (stubReturnSvc) GetReturnPhotos(context.Context, int64, int64) ([]string, error) {
+	return nil, nil
+}
 func (stubReturnSvc) ListReturns(context.Context, int64, int, int) ([]order.Return, error) {
 	return nil, nil
 }

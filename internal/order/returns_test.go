@@ -48,6 +48,16 @@ type fakeReturnRepo struct {
 	nextID      int64
 	productIDs  []int64             // returned by ReturnProductIDs (seller-scope tests)
 	history     []ReturnStatusEvent // RT-04 status timeline
+	photos      []string            // RT-03 evidence photo keys captured on insert
+}
+
+func (f *fakeReturnRepo) InsertReturnPhoto(_ context.Context, _ pgx.Tx, _ int64, photoKey string, _ int) error {
+	f.photos = append(f.photos, photoKey)
+	return nil
+}
+
+func (f *fakeReturnRepo) ListReturnPhotos(_ context.Context, _ int64) ([]string, error) {
+	return f.photos, nil
 }
 
 func (f *fakeReturnRepo) WithTx(ctx context.Context, fn func(pgx.Tx) error) error {
@@ -230,6 +240,74 @@ func TestCreateReturn_HappyPath(t *testing.T) {
 	// refund = 2*5000 + 1*3000 = 13000
 	if rec.RefundAmountMinor != 13000 {
 		t.Errorf("refund=%d want 13000", rec.RefundAmountMinor)
+	}
+}
+
+// RT-05: per-line reasons are stored; a line without one falls back to the header.
+func TestCreateReturn_PerItemReasons(t *testing.T) {
+	o := deliveredOrder(1)
+	items := []OrderItem{{ID: 10, Qty: 1, UnitPriceMinor: 5000}, {ID: 11, Qty: 1, UnitPriceMinor: 3000}}
+	s := svcWith(o, items, &fakeReturnRepo{})
+	_, ri, err := s.CreateReturn(context.Background(), ReturnInput{
+		OrderID: 1, UserID: 7, Reason: ReasonDamaged,
+		Items: []ReturnItemInput{
+			{OrderItemID: 10, Quantity: 1, Reason: ReasonSizeIssue, Note: "too small"},
+			{OrderItemID: 11, Quantity: 1}, // no line reason → header fallback
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byItem := map[int64]ReturnItem{}
+	for _, it := range ri {
+		byItem[it.OrderItemID] = it
+	}
+	if byItem[10].Reason != ReasonSizeIssue || byItem[10].Note != "too small" {
+		t.Errorf("line 10: reason=%q note=%q", byItem[10].Reason, byItem[10].Note)
+	}
+	if byItem[11].Reason != ReasonDamaged {
+		t.Errorf("line 11 fallback: reason=%q want %q", byItem[11].Reason, ReasonDamaged)
+	}
+}
+
+// RT-03: evidence photo keys are stored on create and listed back.
+func TestCreateReturn_StoresPhotos(t *testing.T) {
+	o := deliveredOrder(1)
+	items := []OrderItem{{ID: 10, Qty: 1, UnitPriceMinor: 5000}}
+	rr := &fakeReturnRepo{}
+	s := svcWith(o, items, rr)
+	_, _, err := s.CreateReturn(context.Background(), ReturnInput{
+		OrderID: 1, UserID: 7, Reason: ReasonDamaged,
+		Items:     []ReturnItemInput{{OrderItemID: 10, Quantity: 1}},
+		PhotoKeys: []string{"returns/1/a.jpg", "", "returns/1/b.jpg"}, // empty skipped
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rr.photos) != 2 || rr.photos[0] != "returns/1/a.jpg" || rr.photos[1] != "returns/1/b.jpg" {
+		t.Fatalf("photos stored: got %v", rr.photos)
+	}
+	got, err := s.GetReturnPhotos(context.Background(), 7, rr.created.ID)
+	if err != nil || len(got) != 2 {
+		t.Fatalf("GetReturnPhotos: got %v err=%v", got, err)
+	}
+	// ownership scoping
+	if _, err := s.GetReturnPhotos(context.Background(), 999, rr.created.ID); !errors.Is(err, ErrReturnNotFound) {
+		t.Fatalf("non-owner: want ErrReturnNotFound, got %v", err)
+	}
+}
+
+// RT-05: a supplied (non-empty) line reason must be a valid enum value.
+func TestCreateReturn_InvalidLineReason(t *testing.T) {
+	o := deliveredOrder(1)
+	items := []OrderItem{{ID: 10, Qty: 1, UnitPriceMinor: 5000}}
+	s := svcWith(o, items, &fakeReturnRepo{})
+	_, _, err := s.CreateReturn(context.Background(), ReturnInput{
+		OrderID: 1, UserID: 7, Reason: ReasonDamaged,
+		Items: []ReturnItemInput{{OrderItemID: 10, Quantity: 1, Reason: ReturnReason("bogus")}},
+	})
+	if !errors.Is(err, ErrInvalidReturnReason) {
+		t.Fatalf("want ErrInvalidReturnReason, got %v", err)
 	}
 }
 

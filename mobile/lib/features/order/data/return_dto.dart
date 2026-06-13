@@ -52,17 +52,27 @@ class ReturnStatusEventDto {
   final DateTime createdAt;
 }
 
-/// One requested item line within a return.
+/// One item line within a return. RT-05: carries an optional per-line reason +
+/// note (null/empty reason → the header reason applies).
 class ReturnItemDto {
-  const ReturnItemDto({required this.orderItemId, required this.quantity});
+  const ReturnItemDto({
+    required this.orderItemId,
+    required this.quantity,
+    this.reason,
+    this.note = '',
+  });
 
   factory ReturnItemDto.fromJson(Map<String, dynamic> json) => ReturnItemDto(
         orderItemId: (json['order_item_id'] as num).toInt(),
         quantity: (json['quantity'] as num).toInt(),
+        reason: json['reason'] as String?,
+        note: (json['note'] as String?) ?? '',
       );
 
   final int orderItemId;
   final int quantity;
+  final String? reason;
+  final String note;
 }
 
 /// Compact return for the "İadelerim" list (matches GET /returns data[]).
@@ -97,6 +107,21 @@ class ReturnListItemDto {
   final DateTime createdAt;
 }
 
+/// RT-02: the return cargo block — a stable return cargo code (İade Kargo Kodu,
+/// our own id-derived code, not a live carrier tracking number) + the carrier.
+class ReturnShippingDto {
+  const ReturnShippingDto({required this.code, required this.carrier});
+
+  factory ReturnShippingDto.fromJson(Map<String, dynamic> json) =>
+      ReturnShippingDto(
+        code: (json['code'] as String?) ?? '',
+        carrier: (json['carrier'] as String?) ?? '',
+      );
+
+  final String code;
+  final String carrier;
+}
+
 /// Full return detail (matches GET /returns/{id} and the POST /returns response).
 class ReturnDetailDto {
   const ReturnDetailDto({
@@ -108,6 +133,8 @@ class ReturnDetailDto {
     this.description = '',
     this.items = const [],
     this.history = const [],
+    this.photoUrls = const [],
+    this.shipping,
     this.refund,
   });
 
@@ -125,6 +152,12 @@ class ReturnDetailDto {
         history: (json['history'] as List<dynamic>? ?? [])
             .map((e) => ReturnStatusEventDto.fromJson(e as Map<String, dynamic>))
             .toList(),
+        photoUrls: (json['photo_urls'] as List<dynamic>? ?? [])
+            .map((e) => e as String)
+            .toList(),
+        shipping: json['shipping'] is Map<String, dynamic>
+            ? ReturnShippingDto.fromJson(json['shipping'] as Map<String, dynamic>)
+            : null,
         refund: json['refund'] is Map<String, dynamic>
             ? RefundInfo.fromJson(json['refund'] as Map<String, dynamic>)
             : null,
@@ -141,6 +174,12 @@ class ReturnDetailDto {
   /// RT-04: the append-only status timeline; empty for pre-history returns →
   /// the detail falls back to the status-derived timeline.
   final List<ReturnStatusEventDto> history;
+
+  /// RT-03: evidence photo CDN urls (empty when none / capture not yet wired).
+  final List<String> photoUrls;
+
+  /// RT-02: the return cargo code + carrier (null on pre-RT-02 responses).
+  final ReturnShippingDto? shipping;
   final RefundInfo? refund;
 }
 
@@ -151,6 +190,7 @@ class CreateReturnRequest {
     required this.reason,
     this.description = '',
     this.items = const [],
+    this.photoKeys = const [],
   });
 
   final int orderId;
@@ -158,13 +198,24 @@ class CreateReturnRequest {
   final String description;
   final List<ReturnItemDto> items;
 
+  /// RT-03: evidence photo storage keys. Populated once the capture step (mobile
+  /// picker + upload) lands — gated on storage provisioning.
+  final List<String> photoKeys;
+
   Map<String, dynamic> toJson() => {
         'reason': reason,
         if (description.isNotEmpty) 'description': description,
+        if (photoKeys.isNotEmpty) 'photo_keys': photoKeys,
         if (items.isNotEmpty)
           'items': [
             for (final i in items)
-              {'order_item_id': i.orderItemId, 'quantity': i.quantity},
+              {
+                'order_item_id': i.orderItemId,
+                'quantity': i.quantity,
+                // RT-05: per-line reason + note (omitted when empty → header applies).
+                if (i.reason != null && i.reason!.isNotEmpty) 'reason': i.reason,
+                if (i.note.isNotEmpty) 'note': i.note,
+              },
           ],
       };
 }

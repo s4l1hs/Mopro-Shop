@@ -24,6 +24,8 @@ class ReturnRequest {
      this.description,
 
      this.items,
+
+     this.photoKeys,
   });
 
   @JsonKey(
@@ -63,19 +65,34 @@ class ReturnRequest {
 
 
 
+      /// RT-03: evidence photo storage keys (from POST /uploads/photos). Stored on the return; the detail serves them back as CDN urls (photo_urls). 
+  @JsonKey(
+    
+    name: r'photo_keys',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final List<String>? photoKeys;
+
+
+
 
 
     @override
     bool operator ==(Object other) => identical(this, other) || other is ReturnRequest &&
       other.reason == reason &&
       other.description == description &&
-      other.items == items;
+      other.items == items &&
+      other.photoKeys == photoKeys;
 
     @override
     int get hashCode =>
         reason.hashCode +
         description.hashCode +
-        items.hashCode;
+        items.hashCode +
+        photoKeys.hashCode;
 
   factory ReturnRequest.fromJson(Map<String, dynamic> json) => _$ReturnRequestFromJson(json);
 

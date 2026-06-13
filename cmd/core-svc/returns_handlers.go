@@ -2,15 +2,51 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/mopro/platform/internal/identity/middleware"
 	"github.com/mopro/platform/internal/order"
 	"github.com/mopro/platform/internal/payment"
+	"github.com/mopro/platform/pkg/mediaurl"
 )
+
+// defaultReturnCarrier is the platform's return-leg carrier when RETURN_CARRIER
+// is unset. Not a market constant (a carrier display name) — overridable by env.
+const defaultReturnCarrier = "Aras Kargo"
+
+// returnShipping is the RT-02 return cargo block: a deterministic return cargo
+// code derived from the return id (a real, stable identifier WE own — clearly
+// "İade Kargo Kodu", not a carrier tracking number) + the return carrier. The
+// drop-off instructions are rendered client-side (i18n). NOTE: a live carrier
+// label/tracking integration is a follow-up cargo-adapter vertical.
+func returnShipping(r order.Return) map[string]any {
+	carrier := os.Getenv("RETURN_CARRIER")
+	if carrier == "" {
+		carrier = defaultReturnCarrier
+	}
+	return map[string]any{
+		"code":    fmt.Sprintf("IADE-%07d", r.ID),
+		"carrier": carrier,
+	}
+}
+
+// cdnURLsFromKeys maps storage keys to CDN urls (RT-03 evidence photos); nil/empty
+// → nil so returnJSON omits the key.
+func cdnURLsFromKeys(keys []string) []string {
+	if len(keys) == 0 {
+		return nil
+	}
+	urls := make([]string, 0, len(keys))
+	for _, k := range keys {
+		urls = append(urls, mediaurl.CDNUrl(k))
+	}
+	return urls
+}
 
 // refundEstimateDays is how long after initiation a pending refund is estimated
 // to settle to the buyer (display-only).
@@ -84,7 +120,7 @@ func buildReturnRefundView(r order.Return) *refundView {
 // returnJSON is the wire shape for a return (snake_case order fields, with the
 // nested items + camelCase refund block used elsewhere on the orders surface).
 // history is the append-only status timeline (RT-04); nil omits the key.
-func returnJSON(r order.Return, items []order.ReturnItem, refund *refundView, history []order.ReturnStatusEvent) map[string]any {
+func returnJSON(r order.Return, items []order.ReturnItem, refund *refundView, history []order.ReturnStatusEvent, photoURLs []string) map[string]any {
 	if items == nil {
 		items = []order.ReturnItem{}
 	}
@@ -97,9 +133,13 @@ func returnJSON(r order.Return, items []order.ReturnItem, refund *refundView, hi
 		"created_at":  r.CreatedAt,
 		"items":       items,
 		"refund":      refund,
+		"shipping":    returnShipping(r), // RT-02: return cargo code + carrier
 	}
 	if history != nil {
 		out["history"] = history
+	}
+	if photoURLs != nil {
+		out["photo_urls"] = photoURLs // RT-03: evidence photos (CDN urls)
 	}
 	return out
 }
@@ -119,9 +159,12 @@ func handleCreateReturn(returnSvc order.ReturnService) http.HandlerFunc {
 			Reason      string `json:"reason"`
 			Description string `json:"description"`
 			Items       []struct {
-				OrderItemID int64 `json:"order_item_id"`
-				Quantity    int   `json:"quantity"`
+				OrderItemID int64  `json:"order_item_id"`
+				Quantity    int    `json:"quantity"`
+				Reason      string `json:"reason"` // RT-05: optional per-line reason
+				Note        string `json:"note"`   // RT-05: optional per-line note
 			} `json:"items"`
+			PhotoKeys []string `json:"photo_keys"` // RT-03: evidence photo keys
 		}
 		if err := decodeJSON(w, r, &body); err != nil {
 			return
@@ -133,8 +176,14 @@ func handleCreateReturn(returnSvc order.ReturnService) http.HandlerFunc {
 			Description: body.Description,
 		}
 		for _, it := range body.Items {
-			in.Items = append(in.Items, order.ReturnItemInput{OrderItemID: it.OrderItemID, Quantity: it.Quantity})
+			in.Items = append(in.Items, order.ReturnItemInput{
+				OrderItemID: it.OrderItemID,
+				Quantity:    it.Quantity,
+				Reason:      order.ReturnReason(it.Reason),
+				Note:        it.Note,
+			})
 		}
+		in.PhotoKeys = body.PhotoKeys
 
 		rec, items, err := returnSvc.CreateReturn(r.Context(), in)
 		if err != nil {
@@ -156,7 +205,7 @@ func handleCreateReturn(returnSvc order.ReturnService) http.HandlerFunc {
 			}
 			return
 		}
-		jsonOK(w, http.StatusCreated, returnJSON(rec, items, buildReturnRefundView(rec), nil))
+		jsonOK(w, http.StatusCreated, returnJSON(rec, items, buildReturnRefundView(rec), nil, cdnURLsFromKeys(in.PhotoKeys)))
 	}
 }
 
@@ -219,7 +268,16 @@ func handleGetReturn(returnSvc order.ReturnService) http.HandlerFunc {
 			slog.Warn("returns: GetReturnHistory", "err", hErr)
 			history = []order.ReturnStatusEvent{}
 		}
-		jsonOK(w, http.StatusOK, returnJSON(rec, items, buildReturnRefundView(rec), history))
+		// RT-03: evidence photos (best-effort — a read failure degrades to none).
+		photoKeys, pErr := returnSvc.GetReturnPhotos(r.Context(), userID, returnID)
+		if pErr != nil {
+			slog.Warn("returns: GetReturnPhotos", "err", pErr)
+		}
+		photoURLs := cdnURLsFromKeys(photoKeys)
+		if photoURLs == nil {
+			photoURLs = []string{} // detail always carries the key (possibly empty)
+		}
+		jsonOK(w, http.StatusOK, returnJSON(rec, items, buildReturnRefundView(rec), history, photoURLs))
 	}
 }
 
