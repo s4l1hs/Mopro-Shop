@@ -161,20 +161,41 @@ Examples:
 
 ## Merging & branch protection
 
-`main` requires a set of status checks (incl. `verify`, `build_runner (verify
-generated files up-to-date)`, `Generated files in sync`, `flutter test`). Admin
-override exists (`enforce_admins=false`) **only as an escape hatch for confirmed
-infra flakes** — a runner that died, a transient network/registry failure, a known
-upstream outage.
+`main` requires 14 status checks (incl. `verify`, `build_runner (verify generated
+files up-to-date)`, `Generated files in sync`, `flutter test`). Two settings are
+now **enforced** (hardened after the #217/#218/#221/#223 drift — see
+`docs/internal/main-drift-forensics.md`):
 
-**NEVER override a red `verify`/`gofmt`, `build_runner`/gen-sync, or `flutter
-test`.** These are **deterministic**: red means the branch is wrong (unformatted
-code, stale generated `.g.dart`, a failing test), not that the runner is flaky.
-Overriding them lands broken code on `main`. This actually happened across
-#217/#218/#221/#223 (stale `.g.dart` + a gofmt misalignment merged over red
-required checks) — see `docs/internal/main-drift-forensics.md`. If a required check
-is red, **fix the branch**; if you genuinely believe it is a flake, re-run it and
-get a second opinion before any override.
+- **`enforce_admins=true`** — admins included: **nobody can merge over a red
+  required check.** The casual override that landed stale `.g.dart` + a gofmt
+  misalignment on `main` is no longer possible.
+- **`required_status_checks.strict=true`** — a branch must be **up to date with
+  `main` before it can merge.** This closes the stale-branch drift class (a PR
+  green-but-behind whose combined generated files drift once merged). **Cost:**
+  parallel-lane merges serialize — after one lane lands, the other open PRs must
+  rebase onto latest `main` and let CI go green again before they can merge.
+  Coordinate codegen-touching lanes (only one regenerates at a time; the second to
+  merge rebases + regenerates).
+
+**Red required checks are deterministic** — `verify`/`gofmt`, `build_runner`/gen-sync,
+`flutter test` go red because the branch is wrong (unformatted code, stale generated
+`.g.dart`, a failing test), not because the runner is flaky. **Fix the branch.**
+
+### Break-glass (genuine CI-infra outage only)
+
+If a required check is **truly** unrunnable — a dead runner, a registry/network
+outage, a known upstream incident — and main *must* move, the procedure is
+**deliberate and visible**, never a per-PR habit:
+
+```bash
+gh api -X DELETE repos/<owner>/<repo>/branches/main/protection/enforce_admins  # temp-disable
+# merge the one PR
+gh api -X POST   repos/<owner>/<repo>/branches/main/protection/enforce_admins  # re-enable IMMEDIATELY
+```
+
+Re-enabling in the same sitting is mandatory; note the reason in the PR. Break-glass
+is for infra outages, **never** to bypass a deterministic red (gofmt/gen/test) — that
+is the exact failure mode this hardening exists to prevent.
 
 ### Mandatory post-batch main-green check
 

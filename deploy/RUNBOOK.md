@@ -154,6 +154,26 @@ ssh -p 4625 mopro@195.85.207.92 \
   "docker exec caddy caddy reload --config /etc/caddy/Caddyfile"
 ```
 
+### Branch-protection break-glass (`main`)
+
+`main` is hardened: **`enforce_admins=true`** (nobody merges over a red required
+check) + **`strict=true`** (branches must be up to date before merge). See
+`CONTRIBUTING.md` → "Merging & branch protection".
+
+Break-glass is **only** for a genuine CI-infra outage (dead runner, registry/network
+outage, upstream incident) — **never** to bypass a deterministic red
+(gofmt/gen/test). Deliberate, visible, re-enabled in the same sitting:
+
+```sh
+gh api -X DELETE repos/s4l1hs/Mopro-Shop/branches/main/protection/enforce_admins  # temp-disable
+# merge the single unblocking PR
+gh api -X POST   repos/s4l1hs/Mopro-Shop/branches/main/protection/enforce_admins  # RE-ENABLE now
+gh api repos/s4l1hs/Mopro-Shop/branches/main/protection \
+  | python3 -c "import json,sys;print('enforce_admins:',json.load(sys.stdin)['enforce_admins']['enabled'])"  # must be True
+```
+
+Record the outage reason in the merged PR. Drift forensics: `docs/internal/main-drift-forensics.md`.
+
 ---
 
 ## Backup & Restore
