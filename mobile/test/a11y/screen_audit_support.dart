@@ -16,6 +16,7 @@ import 'package:mopro/design/theme.dart';
 import 'package:mopro/design/theme_controller.dart';
 import 'package:mopro/features/account/account_screen.dart';
 import 'package:mopro/features/account/current_user_provider.dart';
+import 'package:mopro/features/account/providers/fit_profile_provider.dart';
 import 'package:mopro/features/account/security_screen.dart';
 import 'package:mopro/features/account/widgets/account_shell.dart';
 import 'package:mopro/features/cart/application/cart_count_provider.dart';
@@ -237,6 +238,10 @@ Future<void> pumpAuditConfig(WidgetTester tester, String config) async {
           categoryTreeProvider.overrideWithValue(const AsyncData([])),
           catalogApiProvider.overrideWithValue(_FakeCatalogApi()),
           recentlyViewedProvider.overrideWith(_FakeRecentlyViewed.new),
+          // Size-fit: the PDP card's recommendation provider fires a Dio
+          // GET whose timeout Timer leaks past teardown in this harness (the
+          // recently-viewed pattern). Stub it to null → card renders nothing.
+          sizeRecommendationProvider.overrideWith((ref, id) async => null),
         ],
         child: MaterialApp.router(
           theme: buildLightTheme(),

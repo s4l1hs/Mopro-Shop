@@ -96,7 +96,7 @@ func (r *pgxRepository) UpsertProfile(ctx context.Context, p FitProfile) error {
 
 func (r *pgxRepository) GetProfile(ctx context.Context, userID int64) (FitProfile, error) {
 	var (
-		p                                      FitProfile
+		p                                 FitProfile
 		chest, waist, hip, inseam, height *string
 	)
 	p.UserID = userID

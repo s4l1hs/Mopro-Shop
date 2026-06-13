@@ -108,7 +108,7 @@ func (s *service) Recommend(ctx context.Context, userID int64, productTitle stri
 	type sizeScore struct {
 		label string
 		rank  int
-		score int  // Σ distance-to-range over present measurements (mm)
+		score int // Σ distance-to-range over present measurements (mm)
 		// edge position of the binding (largest-range-share) measurement:
 		// -1 unknown, else 0..1000 (per-mille within the range).
 		edgePerMille int
