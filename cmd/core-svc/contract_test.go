@@ -563,7 +563,7 @@ func TestContract_SizeFit(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(sizefinder.Recommendation{
 				Status: "ok", GarmentType: "top", Size: "M",
 				Signal: "true_to_size", Confidence: "basic",
-				Estimated: []string{"chest"}, ChartApproximate: true,
+				Estimated: []string{"chest"}, Source: "standard", ChartApproximate: true,
 			})
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -594,7 +594,7 @@ func TestContract_SizeFit(t *testing.T) {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/products/15/size-recommendation", nil)
 		req.SetPathValue("id", "15")
-		handleSizeRecommendation(client, catalogSvc, "tr-TR")(rec, req)
+		handleSizeRecommendation(client, catalogSvc, &stubSellerSvc{}, "tr-TR")(rec, req)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
 		}

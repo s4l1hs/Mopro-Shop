@@ -36,6 +36,8 @@ class SizeRecommendation {
 
      this.estimated,
 
+     this.source_,
+
     required  this.chartApproximate,
   });
 
@@ -152,6 +154,19 @@ class SizeRecommendation {
 
 
 
+      /// seller (a seller-entered chart for the actual garment) | standard (the EN 13402-3 baseline). Empty for no_chart. 
+  @JsonKey(
+    
+    name: r'source',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final String? source_;
+
+
+
   @JsonKey(
     
     name: r'chart_approximate',
@@ -177,6 +192,7 @@ class SizeRecommendation {
       other.missing == missing &&
       other.confidence == confidence &&
       other.estimated == estimated &&
+      other.source_ == source_ &&
       other.chartApproximate == chartApproximate;
 
     @override
@@ -190,6 +206,7 @@ class SizeRecommendation {
         missing.hashCode +
         confidence.hashCode +
         estimated.hashCode +
+        source_.hashCode +
         chartApproximate.hashCode;
 
   factory SizeRecommendation.fromJson(Map<String, dynamic> json) => _$SizeRecommendationFromJson(json);
