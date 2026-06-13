@@ -519,11 +519,17 @@ type FitProfile struct {
 	ChestMm *int `json:"chest_mm,omitempty"`
 
 	// FitPref regular | loose | tight (between-sizes tiebreak).
-	FitPref  string `json:"fit_pref"`
-	HeightMm *int   `json:"height_mm,omitempty"`
-	HipMm    *int   `json:"hip_mm,omitempty"`
-	InseamMm *int   `json:"inseam_mm,omitempty"`
-	WaistMm  *int   `json:"waist_mm,omitempty"`
+	FitPref string `json:"fit_pref"`
+
+	// Gender female | male | unspecified (basic-estimation input, NOT a measurement). unspecified disables basic estimation for the user.
+	Gender   *string `json:"gender,omitempty"`
+	HeightMm *int    `json:"height_mm,omitempty"`
+	HipMm    *int    `json:"hip_mm,omitempty"`
+	InseamMm *int    `json:"inseam_mm,omitempty"`
+	WaistMm  *int    `json:"waist_mm,omitempty"`
+
+	// WeightG Weight in grams (basic-estimation input; encrypted at rest).
+	WeightG *int `json:"weight_g,omitempty"`
 }
 
 // FitProfileEnvelope defines model for FitProfileEnvelope.
@@ -836,6 +842,12 @@ type SizeRecommendation struct {
 	BetweenLower     *string `json:"between_lower,omitempty"`
 	BetweenUpper     *string `json:"between_upper,omitempty"`
 	ChartApproximate bool    `json:"chart_approximate"`
+
+	// Confidence detailed (every relevant measurement was a real profile value) | basic (>=1 was estimated from height/weight/gender → show the approximate warning). Empty for non-ok statuses.
+	Confidence *string `json:"confidence,omitempty"`
+
+	// Estimated Relevant measurements synthesized from height/weight/gender.
+	Estimated *[]string `json:"estimated,omitempty"`
 
 	// GarmentType top | bottom | dress | skirt | outerwear (chart key).
 	GarmentType *string   `json:"garment_type,omitempty"`

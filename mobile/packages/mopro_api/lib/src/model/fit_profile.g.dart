@@ -17,6 +17,8 @@ FitProfile _$FitProfileFromJson(Map<String, dynamic> json) => $checkedCreate(
       hipMm: $checkedConvert('hip_mm', (v) => (v as num?)?.toInt()),
       inseamMm: $checkedConvert('inseam_mm', (v) => (v as num?)?.toInt()),
       heightMm: $checkedConvert('height_mm', (v) => (v as num?)?.toInt()),
+      weightG: $checkedConvert('weight_g', (v) => (v as num?)?.toInt()),
+      gender: $checkedConvert('gender', (v) => v as String?),
       fitPref: $checkedConvert('fit_pref', (v) => v as String),
     );
     return val;
@@ -27,6 +29,7 @@ FitProfile _$FitProfileFromJson(Map<String, dynamic> json) => $checkedCreate(
     'hipMm': 'hip_mm',
     'inseamMm': 'inseam_mm',
     'heightMm': 'height_mm',
+    'weightG': 'weight_g',
     'fitPref': 'fit_pref',
   },
 );
@@ -38,5 +41,7 @@ Map<String, dynamic> _$FitProfileToJson(FitProfile instance) =>
       'hip_mm': ?instance.hipMm,
       'inseam_mm': ?instance.inseamMm,
       'height_mm': ?instance.heightMm,
+      'weight_g': ?instance.weightG,
+      'gender': ?instance.gender,
       'fit_pref': instance.fitPref,
     };

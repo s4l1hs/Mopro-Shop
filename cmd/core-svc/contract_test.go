@@ -548,19 +548,22 @@ func TestContract_GetMyMembership(t *testing.T) {
 func TestContract_SizeFit(t *testing.T) {
 	doc := loadSpec(t)
 	chest := 970
+	weight := 80000
 
 	jobs := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/internal/sizefit/profile" && r.Method == http.MethodGet:
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(sizefinder.FitProfile{
-				UserID: 1, ChestMM: &chest, FitPref: "regular",
+				UserID: 1, ChestMM: &chest, WeightG: &weight,
+				Gender: "male", FitPref: "regular",
 			})
 		case r.URL.Path == "/internal/sizefit/recommend":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(sizefinder.Recommendation{
 				Status: "ok", GarmentType: "top", Size: "M",
-				Signal: "true_to_size", ChartApproximate: true,
+				Signal: "true_to_size", Confidence: "basic",
+				Estimated: []string{"chest"}, ChartApproximate: true,
 			})
 		default:
 			w.WriteHeader(http.StatusNotFound)

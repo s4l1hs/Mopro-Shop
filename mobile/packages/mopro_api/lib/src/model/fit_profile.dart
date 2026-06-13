@@ -28,6 +28,10 @@ class FitProfile {
 
      this.heightMm,
 
+     this.weightG,
+
+     this.gender,
+
     required  this.fitPref,
   });
 
@@ -91,6 +95,32 @@ class FitProfile {
 
 
 
+      /// Weight in grams (basic-estimation input; encrypted at rest).
+  @JsonKey(
+    
+    name: r'weight_g',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final int? weightG;
+
+
+
+      /// female | male | unspecified (basic-estimation input, NOT a measurement). unspecified disables basic estimation for the user. 
+  @JsonKey(
+    
+    name: r'gender',
+    required: false,
+    includeIfNull: false,
+  )
+
+
+  final String? gender;
+
+
+
       /// regular | loose | tight (between-sizes tiebreak).
   @JsonKey(
     
@@ -113,6 +143,8 @@ class FitProfile {
       other.hipMm == hipMm &&
       other.inseamMm == inseamMm &&
       other.heightMm == heightMm &&
+      other.weightG == weightG &&
+      other.gender == gender &&
       other.fitPref == fitPref;
 
     @override
@@ -122,6 +154,8 @@ class FitProfile {
         hipMm.hashCode +
         inseamMm.hashCode +
         heightMm.hashCode +
+        weightG.hashCode +
+        gender.hashCode +
         fitPref.hashCode;
 
   factory FitProfile.fromJson(Map<String, dynamic> json) => _$FitProfileFromJson(json);
