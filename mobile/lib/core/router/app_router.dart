@@ -9,6 +9,7 @@ import 'package:mopro/features/account/account_screen.dart';
 import 'package:mopro/features/account/browsing_history_screen.dart';
 import 'package:mopro/features/account/cards_screen.dart';
 import 'package:mopro/features/account/current_user_provider.dart';
+import 'package:mopro/features/account/fit_profile_screen.dart';
 import 'package:mopro/features/account/privacy/privacy_settings_screen.dart';
 import 'package:mopro/features/account/profile_screen.dart';
 import 'package:mopro/features/account/questions/my_questions_screen.dart';
@@ -581,6 +582,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/account/reviews',
             builder: (_, __) => const MyReviewsScreen(),
+          ),
+          GoRoute(
+            path: '/account/fit-profile',
+            builder: (_, __) => const FitProfileScreen(),
           ),
           GoRoute(
             path: '/account/questions',

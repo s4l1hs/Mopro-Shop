@@ -172,6 +172,11 @@ class _AccountMobileBody extends ConsumerWidget {
                   onTap: () => context.push('/account/reviews'),
                 ),
                 _Tile(
+                  icon: Icons.straighten,
+                  label: 'fit.title'.tr(),
+                  onTap: () => context.push('/account/fit-profile'),
+                ),
+                _Tile(
                   icon: Icons.help_outline_rounded,
                   label: 'account.rail_questions'.tr(),
                   onTap: () => context.push('/account/questions'),

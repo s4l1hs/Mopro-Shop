@@ -18,6 +18,7 @@ import (
 	"github.com/mopro/platform/internal/analytics"
 	"github.com/mopro/platform/internal/eventbus"
 	"github.com/mopro/platform/internal/notification"
+	"github.com/mopro/platform/internal/sizefinder"
 	"github.com/mopro/platform/pkg/logx"
 	"github.com/mopro/platform/pkg/metrics"
 	"github.com/mopro/platform/pkg/otelx"
@@ -113,12 +114,16 @@ func main() {
 		os.Exit(1)
 	}
 	analyticsSvc := analytics.NewService(analytics.NewRepository(pool))
+	// Size-fit (phase 1): encrypted fit profiles + garment-type match, served
+	// to core-svc over the internal §3.4 HTTP path (see sizefit_handlers.go).
+	sizefitSvc := sizefinder.NewService(sizefinder.NewRepository(pool))
 	analyticsCrons := analytics.NewCrons(analyticsSvc, istanbulLoc, analytics.RetentionDays, slog.Default())
 	analyticsCrons.Start(ctx)
 	defer analyticsCrons.Stop()
 
 	// ── HTTP server ──────────────────────────────────────────────────────────────
 	mux := http.NewServeMux()
+	registerSizefitRoutes(mux, sizefitSvc)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})

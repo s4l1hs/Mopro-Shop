@@ -27,6 +27,7 @@ import (
 	"github.com/mopro/platform/internal/identity"
 	"github.com/mopro/platform/internal/order"
 	"github.com/mopro/platform/internal/seller"
+	"github.com/mopro/platform/internal/sizefinder"
 	"github.com/mopro/platform/pkg/mediaurl"
 )
 
@@ -537,4 +538,63 @@ func TestContract_GetMyMembership(t *testing.T) {
 			assertConformsToSchema(t, doc, "Membership", rec.Body.Bytes())
 		})
 	}
+}
+
+// ── Size-fit: live-handler conformance (phase 1) ─────────────────────────────
+
+// TestContract_SizeFit proves the consumer-facing size-fit handlers emit
+// spec-conformant shapes. jobs-svc is stubbed at the HTTP seam (the §3.4
+// internal hop) — the contract under test is core's, not the network's.
+func TestContract_SizeFit(t *testing.T) {
+	doc := loadSpec(t)
+	chest := 970
+
+	jobs := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/internal/sizefit/profile" && r.Method == http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(sizefinder.FitProfile{
+				UserID: 1, ChestMM: &chest, FitPref: "regular",
+			})
+		case r.URL.Path == "/internal/sizefit/recommend":
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(sizefinder.Recommendation{
+				Status: "ok", GarmentType: "top", Size: "M",
+				Signal: "true_to_size", ChartApproximate: true,
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer jobs.Close()
+	t.Setenv("JOBS_SVC_URL", jobs.URL)
+	client := newSizefitClient()
+
+	t.Run("GET /me/fit-profile conforms to FitProfileEnvelope", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/me/fit-profile", nil)
+		handleGetFitProfile(client)(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
+		}
+		assertConformsToSchema(t, doc, "FitProfileEnvelope", rec.Body.Bytes())
+	})
+
+	t.Run("GET size-recommendation conforms to SizeRecommendation", func(t *testing.T) {
+		catalogSvc := &stubCatalogSvc{
+			getByIDFn: func(id int64) (catalog.Product, []catalog.Variant, []catalog.ProductTranslation, error) {
+				return catalog.Product{ID: id}, nil, []catalog.ProductTranslation{{
+					ProductID: id, Locale: "tr-TR", Title: "Basic Tişört",
+				}}, nil
+			},
+		}
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/products/15/size-recommendation", nil)
+		req.SetPathValue("id", "15")
+		handleSizeRecommendation(client, catalogSvc, "tr-TR")(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status: want 200 got %d (%s)", rec.Code, rec.Body.String())
+		}
+		assertConformsToSchema(t, doc, "SizeRecommendation", rec.Body.Bytes())
+	})
 }

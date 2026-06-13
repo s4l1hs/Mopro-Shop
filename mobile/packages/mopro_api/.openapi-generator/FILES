@@ -38,6 +38,8 @@ doc/ErrorEnvelopeError.md
 doc/Facet.md
 doc/FacetValue.md
 doc/FieldError.md
+doc/FitProfile.md
+doc/FitProfileEnvelope.md
 doc/GetCategoryFacets200Response.md
 doc/HealthApi.md
 doc/ListAddresses200Response.md
@@ -76,6 +78,7 @@ doc/SellerBinding.md
 doc/SellerOrderBreakdown.md
 doc/SellerOrderBreakdownItemsInner.md
 doc/SellerOrderBreakdownTotals.md
+doc/SizeRecommendation.md
 doc/StepUpRequest.md
 doc/StepUpTokenResponse.md
 doc/SuggestResponse.md
@@ -138,6 +141,8 @@ lib/src/model/error_envelope_error.dart
 lib/src/model/facet.dart
 lib/src/model/facet_value.dart
 lib/src/model/field_error.dart
+lib/src/model/fit_profile.dart
+lib/src/model/fit_profile_envelope.dart
 lib/src/model/get_category_facets200_response.dart
 lib/src/model/list_addresses200_response.dart
 lib/src/model/list_banners200_response.dart
@@ -171,6 +176,7 @@ lib/src/model/seller_binding.dart
 lib/src/model/seller_order_breakdown.dart
 lib/src/model/seller_order_breakdown_items_inner.dart
 lib/src/model/seller_order_breakdown_totals.dart
+lib/src/model/size_recommendation.dart
 lib/src/model/step_up_request.dart
 lib/src/model/step_up_token_response.dart
 lib/src/model/suggest_response.dart

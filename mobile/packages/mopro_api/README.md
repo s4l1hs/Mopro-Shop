@@ -137,6 +137,7 @@ Class | Method | HTTP request | Description
 [*CatalogApi*](doc/CatalogApi.md) | [**getCategoryCommission**](doc/CatalogApi.md#getcategorycommission) | **GET** /categories/{id}/commission | Get live commission and KDV rates for a category + market pair
 [*CatalogApi*](doc/CatalogApi.md) | [**getCategoryFacets**](doc/CatalogApi.md#getcategoryfacets) | **GET** /categories/{id}/facets | Faceted attribute aggregation for a category (PLP-13)
 [*CatalogApi*](doc/CatalogApi.md) | [**getProduct**](doc/CatalogApi.md#getproduct) | **GET** /products/{id} | Get full product detail including variants and cashback preview
+[*CatalogApi*](doc/CatalogApi.md) | [**getSizeRecommendation**](doc/CatalogApi.md#getsizerecommendation) | **GET** /products/{id}/size-recommendation | Recommend a size for this product from the user&#39;s fit profile
 [*CatalogApi*](doc/CatalogApi.md) | [**listCategories**](doc/CatalogApi.md#listcategories) | **GET** /categories | List all 42 product categories (locale-resolved names)
 [*CatalogApi*](doc/CatalogApi.md) | [**listProducts**](doc/CatalogApi.md#listproducts) | **GET** /products | List products with category filter, price/brand/rating/shipping filters, pagination, and sort
 [*DiscoveryApi*](doc/DiscoveryApi.md) | [**listBanners**](doc/DiscoveryApi.md#listbanners) | **GET** /banners | Promotional banners for a given placement
@@ -145,7 +146,9 @@ Class | Method | HTTP request | Description
 [*MeApi*](doc/MeApi.md) | [**changePassword**](doc/MeApi.md#changepassword) | **POST** /me/password | Change the authenticated user&#39;s password
 [*MeApi*](doc/MeApi.md) | [**deleteMe**](doc/MeApi.md#deleteme) | **DELETE** /me | Soft-delete the authenticated user account (KVKK / GDPR)
 [*MeApi*](doc/MeApi.md) | [**getMe**](doc/MeApi.md#getme) | **GET** /me | Get authenticated user profile
+[*MeApi*](doc/MeApi.md) | [**getMyFitProfile**](doc/MeApi.md#getmyfitprofile) | **GET** /me/fit-profile | Get the authenticated user&#39;s size-fit profile (size-fit phase 1)
 [*MeApi*](doc/MeApi.md) | [**getMyMembership**](doc/MeApi.md#getmymembership) | **GET** /me/membership | Get the authenticated user&#39;s membership tier (AC-05)
+[*MeApi*](doc/MeApi.md) | [**putMyFitProfile**](doc/MeApi.md#putmyfitprofile) | **PUT** /me/fit-profile | Create or replace the size-fit profile (idempotent upsert)
 [*MeApi*](doc/MeApi.md) | [**registerDevice**](doc/MeApi.md#registerdevice) | **POST** /me/devices | Register a device FCM token for push notifications
 [*MeApi*](doc/MeApi.md) | [**unregisterDevice**](doc/MeApi.md#unregisterdevice) | **DELETE** /me/devices/{id} | Remove a registered device (deregister push notifications)
 [*MeApi*](doc/MeApi.md) | [**updateMe**](doc/MeApi.md#updateme) | **PATCH** /me | Update user profile fields
@@ -197,6 +200,8 @@ Class | Method | HTTP request | Description
  - [Facet](doc/Facet.md)
  - [FacetValue](doc/FacetValue.md)
  - [FieldError](doc/FieldError.md)
+ - [FitProfile](doc/FitProfile.md)
+ - [FitProfileEnvelope](doc/FitProfileEnvelope.md)
  - [GetCategoryFacets200Response](doc/GetCategoryFacets200Response.md)
  - [ListAddresses200Response](doc/ListAddresses200Response.md)
  - [ListBanners200Response](doc/ListBanners200Response.md)
@@ -230,6 +235,7 @@ Class | Method | HTTP request | Description
  - [SellerOrderBreakdown](doc/SellerOrderBreakdown.md)
  - [SellerOrderBreakdownItemsInner](doc/SellerOrderBreakdownItemsInner.md)
  - [SellerOrderBreakdownTotals](doc/SellerOrderBreakdownTotals.md)
+ - [SizeRecommendation](doc/SizeRecommendation.md)
  - [StepUpRequest](doc/StepUpRequest.md)
  - [StepUpTokenResponse](doc/StepUpTokenResponse.md)
  - [SuggestResponse](doc/SuggestResponse.md)

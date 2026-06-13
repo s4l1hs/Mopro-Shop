@@ -926,5 +926,31 @@
     "login_required_title": "Log in for your coins",
     "login_required_body": "Your Mopro Coin balance and activity are personal to your account.",
     "login_cta": "Log in"
+  },
+  "fit": {
+    "title": "My Fit Profile",
+    "intro": "Enter your measurements and we will recommend your best size.",
+    "privacy_note": "Measurements are stored encrypted and used only for size recommendations.",
+    "cm": "cm",
+    "chest": "Chest",
+    "waist": "Waist",
+    "hip": "Hip",
+    "inseam": "Inseam",
+    "height": "Height",
+    "pref_label": "Fit preference",
+    "pref_tight": "Tight",
+    "pref_regular": "Regular",
+    "pref_loose": "Loose",
+    "save": "Save",
+    "saved": "Your fit profile is saved.",
+    "save_failed": "Could not save. Please try again.",
+    "your_size": "Your size: {size}",
+    "approximate": "(approx.)",
+    "signal_true_to_size": "True to size for your measurements.",
+    "signal_between": "You are between {lower} and {upper}.",
+    "signal_size_up": "Near the upper bound; consider sizing up for a looser fit.",
+    "signal_size_down": "Near the lower bound; consider sizing down for a tighter fit.",
+    "cta_complete_profile": "Add your measurements for a size recommendation.",
+    "cta_button": "Add measurements"
   }
 }

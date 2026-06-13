@@ -24,6 +24,7 @@ import 'package:mopro/features/catalog/widgets/pdp/pdp_delivery_info.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_image_pager.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_price_block.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_seller_card.dart';
+import 'package:mopro/features/catalog/widgets/pdp/pdp_size_recommendation.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_sticky_buy_bar.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_sticky_cta.dart';
 import 'package:mopro/features/catalog/widgets/pdp/pdp_variant_selector.dart';
@@ -519,6 +520,7 @@ class _ProductDetailBodyState extends ConsumerState<_ProductDetailBody>
             selected: v,
             onChanged: _selectVariant,
           ),
+          PdpSizeRecommendation(productId: product.id),
         ],
         const SizedBox(height: 16),
         PdpSellerCard(
@@ -659,6 +661,7 @@ class _BuyBox extends StatelessWidget {
               selected: selectedVariant,
               onChanged: onVariantChanged,
             ),
+          PdpSizeRecommendation(productId: product.id),
           ],
         ],
       ),

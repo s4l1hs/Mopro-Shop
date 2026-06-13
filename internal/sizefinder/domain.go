@@ -1,1 +1,105 @@
 package sizefinder
+
+import "time"
+
+// Phase-1 size-fit domain (docs/internal/size-fit.md). Measurements are integer
+// MILLIMETRES end-to-end (no floats — the money-type discipline applied to
+// lengths); they are stored only as AES-GCM ciphertext (§6).
+
+// GarmentType classifies what a chart fits. Charts key on garment type, NOT
+// category — the taxonomy is too coarse (a category holds tops and bottoms).
+type GarmentType string
+
+const (
+	GarmentTop       GarmentType = "top"
+	GarmentBottom    GarmentType = "bottom"
+	GarmentDress     GarmentType = "dress"
+	GarmentSkirt     GarmentType = "skirt"
+	GarmentOuterwear GarmentType = "outerwear"
+)
+
+// Fit preferences (tiebreak for between-sizes).
+const (
+	FitRegular = "regular"
+	FitLoose   = "loose"
+	FitTight   = "tight"
+)
+
+// FitProfile is a user's measurements in mm. Nil pointer = not provided.
+type FitProfile struct {
+	UserID    int64     `json:"user_id"`
+	ChestMM   *int      `json:"chest_mm,omitempty"`
+	WaistMM   *int      `json:"waist_mm,omitempty"`
+	HipMM     *int      `json:"hip_mm,omitempty"`
+	InseamMM  *int      `json:"inseam_mm,omitempty"`
+	HeightMM  *int      `json:"height_mm,omitempty"`
+	FitPref   string    `json:"fit_pref"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// ChartRow is one (size, measurement) range of a garment-type chart.
+type ChartRow struct {
+	GarmentType GarmentType
+	SizeLabel   string
+	SortRank    int
+	Measurement string // chest | waist | hip
+	MinMM       int
+	MaxMM       int
+}
+
+// Recommendation statuses.
+const (
+	StatusOK                = "ok"
+	StatusNoProfile         = "no_profile"
+	StatusIncompleteProfile = "incomplete_profile"
+	StatusNoChart           = "no_chart"
+)
+
+// Recommendation signals.
+const (
+	SignalTrueToSize = "true_to_size"
+	SignalBetween    = "between"
+	SignalSizeUp     = "size_up"
+	SignalSizeDown   = "size_down"
+)
+
+// Recommendation is the match output. ChartApproximate is ALWAYS true in
+// phase 1 — the seed charts are representative, not curated.
+type Recommendation struct {
+	Status           string      `json:"status"`
+	GarmentType      GarmentType `json:"garment_type,omitempty"`
+	Size             string      `json:"size,omitempty"`
+	Signal           string      `json:"signal,omitempty"`
+	BetweenLower     string      `json:"between_lower,omitempty"`
+	BetweenUpper     string      `json:"between_upper,omitempty"`
+	Missing          []string    `json:"missing,omitempty"`
+	ChartApproximate bool        `json:"chart_approximate"`
+}
+
+// relevantMeasurements per garment type. Bottoms/skirts use waist+hip; inseam
+// is collected on the profile for future length recs but no phase-1 chart
+// carries it.
+func relevantMeasurements(g GarmentType) []string {
+	switch g {
+	case GarmentTop, GarmentOuterwear:
+		return []string{"chest"}
+	case GarmentBottom, GarmentSkirt:
+		return []string{"waist", "hip"}
+	case GarmentDress:
+		return []string{"chest", "waist", "hip"}
+	}
+	return nil
+}
+
+// measurementValue resolves a named measurement from the profile (nil = absent).
+func measurementValue(p FitProfile, name string) *int {
+	switch name {
+	case "chest":
+		return p.ChestMM
+	case "waist":
+		return p.WaistMM
+	case "hip":
+		return p.HipMM
+	}
+	return nil
+}

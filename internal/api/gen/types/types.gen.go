@@ -514,6 +514,26 @@ type FieldError struct {
 	Name    string `json:"name"`
 }
 
+// FitProfile Size-fit measurements in integer MILLIMETRES (no floats). Stored only as AES-GCM ciphertext server-side. Absent fields = not provided.
+type FitProfile struct {
+	ChestMm *int `json:"chest_mm,omitempty"`
+
+	// FitPref regular | loose | tight (between-sizes tiebreak).
+	FitPref  string `json:"fit_pref"`
+	HeightMm *int   `json:"height_mm,omitempty"`
+	HipMm    *int   `json:"hip_mm,omitempty"`
+	InseamMm *int   `json:"inseam_mm,omitempty"`
+	WaistMm  *int   `json:"waist_mm,omitempty"`
+}
+
+// FitProfileEnvelope defines model for FitProfileEnvelope.
+type FitProfileEnvelope struct {
+	Exists bool `json:"exists"`
+
+	// Profile Size-fit measurements in integer MILLIMETRES (no floats). Stored only as AES-GCM ciphertext server-side. Absent fields = not provided.
+	Profile *FitProfile `json:"profile,omitempty"`
+}
+
 // Membership AC-05: the user's derived membership tier. Computed per-request from delivered orders in the rolling window; tier codes are reference data (ref_schema.membership_tiers) — display names localize client-side. next_* fields are omitted at the top tier.
 type Membership struct {
 	// Currency Currency of spend_minor and the thresholds.
@@ -809,6 +829,24 @@ type SellerOrderBreakdown struct {
 
 	// UnlockAt Payout unlock date — delivered_at + 3 business days (TR calendar)
 	UnlockAt time.Time `json:"unlock_at"`
+}
+
+// SizeRecommendation Size-fit phase 1 output. chart_approximate is always true (seed charts are representative, not curated).
+type SizeRecommendation struct {
+	BetweenLower     *string `json:"between_lower,omitempty"`
+	BetweenUpper     *string `json:"between_upper,omitempty"`
+	ChartApproximate bool    `json:"chart_approximate"`
+
+	// GarmentType top | bottom | dress | skirt | outerwear (chart key).
+	GarmentType *string   `json:"garment_type,omitempty"`
+	Missing     *[]string `json:"missing,omitempty"`
+
+	// Signal true_to_size | between | size_up | size_down
+	Signal *string `json:"signal,omitempty"`
+	Size   *string `json:"size,omitempty"`
+
+	// Status ok | no_profile | incomplete_profile | no_chart
+	Status string `json:"status"`
 }
 
 // StepUpTokenResponse defines model for StepUpTokenResponse.
@@ -1366,6 +1404,22 @@ type UnregisterDeviceParams struct {
 	XIdempotencyKey IdempotencyKey `json:"X-Idempotency-Key"`
 }
 
+// GetMyFitProfileParams defines parameters for GetMyFitProfile.
+type GetMyFitProfileParams struct {
+	// XTraceId Client-generated trace identifier (UUID or opaque string).
+	// Echoed in error responses as `error.trace_id`.
+	// Falls back to a server-generated UUID if absent.
+	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
+}
+
+// PutMyFitProfileParams defines parameters for PutMyFitProfile.
+type PutMyFitProfileParams struct {
+	// XTraceId Client-generated trace identifier (UUID or opaque string).
+	// Echoed in error responses as `error.trace_id`.
+	// Falls back to a server-generated UUID if absent.
+	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
+}
+
 // GetMyMembershipParams defines parameters for GetMyMembership.
 type GetMyMembershipParams struct {
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
@@ -1584,6 +1638,14 @@ type GetProductParams struct {
 	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
 }
 
+// GetSizeRecommendationParams defines parameters for GetSizeRecommendation.
+type GetSizeRecommendationParams struct {
+	// XTraceId Client-generated trace identifier (UUID or opaque string).
+	// Echoed in error responses as `error.trace_id`.
+	// Falls back to a server-generated UUID if absent.
+	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
+}
+
 // ListRecommendationsParams defines parameters for ListRecommendations.
 type ListRecommendationsParams struct {
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
@@ -1724,6 +1786,9 @@ type UpdateMeJSONRequestBody UpdateMeJSONBody
 
 // RegisterDeviceJSONRequestBody defines body for RegisterDevice for application/json ContentType.
 type RegisterDeviceJSONRequestBody RegisterDeviceJSONBody
+
+// PutMyFitProfileJSONRequestBody defines body for PutMyFitProfile for application/json ContentType.
+type PutMyFitProfileJSONRequestBody = FitProfile
 
 // ChangePasswordJSONRequestBody defines body for ChangePassword for application/json ContentType.
 type ChangePasswordJSONRequestBody ChangePasswordJSONBody

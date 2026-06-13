@@ -438,6 +438,26 @@ type FieldError struct {
 	Name    string `json:"name"`
 }
 
+// FitProfile Size-fit measurements in integer MILLIMETRES (no floats). Stored only as AES-GCM ciphertext server-side. Absent fields = not provided.
+type FitProfile struct {
+	ChestMm *int `json:"chest_mm,omitempty"`
+
+	// FitPref regular | loose | tight (between-sizes tiebreak).
+	FitPref  string `json:"fit_pref"`
+	HeightMm *int   `json:"height_mm,omitempty"`
+	HipMm    *int   `json:"hip_mm,omitempty"`
+	InseamMm *int   `json:"inseam_mm,omitempty"`
+	WaistMm  *int   `json:"waist_mm,omitempty"`
+}
+
+// FitProfileEnvelope defines model for FitProfileEnvelope.
+type FitProfileEnvelope struct {
+	Exists bool `json:"exists"`
+
+	// Profile Size-fit measurements in integer MILLIMETRES (no floats). Stored only as AES-GCM ciphertext server-side. Absent fields = not provided.
+	Profile *FitProfile `json:"profile,omitempty"`
+}
+
 // Membership AC-05: the user's derived membership tier. Computed per-request from delivered orders in the rolling window; tier codes are reference data (ref_schema.membership_tiers) — display names localize client-side. next_* fields are omitted at the top tier.
 type Membership struct {
 	// Currency Currency of spend_minor and the thresholds.
@@ -733,6 +753,24 @@ type SellerOrderBreakdown struct {
 
 	// UnlockAt Payout unlock date — delivered_at + 3 business days (TR calendar)
 	UnlockAt time.Time `json:"unlock_at"`
+}
+
+// SizeRecommendation Size-fit phase 1 output. chart_approximate is always true (seed charts are representative, not curated).
+type SizeRecommendation struct {
+	BetweenLower     *string `json:"between_lower,omitempty"`
+	BetweenUpper     *string `json:"between_upper,omitempty"`
+	ChartApproximate bool    `json:"chart_approximate"`
+
+	// GarmentType top | bottom | dress | skirt | outerwear (chart key).
+	GarmentType *string   `json:"garment_type,omitempty"`
+	Missing     *[]string `json:"missing,omitempty"`
+
+	// Signal true_to_size | between | size_up | size_down
+	Signal *string `json:"signal,omitempty"`
+	Size   *string `json:"size,omitempty"`
+
+	// Status ok | no_profile | incomplete_profile | no_chart
+	Status string `json:"status"`
 }
 
 // StepUpTokenResponse defines model for StepUpTokenResponse.
@@ -1229,6 +1267,22 @@ type UnregisterDeviceParams struct {
 	XIdempotencyKey IdempotencyKey `json:"X-Idempotency-Key"`
 }
 
+// GetMyFitProfileParams defines parameters for GetMyFitProfile.
+type GetMyFitProfileParams struct {
+	// XTraceId Client-generated trace identifier (UUID or opaque string).
+	// Echoed in error responses as `error.trace_id`.
+	// Falls back to a server-generated UUID if absent.
+	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
+}
+
+// PutMyFitProfileParams defines parameters for PutMyFitProfile.
+type PutMyFitProfileParams struct {
+	// XTraceId Client-generated trace identifier (UUID or opaque string).
+	// Echoed in error responses as `error.trace_id`.
+	// Falls back to a server-generated UUID if absent.
+	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
+}
+
 // GetMyMembershipParams defines parameters for GetMyMembership.
 type GetMyMembershipParams struct {
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
@@ -1447,6 +1501,14 @@ type GetProductParams struct {
 	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
 }
 
+// GetSizeRecommendationParams defines parameters for GetSizeRecommendation.
+type GetSizeRecommendationParams struct {
+	// XTraceId Client-generated trace identifier (UUID or opaque string).
+	// Echoed in error responses as `error.trace_id`.
+	// Falls back to a server-generated UUID if absent.
+	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
+}
+
 // ListRecommendationsParams defines parameters for ListRecommendations.
 type ListRecommendationsParams struct {
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
@@ -1567,6 +1629,9 @@ type UpdateMeJSONRequestBody UpdateMeJSONBody
 // RegisterDeviceJSONRequestBody defines body for RegisterDevice for application/json ContentType.
 type RegisterDeviceJSONRequestBody RegisterDeviceJSONBody
 
+// PutMyFitProfileJSONRequestBody defines body for PutMyFitProfile for application/json ContentType.
+type PutMyFitProfileJSONRequestBody = FitProfile
+
 // ChangePasswordJSONRequestBody defines body for ChangePassword for application/json ContentType.
 type ChangePasswordJSONRequestBody ChangePasswordJSONBody
 
@@ -1659,6 +1724,12 @@ type ServerInterface interface {
 	// Remove a registered device (deregister push notifications)
 	// (DELETE /me/devices/{id})
 	UnregisterDevice(w http.ResponseWriter, r *http.Request, id int64, params UnregisterDeviceParams)
+	// Get the authenticated user's size-fit profile (size-fit phase 1)
+	// (GET /me/fit-profile)
+	GetMyFitProfile(w http.ResponseWriter, r *http.Request, params GetMyFitProfileParams)
+	// Create or replace the size-fit profile (idempotent upsert)
+	// (PUT /me/fit-profile)
+	PutMyFitProfile(w http.ResponseWriter, r *http.Request, params PutMyFitProfileParams)
 	// Get the authenticated user's membership tier (AC-05)
 	// (GET /me/membership)
 	GetMyMembership(w http.ResponseWriter, r *http.Request, params GetMyMembershipParams)
@@ -1698,6 +1769,9 @@ type ServerInterface interface {
 	// Get full product detail including variants and cashback preview
 	// (GET /products/{id})
 	GetProduct(w http.ResponseWriter, r *http.Request, id int64, params GetProductParams)
+	// Recommend a size for this product from the user's fit profile
+	// (GET /products/{id}/size-recommendation)
+	GetSizeRecommendation(w http.ResponseWriter, r *http.Request, id int64, params GetSizeRecommendationParams)
 	// Personalised product recommendations for the authenticated user
 	// (GET /recommendations)
 	ListRecommendations(w http.ResponseWriter, r *http.Request, params ListRecommendationsParams)
@@ -3227,6 +3301,98 @@ func (siw *ServerInterfaceWrapper) UnregisterDevice(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// GetMyFitProfile operation middleware
+func (siw *ServerInterfaceWrapper) GetMyFitProfile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetMyFitProfileParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Trace-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Trace-Id")]; found {
+		var XTraceId TraceId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Trace-Id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Trace-Id", valueList[0], &XTraceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Trace-Id", Err: err})
+			return
+		}
+
+		params.XTraceId = &XTraceId
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMyFitProfile(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutMyFitProfile operation middleware
+func (siw *ServerInterfaceWrapper) PutMyFitProfile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutMyFitProfileParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Trace-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Trace-Id")]; found {
+		var XTraceId TraceId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Trace-Id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Trace-Id", valueList[0], &XTraceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Trace-Id", Err: err})
+			return
+		}
+
+		params.XTraceId = &XTraceId
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutMyFitProfile(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMyMembership operation middleware
 func (siw *ServerInterfaceWrapper) GetMyMembership(w http.ResponseWriter, r *http.Request) {
 
@@ -4168,6 +4334,61 @@ func (siw *ServerInterfaceWrapper) GetProduct(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// GetSizeRecommendation operation middleware
+func (siw *ServerInterfaceWrapper) GetSizeRecommendation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetSizeRecommendationParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "X-Trace-Id" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("X-Trace-Id")]; found {
+		var XTraceId TraceId
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Trace-Id", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "X-Trace-Id", valueList[0], &XTraceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Trace-Id", Err: err})
+			return
+		}
+
+		params.XTraceId = &XTraceId
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSizeRecommendation(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListRecommendations operation middleware
 func (siw *ServerInterfaceWrapper) ListRecommendations(w http.ResponseWriter, r *http.Request) {
 
@@ -4700,6 +4921,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("PATCH "+options.BaseURL+"/me", wrapper.UpdateMe)
 	m.HandleFunc("POST "+options.BaseURL+"/me/devices", wrapper.RegisterDevice)
 	m.HandleFunc("DELETE "+options.BaseURL+"/me/devices/{id}", wrapper.UnregisterDevice)
+	m.HandleFunc("GET "+options.BaseURL+"/me/fit-profile", wrapper.GetMyFitProfile)
+	m.HandleFunc("PUT "+options.BaseURL+"/me/fit-profile", wrapper.PutMyFitProfile)
 	m.HandleFunc("GET "+options.BaseURL+"/me/membership", wrapper.GetMyMembership)
 	m.HandleFunc("POST "+options.BaseURL+"/me/password", wrapper.ChangePassword)
 	m.HandleFunc("GET "+options.BaseURL+"/orders", wrapper.ListOrders)
@@ -4713,6 +4936,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("GET "+options.BaseURL+"/products", wrapper.ListProducts)
 	m.HandleFunc("POST "+options.BaseURL+"/products", wrapper.CreateProduct)
 	m.HandleFunc("GET "+options.BaseURL+"/products/{id}", wrapper.GetProduct)
+	m.HandleFunc("GET "+options.BaseURL+"/products/{id}/size-recommendation", wrapper.GetSizeRecommendation)
 	m.HandleFunc("GET "+options.BaseURL+"/recommendations", wrapper.ListRecommendations)
 	m.HandleFunc("GET "+options.BaseURL+"/search", wrapper.Search)
 	m.HandleFunc("GET "+options.BaseURL+"/search/suggest", wrapper.SearchSuggest)
@@ -5891,6 +6115,84 @@ func (response UnregisterDevice503JSONResponse) VisitUnregisterDeviceResponse(w 
 	return json.NewEncoder(w).Encode(response.Body)
 }
 
+type GetMyFitProfileRequestObject struct {
+	Params GetMyFitProfileParams
+}
+
+type GetMyFitProfileResponseObject interface {
+	VisitGetMyFitProfileResponse(w http.ResponseWriter) error
+}
+
+type GetMyFitProfile200JSONResponse FitProfileEnvelope
+
+func (response GetMyFitProfile200JSONResponse) VisitGetMyFitProfileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetMyFitProfile401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetMyFitProfile401JSONResponse) VisitGetMyFitProfileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetMyFitProfile500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetMyFitProfile500JSONResponse) VisitGetMyFitProfileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PutMyFitProfileRequestObject struct {
+	Params PutMyFitProfileParams
+	Body   *PutMyFitProfileJSONRequestBody
+}
+
+type PutMyFitProfileResponseObject interface {
+	VisitPutMyFitProfileResponse(w http.ResponseWriter) error
+}
+
+type PutMyFitProfile204Response struct {
+}
+
+func (response PutMyFitProfile204Response) VisitPutMyFitProfileResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type PutMyFitProfile401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response PutMyFitProfile401JSONResponse) VisitPutMyFitProfileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PutMyFitProfile422Response struct {
+}
+
+func (response PutMyFitProfile422Response) VisitPutMyFitProfileResponse(w http.ResponseWriter) error {
+	w.WriteHeader(422)
+	return nil
+}
+
+type PutMyFitProfile500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response PutMyFitProfile500JSONResponse) VisitPutMyFitProfileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetMyMembershipRequestObject struct {
 	Params GetMyMembershipParams
 }
@@ -6560,6 +6862,51 @@ func (response GetProduct500JSONResponse) VisitGetProductResponse(w http.Respons
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetSizeRecommendationRequestObject struct {
+	Id     int64 `json:"id"`
+	Params GetSizeRecommendationParams
+}
+
+type GetSizeRecommendationResponseObject interface {
+	VisitGetSizeRecommendationResponse(w http.ResponseWriter) error
+}
+
+type GetSizeRecommendation200JSONResponse SizeRecommendation
+
+func (response GetSizeRecommendation200JSONResponse) VisitGetSizeRecommendationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSizeRecommendation401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetSizeRecommendation401JSONResponse) VisitGetSizeRecommendationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSizeRecommendation404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetSizeRecommendation404JSONResponse) VisitGetSizeRecommendationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSizeRecommendation500JSONResponse struct{ InternalErrorJSONResponse }
+
+func (response GetSizeRecommendation500JSONResponse) VisitGetSizeRecommendationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListRecommendationsRequestObject struct {
 	Params ListRecommendationsParams
 }
@@ -6828,6 +7175,12 @@ type StrictServerInterface interface {
 	// Remove a registered device (deregister push notifications)
 	// (DELETE /me/devices/{id})
 	UnregisterDevice(ctx context.Context, request UnregisterDeviceRequestObject) (UnregisterDeviceResponseObject, error)
+	// Get the authenticated user's size-fit profile (size-fit phase 1)
+	// (GET /me/fit-profile)
+	GetMyFitProfile(ctx context.Context, request GetMyFitProfileRequestObject) (GetMyFitProfileResponseObject, error)
+	// Create or replace the size-fit profile (idempotent upsert)
+	// (PUT /me/fit-profile)
+	PutMyFitProfile(ctx context.Context, request PutMyFitProfileRequestObject) (PutMyFitProfileResponseObject, error)
 	// Get the authenticated user's membership tier (AC-05)
 	// (GET /me/membership)
 	GetMyMembership(ctx context.Context, request GetMyMembershipRequestObject) (GetMyMembershipResponseObject, error)
@@ -6867,6 +7220,9 @@ type StrictServerInterface interface {
 	// Get full product detail including variants and cashback preview
 	// (GET /products/{id})
 	GetProduct(ctx context.Context, request GetProductRequestObject) (GetProductResponseObject, error)
+	// Recommend a size for this product from the user's fit profile
+	// (GET /products/{id}/size-recommendation)
+	GetSizeRecommendation(ctx context.Context, request GetSizeRecommendationRequestObject) (GetSizeRecommendationResponseObject, error)
 	// Personalised product recommendations for the authenticated user
 	// (GET /recommendations)
 	ListRecommendations(ctx context.Context, request ListRecommendationsRequestObject) (ListRecommendationsResponseObject, error)
@@ -7627,6 +7983,65 @@ func (sh *strictHandler) UnregisterDevice(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// GetMyFitProfile operation middleware
+func (sh *strictHandler) GetMyFitProfile(w http.ResponseWriter, r *http.Request, params GetMyFitProfileParams) {
+	var request GetMyFitProfileRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMyFitProfile(ctx, request.(GetMyFitProfileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMyFitProfile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMyFitProfileResponseObject); ok {
+		if err := validResponse.VisitGetMyFitProfileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutMyFitProfile operation middleware
+func (sh *strictHandler) PutMyFitProfile(w http.ResponseWriter, r *http.Request, params PutMyFitProfileParams) {
+	var request PutMyFitProfileRequestObject
+
+	request.Params = params
+
+	var body PutMyFitProfileJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutMyFitProfile(ctx, request.(PutMyFitProfileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutMyFitProfile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutMyFitProfileResponseObject); ok {
+		if err := validResponse.VisitPutMyFitProfileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMyMembership operation middleware
 func (sh *strictHandler) GetMyMembership(w http.ResponseWriter, r *http.Request, params GetMyMembershipParams) {
 	var request GetMyMembershipRequestObject
@@ -8006,6 +8421,33 @@ func (sh *strictHandler) GetProduct(w http.ResponseWriter, r *http.Request, id i
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetProductResponseObject); ok {
 		if err := validResponse.VisitGetProductResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSizeRecommendation operation middleware
+func (sh *strictHandler) GetSizeRecommendation(w http.ResponseWriter, r *http.Request, id int64, params GetSizeRecommendationParams) {
+	var request GetSizeRecommendationRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSizeRecommendation(ctx, request.(GetSizeRecommendationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSizeRecommendation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSizeRecommendationResponseObject); ok {
+		if err := validResponse.VisitGetSizeRecommendationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
