@@ -83,3 +83,10 @@ to jobs-svc; no cross-schema JOIN.
 4. Spec + codegen (confidence/estimated/weight_g/gender) + contract test.
 5. Mobile: PDP warning + fit-form basic fields + i18n (TR+EN) + tests.
 6. Doc + ledger.
+
+## Shipped
+Migration 0097 (weight_enc + gender), basic-estimate tier + confidence in the
+match service (estimate-then-match), spec/codegen (confidence/estimated/weight_g/
+gender), PDP approximate warning (BASIC only), fit-form basic fields. Tests cover
+detailed/basic/partial/none. Estimation coefficients remain **illustrative** —
+curate alongside the charts.
