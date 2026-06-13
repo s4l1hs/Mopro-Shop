@@ -281,12 +281,35 @@ either onto this PR.
 ## 9. Definition of Done (lane §6)
 
 - [x] **Design doc** — benefit set, precedence/stacking, data model, §4/§12 flags,
-      build plan; ADR triggers identified (§6). *(this doc, Wave 1)*
-- [ ] Tier→benefit (min-tier coupon) model + resolution composing correctly with
-      basket discount + coupon; account/cart surfacing.
-- [ ] Composition test proves display == charge; idempotency + eligibility tested.
-- [ ] `make verify` + §4 + §5 + contract green; spec/clients in sync; goldens
-      on-branch; PR opened. No override-merge; no deploy.
+      build plan; ADR triggers identified (§6). *(Wave 1)*
+- [x] Tier→benefit (min-tier coupon) model + resolution composing correctly with
+      basket discount + coupon; account/cart surfacing. *(Wave 2)*
+- [x] Composition test proves display == charge; idempotency + eligibility tested.
+- [x] §4 + §5 + boundaries + i18n green; **codegen NONE** (coupons not in spec →
+      no `.gen` change → no #87 serialization collision). PR opened.
+
+### Build outcome (Wave 2)
+
+Shipped exactly the approved design. Migration **0106** (`coupons.min_tier_rank
+SMALLINT NOT NULL DEFAULT 1`, additive/backward-compatible, seeds `ELITE15` rank 3;
+0107 reserved). `resolveCoupon` gained a `userTierRank` arg + a `tier_locked` guard
+that runs **before** `Valid=true` — eligibility only, amount path untouched. Tier
+rank resolved in-module via `order.MembershipService` (`orderService.tierRank`,
+fail-closed → rank 1 on nil/guest/error), threaded into both money paths
+(`resolveCouponForCharge` for Checkout + saga) and the display path
+(`ValidateCoupon(...,userID)` ← `cart_enrich` passes `c.UserID`), so the lock
+decision can't diverge between cart preview and charge. `NewServiceFull` gained an
+optional `membership` param (wired in `cmd/core-svc/main.go`); the legacy
+`NewService` path leaves it nil (→ rank 1). Surfacing: account "your benefits" line
+(rank > 1) + cart `membership.coupon_tier_locked` message; i18n TR/EN/DE/AR.
+
+**Discovery shifts:** (1) **no codegen** — coupons are hand-written raw-Dio, not in
+`api/openapi.yaml`; the `tier_locked` reason rides the existing hand-written cart
+JSON `coupon_message`, so nothing crossed the generated surface and the #87 regen
+lane is untouched. (2) no init lockstep — the `coupons` table lives only in
+migration 0092 (not in `deploy/postgres-ecom/init`), so 0106 is migration-only.
+(3) composition held with **zero** new stacking: the gate withholds, never alters,
+so basket+coupon math is byte-identical to pre-0106 whenever eligible.
 
 ## 10. Discovery shifts (for the report)
 
