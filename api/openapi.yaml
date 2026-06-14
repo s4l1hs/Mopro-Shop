@@ -389,30 +389,6 @@ paths:
         '500':
           $ref: '#/components/responses/InternalError'
 
-  /me/membership:
-    get:
-      operationId: GetMyMembership
-      tags: [me]
-      summary: Get the authenticated user's membership tier (AC-05)
-      description: >
-        Derived read-model over the user's delivered-order history in the
-        rolling window — never a stored balance. Tier codes come from
-        ref_schema.membership_tiers (reference data; the client localizes
-        display names). next_* fields are omitted at the top tier.
-      parameters:
-        - $ref: '#/components/parameters/TraceId'
-      responses:
-        '200':
-          description: Membership tier + progress inputs
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Membership'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/InternalError'
-
   /me/fit-profile:
     get:
       operationId: GetMyFitProfile
@@ -2296,45 +2272,6 @@ components:
             seller (a seller-entered chart for the actual garment) | standard
             (the EN 13402-3 baseline). Empty for no_chart.
         chart_approximate: {type: boolean}
-
-    Membership:
-      type: object
-      description: >
-        AC-05: the user's derived membership tier. Computed per-request from
-        delivered orders in the rolling window; tier codes are reference data
-        (ref_schema.membership_tiers) — display names localize client-side.
-        next_* fields are omitted at the top tier.
-      required: [tier, rank, window_days, spend_minor, order_count, currency]
-      properties:
-        tier:
-          type: string
-          description: Current tier code (e.g. classic, gold, elite).
-        rank:
-          type: integer
-          description: 1-based ladder position of the current tier.
-        window_days:
-          type: integer
-          description: Rolling qualification window length in days.
-        spend_minor:
-          type: integer
-          format: int64
-          description: Delivered-order spend in the window, minor units.
-        order_count:
-          type: integer
-          description: Delivered orders in the window.
-        currency:
-          type: string
-          description: Currency of spend_minor and the thresholds.
-        next_tier:
-          type: string
-          description: Next tier code; omitted at the top tier.
-        next_min_spend_minor:
-          type: integer
-          format: int64
-          description: Spend threshold of the next tier, minor units.
-        next_min_orders:
-          type: integer
-          description: Order-count threshold of the next tier.
 
     User:
       type: object
