@@ -25,6 +25,14 @@ Salih approved; applied to `main` after confirming #224 merged + main GREEN (`7c
 
 **Required `contexts` unchanged: 14, identical set** (symmetric diff vs before = ∅ — enforcement tightened, no check dropped/added/renamed). before/after JSON in the PR body. **Break-glass** (temp-toggle `enforce_admins` for genuine CI-infra outages only, re-enable same sitting) documented in `CONTRIBUTING.md` + `deploy/RUNBOOK.md`. The override class (recurring #163/#182/#190 + this batch) can no longer reach `main` casually.
 
+> (Repo-visibility entries §0d/§0e are in flight in PR #226 — private flip then public revert for free CI + the pre-deploy re-privatize gate.)
+
+---
+
+## 0f. CI resilience — transient-flake hardening — ✅ (`chore/ci-resilience`)
+
+The #226 `curl`→imagemagick.org flake that reddened required `verify` was one instance of a class: **network steps (install/download/pull) transiently fail and redden a required gate.** Swept all 9 workflows; closed the class. **Retried** (transport only): both raw `curl` installs in `make-verify` (ImageMagick + golangci-lint) → `--retry 5 --retry-all-errors --retry-connrefused --connect-timeout --max-time` (the #226 fix generalized + folded in). **Cached:** added the missing `setup-go cache:true` to nightly (others already on). **SHA-pinned** all third-party actions (`subosito/flutter-action`, `docker/*`) with `# vN` comments. **Bounded:** `timeout-minutes: 30` on every job that lacked one (default was 6h). **Bright line enforced:** retries are for infra/transport ONLY — NO build/test/lint/gen-sync step retried or softened; no required gate weakened (`build_runner` stays a hard assertion). `actionlint` clean (lone pre-existing `branch-guard` `github.head_ref` note flagged, not fixed — out of scope). Discipline + the **SSH push method** for workflow edits (keeps the PAT minimal at `repo`+`read:packages`) documented in CONTRIBUTING. Inventory: `docs/internal/ci-resilience.md`.
+
 ---
 
 ## 1. Deferred production deploy (the staged runway)

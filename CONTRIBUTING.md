@@ -215,6 +215,49 @@ immediately**, never leave `main` red. Coordinate migration version numbers and
 codegen-touching lanes across parallel branches (only one lane regenerates at a
 time; the second to merge rebases + regenerates).
 
+## CI network steps must be resilient
+
+Any workflow step that **installs, downloads, or pulls** over the network
+(`apt-get`, `curl`/`wget`, `docker pull`, action/SDK/dep fetches) is a flake surface
+— a transient blip must **auto-recover**, not redden a required gate (precedent: a
+`curl` to imagemagick.org reddened `verify` on a docs-only PR, #226). A **new** such
+step MUST be one of (preference order): **eliminate** (bake the dep into a container
+image / use a maintained setup-action), **cache** (`actions/cache` / setup-action
+`cache: true`, keyed on lockfiles), or **retry + timeout**:
+
+```bash
+curl -fsSL --retry 5 --retry-delay 5 --retry-all-errors --retry-connrefused \
+     --connect-timeout 30 --max-time 300 <url> -o <file>
+```
+
+Also: give every job a `timeout-minutes` (GitHub defaults to 6h) and **pin
+third-party actions to a SHA** (`uses: org/action@<sha> # vN`). See
+`docs/internal/ci-resilience.md` for the full inventory.
+
+> **Bright line:** retries/caching are for **infra/transport ops only** — install,
+> download, pull. **NEVER** retry or `continue-on-error` a build/test/lint/gen-sync
+> step (anything that asserts correctness). A red from a real failure is **fixed,
+> never retried into green** — masking a real red is the override sin in disguise,
+> and `enforce_admins=true` exists to stop exactly that. `continue-on-error` is
+> allowed only on already-informational jobs (e.g. `flutter golden`), never on a
+> required gate.
+
+### Pushing workflow changes (`.github/workflows/*`)
+
+GitHub refuses a `repo`-scoped PAT updating workflow files (*"without `workflow`
+scope"*). The automation token stays **minimal** (`repo` + `read:packages`); push
+workflow edits over **SSH** instead — SSH keys aren't subject to the workflow-scope
+rule, so the PAT doesn't need broadening (we just rotated after a leak; keep its
+blast radius small):
+
+```bash
+git remote set-url --push origin git@github.com:s4l1hs/Mopro-Shop.git   # one-time, or use a separate ssh remote
+git push   # SSH key with push access; no workflow scope needed
+```
+
+Granting the PAT `workflow` scope is the alternative, but it broadens a token we
+deliberately keep narrow — prefer SSH unless frequent automated CI edits justify it.
+
 ## Module boundary enforcement
 
 `./scripts/check-module-boundaries.sh` verifies that:
