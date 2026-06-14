@@ -17,6 +17,7 @@ jobs:
   rebaseline:
     name: Re-baseline goldens (linux)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
@@ -31,7 +32,7 @@ jobs:
           # remains an optional nice-to-have (auto-retrigger checks on PR branches);
           # nothing depends on it.
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
