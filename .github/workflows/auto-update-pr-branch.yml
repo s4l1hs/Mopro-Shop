@@ -1,0 +1,66 @@
+name: auto-update-pr-branch
+
+# Merge-queue FALLBACK (this repo is a personal-account repo → GitHub merge queue
+# is unavailable; see docs/internal/merge-queue/decision.md). Branch protection keeps
+# `strict=true` (PRs must be up to date with main before merge). Without a queue that
+# means a manual "Update branch" every time main advances under a queued PR.
+#
+# This workflow removes that toil: whenever main advances, every OPEN PR that has
+# opted in via **auto-merge** and is now BEHIND main is auto-updated (main merged into
+# it). That re-runs the required checks against current main; once they pass and the
+# branch is up to date, the PR's own auto-merge merges it — which pushes main again and
+# cascades to the next behind PR. Net effect: a serialized, always-current, hands-off
+# merge flow that preserves the exact `strict` safety (nothing merges stale).
+#
+# Re-trigger caveat: a branch update authored by the default GITHUB_TOKEN does NOT
+# re-run workflows (Actions recursion guard), so the required checks would not refresh.
+# To get the re-test, set a PAT secret `AUTO_MERGE_PAT` (repo scope); the update is then
+# authored by that PAT and CI re-runs. Falls back to GITHUB_TOKEN if the secret is
+# absent (branch is still updated, but you may need to nudge checks once).
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-update-pr-branch
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Update behind auto-merge PRs to current main
+        env:
+          # PAT (repo scope) re-triggers required checks on the updated head;
+          # GITHUB_TOKEN updates the branch but does not re-run CI (recursion guard).
+          GH_TOKEN: ${{ secrets.AUTO_MERGE_PAT || secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Only PRs whose author opted in (auto-merge enabled) AND that are now behind
+          # main are touched — never an arbitrary open PR.
+          mapfile -t prs < <(gh pr list --repo "$REPO" --base main --state open \
+            --json number,autoMergeRequest,mergeStateStatus \
+            --jq '.[] | select(.autoMergeRequest != null) | select(.mergeStateStatus == "BEHIND") | .number')
+
+          if [ "${#prs[@]}" -eq 0 ]; then
+            echo "No behind auto-merge PRs to update."
+            exit 0
+          fi
+
+          for n in "${prs[@]}"; do
+            echo "::group::Updating PR #$n branch to current main"
+            if gh api -X PUT "repos/$REPO/pulls/$n/update-branch" >/dev/null 2>&1; then
+              echo "PR #$n updated."
+            else
+              # 422 = already up to date / not mergeable yet; non-fatal, next push retries.
+              echo "PR #$n update skipped (not updatable right now)."
+            fi
+            echo "::endgroup::"
+          done

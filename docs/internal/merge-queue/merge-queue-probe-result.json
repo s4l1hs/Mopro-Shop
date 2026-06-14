@@ -1,0 +1,10 @@
+{
+  "probe": "POST /repos/s4l1hs/Mopro-Shop/rulesets with a {type: merge_queue} rule",
+  "attempts": ["enforcement=disabled", "enforcement=evaluate", "enforcement=active"],
+  "result": "HTTP 422 Validation Failed — {\"errors\":[\"Invalid rule 'merge_queue': \"]}",
+  "control": "A ruleset with {type: required_linear_history} was created+deleted successfully → the rulesets API itself works; the merge_queue RULE TYPE is what is rejected.",
+  "repo_owner_type": "User (personal account, login s4l1hs)",
+  "repo_visibility": "public",
+  "conclusion": "GitHub merge queue is unavailable on personal-account repositories (it is an Organization / Enterprise feature; public visibility does not grant it for user-owned repos). → §4 fallback.",
+  "probe_artifacts_left_behind": "none (all probe rulesets deleted; verified rulesets list == [])"
+}
