@@ -10,3 +10,9 @@
 # scratch DBs for both paths.
 migrations/ecom/0078_sellers.up.sql: ALTER TABLE seller_schema.sellers ALTER COLUMN display_name SET NOT NULL;
 migrations/ecom/0078_sellers.up.sql: ALTER TABLE seller_schema.sellers ALTER COLUMN slug SET NOT NULL;
+# Membership-tier teardown (ADR-0006; reviewed-safe): the CONTRACT phase of an
+# expand/contract. The tier-reading code (coupon min_tier_rank read, /me/membership,
+# ref_schema.membership_tiers reads) is removed FIRST; this drop is gated behind that
+# image being live (RUNBOOK §5). IF EXISTS + 0107.down recreates both additively.
+migrations/ecom/0107_drop_membership_tiers.up.sql: ALTER TABLE order_schema.coupons DROP COLUMN IF EXISTS min_tier_rank;
+migrations/ecom/0107_drop_membership_tiers.up.sql: DROP TABLE IF EXISTS ref_schema.membership_tiers;
