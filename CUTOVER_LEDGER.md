@@ -27,6 +27,16 @@ Salih approved; applied to `main` after confirming #224 merged + main GREEN (`7c
 
 ---
 
+## 0d. Repo flipped back to private — ✅ APPLIED 2026-06-14
+
+The repo was made **public** for the deploy-window work; prod is live + stable, so it is **private again** (`gh api -X PATCH repos/s4l1hs/Mopro-Shop -f private=true` → verified `private=true`, `visibility=private`). Ran after the leaked `gho_` token was rotated (old grant revoked; fresh PAT with `repo` + `read:packages` confirmed).
+
+**Pre-flip verification (no public dependency):** GHCR packages `ghcr.io/s4l1hs/*` are **already private**, pulled via `GHCR_USER`/`GHCR_PAT` (push via `GITHUB_TOKEN`) — GHCR package visibility is independent of repo visibility, so the flip can't affect pulls. No workflow assumes public (no Pages/badges/anon-clone; all auth is `GITHUB_TOKEN`/secrets). Sole collaborator `s4l1hs` (0 forks/watchers) retains access. Branch protection re-confirmed intact post-flip (`enforce_admins=true`, `strict=true`, 14 contexts).
+
+**Post-flip:** host-side GHCR pull re-test (`docker login ghcr.io` + `docker pull ghcr.io/s4l1hs/*`) owned by Salih (host access). The `deploy.yml verify_only=true` dispatch does NOT pull (SSH/scp/compose-config only), so it can't exercise GHCR auth — only a real pull on the host (or a non-verify-only deploy) does. **Deploy-window public exposure closed.**
+
+---
+
 ## 1. Deferred production deploy (the staged runway)
 
 **Trigger:** when Phase B+C are done, execute DEPLOY-EXEC-01 (host-prep → backup → dry-run → migrations → deploy → health → purge).
