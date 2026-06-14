@@ -35,6 +35,33 @@ The #226 `curl`→imagemagick.org flake that reddened required `verify` was one 
 
 ---
 
+## 0d. Repo flipped back to private — ✅ APPLIED 2026-06-14
+
+The repo was made **public** for the deploy-window work; prod is live + stable, so it is **private again** (`gh api -X PATCH repos/s4l1hs/Mopro-Shop -f private=true` → verified `private=true`, `visibility=private`). Ran after the leaked `gho_` token was rotated (old grant revoked; fresh PAT with `repo` + `read:packages` confirmed).
+
+**Pre-flip verification (no public dependency):** GHCR packages `ghcr.io/s4l1hs/*` are **already private**, pulled via `GHCR_USER`/`GHCR_PAT` (push via `GITHUB_TOKEN`) — GHCR package visibility is independent of repo visibility, so the flip can't affect pulls. No workflow assumes public (no Pages/badges/anon-clone; all auth is `GITHUB_TOKEN`/secrets). Sole collaborator `s4l1hs` (0 forks/watchers) retains access. Branch protection re-confirmed intact post-flip (`enforce_admins=true`, `strict=true`, 14 contexts).
+
+**Post-flip:** host-side GHCR pull re-test (`docker login ghcr.io` + `docker pull ghcr.io/s4l1hs/*`) owned by Salih (host access). The `deploy.yml verify_only=true` dispatch does NOT pull (SSH/scp/compose-config only), so it can't exercise GHCR auth — only a real pull on the host (or a non-verify-only deploy) does. **Deploy-window public exposure closed.**
+
+---
+
+## 0e. Repo flipped back to PUBLIC — ✅ APPLIED 2026-06-14 (deliberate, temporary — re-privatize gate below)
+
+Going private (§0d) put CI behind **metered GitHub Actions billing** — private repos meter Actions against the account quota/spending-limit; public repos run free/unlimited. PR #226 then failed **all** stages at dispatch (`conclusion=failure`, jobs never started: *"The job was not started because recent account payments have failed or your spending limit needs to be increased"*). **Decision: we will NOT pay for Actions** → flipped **public** again (`gh api -X PATCH repos/s4l1hs/Mopro-Shop -f private=false` → verified `private=false`, `visibility=public`) to restore free CI.
+
+Pre-flip: no committed secrets in the tree (secrets live in encrypted Actions secrets + the host `.env`, neither exposed by visibility); GHCR `ghcr.io/s4l1hs/*` packages stay **private** (independent of repo visibility); branch protection unchanged (`enforce_admins=true`, `strict=true`, 14 contexts, re-confirmed post-flip).
+
+> ⚠️ **MANDATORY RE-PRIVATIZE GATE — flip private BEFORE the next production deploy.**
+> The repo is left **public between deploys for free CI**; it MUST be private during any production cutover. This is now **pre-deploy step 0** in `deploy/RUNBOOK.md`.
+> ```
+> gh api -X PATCH repos/s4l1hs/Mopro-Shop -f private=true     # before cutover
+> gh api repos/s4l1hs/Mopro-Shop --jq .private                # must be true
+> # then re-confirm host GHCR pull works before deploying
+> ```
+> After the deploy window, flip back public (`private=false`) to restore free CI. (Tradeoff acknowledged: deploy-window-only privacy vs. paying for Actions.)
+
+---
+
 ## 1. Deferred production deploy (the staged runway)
 
 **Trigger:** when Phase B+C are done, execute DEPLOY-EXEC-01 (host-prep → backup → dry-run → migrations → deploy → health → purge).

@@ -19,6 +19,25 @@ scp -P 4625 <local-file> mopro@195.85.207.92:/opt/mopro/
 
 ---
 
+## Step 0 — Flip repo PRIVATE before any production deploy (MANDATORY)
+
+The repo is left **public between deploys** so CI runs free (we declined metered
+GitHub Actions billing — see `CUTOVER_LEDGER.md` §0e). It **MUST be private during
+any production cutover** (Day-0 or routine). Do this **first**, before pull/up:
+
+```sh
+gh api -X PATCH repos/s4l1hs/Mopro-Shop -f private=true     # flip private
+gh api repos/s4l1hs/Mopro-Shop --jq .private                # must print: true
+# confirm host GHCR pull still works (PAT-based; should be unaffected):
+ssh -p 4625 mopro@195.85.207.92 'docker pull ghcr.io/s4l1hs/core-svc:<tag> >/dev/null && echo OK'
+```
+
+After the deploy window closes, flip back public to restore free CI:
+`gh api -X PATCH repos/s4l1hs/Mopro-Shop -f private=false`.
+
+> Note: GHCR **package** visibility is independent of repo visibility (images stay
+> private throughout); this gate is purely about the repo's source visibility.
+
 ## Day 0 — First production deploy
 
 ### Prerequisites
@@ -103,6 +122,7 @@ ssh -p 4625 mopro@195.85.207.92 "docker logs --tail 100 -f caddy"
 
 ### Deploy a new version
 
+**First do [Step 0](#step-0--flip-repo-private-before-any-production-deploy-mandatory) — flip the repo private + verify the host GHCR pull.** Then:
 Dispatch the **`deploy` GitHub workflow** (Actions → deploy → run, `verify_only=false`).
 Fail-fast: a denied pull, failed login, unhealthy service, or image-ID mismatch exits
 non-zero — a green run means the new images are live.
