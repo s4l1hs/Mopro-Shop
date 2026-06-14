@@ -72,3 +72,39 @@ suites unchanged + green, and `git diff --stat` showing no fin-svc/ledger paths.
 - **down (additive):** recreate `membership_tiers` + seed (mirror 0094), re-add
   `min_tier_rank DEFAULT 1`, re-insert `ELITE15` (mirror 0106).
 - Round-trip up/down/up on a throwaway PG before claiming done.
+
+## Outcome (done)
+
+- **All tier code removed; grep clean** — no `MembershipService` / `min_tier_rank` /
+  `membership_tiers` / `tier_locked` references remain outside the shipped 0094/0106
+  files, the new 0107, and the lint baseline note.
+- **Ledger purity proven** — `git diff --stat origin/main…HEAD` touches **zero** files
+  under `internal/{cashback,wallet,ledger,treasury,sellerpayout,commission}`,
+  `cmd/fin-svc`, or `migrations/ledger`. The cashback unit tests pass unchanged.
+- **Coupons** — `resolveCoupon` reverts to pre-#222; `TestResolveCoupon` (non-tier
+  cases) + `TestCouponStacksOnBasketDiscount` (display==charge) green.
+- **Spec/codegen** — `Membership` schema + `GET /me/membership` removed; Go+Dart
+  regenerated; orphan Dart model/test deleted; `api-check-sync` idempotent.
+- **Migration 0107** — round-trip up/down/up verified on a throwaway PG (tiers +
+  column + ELITE15 drop and recreate symmetrically; the normal `WELCOME10` coupon
+  untouched). migration-check baseline updated (reviewed-safe expand/contract).
+- **i18n** — 8 tier keys removed across 4 locales; `--strict` 0 extra, usage 0 dead/0
+  missing.
+- **Gates** — `make verify-fast` exit 0 (fmt, vet, lint-discipline, boundaries,
+  migration-check, build-all, go test, analyze, i18n). Full DB-backed `make verify`
+  (financial property tests) runs in CI — needs the DB clusters.
+
+## Deploy sequencing (RUNBOOK §5) — FLAGGED
+
+0107 is the **contract** phase. The new core-svc image (no tier reads:
+`GetCouponByCode` drops `min_tier_rank`, `/me/membership` gone, no
+`membership_tiers` reads) **MUST be live before/with** `ecom up` to 0107. Do not run
+0107 against the old image. Rollback: `0107.down` recreates the scaffolding
+additively, then redeploy the prior image.
+
+## Resisted clean removal (noted)
+- **`userID` on `ValidateCoupon`** — added by #222 solely for tier gating; removed
+  (reverts to pre-#222). The cart handler keeps its own `c.UserID` (cart owner),
+  just stops passing it to the validator.
+- **0094/0106** — left in history (never rewritten, per §10.6); reversed forward by
+  0107. The lint baseline carries the two reviewed-safe 0107 drops.
