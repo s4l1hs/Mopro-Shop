@@ -42,13 +42,7 @@
     "returns": "Meine Rücksendungen",
     "rail_reviews": "Meine Bewertungen",
     "rail_questions": "Meine Fragen",
-    "rail_privacy": "Privacy",
-    "tier_classic": "Classic",
-    "tier_gold": "Gold",
-    "tier_elite": "Elite",
-    "tier_current": "Deine Mitgliedsstufe: {tier}",
-    "tier_next_progress": "Für {tier}: {spend} / {targetSpend} · {orders} / {targetOrders} Bestellungen",
-    "tier_top": "Du bist auf der höchsten Stufe"
+    "rail_privacy": "Privacy"
   },
   "mega_menu": {
     "empty_children": "Keine Unterkategorien in diesem Bereich.",
@@ -360,9 +354,5 @@
     "basic_hint": "Ohne genaue Maße schätzen wir aus Größe + Gewicht + Geschlecht.",
     "basic_warning": "Dies ist eine ungefähre Schätzung allein aus Größe, Gewicht und Geschlecht und kann ungenau sein. Für ein zuverlässigeres Ergebnis gib deine Maße ein (Brust, Taille, Hüfte).",
     "sized_by_seller": "vom Verkäufer angegeben"
-  },
-  "membership": {
-    "benefit_exclusive_coupons": "Exklusive Gutscheine für deine Mitgliedschaft",
-    "coupon_tier_locked": "Dieser Gutschein gilt nur für höhere Mitgliedschaftsstufen."
   }
 }

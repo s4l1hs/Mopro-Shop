@@ -474,36 +474,6 @@ type FitProfileEnvelope struct {
 	Profile *FitProfile `json:"profile,omitempty"`
 }
 
-// Membership AC-05: the user's derived membership tier. Computed per-request from delivered orders in the rolling window; tier codes are reference data (ref_schema.membership_tiers) — display names localize client-side. next_* fields are omitted at the top tier.
-type Membership struct {
-	// Currency Currency of spend_minor and the thresholds.
-	Currency string `json:"currency"`
-
-	// NextMinOrders Order-count threshold of the next tier.
-	NextMinOrders *int `json:"next_min_orders,omitempty"`
-
-	// NextMinSpendMinor Spend threshold of the next tier, minor units.
-	NextMinSpendMinor *int64 `json:"next_min_spend_minor,omitempty"`
-
-	// NextTier Next tier code; omitted at the top tier.
-	NextTier *string `json:"next_tier,omitempty"`
-
-	// OrderCount Delivered orders in the window.
-	OrderCount int `json:"order_count"`
-
-	// Rank 1-based ladder position of the current tier.
-	Rank int `json:"rank"`
-
-	// SpendMinor Delivered-order spend in the window, minor units.
-	SpendMinor int64 `json:"spend_minor"`
-
-	// Tier Current tier code (e.g. classic, gold, elite).
-	Tier string `json:"tier"`
-
-	// WindowDays Rolling qualification window length in days.
-	WindowDays int `json:"window_days"`
-}
-
 // Order defines model for Order.
 type Order struct {
 	CargoOption *OrderCargoOption `json:"cargo_option"`
@@ -1334,14 +1304,6 @@ type PutMyFitProfileParams struct {
 	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
 }
 
-// GetMyMembershipParams defines parameters for GetMyMembership.
-type GetMyMembershipParams struct {
-	// XTraceId Client-generated trace identifier (UUID or opaque string).
-	// Echoed in error responses as `error.trace_id`.
-	// Falls back to a server-generated UUID if absent.
-	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
-}
-
 // ChangePasswordJSONBody defines parameters for ChangePassword.
 type ChangePasswordJSONBody struct {
 	// NewPassword New password (≥8 chars, 1 upper, 1 lower, 1 special)
@@ -1781,9 +1743,6 @@ type ServerInterface interface {
 	// Create or replace the size-fit profile (idempotent upsert)
 	// (PUT /me/fit-profile)
 	PutMyFitProfile(w http.ResponseWriter, r *http.Request, params PutMyFitProfileParams)
-	// Get the authenticated user's membership tier (AC-05)
-	// (GET /me/membership)
-	GetMyMembership(w http.ResponseWriter, r *http.Request, params GetMyMembershipParams)
 	// Change the authenticated user's password
 	// (POST /me/password)
 	ChangePassword(w http.ResponseWriter, r *http.Request, params ChangePasswordParams)
@@ -3444,52 +3403,6 @@ func (siw *ServerInterfaceWrapper) PutMyFitProfile(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
-// GetMyMembership operation middleware
-func (siw *ServerInterfaceWrapper) GetMyMembership(w http.ResponseWriter, r *http.Request) {
-
-	var err error
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetMyMembershipParams
-
-	headers := r.Header
-
-	// ------------- Optional header parameter "X-Trace-Id" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("X-Trace-Id")]; found {
-		var XTraceId TraceId
-		n := len(valueList)
-		if n != 1 {
-			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "X-Trace-Id", Count: n})
-			return
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "X-Trace-Id", valueList[0], &XTraceId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false})
-		if err != nil {
-			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "X-Trace-Id", Err: err})
-			return
-		}
-
-		params.XTraceId = &XTraceId
-
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetMyMembership(w, r, params)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // ChangePassword operation middleware
 func (siw *ServerInterfaceWrapper) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
@@ -4974,7 +4887,6 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc("DELETE "+options.BaseURL+"/me/devices/{id}", wrapper.UnregisterDevice)
 	m.HandleFunc("GET "+options.BaseURL+"/me/fit-profile", wrapper.GetMyFitProfile)
 	m.HandleFunc("PUT "+options.BaseURL+"/me/fit-profile", wrapper.PutMyFitProfile)
-	m.HandleFunc("GET "+options.BaseURL+"/me/membership", wrapper.GetMyMembership)
 	m.HandleFunc("POST "+options.BaseURL+"/me/password", wrapper.ChangePassword)
 	m.HandleFunc("GET "+options.BaseURL+"/orders", wrapper.ListOrders)
 	m.HandleFunc("POST "+options.BaseURL+"/orders", wrapper.CreateOrder)
@@ -6244,41 +6156,6 @@ func (response PutMyFitProfile500JSONResponse) VisitPutMyFitProfileResponse(w ht
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetMyMembershipRequestObject struct {
-	Params GetMyMembershipParams
-}
-
-type GetMyMembershipResponseObject interface {
-	VisitGetMyMembershipResponse(w http.ResponseWriter) error
-}
-
-type GetMyMembership200JSONResponse Membership
-
-func (response GetMyMembership200JSONResponse) VisitGetMyMembershipResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetMyMembership401JSONResponse struct{ UnauthorizedJSONResponse }
-
-func (response GetMyMembership401JSONResponse) VisitGetMyMembershipResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetMyMembership500JSONResponse struct{ InternalErrorJSONResponse }
-
-func (response GetMyMembership500JSONResponse) VisitGetMyMembershipResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
 type ChangePasswordRequestObject struct {
 	Params ChangePasswordParams
 	Body   *ChangePasswordJSONRequestBody
@@ -7232,9 +7109,6 @@ type StrictServerInterface interface {
 	// Create or replace the size-fit profile (idempotent upsert)
 	// (PUT /me/fit-profile)
 	PutMyFitProfile(ctx context.Context, request PutMyFitProfileRequestObject) (PutMyFitProfileResponseObject, error)
-	// Get the authenticated user's membership tier (AC-05)
-	// (GET /me/membership)
-	GetMyMembership(ctx context.Context, request GetMyMembershipRequestObject) (GetMyMembershipResponseObject, error)
 	// Change the authenticated user's password
 	// (POST /me/password)
 	ChangePassword(ctx context.Context, request ChangePasswordRequestObject) (ChangePasswordResponseObject, error)
@@ -8086,32 +7960,6 @@ func (sh *strictHandler) PutMyFitProfile(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(PutMyFitProfileResponseObject); ok {
 		if err := validResponse.VisitPutMyFitProfileResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// GetMyMembership operation middleware
-func (sh *strictHandler) GetMyMembership(w http.ResponseWriter, r *http.Request, params GetMyMembershipParams) {
-	var request GetMyMembershipRequestObject
-
-	request.Params = params
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetMyMembership(ctx, request.(GetMyMembershipRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetMyMembership")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetMyMembershipResponseObject); ok {
-		if err := validResponse.VisitGetMyMembershipResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

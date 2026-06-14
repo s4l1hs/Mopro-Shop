@@ -271,13 +271,7 @@
     "softgate_orders": "Siparişlerini görmek için giriş yap.",
     "softgate_wallet": "Cüzdanını görmek için giriş yap.",
     "softgate_addresses": "Adreslerini yönetmek için giriş yap.",
-    "menu_favorites": "Favorilerim",
-    "tier_classic": "Classic",
-    "tier_gold": "Gold",
-    "tier_elite": "Elite",
-    "tier_current": "Üyelik seviyen: {tier}",
-    "tier_next_progress": "{tier} için: {spend} / {targetSpend} · {orders} / {targetOrders} sipariş",
-    "tier_top": "En üst seviyedesin"
+    "menu_favorites": "Favorilerim"
   },
   "address": {
     "list_title": "Adreslerim",
@@ -1030,9 +1024,5 @@
     "basic_hint": "Detaylı ölçü yoksa boy + kilo + cinsiyet ile yaklaşık bir tahmin yapılır.",
     "basic_warning": "Bu öneri yalnızca boy, kilo ve cinsiyetinize göre yapılan yaklaşık bir tahmindir ve yanlış olabilir. Daha doğru bir sonuç için ölçülerinizi (göğüs, bel, kalça) girin.",
     "sized_by_seller": "satıcı beden tablosu"
-  },
-  "membership": {
-    "benefit_exclusive_coupons": "Üyeliğine özel kuponlar",
-    "coupon_tier_locked": "Bu kupon yalnızca üst üyelik seviyeleri içindir."
   }
 }

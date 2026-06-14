@@ -66,7 +66,6 @@ export 'package:mopro_api/src/model/list_products200_response.dart';
 export 'package:mopro_api/src/model/list_recommendations200_response.dart';
 export 'package:mopro_api/src/model/list_returns200_response.dart';
 export 'package:mopro_api/src/model/list_wallet_transactions200_response.dart';
-export 'package:mopro_api/src/model/membership.dart';
 export 'package:mopro_api/src/model/model_return.dart';
 export 'package:mopro_api/src/model/order.dart';
 export 'package:mopro_api/src/model/order_item.dart';

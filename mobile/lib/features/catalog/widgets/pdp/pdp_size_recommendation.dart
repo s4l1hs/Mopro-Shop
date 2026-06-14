@@ -11,7 +11,7 @@ import 'package:mopro/features/account/providers/fit_profile_provider.dart';
 ///   (the seed charts are representative — phase-1 honesty requirement).
 /// - no_profile / incomplete_profile → CTA to the Account fit form.
 /// - no_chart / guest / loading / error → renders nothing (enrichment, never a
-///   blocker — the membership-card pattern).
+///   blocker).
 class PdpSizeRecommendation extends ConsumerWidget {
   const PdpSizeRecommendation({required this.productId, super.key});
 

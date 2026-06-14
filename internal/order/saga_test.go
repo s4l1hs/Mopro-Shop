@@ -92,7 +92,7 @@ func newSagaService(
 	if len(resolver) > 0 {
 		ar = resolver[0]
 	}
-	return order.NewServiceFull(repo, sessionRepo, cartSvc, catSvc, ob, "TR", "TRY_COIN", psp, nil, nil, ar, nil)
+	return order.NewServiceFull(repo, sessionRepo, cartSvc, catSvc, ob, "TR", "TRY_COIN", psp, nil, nil, ar)
 }
 
 // ── tests ─────────────────────────────────────────────────────────────────────

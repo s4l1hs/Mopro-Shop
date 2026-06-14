@@ -63,18 +63,8 @@ CREATE TABLE IF NOT EXISTS ref_schema.business_calendars (
   PRIMARY KEY (market, date)
 );
 
--- AC-05: membership-tier ladder (reference data; lockstep with migration 0094).
-CREATE TABLE IF NOT EXISTS ref_schema.membership_tiers (
-  code            TEXT   NOT NULL,
-  market          TEXT   NOT NULL,
-  rank            INT    NOT NULL CHECK (rank >= 1),
-  currency        TEXT   NOT NULL,
-  min_spend_minor BIGINT NOT NULL DEFAULT 0 CHECK (min_spend_minor >= 0),
-  min_orders      INT    NOT NULL DEFAULT 0 CHECK (min_orders >= 0),
-  active          BOOL   NOT NULL DEFAULT TRUE,
-  PRIMARY KEY (market, code),
-  UNIQUE (market, rank)
-);
+-- Membership tiers removed (ADR-0006; migration 0107). Cashback/coin is the sole
+-- loyalty mechanism — no ref_schema.membership_tiers table.
 
 -- Size-fit standard charts (AC: size-fit phase 1; lockstep with migrations
 -- 0096 + 0098). EN 13402-3 standard-reference baseline: gendered (women bust ≠

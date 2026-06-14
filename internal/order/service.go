@@ -30,12 +30,6 @@ type orderService struct {
 	diskChecker      DiskPressureChecker      // nil disables disk panic check
 	biz              *metrics.BusinessMetrics // nil disables business KPI counters
 	addressResolver  AddressResolver          // nil disables delivery-address capture (OR-02)
-	// membership resolves the buyer's tier rank to gate tier-exclusive coupons
-	// (migration 0106). In-module dependency (no cross-schema path, §5). When nil
-	// every user resolves to rank 1 (classic) — fail-closed, so a tier-gated coupon
-	// is simply not applied (buyer charged full price); existing min_tier_rank=1
-	// coupons are unaffected.
-	membership MembershipService
 }
 
 // NewService constructs an order Service for the legacy single-order checkout flow.
@@ -61,7 +55,6 @@ func NewService(
 // NewServiceFull constructs an order Service with PSP integration for InitiateCheckout.
 // diskChecker is optional (nil disables the disk panic guard in InitiateCheckout).
 // biz is optional (nil disables business KPI metrics).
-// membership is optional (nil → every user is rank 1/classic for coupon tier gating).
 func NewServiceFull(
 	repo Repository,
 	sessionRepo CheckoutSessionRepository,
@@ -74,7 +67,6 @@ func NewServiceFull(
 	diskChecker DiskPressureChecker,
 	biz *metrics.BusinessMetrics,
 	addressResolver AddressResolver,
-	membership MembershipService,
 ) Service {
 	return &orderService{
 		repo:             repo,
@@ -88,7 +80,6 @@ func NewServiceFull(
 		diskChecker:      diskChecker,
 		biz:              biz,
 		addressResolver:  addressResolver,
-		membership:       membership,
 	}
 }
 
@@ -154,7 +145,7 @@ func (s *orderService) Checkout(ctx context.Context, req CheckoutRequest) (Order
 	// funded ⇒ applied per unit ON TOP of the basket discount, so the snapshot
 	// unit_price_minor stays the final CHARGED unit and commission/KDV/seller-net/
 	// cashback all derive from it. Same resolve logic the cart used ⇒ display==charge.
-	couponPct, coupon := s.resolveCouponForCharge(ctx, req.CouponCode, market, basketSubtotal, req.UserID)
+	couponPct, coupon := s.resolveCouponForCharge(ctx, req.CouponCode, market, basketSubtotal)
 
 	// Integer arithmetic — NEVER float (CLAUDE.md § 4.6 + § 10.7).
 	items := make([]OrderItem, 0, len(lines))
@@ -543,31 +534,12 @@ type resolvedLine struct {
 	discUnit  int64 // basket-discounted unit price (pre-coupon)
 }
 
-// tierRank resolves the buyer's membership tier rank for coupon eligibility gating
-// (migration 0106). It is §5-trivial: the order module owns both the tier
-// read-model and the coupon apply, so this is an in-module call (no cross-schema
-// JOIN). Fail-closed: a nil membership dependency, a guest (userID<=0), or any
-// resolution error yields rank 1 (classic) — a tier-gated coupon is then simply
-// not applied (buyer charged full price), never a checkout failure.
-func (s *orderService) tierRank(ctx context.Context, userID int64, market string) int {
-	if s.membership == nil || userID <= 0 {
-		return 1
-	}
-	m, err := s.membership.GetMembershipTier(ctx, userID, market)
-	if err != nil {
-		slog.Warn("order: membership tier lookup failed (coupon gating)", "user_id", userID, "err", err)
-		return 1
-	}
-	return m.Rank
-}
-
 // resolveCouponForCharge looks up a coupon code and resolves the whole-percent to
-// apply against a basket-discounted subtotal for the given buyer. Returns (0, nil)
-// when the code is empty, unknown, or invalid (including tier_locked) — silently
-// dropped, never failing the checkout (a stale/expired/tier-locked code charges the
-// full price, which is buyer-safe). The returned *Coupon is non-nil only when valid
-// (used to record the redemption in-tx).
-func (s *orderService) resolveCouponForCharge(ctx context.Context, code, market string, subtotalMinor int64, userID int64) (int, *Coupon) {
+// apply against a basket-discounted subtotal. Returns (0, nil) when the code is
+// empty, unknown, or invalid — silently dropped, never failing the checkout (a
+// stale/expired code charges the full price, which is buyer-safe). The returned
+// *Coupon is non-nil only when valid (used to record the redemption in-tx).
+func (s *orderService) resolveCouponForCharge(ctx context.Context, code, market string, subtotalMinor int64) (int, *Coupon) {
 	code = NormalizeCouponCode(code)
 	if code == "" {
 		return 0, nil
@@ -584,7 +556,7 @@ func (s *orderService) resolveCouponForCharge(ctx context.Context, code, market 
 		slog.Warn("order: coupon redemption count failed", "code", code, "err", err)
 		return 0, nil
 	}
-	res := resolveCoupon(&c, subtotalMinor, redemptions, s.tierRank(ctx, userID, market), time.Now().UTC())
+	res := resolveCoupon(&c, subtotalMinor, redemptions, time.Now().UTC())
 	if !res.Valid {
 		slog.Info("order: coupon not applied", "code", code, "reason", res.Reason)
 		return 0, nil
@@ -595,7 +567,7 @@ func (s *orderService) resolveCouponForCharge(ctx context.Context, code, market 
 // ValidateCoupon resolves a coupon code against a basket-discounted subtotal for a
 // read-only preview (cart display). An unknown/invalid code returns Valid=false +
 // a Reason, never an error (only an infra failure surfaces as an error).
-func (s *orderService) ValidateCoupon(ctx context.Context, code string, subtotalMinor int64, market string, userID int64) (CouponValidation, error) {
+func (s *orderService) ValidateCoupon(ctx context.Context, code string, subtotalMinor int64, market string) (CouponValidation, error) {
 	code = NormalizeCouponCode(code)
 	if code == "" {
 		return CouponValidation{Reason: "not_found"}, nil
@@ -614,7 +586,7 @@ func (s *orderService) ValidateCoupon(ctx context.Context, code string, subtotal
 	if err != nil {
 		return CouponValidation{}, fmt.Errorf("order: validate coupon count: %w", err)
 	}
-	// Same tier-rank resolution the charge path uses ⇒ the displayed tier_locked
-	// decision can never diverge from the charge decision (display==charge).
-	return resolveCoupon(&c, subtotalMinor, redemptions, s.tierRank(ctx, userID, market), time.Now().UTC()), nil
+	// The SAME pure resolve the charge path uses ⇒ the displayed decision can never
+	// diverge from the charge decision (display==charge).
+	return resolveCoupon(&c, subtotalMinor, redemptions, time.Now().UTC()), nil
 }

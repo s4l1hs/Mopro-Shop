@@ -550,36 +550,6 @@ type FitProfileEnvelope struct {
 	Profile *FitProfile `json:"profile,omitempty"`
 }
 
-// Membership AC-05: the user's derived membership tier. Computed per-request from delivered orders in the rolling window; tier codes are reference data (ref_schema.membership_tiers) — display names localize client-side. next_* fields are omitted at the top tier.
-type Membership struct {
-	// Currency Currency of spend_minor and the thresholds.
-	Currency string `json:"currency"`
-
-	// NextMinOrders Order-count threshold of the next tier.
-	NextMinOrders *int `json:"next_min_orders,omitempty"`
-
-	// NextMinSpendMinor Spend threshold of the next tier, minor units.
-	NextMinSpendMinor *int64 `json:"next_min_spend_minor,omitempty"`
-
-	// NextTier Next tier code; omitted at the top tier.
-	NextTier *string `json:"next_tier,omitempty"`
-
-	// OrderCount Delivered orders in the window.
-	OrderCount int `json:"order_count"`
-
-	// Rank 1-based ladder position of the current tier.
-	Rank int `json:"rank"`
-
-	// SpendMinor Delivered-order spend in the window, minor units.
-	SpendMinor int64 `json:"spend_minor"`
-
-	// Tier Current tier code (e.g. classic, gold, elite).
-	Tier string `json:"tier"`
-
-	// WindowDays Rolling qualification window length in days.
-	WindowDays int `json:"window_days"`
-}
-
 // Order defines model for Order.
 type Order struct {
 	CargoOption *OrderCargoOption `json:"cargo_option"`
@@ -1465,14 +1435,6 @@ type GetMyFitProfileParams struct {
 
 // PutMyFitProfileParams defines parameters for PutMyFitProfile.
 type PutMyFitProfileParams struct {
-	// XTraceId Client-generated trace identifier (UUID or opaque string).
-	// Echoed in error responses as `error.trace_id`.
-	// Falls back to a server-generated UUID if absent.
-	XTraceId *TraceId `json:"X-Trace-Id,omitempty"`
-}
-
-// GetMyMembershipParams defines parameters for GetMyMembership.
-type GetMyMembershipParams struct {
 	// XTraceId Client-generated trace identifier (UUID or opaque string).
 	// Echoed in error responses as `error.trace_id`.
 	// Falls back to a server-generated UUID if absent.
