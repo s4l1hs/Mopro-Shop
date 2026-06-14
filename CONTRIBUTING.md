@@ -472,6 +472,14 @@ To (re-)baseline goldens:
 Do **not** commit macOS-generated goldens. New golden tests are added without a
 baseline; trigger the workflow to produce it.
 
+**Rebaselining accepts the current render as the new truth — so only do it when that
+render is the *intended* design.** Before accepting a regenerated baseline, confirm
+the changed frames correspond to a known intended UI change; a baseline that shifts
+for a screen you didn't touch is a possible **real visual regression** — investigate,
+don't rebaseline past it. Never loosen the comparator tolerance to force green
+(that masks diffs) — fix the baselines on Linux instead. This is the same bright
+line as the CI-resilience rule: green must mean *correct*, never *masked*.
+
 ## Adding a Notifier (Riverpod)
 
 A `Notifier` / `AsyncNotifier` / `FamilyNotifier`'s `build()` runs **before the
