@@ -30,12 +30,6 @@ type orderService struct {
 	diskChecker      DiskPressureChecker      // nil disables disk panic check
 	biz              *metrics.BusinessMetrics // nil disables business KPI counters
 	addressResolver  AddressResolver          // nil disables delivery-address capture (OR-02)
-	// membership resolves the buyer's tier rank to gate tier-exclusive coupons
-	// (migration 0106). In-module dependency (no cross-schema path, §5). When nil
-	// every user resolves to rank 1 (classic) — fail-closed, so a tier-gated coupon
-	// is simply not applied (buyer charged full price); existing min_tier_rank=1
-	// coupons are unaffected.
-	membership MembershipService
 }
 
 // NewService constructs an order Service for the legacy single-order checkout flow.
@@ -61,7 +55,6 @@ func NewService(
 // NewServiceFull constructs an order Service with PSP integration for InitiateCheckout.
 // diskChecker is optional (nil disables the disk panic guard in InitiateCheckout).
 // biz is optional (nil disables business KPI metrics).
-// membership is optional (nil → every user is rank 1/classic for coupon tier gating).
 func NewServiceFull(
 	repo Repository,
 	sessionRepo CheckoutSessionRepository,
@@ -74,7 +67,6 @@ func NewServiceFull(
 	diskChecker DiskPressureChecker,
 	biz *metrics.BusinessMetrics,
 	addressResolver AddressResolver,
-	membership MembershipService,
 ) Service {
 	return &orderService{
 		repo:             repo,
@@ -88,7 +80,6 @@ func NewServiceFull(
 		diskChecker:      diskChecker,
 		biz:              biz,
 		addressResolver:  addressResolver,
-		membership:       membership,
 	}
 }
 
