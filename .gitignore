@@ -1,5 +1,7 @@
 # Secrets — NEVER commit
 .env*
+# …except the placeholder template (no real secrets; the authoritative env shape).
+!.env.example
 
 # Local data volumes (populated by docker compose)
 /data/
