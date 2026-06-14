@@ -171,11 +171,31 @@ now **enforced** (hardened after the #217/#218/#221/#223 drift — see
   misalignment on `main` is no longer possible.
 - **`required_status_checks.strict=true`** — a branch must be **up to date with
   `main` before it can merge.** This closes the stale-branch drift class (a PR
-  green-but-behind whose combined generated files drift once merged). **Cost:**
-  parallel-lane merges serialize — after one lane lands, the other open PRs must
-  rebase onto latest `main` and let CI go green again before they can merge.
-  Coordinate codegen-touching lanes (only one regenerates at a time; the second to
-  merge rebases + regenerates).
+  green-but-behind whose combined generated files drift once merged). The manual
+  "Update branch" this used to cost on every queued merge is now **automated** — see
+  *Hands-off merging* below. The anti-drift guarantee is unchanged.
+
+### Hands-off merging (auto-update + auto-merge)
+
+GitHub's **merge queue is unavailable** on this repo (it's a personal-account repo;
+merge queue is an Org/Enterprise feature — empirically confirmed, see
+`docs/internal/merge-queue/decision.md`). The equivalent, strict-preserving flow:
+
+- **Click "Enable auto-merge"** on your green PR (squash or merge, per the buttons).
+  The PR merges itself once all 14 required checks pass **and** it's up to date — it
+  bypasses nothing (`strict` + `enforce_admins` + every required check still apply).
+- When `main` advances under a queued PR, the **`auto-update-pr-branch`** workflow
+  merges `main` into every behind auto-merge PR, CI re-runs, and the first to go
+  green+up-to-date auto-merges — which cascades to the next. **No manual "Update
+  branch."** Reds still block; the break-glass override below is still forbidden for
+  deterministic reds.
+- One-time owner setup: `gh secret set AUTO_MERGE_PAT` (a `repo`-scoped PAT) so the
+  branch update re-triggers CI (a `GITHUB_TOKEN`-authored update does not, by the
+  Actions recursion guard). Without it the branch still updates but checks may need a
+  manual nudge once.
+
+Coordinate codegen-touching lanes regardless (only one regenerates at a time; the
+second to merge re-updates + regenerates — now automatically).
 
 **Red required checks are deterministic** — `verify`/`gofmt`, `build_runner`/gen-sync,
 `flutter test` go red because the branch is wrong (unformatted code, stale generated

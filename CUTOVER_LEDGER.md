@@ -29,6 +29,29 @@ Salih approved; applied to `main` after confirming #224 merged + main GREEN (`7c
 
 ---
 
+## 0g. Merge-queue automation → fallback (kill the strict-rebase toil) — ✅ (`chore/merge-queue`)
+
+`strict=true` (§0c) forces a manual "Update branch" on every queued merge. The §0c
+"merge-queue Option B" is **empirically UNAVAILABLE**: a `merge_queue` ruleset rule is
+rejected `HTTP 422 Invalid rule` in all enforcement modes, while a control rule
+(`required_linear_history`) is accepted — i.e. the rule type, not the API, is the
+blocker. Reason: **merge queue is an Org/Enterprise feature; this repo is owned by a
+personal User account** (public visibility doesn't grant it). Probe JSON + control in
+`docs/internal/merge-queue/`.
+
+**Fallback shipped (strict preserved):** repo settings `allow_auto_merge=true` +
+`allow_update_branch=true` (live; before/after JSON saved), plus
+`.github/workflows/auto-update-pr-branch.yml` — on push to `main`, every behind PR that
+opted into **auto-merge** is auto-updated → CI re-runs → it auto-merges → cascades to
+the next. Serialized, always-current, hands-off; **`strict` + `enforce_admins=true` +
+14 contexts all unchanged** (branch-protection JSON byte-identical before/after). One-time
+owner setup: `gh secret set AUTO_MERGE_PAT` (repo-scoped) so the update re-triggers CI
+(a `GITHUB_TOKEN` update doesn't, by the Actions recursion guard). Full hands-off cycle
+takes effect once this PR is on `main` (workflows resolve from the default branch).
+Doc: `docs/internal/merge-queue/decision.md`; CONTRIBUTING "Hands-off merging".
+
+---
+
 ## 0f. CI resilience — transient-flake hardening — ✅ (`chore/ci-resilience`)
 
 The #226 `curl`→imagemagick.org flake that reddened required `verify` was one instance of a class: **network steps (install/download/pull) transiently fail and redden a required gate.** Swept all 9 workflows; closed the class. **Retried** (transport only): both raw `curl` installs in `make-verify` (ImageMagick + golangci-lint) → `--retry 5 --retry-all-errors --retry-connrefused --connect-timeout --max-time` (the #226 fix generalized + folded in). **Cached:** added the missing `setup-go cache:true` to nightly (others already on). **SHA-pinned** all third-party actions (`subosito/flutter-action`, `docker/*`) with `# vN` comments. **Bounded:** `timeout-minutes: 30` on every job that lacked one (default was 6h). **Bright line enforced:** retries are for infra/transport ONLY — NO build/test/lint/gen-sync step retried or softened; no required gate weakened (`build_runner` stays a hard assertion). `actionlint` clean (lone pre-existing `branch-guard` `github.head_ref` note flagged, not fixed — out of scope). Discipline + the **SSH push method** for workflow edits (keeps the PAT minimal at `repo`+`read:packages`) documented in CONTRIBUTING. Inventory: `docs/internal/ci-resilience.md`.
