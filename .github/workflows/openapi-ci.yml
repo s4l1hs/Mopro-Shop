@@ -28,6 +28,7 @@ jobs:
   lint-spec:
     name: Spectral OpenAPI lint
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - name: Run Spectral
@@ -37,6 +38,7 @@ jobs:
   generated-sync:
     name: Generated files in sync
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
 
@@ -76,6 +78,7 @@ jobs:
   go-build:
     name: Go build + contract tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
 
@@ -102,10 +105,11 @@ jobs:
   dart-analyze:
     name: Flutter analyze (dart-dio client)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable

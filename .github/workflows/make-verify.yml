@@ -33,12 +33,19 @@ jobs:
 
       - name: Install golangci-lint (v2 — matches .golangci.yml)
         run: |
-          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v2.12.2/install.sh \
-            | sh -s -- -b "$(go env GOPATH)/bin" v2.12.2
+          # Fetch the installer to a file with retries (don't pipe curl|sh — a
+          # mid-stream network blip would partially-pipe). Retry transient
+          # transport failures so a hiccup can't redden the required gate.
+          curl -sSfL \
+            --retry 5 --retry-delay 5 --retry-all-errors --retry-connrefused \
+            --connect-timeout 30 --max-time 120 \
+            https://raw.githubusercontent.com/golangci/golangci-lint/v2.12.2/install.sh \
+            -o /tmp/golangci-install.sh
+          sh /tmp/golangci-install.sh -b "$(go env GOPATH)/bin" v2.12.2
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
@@ -53,7 +60,14 @@ jobs:
       # runner lacks libfuse2, so extract it headless once and symlink AppRun.
       - name: Install ImageMagick 7 (for verify-image-manifest)
         run: |
-          curl -fsSL https://imagemagick.org/archive/binaries/magick -o /tmp/magick.appimage
+          # Runtime download of the IM7 portable binary. A bare curl made the
+          # required `verify` gate hostage to a transient blip (PR #226 went red on
+          # `curl: (7) Couldn't connect to server`). Retry + timeout so a flake
+          # retries instead of failing the gate.
+          curl -fsSL \
+            --retry 5 --retry-delay 5 --retry-all-errors --retry-connrefused \
+            --connect-timeout 30 --max-time 300 \
+            https://imagemagick.org/archive/binaries/magick -o /tmp/magick.appimage
           chmod +x /tmp/magick.appimage
           ( cd /tmp && ./magick.appimage --appimage-extract >/dev/null )
           sudo mv /tmp/squashfs-root /opt/imagemagick7

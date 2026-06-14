@@ -27,6 +27,7 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache: true
       - name: soak
         run: make soak SOAK_COUNT=${{ github.event.inputs.count || '50' }}
       - name: Open issue on failure
