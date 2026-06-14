@@ -12,7 +12,7 @@ final AutoDisposeFutureProvider<FitProfileEnvelope?> fitProfileProvider =
 });
 
 /// Per-product size recommendation. Null on any failure — the PDP card is
-/// enrichment, never a blocker (mirrors the membership-card pattern).
+/// enrichment, never a blocker.
 final AutoDisposeFutureProviderFamily<SizeRecommendation?, int>
     sizeRecommendationProvider =
     FutureProvider.autoDispose.family<SizeRecommendation?, int>(

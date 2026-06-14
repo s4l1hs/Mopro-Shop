@@ -42,13 +42,7 @@
     "returns": "مرتجعاتي",
     "rail_reviews": "تقييماتي",
     "rail_questions": "أسئلتي",
-    "rail_privacy": "Privacy",
-    "tier_classic": "Classic",
-    "tier_gold": "Gold",
-    "tier_elite": "Elite",
-    "tier_current": "مستوى عضويتك: {tier}",
-    "tier_next_progress": "لمستوى {tier}: {spend} / {targetSpend} · {orders} / {targetOrders} طلبات",
-    "tier_top": "أنت في أعلى مستوى"
+    "rail_privacy": "Privacy"
   },
   "mega_menu": {
     "empty_children": "لا توجد فئات فرعية في هذا القسم.",
@@ -360,9 +354,5 @@
     "basic_hint": "بدون قياسات مفصّلة، نقدّر المقاس من الطول + الوزن + الجنس.",
     "basic_warning": "هذا تقدير تقريبي يعتمد فقط على الطول والوزن والجنس وقد يكون غير دقيق. للحصول على نتيجة أكثر موثوقية، أدخِل قياساتك (الصدر، الخصر، الورك).",
     "sized_by_seller": "حسب جدول مقاسات البائع"
-  },
-  "membership": {
-    "benefit_exclusive_coupons": "قسائم حصرية لعضويتك",
-    "coupon_tier_locked": "هذه القسيمة مخصصة لمستويات العضوية الأعلى فقط."
   }
 }
